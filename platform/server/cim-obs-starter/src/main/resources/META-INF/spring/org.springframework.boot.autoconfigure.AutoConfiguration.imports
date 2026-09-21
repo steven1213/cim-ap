@@ -1,0 +1,2 @@
+com.cim.obs.config.ObsAutoConfiguration
+com.cim.obs.trace.OtelTracingConfig

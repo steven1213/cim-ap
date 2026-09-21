@@ -13,17 +13,66 @@
     <artifactId>cim-jpa-starter</artifactId>
     <packaging>jar</packaging>
     <name>cim-jpa-starter</name>
-    <description>持久化 Starter：多库 EMF / 审计 / 历史 / 多租户过滤（P1 实现）</description>
+    <description>持久化 starter：多库 EMF / 应用层主键 / 审计填充 / 分级历史 / 多租户过滤 / Flyway 多目录</description>
 
     <dependencies>
         <dependency>
             <groupId>com.cim</groupId>
-            <artifactId>cim-spring-support</artifactId>
-            <version>${project.version}</version>
+            <artifactId>cim-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-spring-support</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- Flyway 迁移：db/migration/{mysql,oracle,pg} 多目录（见 README §3）。
+             按实际启用的数据库追加对应 db 模块（版本由 Spring Boot BOM 收敛）：
+             flyway-mysql / flyway-database-postgresql / flyway-database-oracle -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 集成测试：H2 内存库验证 JPA/历史全链路 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- 集成测试需加载 cim-spring-support 的自动装配（其 web 组件引用 servlet API） -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

@@ -13,5 +13,29 @@
     <artifactId>cim-core</artifactId>
     <packaging>jar</packaging>
     <name>cim-core</name>
-    <description>领域内核：实体 / 领域服务 / Repository 端口（零 Spring 依赖）</description>
+    <description>领域内核：基类族 / 领域服务 / 端口接口（零 Spring 依赖，仅允许 JPA/Validation 规范注解）</description>
+
+    <dependencies>
+        <!-- 规范注解：@MappedSuperclass / @Id（jakarta.persistence 规范，非 Spring 实现） -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

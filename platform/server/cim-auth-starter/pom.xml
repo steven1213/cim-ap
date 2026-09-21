@@ -16,15 +16,46 @@
     <description>认证 Starter：RS256 / 刷新轮换 / 数据权限；P3 改为对接 IAM 令牌（验签 + 准入 claim）</description>
 
     <dependencies>
+        <!-- 领域内核：CurrentUserPort、JPA 规范注解（零 Spring 实现） -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.cim</groupId>
             <artifactId>cim-spring-support</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- 资源服务器侧安全（design.md §2.4） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- JWKS(JSON) 解析 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- 数据权限 Criteria API（保持 JPA 无关） -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+        <!-- Servlet API（过滤器编译需要，运行态由消费方 web 容器提供） -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- JWT（RS256 验签，见 README §5 / design.md §2.4） -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-api</artifactId>
@@ -41,6 +72,18 @@
             <artifactId>jjwt-jackson</artifactId>
             <version>0.12.6</version>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- 测试：Web 上下文 + MockMvc + Security 测试支持 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

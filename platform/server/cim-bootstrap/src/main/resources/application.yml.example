@@ -4,15 +4,74 @@ server:
 spring:
   application:
     name: cim-ap
-  # 数据源等配置在对应 P 阶段（P1 持久化）补充；当前为 P0 骨架，无需数据库即可启动
+  # ---------------------------------------------------------------------------
+  # 持久化（M1+ 启用）。未配置数据源时，本项目为纯 Web 骨架，可无库启动。
+  # 按需引入 cim-jpa-starter 后填以下内容：
   # datasource:
-  #   ...
+  #   url: jdbc:mysql://localhost:3306/cim_ap?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+  #   username: cim
+  #   password: ${CIM_DB_PASSWORD}
+  # jpa:
+  #   hibernate:
+  #     ddl-auto: validate          # 仅校验，不自动改表（结构由 Flyway 管，见 README §3）
+  #   open-in-view: false
+  # flyway:
+  #   enabled: true
+  #   locations: classpath:db/migration/mysql   # 按库切换 mysql / oracle / pg
+  # ---------------------------------------------------------------------------
+
+# =============================================================================
+# cim-* 框架配置键（完整定义见各 starter 的 *Properties javadoc；
+# 认证/准入契约见 docs/platform/server/design.md §8.1）
+# =============================================================================
+cim:
+  # 多租户（cim-spring-support，默认关闭）
+  tenant:
+    enabled: false
+    header-name: X-Tenant-Id
+    default-tenant: ""
+    allow-super-cross-tenant: false
+
+  # 持久化（cim-jpa-starter，M1 启用）
+  jpa:
+    id:
+      mode: SNOWFLAKE             # SNOWFLAKE | UUIDV7
+      worker-id: 1                # 生产由部署平台下发，保证同数据中心唯一（README §3.1）
+      datacenter-id: 1
+    history:
+      enabled: true
+      write-mode: IN_TRANSACTION  # IN_TRANSACTION | OUTBOX
+    naming:
+      lowercase-snake: true
+      table-prefix: ""
+
+  # 国际化（cim-i18n-starter，M4 启用）
+  i18n:
+    enabled: true
+
+  # 缓存（cim-cache-starter，M4 启用）
+  cache:
+    enabled: true
+
+  # 认证（cim-auth-starter，M3 启用；对接 IAM JWKS，契约见 design.md §8.1）
+  auth:
+    enabled: true                       # 总开关；关闭则回退匿名操作人（cim-spring-support）
+    jwks-uri: http://iam-ap:8081/.well-known/jwks.json   # IAM 公钥地址（按 kid 轮换）
+    jwks-cache-minutes: 60              # 公钥缓存时长，到期重拉以支持密钥轮换
+    authorities-claim: authorities      # 业务权限集所在 claim 键
+    admission:
+      app-code: ""                      # 本 ap 接入码（mds-ap/mes-ap），校验令牌 apps claim
+      enabled: true                     # 准入开关；关闭则跳过（仅本地调试）
+
+  # 可观测（cim-obs-starter，M4 启用）
+  obs:
+    enabled: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,readiness,liveness
+        include: health,info,readiness,liveness,prometheus,metrics
   endpoint:
     health:
       probes:

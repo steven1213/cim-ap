@@ -13,14 +13,15 @@
     <artifactId>cim-spring-support</artifactId>
     <packaging>jar</packaging>
     <name>cim-spring-support</name>
-    <description>Spring 适配层：基类 / 工具 / 注解 / AOP 切面（依赖 cim-core）</description>
+    <description>Spring 适配层：统一响应 / 全局异常 / 泛型基类 / 租户上下文 / 链路（依赖 cim-core）</description>
 
     <dependencies>
         <dependency>
             <groupId>com.cim</groupId>
             <artifactId>cim-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
+
+        <!-- Spring 适配（细粒度，避免强拉嵌入式容器） -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
@@ -28,6 +29,55 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot</artifactId>
+        </dependency>
+        <!-- 仅需分页/排序抽象（Pageable/Page/Sort），不含 JPA 实现（JPA 归 cim-jpa-starter） -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-commons</artifactId>
+        </dependency>
+
+        <!-- Servlet API 由运行容器提供 -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
