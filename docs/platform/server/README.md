@@ -1092,7 +1092,7 @@ public class EquipmentDef extends BaseDefData implements Historizable {
 
 // 2) 设备历史表（实体专属，与主表同构）—— 形态 A（推荐）
 //    继承 BaseHistoryData 获得历史公共列（historyId/bizId/opType/opTime/...），
-//    业务字段与 EquipmentDef 一一对应；由代码生成器（§6）随主表同步产出，避免手工遗漏。
+//    业务字段与 EquipmentDef 一一对应；由代码生成器（§25）随主表同步产出，避免手工遗漏。
 @Entity @Table(name = "equipment_def_hist")
 public class EquipmentDefHist extends BaseHistoryData {
     // —— 以下业务字段与 EquipmentDef 同构（生成器同步维护）——
@@ -1136,7 +1136,7 @@ public class EquipmentState extends BaseStateData {
 
 - `equipment` 每次**真正变更**（如改规格）→ 框架自动落**该实体专属的** `equipment_def_hist`（与主表同构，存整行快照 + `changeSetJson` 字段级变更），未变更则不产生历史；审计可用、时间链可回溯。
 - `equipment_state` 每次状态切换（RUN→DOWN）→ 经状态机校验后写**该实体专属的** `equipment_state_log` 变迁流水；非法转移被拒绝。
-- **新增一张需要历史的业务表 = 新增「主表实体 + 该表专属历史实体 + 两张表的 DDL」**。历史实体与 DDL 由代码生成器（§6）随主表一键产出，避免手工遗漏；schema drift 的治理办法见 §9.8。
+- **新增一张需要历史的业务表 = 新增「主表实体 + 该表专属历史实体 + 两张表的 DDL」**。历史实体与 DDL 由代码生成器（§25）随主表一键产出，避免手工遗漏；schema drift 的治理办法见 §9.8。
 - 通用 CRUD 由 `DataAp<EquipmentDef, String>`（见 §21.3）泛型基类自动提供，与历史拦截器天然衔接。
 
 #### 历史查询与回滚 API
@@ -1170,7 +1170,7 @@ public interface HistoryService {
 
 「每个实体一张专属历史表」的代价是**主表加列时历史表需同步**，否则出现 schema drift（历史表缺列导致旧快照字段丢失）。本框架用两项机制根治，而非回避：
 
-1. **代码生成器统一产出（首选）**：新建业务表时，由代码生成器（§6）根据主表实体**一次性生成** `XxxHist` 实体类 + 两张表的 Flyway DDL；主表字段变更后重新生成即可增量对齐。生成模板内建 `@History` 策略与索引定义，杜绝人工遗漏。
+1. **代码生成器统一产出（首选）**：新建业务表时，由代码生成器（§25）根据主表实体**一次性生成** `XxxHist` 实体类 + 两张表的 Flyway DDL；主表字段变更后重新生成即可增量对齐。生成模板内建 `@History` 策略与索引定义，杜绝人工遗漏。
 2. **Flyway 主/历同步迁移规范（强制）**：规定任何 `ALTER TABLE {X} ADD COLUMN` 的迁移脚本，**必须在同一迁移文件中**包含对应的 `ALTER TABLE {X}_hist ADD COLUMN`（历史表新增列允许为 NULL，不影响存量历史行）。CI 增加**迁移脚本检查**（检测只改主表未改历史表的变更并告警）。
 3. **只增不改原则**：历史表列**只允许增加、不允许删除或改类型**；主表若需删除字段，历史表保留该列（历史快照仍需可读），仅主表下线。
 4. **启动自检**：应用启动时 `ddl-auto=validate`（§3）校验实体与库表一致；框架额外提供**历史表列覆盖率自检**（对比主表实体字段与历史表列，缺失即启动告警/失败），把 drift 拦在上线前。

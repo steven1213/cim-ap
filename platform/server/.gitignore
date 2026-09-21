@@ -1,0 +1,15 @@
+# Maven 构建产物
+target/
+**/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 本地配置（模板以 .example 形式提交）
+**/application.yml
+!**/application.yml.example
+
+# OS
+.DS_Store

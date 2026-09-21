@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.cim</groupId>
+    <artifactId>cim-ap-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>cim-ap-parent</name>
+    <description>CIM-AP 企业级基础框架 - 父工程（BOM 收敛 + 模块聚合）</description>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+        <spring-boot.version>3.3.5</spring-boot.version>
+    </properties>
+
+    <!-- 模块结构与 README §4 保持一致；当前各 starter / domain 仅含骨架（pom + 占位标记），
+         具体能力在实现路线 P1–P7 阶段填充（见 README §8）。 -->
+    <modules>
+        <module>cim-core</module>
+        <module>cim-spring-support</module>
+        <module>cim-jpa-starter</module>
+        <module>cim-auth-starter</module>
+        <module>cim-cache-starter</module>
+        <module>cim-mq-starter</module>
+        <module>cim-i18n-starter</module>
+        <module>cim-obs-starter</module>
+        <module>cim-gen-starter</module>
+        <module>cim-system</module>
+        <module>cim-business</module>
+        <module>cim-bootstrap</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 统一收敛 Spring Boot 依赖版本 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

@@ -1,66 +1,24 @@
-# ===== OS / Editor =====
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-*.swp
-*~
+# ============ Maven（后端） ============
+server/**/target/
+**/target/
 
-# ===== IntelliJ IDEA =====
-.idea/
-*.iws
-*.iml
-*.ipr
-out/
+# ============ Node / Vite（前端） ============
+**/node_modules/
+**/dist/
+**/dist-ssr/
 
-# ===== VSCode =====
-.vscode/
-*.code-workspace
-
-# ===== Eclipse =====
-.classpath
-.project
-.settings/
-bin/
-
-# ===== Java / Maven (后端) =====
-target/
-*.class
-*.jar
-*.war
-*.ear
-*.nar
-*.log
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-
-# ===== Gradle =====
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# ===== Node / Frontend (前端) =====
-node_modules/
-dist/
-dist-ssr/
-*.local
-.pnp.*
-.yarn/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# ===== Env / Secrets =====
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-
-# ===== Logs =====
-logs/
-*.log
-
-# ===== WorkBuddy 本地数据（含项目记忆，不入库） =====
+# ============ WorkBuddy 本地记忆（不入库） ============
 .workbuddy/
+
+# ============ IDE ============
+.idea/
+.vscode/
+*.iml
+
+# ============ 本地配置 ============
+# 本地 application.yml 不入库，仅模板 application.yml.example 入库
+**/application.yml
+!**/application.yml.example
+
+# ============ OS ============
+.DS_Store

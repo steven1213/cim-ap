@@ -1,0 +1,16 @@
+// 全局样式入口：Design Token + 基础重置。
+// 详细 Token 体系见平台前端文档 §7（主题与 SCSS）。
+:root {
+  --cim-color-primary: #1677ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}

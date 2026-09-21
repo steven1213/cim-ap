@@ -1,0 +1,16 @@
+# Node 依赖与构建产物
+node_modules/
+dist/
+dist-ssr/
+
+# 本地环境配置
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
