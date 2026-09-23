@@ -3,6 +3,7 @@ package com.cim.core.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -35,4 +36,9 @@ public abstract class BaseStateData extends Auditable {
     /** 逻辑删除标记。 */
     @Column(name = "deleted", nullable = false)
     private Boolean deleted = Boolean.FALSE;
+
+    /** 行级乐观锁（① 版本语义之一，不进历史，见 README §9.5）。 */
+    @Version
+    @Column(name = "version")
+    private Long version;
 }

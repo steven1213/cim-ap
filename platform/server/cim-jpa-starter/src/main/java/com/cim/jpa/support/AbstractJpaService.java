@@ -7,6 +7,7 @@ import com.cim.core.shared.PageResult;
 import com.cim.jpa.history.ChangeDetector;
 import com.cim.jpa.history.HistoryRecorder;
 import com.cim.jpa.history.OpType;
+import com.cim.jpa.tenant.TenantFilterApplier;
 import com.cim.spring.support.service.CrudService;
 import com.cim.spring.support.web.BizException;
 import com.cim.spring.support.web.PageQuery;
@@ -39,24 +40,29 @@ public abstract class AbstractJpaService<T extends BaseDefData> implements CrudS
     protected final BaseRepository<T, String> repository;
     protected final EntityManager entityManager;
     protected final HistoryRecorder historyRecorder;
+    protected final TenantFilterApplier tenantFilterApplier;
 
     protected AbstractJpaService(BaseRepository<T, String> repository,
                                  EntityManager entityManager,
-                                 HistoryRecorder historyRecorder) {
+                                 HistoryRecorder historyRecorder,
+                                 TenantFilterApplier tenantFilterApplier) {
         this.repository = repository;
         this.entityManager = entityManager;
         this.historyRecorder = historyRecorder;
+        this.tenantFilterApplier = tenantFilterApplier;
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResult<T> page(PageQuery query) {
+        tenantFilterApplier.apply(entityManager);
         return PageResults.from(repository.findAll(query.toPageable()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public T load(String id) {
+        tenantFilterApplier.apply(entityManager);
         return repository.findById(id).orElseThrow(() -> BizException.notFound(id));
     }
 
@@ -74,6 +80,7 @@ public abstract class AbstractJpaService<T extends BaseDefData> implements CrudS
     @Override
     @Transactional
     public T update(T entity) {
+        tenantFilterApplier.apply(entityManager);
         T existing = repository.findById(entity.getId()).orElseThrow(() -> BizException.notFound(entity.getId()));
         ChangeSet changeSet = detectChanges(existing, entity);
         T saved = repository.save(entity);
@@ -84,6 +91,7 @@ public abstract class AbstractJpaService<T extends BaseDefData> implements CrudS
     @Override
     @Transactional
     public void remove(String id) {
+        tenantFilterApplier.apply(entityManager);
         T existing = repository.findById(id).orElseThrow(() -> BizException.notFound(id));
         existing.setDeleted(Boolean.TRUE);
         T saved = repository.save(existing);

@@ -175,8 +175,8 @@
 > 进度标记：`[x]` 已完成并验证 · `[~]` 部分完成 · `[ ]` 未开始。**验证方式**：`mvn install`（全 12 模块）+ 单测；M0 已通过「无库启动 + `/actuator/health` UP」冒烟。
 
 - [x] **M0** T0.1 父POM · T0.2 core · T0.3 spring-support · T0.4 bootstrap · T0.5 CI*（*CI 待接入平台）
-- [~] **M1** T1.2 命名 ✅ · T1.3 主键 ✅ · T1.4 JSON ✅ · T1.6 能力抽象 ✅ · T1.1 多库EMF ⬜ · T1.5 Flyway ⬜
-- [~] **M2** T2.1 基类族 ✅ · T2.2 审计填充 ✅ · T2.3 @History ✅ · T2.4 自动历史 + 变更检测 ✅（H2 集成测试验证 I/U/D 与「未变更不落」） · T2.5 软删唯一约束 ⬜ · T2.6 Hibernate 租户 Filter ⬜（上下文/过滤器已备） · T2.7 版本语义 ⬜
+- [x] **M1** T1.2 命名 ✅ · T1.3 主键 ✅ · T1.4 JSON ✅ · T1.6 能力抽象 ✅ · T1.1 多库 EMF/TxManager/Hikari ✅（`cim.jpa.datasources.*` 动态装配；H2 双源隔离验证，真实三库连通见 M7/T7.2） · T1.5 Flyway 多目录 ✅（按库型选 `db/migration/{vendor}`，H2 `ddl-auto=validate` 通过；三库见 M7）
+- [x] **M2** T2.1 基类族 ✅ · T2.2 审计填充 ✅ · T2.3 @History ✅ · T2.4 自动历史 + 变更检测 ✅（H2 集成测试验证 I/U/D 与「未变更不落」） · T2.5 软删唯一约束 ✅（唯一键含 `deleted`，一删一活并存；H2 验证） · T2.6 租户 Hibernate Filter ✅（`TenantContext` 驱动、跨租户不可见、业务零感知；H2 验证） · T2.7 三层版本语义 ✅（`@Version`/`revision`/历史 相互独立；H2 验证）
 - [x] **M3** T3.1 JWKS · T3.2 验签 · T3.3 过滤器 · T3.4 准入 · T3.5 权限加载 · T3.6 数据权限 · T3.7 操作人适配 · T3.8 IAM 契约（已冻结，见 design.md §8）
 - [~] **M4** T4.1 响应异常 ✅（字段级 errors + 5xx 不泄露，单测闭环） · T4.2 i18n ⬜ · T4.3 cache ⬜ · T4.4 obs ✅（指标门面+公共标签+日志脱敏+Logback 转换器，11 单测闭环） · T4.5 限流幂等 ⬜ · T4.6 mq ⬜
 - [ ] **M5** T5.1 元数据 · T5.2 成对计划 · T5.3 模板 · T5.4 dry-run · T5.5 增量 · T5.6 CI 守卫

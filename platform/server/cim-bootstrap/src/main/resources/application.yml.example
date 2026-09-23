@@ -16,8 +16,7 @@ spring:
   #     ddl-auto: validate          # 仅校验，不自动改表（结构由 Flyway 管，见 README §3）
   #   open-in-view: false
   # flyway:
-  #   enabled: true
-  #   locations: classpath:db/migration/mysql   # 按库切换 mysql / oracle / pg
+  #   enabled: true               # 开启后由 cim.jpa.flyway 按库类型自动选择迁移目录（见下）
   # ---------------------------------------------------------------------------
 
 # =============================================================================
@@ -44,6 +43,24 @@ cim:
     naming:
       lowercase-snake: true
       table-prefix: ""
+    # 额外数据源（T1.1）：每个逻辑库一套独立 EMF/TxManager/Hikari；不配置则不启用。
+    # 配置后自动生成 {name}DataSource / {name}EntityManagerFactory / {name}TransactionManager。
+    # datasources:
+    #   report:                      # 逻辑库名（示例：报表库）
+    #     url: jdbc:postgresql://localhost:5432/cim_report
+    #     username: cim
+    #     password: ${CIM_REPORT_DB_PASSWORD}
+    #     driver-class-name: org.postgresql.Driver
+    #     dialect: org.hibernate.dialect.PostgreSQLDialect   # 可省略（自动探测）
+    #     packages-to-scan: com.cim.report.entity            # 本库实体包（逗号分隔）
+    #     ddl-auto: none             # 生产用 none（结构由 Flyway 管）
+    #     maximum-pool-size: 10
+    # Flyway 多目录迁移（T1.5）：开启后按库类型选 db/migration/common + db/migration/{vendor}
+    # （vendor ∈ mysql/oracle/postgresql/h2）；配合上 spring.jpa.hibernate.ddl-auto=validate。
+    flyway:
+      enabled: false               # 是否由 cim 框架接管迁移位置选择
+      # locations: classpath:db/migration/common,classpath:db/migration/mysql  # 显式覆盖
+      baseline-on-migrate: false
 
   # 国际化（cim-i18n-starter，M4 启用）
   i18n:

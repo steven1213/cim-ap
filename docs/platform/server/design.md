@@ -206,11 +206,13 @@ com.cim.spring.support
 ```
 com.cim.jpa
 ├── config
-│   ├── CimJpaProperties           # cim.jpa.*（id / history / naming）
-│   ├── JpaAutoConfiguration       # 自动装配入口
-│   ├── LowercaseSnakeNamingStrategy  # 统一小写蛇形 PhysicalNamingStrategy
-│   └── MultiDataSourceConfig      # 【M1 后续】每库独立 EMF + TxManager + Hikari
-│   └── FlywayConfig               # 【M1 后续】per-DB location 迁移
+│   ├── CimJpaProperties           # cim.jpa.*（id / history / naming / datasources / flyway）
+│   ├── JpaAutoConfiguration       # 自动装配入口（主键/回调/命名/DbCapability/租户启用器）
+│   ├── CimMultiDataSourceAutoConfiguration  # 【T1.1 ✅】每库独立 EMF+TxManager+Hikari（动态注册）
+│   ├── CimFlywayAutoConfiguration # 【T1.5 ✅】按库型选 db/migration/{vendor}
+│   └── LowercaseSnakeNamingStrategy  # 统一小写蛇形 PhysicalNamingStrategy
+├── tenant
+│   └── TenantFilterApplier        # 【T2.6 ✅】按 TenantContext 启用 Hibernate 租户过滤器
 ├── id
 │   ├── Snowflake                  # 雪花算法（时钟回拨容忍 + 抛异常）
 │   ├── ClockBackwardsException    # 时钟回拨异常
@@ -239,12 +241,14 @@ com.cim.jpa
 
 **关键设计：**
 
-- **多库物理隔离**：每个数据库一个 `LocalContainerEntityManagerFactoryBean` + 独立 `PlatformTransactionManager` + 独立 `HikariDataSource` + 独立 `hibernate.dialect`；`AbstractRoutingDataSource` 仅用于同方言读写分离。
+- **多库物理隔离（T1.1 落地）**：每个数据库一个 `LocalContainerEntityManagerFactoryBean` + 独立 `PlatformTransactionManager` + 独立 `HikariDataSource` + 独立 `hibernate.dialect`；`AbstractRoutingDataSource` 仅用于同方言读写分离。落地为 `CimMultiDataSourceAutoConfiguration`：读 `cim.jpa.datasources.<name>.*` 后经 `CimDataSourceRegistrar`（`ImportBeanDefinitionRegistrar`）动态注册 `{name}DataSource` / `{name}EntityManagerFactory` / `{name}TransactionManager`，与 Boot 主数据源并行；未配置则空操作。
 - **主键**：`IdGenerator`（[README §3](README.md#3-多数据库支持oraclemysqlpostgresql)）在 `@PrePersist` 注入 `String id`；时钟回拨降级 UUIDv7。
 - **回调桥接（实现要点）**：基类族的 `@PrePersist`/`@PreUpdate` 定义在 `cim-core`（零 Spring），通过 `EntityLifecycleCallbacks` **静态持有者**把控制权交给 `cim-jpa-starter` 的 `SpringEntityLifecycleCallback`（启动时由 `LifecycleCallbackRegistrar` 注册）。这样既保持核心零 Spring 依赖，又能让 JPA 回调访问 Spring 管理的 `IdGenerator`/`CurrentUserPort`/`TenantPort`。
 - **历史（落地要点）**：由服务基类 `AbstractJpaService` 在写操作后调用 `HistoryRecorder` 触发（即 README §21.3 所述「经 DataAp 触发历史」）——`update` 先用 `ChangeDetector` 对「库中旧值 vs 入参新值」做字段级 diff，**未变更则不落历史**；`HistoryMapper` 按约定（`{X}Hist` / `{X}StateLog`，同包同构）解析并拷贝业务字段。落库目标由 `@History` 策略决定（`SNAPSHOT`→`{X}Hist`，`STATE_LOG`→`{X}StateLog`，`NONE`→跳过）。**取舍**：经 `AbstractJpaService` 的写入自动落历史；绕过服务直接 `repository.save()` 则不落（历史以服务为统一入口，代码生成器产出的服务天然继承基类）。关键数据同事务、高频数据走发件箱异步（[README §12](README.md#12-事务与一致性跨库--发件箱)）。
-- **租户**：基于 `TenantContext` 开启 Hibernate Filter，自动追加 `tenant_id` 条件，业务零感知。
-- **迁移**：`db/migration/{mysql,oracle,pg}` 各自增量；`ddl-auto=validate`；**主/历 DDL 成对**（见 §6.2）。
+- **租户（T2.6 落地）**：基于 `TenantContext` 开启 Hibernate Filter 自动追加 `tenant_id` 条件，业务零感知。落地为 `TenantFilterApplier`（框架 Bean），由 `AbstractJpaService` 在每个读写方法入口按 `TenantContext.get()` 启用名为 `cimTenantFilter` 的过滤器并注入参数；上下文为空（超管跨租户）时不启用（风险 R6）。**约定**：`@FilterDef`（`cimTenantFilter`，参数 `tenantId`）全局唯一，放在实体包的 `package-info.java`；各租户化实体仅标注 `@Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")`。注：Hibernate **不解析元注解**，故 `@FilterDef`/`@Filter`/`@SQLRestriction` 须直接标注（不能封装成 `@CimTenantFilter` 之类的元注解）。
+- **软删唯一约束（T2.5 落地）**：逻辑删除以 `deleted` 布尔列表示；**唯一约束须含 `deleted` 列**（如 `(biz_key, tenant_id, deleted)`），使「一删一活可并存」（同键仅允许一条有效 + 一条已删）。查询侧以 `@SQLRestriction("deleted = false")` 直接标注实体（同上，不可用元注解），使逻辑删除行对业务查询不可见；`AbstractJpaService.remove` 置 `deleted=true` 完成软删。
+- **三层版本语义（T2.7 落地）**：① `@Version`（行级乐观锁，Hibernate 自动 +1，不进历史，落在 `BaseDefData`/`BaseStateData`）；② `revision`（业务版本，由发布/归档等业务动作驱动，落在 `BaseRevisionData`）；③ 历史表（`{X}Hist`/`{X}StateLog`，独立变更流水）。三者相互独立、各自演进，已由 H2 用例验证。
+- **迁移（T1.5 落地）**：`db/migration/{mysql,oracle,postgresql,h2}` + `common` 多目录；`CimFlywayAutoConfiguration` 在 `cim.jpa.flyway.enabled=true` 时按当前库产品名选择 `common` + `{vendor}` 目录；生产配合 `ddl-auto=validate`、**主/历 DDL 成对**（见 §6.2）。
 - 依赖：Spring Data JPA、Hibernate、Flyway、`cim-spring-support`、`cim-core`。
 
 ### 2.4 cim-auth-starter（认证与鉴权 · 资源服务器侧）

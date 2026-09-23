@@ -3,6 +3,7 @@ package com.cim.jpa.it;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.util.List;
 
@@ -13,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 变更检测闸门（未变更不落历史）。
  */
 @SpringBootTest(classes = TestApplication.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class HistoryIntegrationTest {
 
     @Autowired

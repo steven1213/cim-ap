@@ -1,1 +1,3 @@
 com.cim.jpa.config.JpaAutoConfiguration
+com.cim.jpa.config.CimMultiDataSourceAutoConfiguration
+com.cim.jpa.config.CimFlywayAutoConfiguration

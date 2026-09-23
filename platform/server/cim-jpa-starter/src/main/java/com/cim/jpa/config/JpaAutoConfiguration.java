@@ -12,6 +12,7 @@ import com.cim.jpa.history.HistoryRecorder;
 import com.cim.jpa.id.IdMode;
 import com.cim.jpa.id.SnowflakeIdGenerator;
 import com.cim.jpa.id.UuidV7IdGenerator;
+import com.cim.jpa.tenant.TenantFilterApplier;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -86,11 +87,11 @@ public class JpaAutoConfiguration {
         };
     }
 
-    /** 数据库能力抽象（从 DataSource 元数据解析）。 */
+    /** 数据库能力抽象（从 DataSource 元数据解析；多数据源时取唯一/主源，歧义则跳过）。 */
     @Bean
     @ConditionalOnMissingBean
     public DbCapability dbCapability(ObjectProvider<DataSource> dataSourceProvider) {
-        DataSource dataSource = dataSourceProvider.getIfAvailable();
+        DataSource dataSource = dataSourceProvider.getIfUnique();
         if (dataSource == null) {
             return DbCapabilities.of(null);
         }
@@ -102,5 +103,12 @@ public class JpaAutoConfiguration {
             log.warn("[cim-jpa] resolve DbCapability failed: {}", e.getMessage());
             return DbCapabilities.of(null);
         }
+    }
+
+    /** 租户过滤器启用器（按 {@code TenantContext} 自动启用 Hibernate 租户隔离）。 */
+    @Bean
+    @ConditionalOnMissingBean
+    public TenantFilterApplier tenantFilterApplier() {
+        return new TenantFilterApplier();
     }
 }
