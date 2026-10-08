@@ -13,21 +13,55 @@
     <artifactId>cim-cache-starter</artifactId>
     <packaging>jar</packaging>
     <name>cim-cache-starter</name>
-    <description>缓存 Starter：多级缓存（Caffeine + Redis）+ 防穿透/击穿/雪崩（P4 实现）</description>
+    <description>缓存 starter：多级缓存（Caffeine 本地 + Redis 全局）、防穿透/击穿/雪崩、@CacheableCim 注解（见 design.md §2.5 / README §11）</description>
 
     <dependencies>
+        <!-- 领域内核（零 Spring 依赖，仅规范注解），保持与各 starter 一致 -->
         <dependency>
             <groupId>com.cim</groupId>
-            <artifactId>cim-spring-support</artifactId>
-            <version>${project.version}</version>
+            <artifactId>cim-core</artifactId>
         </dependency>
+
+        <!-- AOP：@CacheableCim / @CacheEvictCim 切面 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <!-- L2 Redis 支撑：提供 RedisTemplate / RedisConnectionFactory（compile，使多级缓存开箱即用）。
+             业务 app 通过 spring.redis.* 配置；未配置或不可达时 starter 自动降级为本地缓存。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+
+        <!-- L1 本地缓存 -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- JSON 序列化（Redis 值序列化 + 跨语言可读） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
