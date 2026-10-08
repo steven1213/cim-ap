@@ -37,7 +37,7 @@ cim-ap
 │   │   ├── cim-i18n-starter   # 国际化
 │   │   ├── cim-obs-starter    # 可观测（指标 / 链路 / 日志）
 │   │   ├── cim-gen-starter    # 代码生成器（见后端文档 §25）
-│   │   ├── cim-system         # 系统域模块：用户/角色/菜单/字典/日志
+│   │   ├── cim-system         # 系统域模块：用户/角色/菜单/权限/字典/参数/日志（RBAC 已落地）
 │   │   ├── cim-business       # 业务域模块（后续按域孵化）
 │   │   └── cim-bootstrap      # 启动装配模块（仅 Main + 配置）
 │   └── web/                   # 前端基础框架（Node + Vite，package.json 在此）
@@ -106,7 +106,7 @@ cim-ap
 | 目录 | 当前状态 | 说明 |
 | --- | --- | --- |
 | `docs/**` | ✅ 已完成 | 设计文档：后端 §1–§25、前端 §1–§13、business 骨架（iam-ap / mds-ap / mes-ap 占位文档）、repo 仓库文档 |
-| `platform/server/**` | 🟡 骨架已生成 | 后端基础框架 Maven 多模块（父 BOM + cim-core / cim-spring-support / 各 starter / cim-system / cim-business / cim-bootstrap），依赖方向见[后端文档 §1](../../platform/server/README.md#1-maven-多模块) |
+| `platform/server/**` | 🟡 部分已实现 | 后端基础框架 Maven 多模块（父 BOM + cim-core / cim-spring-support / 各 starter / cim-system / cim-business / cim-bootstrap）。已实现：core、spring-support、jpa、auth、cache、mq、obs、system；仍占位：i18n、gen、business。依赖方向见[后端文档 §1](../../platform/server/README.md#1-maven-多模块) |
 | `platform/web/**` | 🟡 骨架已生成 | 前端基础框架 Vite + React + TS 脚手架，目录规范见[前端文档 §1](../../platform/web/README.md#1-技术栈与目录结构) |
 | `business/**` | 🟡 骨架已生成 | 业务层 ap：iam-ap / mds-ap / mes-ap 各自的 `server`（Maven 应用）+ `web`（Vite 应用）骨架 |
 | `deploy/**` | 🔲 未生成 | Nginx 配置 / K8s manifests / 生产 compose |

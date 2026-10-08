@@ -6,7 +6,7 @@ package com.cim.jpa.db;
  */
 public interface DbCapability {
 
-    /** 数据库产品标识（小写）：{@code mysql} / {@code oracle} / {@code postgresql}。 */
+    /** 数据库产品标识（小写）：{@code mysql} / {@code oracle} / {@code postgresql} / {@code dm}（达梦）。 */
     String product();
 
     /** NULL 值是否默认排在最后（Oracle 默认在最前，需显式 {@code NULLS LAST}）。 */

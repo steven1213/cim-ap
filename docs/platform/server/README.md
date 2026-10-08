@@ -5,13 +5,13 @@
 > 全文采用统一方法论：**先列常见做法利弊、指出不足，再给本框架优化设计**。
 > ⚠️ 本文为**架构设计文档**（回答「为什么这样设计」），`✅` 表示设计已完成，**不代表代码已实现**；代码骨架已生成（`platform/server`，占位为主），实现状态见[落地路线](../../repo/roadmap.md)。
 >
-> 📄 **配套文档**：实现级细化见 [`design.md`](design.md)（模块/包结构、类与接口、横切机制、契约、配置键、与 IAM 对接边界）；开发排期与任务拆解见 [`plan.md`](plan.md)（里程碑 M0–M7，对齐 P0–P7）。
+> 📄 **配套文档**：实现级细化见 [`design.md`](design.md)（模块/包结构、类与接口、横切机制、契约、配置键、与 IAM 对接边界）；开发排期与任务拆解见 [`plan.md`](plan.md)（里程碑 M0–M7，对齐 P0–P7）；各 starter 的**使用指南**（打包 / 接入 / 配置 / 切换 MQ）见同目录 [`cim-mq-starter-usage.md`](cim-mq-starter-usage.md)。
 
 ## 目录
 
 - [1. Maven 多模块](#1-maven-多模块)
 - [2. 分层架构](#2-分层架构)
-- [3. 多数据库支持（Oracle/MySQL/PostgreSQL）](#3-多数据库支持oraclemysqlpostgresql)
+- [3. 多数据库支持（Oracle/MySQL/PostgreSQL/达梦DM）](#3-多数据库支持oraclemysqlpostgresql达梦dm)
 - [4. 统一响应与全局异常](#4-统一响应与全局异常)
 - [5. 安全认证（JWT + Spring Security）](#5-安全认证jwt--spring-security)
 - [6. 基础能力矩阵](#6-基础能力矩阵)
@@ -56,7 +56,7 @@ server/                      # 后端工程根（对应仓库顶层 `server/`，
 ├── cim-i18n-starter       # 国际化 starter（见 §7）
 ├── cim-obs-starter        # 可观测 starter（指标 / 链路 / 日志，见 §14）
 ├── cim-gen-starter        # 代码生成器 starter（主/历实体 + 成对 DDL，见 §25，provided 作用域）
-├── cim-system             # 系统域模块：用户/角色/菜单/字典/日志（自包含 ctrl→entity）
+├── cim-system             # 系统域模块：用户(授权档案)/角色/菜单/权限/字典/参数/日志（自包含 ctrl→entity，见 §21.1）
 ├── cim-business           # 业务域模块（后续按域孵化，每个域自包含）
 └── cim-bootstrap         # 启动装配模块（仅 Main + 配置，按需引入各 starter/域）
 ```
@@ -64,6 +64,10 @@ server/                      # 后端工程根（对应仓库顶层 `server/`，
 > **仓库定位**：本目录即仓库顶层 `server/`（后端工程根），Maven 父 POM 下沉于此，`<modules>` 使用相对路径；`.mvn/`、`target/` 等构建产物不外溢到仓库根。仓库整体采用 `server/` + `web/` 顶层划分，命名取舍与工程约定见[总文档 §4](../../README.md#4-仓库目录结构)。
 
 父 BOM 统一收敛 Spring Boot、JPA、JWT、Lombok 等版本；子模块按需引入，**避免依赖漂移与循环依赖**。新增 `cim-cache/mq/obs-starter` 以承载 §11/§12/§13/§14 的横切能力。
+
+> **父 POM 编译约定（两条硬性，改动需 clean 重建）**
+> 1. **`<parameters>true</parameters>`**（ADR-9）：Spring MVC 解析 `@PathVariable`/`@RequestParam` 未显式命名时依赖方法参数名；缺失会在**运行期**才爆发为 500（`Name for argument ... not specified`）。单测走 MockMvc 或直调服务不触发，故极易漏网。
+> 2. **`maven-compiler-plugin` 版本钉死 + `annotationProcessorPaths`（Lombok/MapStruct）**：新版 javac 不再自动发现 classpath 上的注解处理器；插件被解析到 3.16.0+ 且未声明处理器时 Lombok 静默失效，报满屏「找不到 getter/构造器」。两条决策见 design.md §2.2 与 §9（ADR-9）。
 
 #### 利弊分析（常见做法 vs 本框架优化）
 
@@ -182,7 +186,7 @@ public class EquipmentAcl {
 
 ---
 
-## 3. 多数据库支持（Oracle/MySQL/PostgreSQL）
+## 3. 多数据库支持（Oracle/MySQL/PostgreSQL/达梦DM）
 
 一套代码同时跑在 Oracle / MySQL / PostgreSQL 是核心诉求，但三者**方言、主键、分页、JSON、事务、标识符大小写、NULL 排序**差异巨大。朴素做法（用一个 `EntityManagerFactory` + 动态数据源路由「通吃」三库）会在生产环境频繁翻车。本节**先列利弊，再给优化设计**。
 
@@ -213,7 +217,7 @@ flowchart TB
   EM -->|MySQL| M[MySQLDialect + Hikari]
   EM -->|Oracle| O[Oracle12cDialect + Hikari]
   EM -->|PostgreSQL| P[PostgreSQLDialect + Hikari]
-  App --> Fly[Flyway 多目录迁移: db/migration/{mysql,oracle,pg}]
+  App --> Fly[Flyway 多目录迁移: db/migration/{mysql,oracle,postgresql,dm}]
   M --> DB1[(MySQL)]
   O --> DB2[(Oracle)]
   P --> DB3[(PostgreSQL)]
@@ -279,6 +283,16 @@ public class IdGenerator {
 > - 统一封装在 `IdGenerator`，业务与具体算法解耦，未来切换不影响实体。
 
 > 该设计与 §8 可插拔呼应：每种数据库的 `JpaConfig` + `HikariConfig` + `Flyway` 可封装为 `cim-jpa-{mysql|oracle|pg}-starter`，引入依赖即启用对应库支持，移除即降级；与 §9 的历史 `history_id`（雪花/UUIDv7）同源，保证审计链路全局有序。
+
+#### 达梦 DM 接入要点
+
+达梦 DM 与 Oracle 语法高度兼容，接入方式与 Oracle 基本一致，差异点如下（能力抽象见 `DbCapabilities`：产品名 `DM DBMS` → `dm`）：
+
+- **驱动与方言外置**：DM JDBC 驱动（`com.dameng:DmJdbcDriver18`，驱动类 `dm.jdbc.driver.DmDriver`，URL `jdbc:dm://host:5236`）与 Hibernate 方言（`com.dameng:DmDialect-for-hibernate6.x` 提供的 `org.hibernate.dialect.DmDialect`）**不在 Maven Central**，由业务 app 本地安装/私仓引入，并显式配置 `spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.DmDialect`（Hibernate 6 无内置 DmDialect）。starter 不内置这些依赖。
+- **Flyway 目录**：`db/migration/dm`（见 `db/migration/dm/README.md`）；因 DM 与 Oracle 兼容，也可直接复用 `oracle` 目录脚本，或经 `cim.jpa.flyway.locations` 覆盖。Spring Boot 3.3.5 的 Flyway 10.x 下 `flyway-database-dameng` 社区模块可能需 Teams 许可，故不强制依赖。
+- **模块自带迁移**：模块（如 `cim-system`）把自己的 DDL 放在 `classpath:db/migration/system/{vendor}`，由模块追加到 Flyway locations。故 `db/migration/system/dm` 存在时亦按同一规则生效；因 Hibernate 6 无内置 `DmDialect`，该目录当前由 Oracle 方言导出（引入达梦官方方言包后建议重新生成，避免 `ddl-auto=validate` 在类型名上误报）。
+- **能力约定**：`nullsLastByDefault=false`（NULL 默认排最前，排序需显式 `NULLS LAST`）、`supportsJsonFunctions=false`（JSON 字段走 `@Convert` 存 `TEXT/CLOB`）、`supportsLimitSyntax=true`（DM8 起支持 `LIMIT/OFFSET`）。
+- **大小写**：沿用统一小写蛇形命名策略，DM 与 Oracle 一样会折叠未加引号标识符为大写，框架已一致处理。
 
 ---
 
@@ -369,6 +383,8 @@ public class GlobalExceptionHandler {
 ## 5. 安全认证（JWT + Spring Security）
 
 认证授权是企业框架的安全边界。朴素 JWT 实现（对称密钥、令牌存 `localStorage`、刷新令牌不轮换、退出仅靠前端删 token）有诸多隐患。本节**先列利弊，再给优化设计**。
+
+> **⚠️ 归属边界（重要）**：本节描述的**令牌签发 / 刷新轮换 / 吊销 / 口令派生 / 登录接口**由 `business/iam-ap` 落地，**不在 platform 的 `cim-auth-starter` 内**。platform 侧只做**验证侧**：JWKS 本地验签（RS256 钉死）+ `apps` 准入判定 + 业务 RBAC 鉴权（`@PreAuthorize`）+ 数据权限（`@DataPermission`）。因此下文 §5.1 的登录代码示例是**设计意图的完整表达**（含服务端二次派生等安全要点），实现位置在 iam-ap；平台各 ap 只引入 `cim-auth-starter` 做验签与准入。详见 `design.md` §8 与 §2.10。
 
 #### 利弊分析（常见做法 vs 本框架优化）
 
@@ -1246,31 +1262,46 @@ Redis 在本文档多处被使用（i18n、令牌版本、分布式锁），但*
 
 ```mermaid
 flowchart LR
-  APP[业务] --> LC[(Caffeine 本地 L1)]
+  APP[业务] --> BF{BloomFilter<br/>可选防穿透}
+  BF -->|确定不存在| NULL[直接返回空]
+  BF -->|可能存在| LC[(Caffeine 本地 L1)]
   LC -->|未命中| RC[(Redis 全局 L2)]
   RC -->|未命中| DB[(DB)]
   DB -->|回填| RC -->|回填| LC
-  W[写操作] --> EV[失效事件: 发件箱/Canal]
-  EV --> RC
+  W[写操作 @CacheEvictCim] --> EV[删本机 L1+L2]
+  EV --> PUB[Redis pub/sub 广播]
+  PUB -->|订阅| PEER[其它节点清 L1]
 ```
 
 **关键设计点：**
 
-1. **多级缓存**：`@Cacheable` 封装 `CacheManager` 组合（Caffeine 本地 + Redis 全局）；热点只读数据本地纳秒级返回，降低 Redis 压力与 RT。
-2. **Cache-Aside 标准读写**：读先 L1→L2→DB 回填；写更新 DB 后**删除缓存**（非更新缓存，避免并发写乱序）。
-3. **防穿透**：空结果缓存短 TTL + 可选 BloomFilter；防击穿：重建加分布式锁（Redisson `getLock`）；防雪崩：TTL 加随机抖动。
-4. **一致性兜底**：关键业务（如权限、字典）变更除删缓存外，可发**失效事件**（经 §12 发件箱 / §13 MQ）让各节点同步失效，避免多实例缓存不一致。
-5. **i18n 缓存（§7）即典型落地**：Redis Hash 存译文 + 版本号，本地可再缓存一层，版本号变化即失效。
+1. **多级缓存**：`cim-cache-starter` 提供 `@CacheableCim` 注解，底层 `MultiLevelCache` 组合 `LocalCaffeineCache`(L1 本地) + 可选 `RedisCache`(L2 全局)；热点只读数据本地纳秒级返回，降低 Redis 压力与 RT。无 Redis / 不可达 / `cim.cache.redis.enabled=false` 时**自动降级为仅本地 Caffeine**（三守卫仍生效，只是不跨实例共享）。
+2. **Cache-Aside 标准读写**：读先 L1→L2→DB 回填；写更新 DB 后**删除缓存**（非更新缓存，避免并发写乱序），由 `@CacheEvictCim` 切面在方法成功返回后才失效。
+3. **防穿透**：`NullValueGuard` 将「查无结果」缓存为短 TTL 空值占位（`CachedValue.nullValue=true`），后续相同 key 直接命中占位，不再穿透 DB。**可选 BloomFilter 增强**（`cim.cache.bloom.enabled=true` + 业务提供 `BloomFilterProvider`）：回源前若判定 key 确定不存在则直接短路，绝不查 DB；`SimpleBloomFilter` 零额外依赖（`BitSet` + 双哈希），无假阴性。注意 BloomFilter **须业务启动时全量灌入**有效 key，且写路径会 `recordValidKey` 补录新增 key（否则新增实体被误判穿透）。
+4. **防击穿**：`MutexRebuild` + `LockProvider` 单线程重建（有 Redis 用 `RedisLockProvider` SETNX 分布式锁，否则 `LocalLockProvider` 进程内锁），double-check + 重试等待 + 兜底回源。**防雪崩**：`TtlJitter` 对 L2 TTL 加 ±percent 随机抖动（`maxJitter` 封顶）。
+5. **跨节点一致（内建）**：多实例部署时，本节点 `@CacheEvictCim` 只清了本机 L1 + 共享 L2，**其它节点的 L1 仍是旧值**。`cim-cache-starter` 内建 **Redis pub/sub 失效广播**（默认开，`cim.cache.cluster.invalidation-enabled`）：失效成功后广播事件，各节点订阅后清本节点 L1，实现最终一致——零额外基础设施（复用 L2 的 Redis）。需「持久化/可靠投递」的关键失效（权限、字典），可另实现经 §12 发件箱 / §13 MQ 的 `CacheInvalidationBroadcaster` 变体（绑定同一 `CHANNEL`）。
+6. **i18n 缓存（§7）即典型落地**：Redis Hash 存译文 + 版本号，本地可再缓存一层，版本号变化即失效。
 
 ```java
-@Cacheable(value = "equipment", key = "#id", sync = true) // sync=互斥重建，防击穿
+// 键表达式支持 #p0 / #args[i] / #args[0].id；不支持形参名 #id
+@CacheableCim(value = "equipment", key = "#p0")        // 读穿 + 互斥重建（防击穿）
 public Equipment load(String id) { return repo.findById(id); }
 
-@CacheEvict(value = "equipment", key = "#entity.id")
+@CacheEvictCim(value = "equipment", key = "#p0.id")    // 写成功后才失效（Cache-Aside）
 @Transactional public Equipment save(Equipment entity) {
     Equipment e = repo.save(entity);
-    eventPublisher.publish(new CacheInvalidateEvent("equipment", entity.getId())); // 跨节点失效
+    // 跨节点失效由 starter 的 Redis pub/sub 广播自动完成（无需业务手动发事件）
+    // 若启用 BloomFilter：切面会自动 recordValidKey(key) 补录新增实体的 key
     return e;
+}
+```
+
+**可选 BloomFilter 灌入（业务侧 SPI）：**
+```java
+@Bean BloomFilterProvider bloomFilterProvider(EquipmentRepository repo) {
+    SimpleBloomFilter bf = new SimpleBloomFilter(1 << 20, 4);
+    repo.findAllIds().forEach(id -> bf.put("cim:equipment:" + id)); // 启动时全量灌入有效 key
+    return () -> bf;
 }
 ```
 
@@ -1338,7 +1369,7 @@ flowchart TB
   DOM[领域事件 ApplicationEvent] --> H[本地 Handler: 审计/通知/索引]
   DOM --> OUT[Outbox 表]
   OUT --> RELAY[Relay 中继]
-  RELAY --> MQ[(Kafka/RabbitMQ)]
+  RELAY --> MQ[(Kafka/Pulsar/RabbitMQ)]
   MQ --> CONS[消费者: 幂等 + 重试 + 死信]
   SVC[外部调用] --> RES[Resilience4j: 熔断/舱壁/超时/重试]
 ```
@@ -1669,11 +1700,17 @@ erDiagram
   SYS_ROLE ||--o{ SYS_ROLE_MENU : 关联
   SYS_MENU ||--o{ SYS_ROLE_MENU : 被关联
 
-  SYS_USER { string id PK "用户ID(雪花/UUIDv7)" string username "账号" string password "Argon2id/BCrypt" string lang "语言偏好" string tenant_id "租户" }
+  SYS_USER { string id PK "用户ID(雪花/UUIDv7)" string username "AD账号" string external_id "IAM sub(优先对齐)" string lang "语言偏好" string status "ENABLED/DISABLED" string tenant_id "租户" }
   SYS_ROLE { string id PK "角色ID" string code "角色编码" bool is_super "超级管理员" string tenant_id }
   SYS_PERMISSION { string id PK "权限ID" string code "module:res:action" string tenant_id }
-  SYS_MENU { string id PK "菜单ID" string path "路由" string i18n_code "名称i18n键" string tenant_id }
+  SYS_MENU { string id PK "菜单ID" string path "路由" string i18n_code "名称i18n键" string type "DIR/MENU/BUTTON" string perm_code "按钮权限码" string tenant_id }
 ```
+
+> **`SYS_USER` 没有 password 列，这是刻意的**：口令校验与令牌签发由 `business/iam-ap` +
+> 企业 AD/LDAP 负责，本表只是「把 AD/IAM 身份授权到本 ap 角色」的**授权档案**
+> （对齐键 `external_id` 优先、`username` 兜底）。把口令搬进来会同时踩三个坑：
+> 与 AD 双口令源不一致、把「准入」与「内部权限」两层职责混回一张表、以及多一套口令
+> 存储/轮换/加盐的责任面。见 design.md §2.10 与 §8「IAM 对接边界」。
 
 #### 利弊分析（常见做法 vs 本框架优化）
 
@@ -1689,10 +1726,18 @@ erDiagram
 **关键设计点：**
 
 1. 三级授权（用户—角色—权限），菜单仅作导航、与权限解耦又可通过 `SYS_ROLE_MENU` 关联，支持「按角色配置菜单可见性」。
-2. 权限码规范 `module:resource:action`，按钮级亦纳入，配合 §5 `@PreAuthorize("hasAuthority('sys:user:list')")`。
+2. 权限码规范 `module:resource:action`，按钮级亦纳入，配合 §5 `@PreAuthorize("hasAuthority('sys:user:list')")`。实现见 `cim-system` 的 `support/PermissionCodes` 与各 Service 方法。
 3. 数据权限 + 租户隔离在 API 层叠加（§5/§10），与功能权限正交。
 4. 登录一次性加载权限到 `SecurityContext`，前端路由守卫（见[前端文档 §3 认证与路由守卫](../web/README.md#3-认证与路由守卫)）与后端过滤共用同一份；权限变更经 token 版本号（§5）即时失效。
-5. `is_super` 角色短路；菜单名与按钮文案走 §7 数据库 i18n，用户语言偏好驱动。
+   前端经 `GET /sys/me/permissions`、`GET /sys/me/menus` 取这份权威数据——它直接回显已注入的 authorities，不重新查库，保证前后端判断同源。
+5. `is_super` 角色短路；菜单名与按钮文案走 §7 数据库 i18n，用户语言偏好驱动（`sys_user.lang`）。
+
+**落地要点（`cim-system`，见 design.md §2.10）：**
+
+1. `SYS_USER` 是**授权档案**，按 `external_id`（IAM 令牌 `sub`）优先、`username`（AD 账号）兜底与已认证身份对齐；无口令列。
+2. 超管短路会**同时**下发 `SUPER_ADMIN` 标记与**全量启用权限码**——因为 `hasAuthority(...)` 不认识超管标记，只给标记会让超管过不了方法级鉴权（`hasPermission(...)` 才会短路）。
+3. 未建档 / 未授予任何权限时：`cim.system.rbac.fallback-to-claims=false`（默认）→ 拒绝；`=true` → 回退令牌 `authorities`（灰度迁移用）。用户被**停用**时恒拒绝。
+4. 权限写为「先删后插」的覆盖式授权（幂等），角色→权限与角色→菜单是**两张表、两个端点**，不合并。
 
 ### 21.2 登录认证时序
 
@@ -1785,7 +1830,7 @@ public abstract class BaseController<T extends BaseDefData, ID> {
 - Node.js 18+/20+、pnpm 9+
 - 至少一种数据库（MySQL 8 / Oracle 19c / PostgreSQL 15）
 - Redis 7（缓存、令牌、限流、幂等、锁）
-- 消息总线（Kafka/RabbitMQ，启用异步/集成事件时；见 §13）
+- 消息总线（Kafka/Pulsar/RabbitMQ，启用异步/集成事件时；见 §13）
 - 配置中心（Nacos/Apollo，生产；见 §19）+ 密钥管理（Vault/KMS，见 §15/§19）
 
 **后端启动**

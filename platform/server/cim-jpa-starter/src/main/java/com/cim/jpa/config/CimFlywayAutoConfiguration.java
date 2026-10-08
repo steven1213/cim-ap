@@ -10,6 +10,8 @@ import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayConfigurationCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -19,7 +21,7 @@ import java.sql.Connection;
  *
  * <p>当 {@code cim.jpa.flyway.enabled=true} 时激活：按当前数据库类型选择迁移位置
  * {@code classpath:db/migration/common} + {@code classpath:db/migration/{vendor}}
- * （vendor ∈ {@code mysql/oracle/postgresql/h2}）。生产配合
+ * （vendor ∈ {@code mysql/oracle/postgresql/h2/dm}，其中 {@code dm} 为达梦 DM）。生产配合
  * {@code spring.jpa.hibernate.ddl-auto=validate} 使用，表结构由 Flyway 管理。</p>
  *
  * <p>不新建 Flyway Bean，而是通过 {@link FlywayConfigurationCustomizer} 定制 Spring Boot
@@ -31,8 +33,16 @@ import java.sql.Connection;
 @EnableConfigurationProperties(CimJpaProperties.class)
 public class CimFlywayAutoConfiguration {
 
-    /** 按数据库类型追加 vendor 迁移目录。 */
+    /**
+     * 按数据库类型设定 vendor 迁移目录。
+     *
+     * <p><b>{@code @Order(HIGHEST_PRECEDENCE)} 是刻意的</b>：本方法会<b>整体改写</b>
+     * {@code locations}，必须在任何「追加模块目录」的 customizer 之前执行——否则模块
+     * （如 {@code cim-system} 的 {@code classpath:db/migration/system/{vendor}}）加的目录
+     * 会被本方法覆盖掉。Spring Boot 按 {@code @Order} 排序后依次应用 customizer。</p>
+     */
     @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
     @ConditionalOnMissingBean(name = "cimFlywayLocationsCustomizer")
     public FlywayConfigurationCustomizer cimFlywayLocationsCustomizer(DataSource dataSource,
                                                                      CimJpaProperties properties) {

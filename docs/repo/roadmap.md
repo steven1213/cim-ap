@@ -7,11 +7,11 @@
 | 层次 | 内容 | 状态 |
 | --- | --- | --- |
 | 设计文档 | 总文档 §1–§9、后端文档 §1–§25、前端文档 §1–§13 | ✅ 完成 |
-| 后端基础框架 | `platform/server`：父 BOM + 全部模块（cim-core / cim-spring-support / 各 starter / cim-system / cim-business / cim-bootstrap）骨架（pom + 占位类），`cim-bootstrap` 与各业务 ap 的 `server` 含可启动主类 | 🟡 骨架已生成 |
+| 后端基础框架 | `platform/server`：父 BOM + 全部模块骨架。**已实现功能**：`cim-core`、`cim-spring-support`、`cim-jpa-starter`（多库/主键/审计/历史/多租户/Flyway 多目录）、`cim-auth-starter`（验签/准入/数据权限）、`cim-cache-starter`（多级缓存 + 三守卫 + 跨节点失效 + BloomFilter）、`cim-mq-starter`、`cim-obs-starter`、`cim-system`（RBAC 系统域，63 类）。**仍为占位**：`cim-i18n-starter`、`cim-gen-starter`、`cim-business`、`cim-bootstrap` | 🟡 部分已实现 |
 | 前端基础框架 | `platform/web`：Vite + React + TS 脚手架、目录结构、请求层/权限组件/路由/i18n 占位 | 🟡 骨架已生成 |
 | 业务层代码 | `business/iam-ap`、`business/mds-ap`、`business/mes-ap` 各自的 `server`（Maven 应用）+ `web`（Vite 应用）骨架 | 🟡 骨架已生成 |
 | 基础设施 | `docker-compose.yml`、各工程 `Dockerfile` 已生成；CI 流水线、K8s 编排未生成 | 🟡 部分已生成 |
-| 数据库脚本 | Flyway 多目录迁移（含主表 + 历史表成对 DDL） | 🔲 未生成 |
+| 数据库脚本 | `cim-system` 已交付模块自带迁移（19 表 × `mysql/postgresql/oracle/dm/h2`，由实体元数据导出、主/历成对）；平台与业务 ap 的迁移仍待生成 | 🟡 部分已生成 |
 
 > 文档与状态表中的标记含义：**✅ = 设计已完成**，**🟡 = 代码骨架已生成（占位，功能待填充）**，**🔲 = 仅规划或未落地**；🔲 / 🟡 均不代表功能已实现。
 

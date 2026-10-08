@@ -20,6 +20,11 @@ public final class DbCapabilities {
         if (p.contains("postgre")) {
             return new SimpleDbCapability("postgresql", true, true);
         }
+        if (p.contains("dm") || p.contains("dameng")) {
+            // 达梦 DM：与 Oracle 高度兼容——NULL 默认排最前、无原生 JSON 函数；DM8 起支持 LIMIT/OFFSET。
+            // 注意：Hibernate 6 无内置 DmDialect，方言须由业务 app 显式配置（org.hibernate.dialect.DmDialect）。
+            return new SimpleDbCapability("dm", false, false);
+        }
         return new SimpleDbCapability(p, true, false);
     }
 

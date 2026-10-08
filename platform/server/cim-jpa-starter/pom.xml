@@ -34,13 +34,36 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
-        <!-- Flyway 迁移：db/migration/{mysql,oracle,pg} 多目录（见 README §3）。
+        <!-- Flyway 迁移：db/migration/{mysql,oracle,postgresql,dm,h2} 多目录（见 README §3）。
              按实际启用的数据库追加对应 db 模块（版本由 Spring Boot BOM 收敛）：
-             flyway-mysql / flyway-database-postgresql / flyway-database-oracle -->
+             flyway-mysql / flyway-database-postgresql / flyway-database-oracle。
+             达梦 DM：Spring Boot 3.3.5 用 Flyway 10.x，社区模块 flyway-database-dameng 在该版本可能需
+             Teams 许可；若不可用，复用 oracle 目录脚本（DM 与 Oracle 兼容）或经
+             cim.jpa.flyway.locations 指向自有脚本即可，无需在 starter 内依赖。 -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
         </dependency>
+
+        <!--
+        ============================================================================
+         达梦 DM 适配说明（starter 不内置，由业务 app 提供，避免引入非 Maven Central 私包）：
+         1) JDBC 驱动（不在中央仓库，需业务 app 本地安装或私仓引入）：
+              <dependency>
+                <groupId>com.dameng</groupId>
+                <artifactId>DmJdbcDriver18</artifactId>
+                <version>8.1.x</version>
+              </dependency>
+            驱动类 dm.jdbc.driver.DmDriver，URL jdbc:dm://host:5236，产品名 "DM DBMS"。
+         2) Hibernate 方言（Hibernate 6 无内置 DmDialect，必须显式配置）：
+              <dependency>
+                <groupId>com.dameng</groupId>
+                <artifactId>DmDialect-for-hibernate6.x</artifactId>
+                <version>8.1.x</version>
+              </dependency>
+            并在配置中指定 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.DmDialect。
+         ============================================================================
+        -->
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

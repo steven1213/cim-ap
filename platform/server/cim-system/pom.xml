@@ -13,17 +13,69 @@
     <artifactId>cim-system</artifactId>
     <packaging>jar</packaging>
     <name>cim-system</name>
-    <description>系统域模块：用户 / 角色 / 菜单 / 字典 / 日志（P3 实现）</description>
+    <description>系统域模块：用户 / 角色 / 菜单 / 权限 / 字典 / 参数 / 日志（本 ap 内部权限来源）</description>
 
+    <!--
+      ============================================================================
+      定位说明（design.md §2.10 / §8）：cim-system 是**业务域模块**，不是 starter。
+        · 交付形态：controller → service → repository → entity + 本模块自带 Flyway 迁移
+        · 装配方式：随宿主 ap 的组件扫描生效（com.cim 包约定），
+          **不写 META-INF/spring/...AutoConfiguration.imports**（那是 starter 的注册方式）
+        · 职责边界：只做「本 ap 内部权限」（菜单/按钮/数据权限）；
+          统一登录、跨 ap 准入属 business/iam-ap
+      依赖方向见 design.md §1.1：可依赖 cim-core / cim-spring-support / cim-jpa-starter / cim-auth-starter。
+      ============================================================================
+    -->
     <dependencies>
         <dependency>
             <groupId>com.cim</groupId>
-            <artifactId>cim-spring-support</artifactId>
-            <version>${project.version}</version>
+            <artifactId>cim-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-spring-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-jpa-starter</artifactId>
+        </dependency>
+        <!-- 仅为提供 LocalAuthorityLoader 的实现（SPI 接缝的另一端定义在 cim-auth-starter）。
+             若某 ap 不需要本模块，去掉本依赖即可；auth 会退回 M3 默认的 ClaimLocalAuthorityLoader。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-auth-starter</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- 集成测试：H2 内存库跑「建档 → 角色 → 权限码」全链路 + 方法级鉴权 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

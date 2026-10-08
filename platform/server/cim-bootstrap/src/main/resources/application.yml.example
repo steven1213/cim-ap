@@ -5,19 +5,23 @@ spring:
   application:
     name: cim-ap
   # ---------------------------------------------------------------------------
-  # 持久化（M1+ 启用）。未配置数据源时，本项目为纯 Web 骨架，可无库启动。
-  # 按需引入 cim-jpa-starter 后填以下内容：
-  # datasource:
-  #   url: jdbc:mysql://localhost:3306/cim_ap?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-  #   username: cim
-  #   password: ${CIM_DB_PASSWORD}
-  # jpa:
-  #   hibernate:
-  #     ddl-auto: validate          # 仅校验，不自动改表（结构由 Flyway 管，见 README §3）
-  #   open-in-view: false
-  # flyway:
-  #   enabled: true               # 开启后由 cim.jpa.flyway 按库类型自动选择迁移目录（见下）
+  # 持久化（生产配置模板）。开发/演示默认值见 application.yml（H2 内存库）。
+  # 引入 cim-jpa-starter + cim-system 后数据源为必需。
   # ---------------------------------------------------------------------------
+  datasource:
+    # MySQL 示例（PostgreSQL：jdbc:postgresql://host:5432/cim_ap）
+    url: jdbc:mysql://localhost:3306/cim_ap?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: cim
+    password: ${CIM_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    # 表结构由 Flyway 管（平台基线 + 各域模块自带脚本），Hibernate 只校验
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    # locations 由 cim.jpa.flyway 自动选择（见下），域模块（cim-system）再追加自己的目录
 
 # =============================================================================
 # cim-* 框架配置键（完整定义见各 starter 的 *Properties javadoc；
@@ -31,7 +35,7 @@ cim:
     default-tenant: ""
     allow-super-cross-tenant: false
 
-  # 持久化（cim-jpa-starter，M1 启用）
+  # 持久化（cim-jpa-starter）
   jpa:
     id:
       mode: SNOWFLAKE             # SNOWFLAKE | UUIDV7
@@ -44,35 +48,24 @@ cim:
       lowercase-snake: true
       table-prefix: ""
     # 额外数据源（T1.1）：每个逻辑库一套独立 EMF/TxManager/Hikari；不配置则不启用。
-    # 配置后自动生成 {name}DataSource / {name}EntityManagerFactory / {name}TransactionManager。
     # datasources:
-    #   report:                      # 逻辑库名（示例：报表库）
+    #   report:
     #     url: jdbc:postgresql://localhost:5432/cim_report
     #     username: cim
     #     password: ${CIM_REPORT_DB_PASSWORD}
     #     driver-class-name: org.postgresql.Driver
-    #     dialect: org.hibernate.dialect.PostgreSQLDialect   # 可省略（自动探测）
-    #     packages-to-scan: com.cim.report.entity            # 本库实体包（逗号分隔）
-    #     ddl-auto: none             # 生产用 none（结构由 Flyway 管）
-    #     maximum-pool-size: 10
-    # Flyway 多目录迁移（T1.5）：开启后按库类型选 db/migration/common + db/migration/{vendor}
-    # （vendor ∈ mysql/oracle/postgresql/h2）；配合上 spring.jpa.hibernate.ddl-auto=validate。
+    #     packages-to-scan: com.cim.report.entity
+    #     ddl-auto: none
+    # Flyway 多目录迁移（T1.5）：按库类型选 db/migration/common + db/migration/{vendor}
     flyway:
-      enabled: false               # 是否由 cim 框架接管迁移位置选择
+      enabled: true
       # locations: classpath:db/migration/common,classpath:db/migration/mysql  # 显式覆盖
       baseline-on-migrate: false
 
-  # 国际化（cim-i18n-starter，M4 启用）
-  i18n:
-    enabled: true
-
-  # 缓存（cim-cache-starter，M4 启用）
-  cache:
-    enabled: true
-
-  # 认证（cim-auth-starter，M3 启用；对接 IAM JWKS，契约见 design.md §8.1）
+  # 认证（cim-auth-starter；对接 IAM JWKS，契约见 design.md §8.1）
+  # 只做验证侧：验签 + 版本失效 + 准入 + 业务鉴权 + 数据权限；登录/签发/吊销在 business/iam-ap。
   auth:
-    enabled: true                       # 总开关；关闭则回退匿名操作人（cim-spring-support）
+    enabled: true
     jwks-uri: http://iam-ap:8081/.well-known/jwks.json   # IAM 公钥地址（按 kid 轮换）
     jwks-cache-minutes: 60              # 公钥缓存时长，到期重拉以支持密钥轮换
     authorities-claim: authorities      # 业务权限集所在 claim 键
@@ -80,7 +73,24 @@ cim:
       app-code: ""                      # 本 ap 接入码（mds-ap/mes-ap），校验令牌 apps claim
       enabled: true                     # 准入开关；关闭则跳过（仅本地调试）
 
-  # 可观测（cim-obs-starter，M4 启用）
+  # 系统域（cim-system 域模块）——本 ap 内部权限来源
+  system:
+    enabled: true
+    rbac:
+      fallback-to-claims: false         # 未建档即拒绝（生产默认）
+      super-authority: SUPER_ADMIN
+    menu:
+      include-buttons: false
+
+  # 国际化（cim-i18n-starter）
+  i18n:
+    enabled: true
+
+  # 缓存（cim-cache-starter）
+  cache:
+    enabled: true
+
+  # 可观测（cim-obs-starter）
   obs:
     enabled: true
 

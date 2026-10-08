@@ -8,6 +8,7 @@ db/migration/
 ├── mysql/        # MySQL / MariaDB
 ├── oracle/       # Oracle
 ├── postgresql/   # PostgreSQL
+├── dm/           # 达梦 DM（Oracle 兼容，见 dm/README.md）
 └── h2/           # H2（单测/本地）
 ```
 
@@ -17,7 +18,7 @@ db/migration/
 自动选择位置：
 
 - `classpath:db/migration/common`
-- `classpath:db/migration/{vendor}`，`vendor ∈ {mysql, oracle, postgresql, h2}`
+- `classpath:db/migration/{vendor}`，`vendor ∈ {mysql, oracle, postgresql, dm, h2}`
 
 可用 `cim.jpa.flyway.locations` 显式覆盖。
 

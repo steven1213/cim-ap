@@ -13,13 +13,24 @@
     <artifactId>cim-bootstrap</artifactId>
     <packaging>jar</packaging>
     <name>cim-bootstrap</name>
-    <description>启动装配模块（仅 Main + 配置），聚合各 starter / 域模块</description>
+    <description>启动装配模块（Main + 配置）：唯一可执行模块，聚合各 starter 与域模块</description>
+
+    <!--
+      ============================================================================
+      装配说明（design.md §1 / §2）：
+        · 本模块是**唯一**含启动类与 repackage 的可执行模块；其余模块都是被依赖的库 jar。
+        · 「加依赖即可用」的验证点就在这里：引入 cim-system（域模块）后，无需额外配置扫描根，
+          其 @EntityScan/@EnableJpaRepositories + 自带迁移便自动生效（见 design.md §2.10）。
+        · 数据源为**必需**：域模块的实体/仓储与 Flyway 脚本都要落到一个真实库上。
+          开发/演示默认 H2 内存库；生产按 application.yml.example 切换 MySQL/PostgreSQL/DM。
+      ============================================================================
+    -->
 
     <dependencies>
+        <!-- 基础设施：Web + Actuator -->
         <dependency>
             <groupId>com.cim</groupId>
             <artifactId>cim-spring-support</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -28,6 +39,48 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- 持久化 + 认证（cim-system 会传递引入二者，此处显式声明以表明装配意图） -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-jpa-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-auth-starter</artifactId>
+        </dependency>
+
+        <!-- 系统域（域模块，非 starter）：用户/角色/菜单/权限/字典/参数/日志 + 自带 Flyway 迁移 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-system</artifactId>
+        </dependency>
+
+        <!-- 开发/演示默认数据库：H2（内存库，随进程消亡）。
+             生产按需替换为对应驱动（版本由 Spring Boot BOM 收敛），例如：
+             <dependency>
+               <groupId>com.mysql</groupId>
+               <artifactId>mysql-connector-j</artifactId>
+               <scope>runtime</scope>
+             </dependency>
+             <dependency>
+               <groupId>org.postgresql</groupId>
+               <artifactId>postgresql</artifactId>
+               <scope>runtime</scope>
+             </dependency>
+             达梦 DM 驱动不在 Maven Central，需本地/私仓安装，详见 cim-jpa-starter/pom.xml 注释。 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- 装配冒烟测试：验证「bootstrap + starter + 域模块 + 数据源」能整体启动 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
