@@ -22,6 +22,31 @@
         <cim.version>0.0.1-SNAPSHOT</cim.version>
     </properties>
 
+    <!-- 与 platform 对齐：保留方法参数名，否则 @PathVariable/@RequestParam 运行期 500（ADR-9） -->
+    <build>
+        <finalName>cim-iam-ap-server</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <parameters>true</parameters>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <!-- 基础底座能力（详见 docs/platform/server/README.md） -->
         <dependency>
@@ -39,26 +64,9 @@
             <artifactId>cim-auth-starter</artifactId>
             <version>${cim.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.cim</groupId>
-            <artifactId>cim-cache-starter</artifactId>
-            <version>${cim.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.cim</groupId>
-            <artifactId>cim-i18n-starter</artifactId>
-            <version>${cim.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.cim</groupId>
-            <artifactId>cim-obs-starter</artifactId>
-            <version>${cim.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.cim</groupId>
-            <artifactId>cim-mq-starter</artifactId>
-            <version>${cim.version}</version>
-        </dependency>
+
+        <!-- 注：cache/mq/obs/i18n 等 starter 按生产需要再引入；本里程碑聚焦「令牌版本 + ap 准入」，
+             仅需基础底座（spring-support / jpa / auth），避免引入 Redis/MQ/OTLP 等外部依赖耦合。 -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -73,15 +81,39 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-    </dependencies>
 
-    <build>
-        <finalName>cim-iam-ap-server</finalName>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
+        <!-- Lombok（与 platform 对齐，显式声明注解处理器） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- H2 内存库（开发/演示数据源，与 application.yml 的 org.h2.Driver 对应；
+             cim-jpa-starter 不传递 H2，需本 ap 显式声明） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- JWT 签发（RS256，与 cim-auth-starter 验签库 jjwt 0.12.6 对齐） -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
 </project>

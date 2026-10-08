@@ -16,6 +16,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -107,6 +109,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
         BizCode code = BizCode.OPERATION_NOT_ALLOWED;
         String msg = messageResolver.resolve(code.getI18nKey(), null, code.getDefaultMessage());
+        return ResponseEntity.status(code.getHttpStatus()).body(Result.fail(code, msg));
+    }
+
+    /**
+     * 未匹配到处理器（含静态资源 404）。
+     *
+     * <p>Spring 6.1 起，未匹配的请求会抛 {@link NoResourceFoundException}；若开启
+     * {@code spring.mvc.throw-exception-if-no-handler-found} 则抛 {@link NoHandlerFoundException}。
+     * 二者都继承 {@code ServletException}，若无专用处理器，会被下面的
+     * {@link #handleUnknown(Exception)} 兜底成 <b>500</b>——把「路径写错」误报成「服务故障」，
+     * 既误导客户端也污染 5xx 监控。故此处显式映射为 404。</p>
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<Result<Void>> handleNotFound(Exception ex) {
+        BizCode code = BizCode.DATA_NOT_FOUND;
+        String msg = messageResolver.resolve(code.getI18nKey(), null, code.getDefaultMessage());
+        log.debug("[NotFound] {} traceId={}", ex.getClass().getSimpleName(), TraceContext.currentTraceId());
         return ResponseEntity.status(code.getHttpStatus()).body(Result.fail(code, msg));
     }
 

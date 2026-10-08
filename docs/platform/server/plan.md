@@ -53,7 +53,7 @@
 | T1.2 | `NamingStrategy` 统一小写蛇形 | T1.1 | 1S | 三库表/列名一致 |
 | T1.3 | `IdGenerator`（雪花）+ 时钟回拨降级 UUIDv7 | T1.1 | 2S | 单测覆盖回拨；`@PrePersist` 注入生效 |
 | T1.4 | `JpaJsonConverter`（TEXT/CLOB + Jackson） | T1.1 | 1S | 三库 JSON 往返一致 |
-| T1.5 | Flyway 多目录 `db/migration/{mysql,oracle,pg}` + `ddl-auto=validate` | T1.1 | 2S | 三库迁移自动化；validate 不报错 |
+| T1.5 | Flyway 多目录 `db/migration/{mysql,oracle,postgresql,dm}` + `ddl-auto=validate` | T1.1 | 2S | 多库迁移自动化（含达梦 DM）；validate 不报错 |
 | T1.6 | `DbCapability`（nullOrdering/concat/jsonFn/pagination） | T1.5 | 2S | 三库分页/排序一致 |
 
 **里程碑 DoD**：以一张示例表为样本，三种库建表→迁移→读写→分页全绿；主键跨库一致且时间有序。
@@ -111,7 +111,7 @@
 | --- | --- | --- | --- | --- |
 | T4.1 | `Result`/`BizCode`/`GlobalExceptionHandler` 完整化 + 字段级 errors | M0、T2.1 | 2S | 校验错误精确到字段；5xx 不泄露 |
 | T4.2 | `cim-i18n-starter`：两表 + `DatabaseMessageSource` + 种子 | M1 | 3S | `@Valid` 消息命中 DB；热更新生效 |
-| T4.3 | `cim-cache-starter`：多级缓存 + 防穿透/击穿/雪崩 | M1 | 3S | 三场景单测通过 |
+| T4.3 ✅ | `cim-cache-starter`：多级缓存 + 防穿透/击穿/雪崩 + BloomFilter 增强 + 跨节点失效广播 | M1 | 3S | 三场景单测通过；真 Redis 集成 + pub/sub 一致（32 测全绿） |
 | T4.4 | `cim-obs-starter`：指标/链路/结构化日志 + 脱敏 | M1 | 3S | `/actuator/prometheus` 有指标；日志无敏感信息 |
 | T4.5 | 限流/幂等注解 + 切面（Redis 滑动窗口 + 幂等键） | T4.3 | 3S | 并发重复请求仅一次生效 |
 | T4.6 | `cim-mq-starter`：领域事件 + 发件箱中继 + 韧性 | M1、T2.4 | 4S | 事务提交后事件必达；重试/死信可观测 |
@@ -143,11 +143,42 @@
 
 | 任务 | 内容 | 依赖 | 估时 | 验收 |
 | --- | --- | --- | --- | --- |
-| T6.1 | 实体与迁移：`sys_user/role/menu/permission/dict/log`（含历史表成对） | M2、M5 | 3S | 迁移成对；CRUD 可用 |
-| T6.2 | 三级 RBAC 服务 + `LocalAuthorityLoader` 实现 | M3、T6.1 | 3S | `@PreAuthorize` 命中真实权限 |
-| T6.3 | 菜单（导航）与权限（API/按钮）分离 + 角色菜单关联 | T6.2 | 2S | 菜单可见性按角色生效 |
-| T6.4 | 字典 + 操作/登录日志（`BaseEventData` 子类） | T6.1、T4.4 | 2S | 日志落库 + 脱敏 |
-| T6.5 | `is_super` 短路 + 权限变更经令牌版本失效 | T6.2 | 1S | 超管放通；变更即时生效 |
+| T6.1 ✅ | 实体与迁移：`sys_user/role/menu/permission/dict/config/log`（含历史表成对） | M2、M5 | 3S | 迁移成对；CRUD 可用 |
+| T6.2 ✅ | 三级 RBAC 服务 + `LocalAuthorityLoader` 实现 | M3、T6.1 | 3S | `@PreAuthorize` 命中真实权限 |
+| T6.3 ✅ | 菜单（导航）与权限（API/按钮）分离 + 角色菜单关联 | T6.2 | 2S | 菜单可见性按角色生效 |
+| T6.4 ✅ | 字典 + 操作/登录日志（`BaseEventData` 子类） | T6.1、T4.4 | 2S | 日志落库 + 脱敏 |
+| T6.5 ✅ | `is_super` 短路 + 权限变更即时生效（含令牌版本失效验证侧） | T6.2、T3.2 | 1S | 超管放通；变更即时生效 |
+
+> **落地说明（`cim-system`，14 用例绿）**
+> - T6.1：19 张表（含 7 张 `*Hist` 成对 + 3 张关联表 + 2 张流水表），DDL 由 `DdlExportTest`
+>   从实体元数据导出的 5 种方言脚本承载，随模块发布并在测试中真跑 Flyway + `ddl-auto=validate`。
+> - T6.2：`DbLocalAuthorityLoader` 顶掉认证 starter 的默认 `ClaimLocalAuthorityLoader`
+>   （`@ConditionalOnMissingBean` 让位），测试直接断言实现类型。
+> - T6.3：`sys_role_perm` / `sys_role_menu` 两表两端点；菜单树支持按钮节点过滤与「父不可见则上浮」。
+> - T6.4：`OperationLog` / `LoginLog` 为 `BaseEventData` 流水（**无**历史表，设计使然）；
+>   `@OperationLogged` + `OperationLogAspect` 环绕记录，**不落请求/响应体**（默认脱敏），
+>   且审计写失败不影响业务事务。
+> - T6.5：`is_super` 短路已实现（下发 `SUPER_ADMIN` **并**展开全量启用权限码，
+>   否则 `hasAuthority(...)` 对超管不成立）。**「变更即时生效」已闭合**：`DbLocalAuthorityLoader`
+>   每请求从库解析、不缓存，授权/收权/停用在同一令牌的下一次请求即生效（`DbLocalAuthorityLoaderTest`
+>   以「同一 claims 前后两次解析」直接断言）。**令牌版本失效链路的 platform 侧已补齐**：
+>   `cim-auth-starter` 新增 `TokenVersionChecker` SPI + 默认 `acceptAll`，接入
+>   `JwtAuthenticationFilter`（验签 → 版本 → 准入），`TokenRevocationIntegrationTest` 3 用例覆盖
+>   「版本过期 → 401、当前版本 → 200、版本判定先于准入」。**版本号的存储与递增 + 下发已落在
+>   `business/iam-ap/server`**（`token` 包的 `TokenVersionService`/`TokenVersionController`，见 design.md §8.1(g) 落地状态）。
+>
+> **边界提醒**：跨 ap 准入与统一登录**不在**本模块，属 `business/iam-ap`（§8）。
+> 业务 ap 若要「完整可用」，需要三件事：① 引入 starter（能力）② 权限数据落地
+> （cim-system 或自研 `LocalAuthorityLoader`）③ IAM 侧注册本 ap 接入码（准入）。
+> 当前进度：① ② 已落地并由 `cim-bootstrap` 装配冒烟验证（`BootstrapAssemblyTest` 5 用例：
+> 上下文 + 关键 Bean + 健康端点 + 401/404 语义）；③ 待 IAM 侧接入。
+
+> **本轮附带修复（为保证「可启动、可访问」而必须）**
+> - **父 POM 开启 `-parameters`**（ADR-9）：否则 `@PathVariable`/`@RequestParam` 未显式命名会抛
+>   `IllegalArgumentException("Name for argument ... not specified")` → 500。此前单测均走 MockMvc
+>   或直接调服务，故未暴露。**改后需 clean 重建**。
+> - **未匹配路由映射为 404**（`GlobalExceptionHandler` 新增 `NoResourceFoundException`/`NoHandlerFoundException`
+>   处理器）：原先被 `@ExceptionHandler(Exception.class)` 兜底成 500，把「路径写错」误报成「服务故障」。
 
 **里程碑 DoD**：用生成的代码完成一个「用户-角色-菜单」闭环；越权调用被拒。
 
@@ -178,9 +209,9 @@
 - [x] **M1** T1.2 命名 ✅ · T1.3 主键 ✅ · T1.4 JSON ✅ · T1.6 能力抽象 ✅ · T1.1 多库 EMF/TxManager/Hikari ✅（`cim.jpa.datasources.*` 动态装配；H2 双源隔离验证，真实三库连通见 M7/T7.2） · T1.5 Flyway 多目录 ✅（按库型选 `db/migration/{vendor}`，H2 `ddl-auto=validate` 通过；三库见 M7）
 - [x] **M2** T2.1 基类族 ✅ · T2.2 审计填充 ✅ · T2.3 @History ✅ · T2.4 自动历史 + 变更检测 ✅（H2 集成测试验证 I/U/D 与「未变更不落」） · T2.5 软删唯一约束 ✅（唯一键含 `deleted`，一删一活并存；H2 验证） · T2.6 租户 Hibernate Filter ✅（`TenantContext` 驱动、跨租户不可见、业务零感知；H2 验证） · T2.7 三层版本语义 ✅（`@Version`/`revision`/历史 相互独立；H2 验证）
 - [x] **M3** T3.1 JWKS · T3.2 验签 · T3.3 过滤器 · T3.4 准入 · T3.5 权限加载 · T3.6 数据权限 · T3.7 操作人适配 · T3.8 IAM 契约（已冻结，见 design.md §8）
-- [~] **M4** T4.1 响应异常 ✅（字段级 errors + 5xx 不泄露，单测闭环） · T4.2 i18n ⬜ · T4.3 cache ⬜ · T4.4 obs ✅（指标门面+公共标签+日志脱敏+Logback 转换器，11 单测闭环） · T4.5 限流幂等 ⬜ · T4.6 mq ⬜
+- [~] **M4** T4.1 响应异常 ✅（字段级 errors + 5xx 不泄露，单测闭环） · T4.2 i18n ⬜ · T4.3 cache ✅（多级缓存+三守卫+BloomFilter+跨节点失效，32 测全绿含真 Redis） · T4.4 obs ✅（指标门面+公共标签+日志脱敏+Logback 转换器，11 单测闭环） · T4.5 限流幂等 ⬜ · T4.6 mq ⬜
 - [ ] **M5** T5.1 元数据 · T5.2 成对计划 · T5.3 模板 · T5.4 dry-run · T5.5 增量 · T5.6 CI 守卫
-- [ ] **M6** T6.1 实体迁移 · T6.2 RBAC · T6.3 菜单权限 · T6.4 字典日志 · T6.5 超管/失效
+- [x] **M6** T6.1 ✅ 实体迁移（19 表 · 5 方言 DDL 实体导出） · T6.2 ✅ RBAC + `LocalAuthorityLoader` · T6.3 ✅ 菜单/权限分离 · T6.4 ✅ 字典/日志 ✅ · T6.5 ✅ 超管短路 + 变更即时生效（platform 侧 `TokenVersionChecker`/`TokenBlacklistChecker` SPI 已补齐；验证端 `IamTokenVersionChecker`/`IamTokenBlacklistChecker` 已就绪且装配顺序缺陷已修（见 §8.1(g)/(h)）；版本/黑名单**存储/递增/拉黑**归 `business/iam-ap`；**登录失败锁定（M-lockout）亦已落 `business/iam-ap`**（`account_lock` 表 + `AccountLockService` + `LoginService` 接入 + `BizCode.ACCOUNT_LOCKED(1004)`，见 §8.1(i)），端到端由 `iam-ap` 的 `IamApIntegrationTest`/`SessionIntegrationTest`/`AccountLockServiceTest`/`LoginLockoutTest` 验证，**24 测全绿**）
 - [ ] **M7** T7.1 ArchUnit · T7.2 集成测试 · T7.3 契约 · T7.4 安全 · T7.5 编排 · T7.6 归档
 
 ---

@@ -82,11 +82,12 @@ public class JwtVerifier {
         Set<String> apps = asSet(c.get(JwtClaimKeys.APP_CODES));
         Set<String> roles = asSet(c.get(JwtClaimKeys.ROLES));
         String tenantId = c.get(JwtClaimKeys.TENANT_ID, String.class);
+        String jti = c.get(JwtClaimKeys.JTI, String.class);
         Set<String> authorities = asSet(c.get(JwtClaimKeys.AUTHORITIES));
         Long version = c.get(JwtClaimKeys.VERSION, Long.class);
         Instant expiresAt = c.getExpiration() != null ? c.getExpiration().toInstant() : null;
         Map<String, Object> raw = new LinkedHashMap<>(c);
-        return new TokenClaims(userId, username, apps, roles, tenantId, authorities, version, expiresAt, raw);
+        return new TokenClaims(userId, username, apps, roles, tenantId, jti, authorities, version, expiresAt, raw);
     }
 
     @SuppressWarnings("unchecked")

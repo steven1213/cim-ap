@@ -7,8 +7,12 @@ import com.cim.auth.filter.JwtAuthenticationFilter;
 import com.cim.auth.rbac.ClaimLocalAuthorityLoader;
 import com.cim.auth.rbac.LocalAuthorityLoader;
 import com.cim.auth.support.SecurityContextPortAdapter;
+import com.cim.auth.token.IamTokenVersionChecker;
+import com.cim.auth.token.IamTokenBlacklistChecker;
 import com.cim.auth.token.JwksKeyProvider;
 import com.cim.auth.token.JwtVerifier;
+import com.cim.auth.token.TokenBlacklistChecker;
+import com.cim.auth.token.TokenVersionChecker;
 import com.cim.core.port.CurrentUserPort;
 import com.cim.spring.support.config.SpringSupportAutoConfiguration;
 
@@ -75,6 +79,63 @@ public class SecurityAutoConfiguration {
         return new ClaimLocalAuthorityLoader();
     }
 
+    /**
+     * 令牌版本失效判定（§8.1(g) / T6.5 验证侧）——接入 IAM 版本端点时注册 {@link IamTokenVersionChecker}。
+     *
+     * <p><b>声明顺序约束</b>：本 Bean 必须位于默认实现之前。原因见下方默认 Bean 注释——
+     * 默认 Bean 的 {@code @ConditionalOnProperty(havingValue="", matchIfMissing=true)} 在「属性已配置且
+     * 为 truthy 值」时同样成立，会与本 Bean 同时命中；靠「本 Bean 先注册 + 默认 Bean 的
+     * {@code @ConditionalOnMissingBean} 兜底」才能保证「有 IAM 实现则用之，否则放行」。</p>
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "cim.auth.token-version", name = "iam-base-url")
+    @ConditionalOnMissingBean
+    public TokenVersionChecker iamTokenVersionChecker(CimAuthProperties props) {
+        CimAuthProperties.TokenVersion tv = props.getTokenVersion();
+        return new IamTokenVersionChecker(
+                tv.getIamBaseUrl(), tv.getEndpoint(), Duration.ofMinutes(tv.getCacheMinutes()));
+    }
+
+    /**
+     * 令牌版本失效默认实现：未接入 IAM 版本端点时放行（不校验版本）。
+     *
+     * <p><b>为何只用 {@code @ConditionalOnMissingBean}、不再叠加 {@code @ConditionalOnProperty}</b>：
+     * 若保留 {@code @ConditionalOnProperty(prefix, name, havingValue="", matchIfMissing=true)}，在
+     * {@code cim.auth.token-version.iam-base-url} 被配置为真实 URL（truthy）时该条件也成立，会与上方
+     * IAM 实现同时命中；最终因两者同类型 + {@code @ConditionalOnMissingBean} 竞争，默认实现抢先注册，
+     * 导致「配了 IAM 端点却仍走 acceptAll」的隐蔽 bug。单靠 {@code @ConditionalOnMissingBean} 即足以
+     * 表达「有 IAM 实现则用 IAM，无则用默认」的兜底语义。</p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public TokenVersionChecker tokenVersionChecker() {
+        return TokenVersionChecker.acceptAll();
+    }
+
+    /**
+     * 令牌黑名单判定（§8.1(h) 验证端）——接入 IAM 黑名单端点时注册 {@link IamTokenBlacklistChecker}。
+     * 声明顺序约束同 {@link #iamTokenVersionChecker}：必须先于默认实现。
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "cim.auth.token-blacklist", name = "iam-base-url")
+    @ConditionalOnMissingBean
+    public TokenBlacklistChecker iamTokenBlacklistChecker(CimAuthProperties props) {
+        CimAuthProperties.TokenBlacklist bl = props.getTokenBlacklist();
+        return new IamTokenBlacklistChecker(
+                bl.getIamBaseUrl(), bl.getEndpoint(), Duration.ofMinutes(bl.getCacheMinutes()));
+    }
+
+    /**
+     * 令牌黑名单默认实现：未接入 IAM 黑名单端点时一律放行（放弃「按 jti 主动吊销」这一层）。
+     * 原因同 {@link #tokenVersionChecker}：只用 {@code @ConditionalOnMissingBean} 兜底，
+     * 避免「属性已配置（truthy）时默认实现反而抢注」的陷阱。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public TokenBlacklistChecker tokenBlacklistChecker() {
+        return TokenBlacklistChecker.acceptAll();
+    }
+
     @Bean
     @ConditionalOnMissingBean(CurrentUserPort.class)
     public CurrentUserPort currentUserPort() {
@@ -99,10 +160,13 @@ public class SecurityAutoConfiguration {
     @Bean
     public SecurityFilterChain cimSecurityFilterChain(HttpSecurity http,
                                                     JwtVerifier jwtVerifier,
+                                                    TokenVersionChecker tokenVersionChecker,
+                                                    TokenBlacklistChecker tokenBlacklistChecker,
                                                     AppAdmissionChecker admissionChecker,
                                                     LocalAuthorityLoader authorityLoader) throws Exception {
         JwtAuthenticationFilter jwtFilter =
-                new JwtAuthenticationFilter(jwtVerifier, admissionChecker, authorityLoader);
+                new JwtAuthenticationFilter(jwtVerifier, tokenVersionChecker, tokenBlacklistChecker,
+                        admissionChecker, authorityLoader);
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

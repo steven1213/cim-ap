@@ -41,4 +41,9 @@ public class BizException extends RuntimeException {
     public static BizException noAdmission(Object... args) {
         return new BizException(BizCode.NO_ADMISSION, args);
     }
+
+    /** 快捷构造：账户被锁定（暴力破解防护触发）。 */
+    public static BizException accountLocked(Object... args) {
+        return new BizException(BizCode.ACCOUNT_LOCKED, args);
+    }
 }

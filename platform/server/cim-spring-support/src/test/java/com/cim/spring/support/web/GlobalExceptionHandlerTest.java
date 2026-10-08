@@ -9,10 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -100,6 +102,17 @@ class GlobalExceptionHandlerTest {
         assertEquals(400, r.getStatusCode().value());
         assertNotNull(r.getBody().errors());
         assertTrue(r.getBody().errors().isEmpty());
+    }
+
+    @Test
+    @DisplayName("未匹配路由 → 404 + 业务码 2001（不得被兜底成 500）")
+    void handleNotFound_returns404Not500() {
+        ResponseEntity<Result<Void>> r = handler.handleNotFound(
+                new NoResourceFoundException(HttpMethod.GET, "/nope"));
+
+        assertEquals(404, r.getStatusCode().value());
+        assertEquals(2001, r.getBody().code());
+        assertNotEquals(9000, r.getBody().code(), "路径不存在不应报成 SYSTEM_ERROR");
     }
 
     @Test

@@ -29,6 +29,9 @@ public final class JwtClaimKeys {
     /** 令牌版本（本地吊销 / 权限失效判定）。 */
     public static final String VERSION = "ver";
 
+    /** JWT ID（令牌唯一标识，登出 / 主动吊销时写入黑名单的键）。 */
+    public static final String JTI = "jti";
+
     private JwtClaimKeys() {
     }
 }

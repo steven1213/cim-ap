@@ -15,6 +15,7 @@ import java.util.Set;
  * @param apps       可进入的 ap 列表（准入依据）
  * @param roles      ap 内粗角色组（可选）
  * @param tenantId   租户 ID
+ * @param jti        JWT ID（令牌唯一标识，黑名单吊销键）
  * @param authorities 本 ap 业务权限集（module:res:action）
  * @param version    令牌版本（本地失效判定）
  * @param expiresAt  过期时间
@@ -26,6 +27,7 @@ public record TokenClaims(
         Set<String> apps,
         Set<String> roles,
         String tenantId,
+        String jti,
         Set<String> authorities,
         Long version,
         Instant expiresAt,

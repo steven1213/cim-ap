@@ -29,6 +29,7 @@ public enum BizCode {
     BAD_CREDENTIALS(1001, HttpStatus.UNAUTHORIZED, "biz.auth.badCredentials", "用户名或密码错误"),
     TOKEN_EXPIRED(1002, HttpStatus.UNAUTHORIZED, "biz.auth.tokenExpired", "令牌已过期"),
     TOKEN_REVOKED(1003, HttpStatus.UNAUTHORIZED, "biz.auth.tokenRevoked", "令牌已失效，请重新登录"),
+    ACCOUNT_LOCKED(1004, HttpStatus.UNAUTHORIZED, "biz.auth.accountLocked", "账户已锁定，请稍后再试或联系管理员"),
     NO_ADMISSION(1403, HttpStatus.FORBIDDEN, "biz.auth.noAdmission", "无该应用的准入权限"),
     ACCESS_DENIED(1404, HttpStatus.FORBIDDEN, "biz.auth.accessDenied", "无操作权限"),
 

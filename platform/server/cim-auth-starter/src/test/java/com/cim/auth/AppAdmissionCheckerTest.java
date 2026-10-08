@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AppAdmissionCheckerTest {
 
     private TokenClaims claims(Set<String> apps) {
-        return new TokenClaims("u1", "u1", apps, Set.of(), "t", Set.of(), 1L, null, Map.of());
+        return new TokenClaims("u1", "u1", apps, Set.of(), "t", null, Set.of(), 1L, null, Map.of());
     }
 
     @Test
