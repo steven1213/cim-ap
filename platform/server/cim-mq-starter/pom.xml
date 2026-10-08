@@ -13,7 +13,7 @@
     <artifactId>cim-mq-starter</artifactId>
     <packaging>jar</packaging>
     <name>cim-mq-starter</name>
-    <description>消息 Starter：发件箱(outbox)中继 / 集成事件（P4 实现）</description>
+    <description>消息 Starter：供应商中立 MQ 抽象 + 发件箱(outbox) 中继 + 消费幂等 + 重试/死信（Kafka/Pulsar/RabbitMQ 可插拔）</description>
 
     <dependencies>
         <dependency>
@@ -24,6 +24,53 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
+        <!-- 幂等去重（Redis 实现，缺省降级内存） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- MQ 厂商客户端：均 optional，按 cim.mq.type 选择性引入 -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pulsar</groupId>
+            <artifactId>pulsar-client</artifactId>
+            <version>3.3.1</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.rabbitmq</groupId>
+            <artifactId>amqp-client</artifactId>
+            <version>5.21.0</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- 集成测试用：发件箱落到内存 H2，消息走真实 RabbitMQ -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
