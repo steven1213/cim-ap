@@ -304,7 +304,7 @@ CREATE TABLE mds_test_program (
   effective_from   DATETIME(3),
   effective_to     DATETIME(3),
   description      VARCHAR(512),
-  version_         BIGINT NOT NULL DEFAULT 0,
+  version         BIGINT NOT NULL DEFAULT 0,
   deleted          BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -328,7 +328,7 @@ CREATE TABLE mds_test_program_item (
   is_critical      BIT DEFAULT 0,
   fail_bin_ref     VARCHAR(32),
   description      VARCHAR(512),
-  version_         BIGINT NOT NULL DEFAULT 0,
+  version         BIGINT NOT NULL DEFAULT 0,
   deleted          BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -351,7 +351,7 @@ CREATE TABLE mds_test_asset_usage_policy (
   on_exhaust_action        VARCHAR(16) NOT NULL,
   warning_ratio            DECIMAL(4,2),
   description              VARCHAR(512),
-  version_                 BIGINT NOT NULL DEFAULT 0,
+  version                 BIGINT NOT NULL DEFAULT 0,
   deleted                  BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -379,7 +379,7 @@ CREATE TABLE mds_probe_card (
   admin_status    VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
   status          VARCHAR(16) NOT NULL,
   description     VARCHAR(512),
-  version_        BIGINT NOT NULL DEFAULT 0,
+  version        BIGINT NOT NULL DEFAULT 0,
   deleted         BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -406,7 +406,7 @@ CREATE TABLE mds_load_board (
   admin_status    VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
   status          VARCHAR(16) NOT NULL,
   description     VARCHAR(512),
-  version_        BIGINT NOT NULL DEFAULT 0,
+  version        BIGINT NOT NULL DEFAULT 0,
   deleted         BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -430,7 +430,7 @@ CREATE TABLE mds_test_interface_qual (
   qualified_at         DATETIME(3),
   requal_interval_days INT,
   description          VARCHAR(512),
-  version_             BIGINT NOT NULL DEFAULT 0,
+  version             BIGINT NOT NULL DEFAULT 0,
   deleted              BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -496,3 +496,4 @@ com.cim.mds.testasset
 - **针痕/接触质量数据**：针痕深度、接触电阻等质量指标是否纳入寿命判定（可关联 [sampling-spc-design](sampling-spc-design.md)）。
 - **Socket 独立建模**：Socket 作为负载板上的**可更换子件**，是否需要独立台账（当前作为负载板属性）。
 - **与既有文档闭环**：本文引用 [reticle-design](reticle-design.md)（同范式）、[recipe-design](recipe-design.md)（资格范式）、[equipment-design](equipment-design.md)（tester/prober）、[carrier-design](carrier-design.md)（盒）、[bank-design](bank-design.md)（库）、[param-def-design](param-def-design.md)（测试项）、[reason-defect-design](reason-defect-design.md)（Bin）、[constraint-design](constraint-design.md)（新增 `TEST_ASSET_QUAL`/`TEST_ASSET_USAGE_LIMIT`）、[naming-rule-design](naming-rule-design.md)（新增 `entity_type`）。
+- **T9 尺寸码表（[99-backlog T9-1/T9-15](99-backlog.md)）**：探针卡 `wafer_size` 为 `VARCHAR` 且仅 `200`/`300`，须改为码表引用并纳入 **150**。

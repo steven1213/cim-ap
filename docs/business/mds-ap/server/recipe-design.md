@@ -420,3 +420,42 @@ com.cim.mds.recipe
 
 - **正文仍在 `body_ref`**：外围 Recipe 系统（SEMI E40）是权威正文源；本表是 MDS 侧的**结构化镜像**，用于**校验/对比/DCP**；
 - 同步方式：外围系统推送或受控导入，**不把 MDS 做成 Recipe 编辑器**（避免职责膨胀）。
+
+---
+
+## 附录 B · `recipe_class` 权威枚举（R1 场景走查补）
+
+> **补的缺口**：`mds_recipe.recipe_class`、`mds_equipment_capability.recipe_class`、`mds_equipment_model.recipe_class` 三处均为**自由 `VARCHAR(64)`**，无权威取值域。后果：① 三处写法易漂移（`METRO` vs `METROLOGY`）；② 量测/清洗/校准类配方无法被可靠筛选；③ 与 `equipment_capability.capability_type`（已枚举）语义重叠却不对齐。
+
+### B.1 权威取值（码表 `RECIPE_CLASS`）
+
+| 值 | 含义 | 典型设备 |
+| --- | --- | --- |
+| `PROCESS` | 工艺配方（改片子） | 刻蚀 / CVD / PVD / 注入 / 光刻 |
+| `METROLOGY` | 量测配方（量片子） | CD-SEM / 膜厚 / 椭偏 / 套刻 |
+| `CLEAN` | 清洗配方 | 湿法 / 干法清洗 |
+| `CALIBRATION` | 校准配方（设备自校） | 各设备内置 |
+| `SETUP` | 换型/准备配方（不走片或走 dummy） | 各设备 |
+| `MAINTENANCE` | 保养配方（PM 用） | 各设备 |
+| `OTHER` | 其他 / 待分类 | — |
+
+### B.2 与既有枚举的对齐
+
+| 枚举 | 现状 | 关系 |
+| --- | --- | --- |
+| `equipment_capability.capability_type` | `PROCESS`/`METROLOGY`/`CLEAN`/`OTHER` | **应与 `recipe_class` 同源**（同一码表），消除两套并行取值 |
+| `org_personnel.skill_type` | 含 `METROLOGY` | 技能分类独立，但**取值对齐**便于交叉查询 |
+
+### B.3 决策（RC7）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **RC7** | `recipe_class` 是固定枚举还是码表？ | **码表**（`mds_code_table(RECIPE_CLASS)`，系统码表 + 租户可扩展） | 与 `WAFER_SIZE`、单位等**同机制**；将来出现新量测原理/新工艺类型时可扩展而不改码 |
+
+### B.4 一致性校验
+
+- `RecipeValidator`：`recipe_class=METROLOGY` 的配方**不得**被绑定到 `capability_type=PROCESS` 的设备类；
+- 派工解析时按 `recipe_class` × 设备 `capability_type` **交叉校验**（约束 `CAPABILITY` 族）。
+
+**待补**：
+- 三处 `recipe_class` 字段统一改为码表引用（建议与 T9-1 `wafer_size` **同批处理**，避免两次改动同一批文件）。

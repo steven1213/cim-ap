@@ -213,7 +213,7 @@ CREATE TABLE mds_uom (
   is_base     BIT DEFAULT 0,
   symbol      VARCHAR(16),
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -231,7 +231,7 @@ CREATE TABLE mds_uom_conversion (
   factor      DECIMAL(20,10) NOT NULL,
   offset      DECIMAL(20,10) DEFAULT 0,
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -252,7 +252,7 @@ CREATE TABLE mds_code_table (
   is_extensible BIT DEFAULT 0,
   status       VARCHAR(16) NOT NULL,
   description  VARCHAR(512),
-  version_     BIGINT NOT NULL DEFAULT 0,
+  version     BIGINT NOT NULL DEFAULT 0,
   deleted      BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -273,7 +273,7 @@ CREATE TABLE mds_code_table_item (
   is_default  BIT DEFAULT 0,
   is_enabled  BIT DEFAULT 1,
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -315,6 +315,7 @@ com.cim.mds.refdata
 ## 8. 待补 / 后续
 
 - **码表种子清单**：把各域已有枚举（`carrier_type`/`bank_type`/`flow_type`/`E10_CATEGORY`/`material_category`…）登记为系统码表种子，形成"枚举全集"。
+- **T9 晶圆尺寸权威码表（[99-backlog T9-1](99-backlog.md)）**：新增系统码表 `WAFER_SIZE`，值域 **`100`/`125`/`150`/`200`/`300`**（`450` 预留，**租户可扩展**）。product / carrier / bank / material / test-asset / equipment 全部改为引用本码表，禁止 INT 与 VARCHAR 混用。
 - **缓存与发布**：码表变更经 [md-distribution-design](md-distribution-design.md) 推送给前端与下游服务，避免各自缓存不一致。
 - **单位换算方向**：是否允许反向换算自动推导（`1/factor`），或显式定义双向（`offset` 场景必须显式）。
 - **与既有文档闭环**：本文引用 `mds_material`（[material-design](material-design.md)）、`mds_equip_if_variable`（[equipment-interface-design](equipment-interface-design.md)）、`mds_process_flow_step_param`（[process-flow-design](process-flow-design.md)）、`mds_calibration_item`（[pm-calibration-design](pm-calibration-design.md)）及各域枚举字段。

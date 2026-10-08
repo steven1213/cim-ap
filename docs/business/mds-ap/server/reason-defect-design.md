@@ -267,7 +267,7 @@ CREATE TABLE mds_reason_code (
   default_for_alarm   BIT DEFAULT 0,
   status              VARCHAR(16) NOT NULL,
   description         VARCHAR(512),
-  version_            BIGINT NOT NULL DEFAULT 0,
+  version            BIGINT NOT NULL DEFAULT 0,
   deleted             BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -291,7 +291,7 @@ CREATE TABLE mds_defect_code (
   layer_scope  VARCHAR(64),
   status       VARCHAR(16) NOT NULL,
   description  VARCHAR(512),
-  version_     BIGINT NOT NULL DEFAULT 0,
+  version     BIGINT NOT NULL DEFAULT 0,
   deleted      BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -311,7 +311,7 @@ CREATE TABLE mds_bin_code (
   defect_code_ref VARCHAR(32),
   is_scrap        BIT DEFAULT 0,
   description     VARCHAR(512),
-  version_        BIGINT NOT NULL DEFAULT 0,
+  version        BIGINT NOT NULL DEFAULT 0,
   deleted         BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -335,7 +335,7 @@ CREATE TABLE mds_disposition_rule (
   status            VARCHAR(16) NOT NULL,
   revision           VARCHAR(16) NOT NULL,
   description       VARCHAR(512),
-  version_          BIGINT NOT NULL DEFAULT 0,
+  version          BIGINT NOT NULL DEFAULT 0,
   deleted           BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -355,7 +355,7 @@ CREATE TABLE mds_disposition_rule_item (
   cond_value  VARCHAR(256) NOT NULL,
   logic       VARCHAR(4) DEFAULT 'AND',
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -400,3 +400,77 @@ com.cim.mds.quality
 - **条件字段字典**：`cond_key` 的合法取值需与可求值上下文对齐（与 [constraint-design §4.7](constraint-design.md) 的求值上下文共享定义）。
 - **缺陷-原因因果链**：缺陷 → 原因（供 8D / 根因分析），可作为分析域的关联表。
 - **与既有文档闭环**：本文引用 `mds_equipment_state_transition`（[equipment-design](equipment-design.md)）、`mds_equip_if_alarm`（[equipment-interface-design](equipment-interface-design.md)）、`mds_layer`（[layer-design](layer-design.md)）、`mds_process_flow_step_param`（[process-flow-design](process-flow-design.md)）、新增 `entity_type=REASON/DEFECT/BIN`（[naming-rule-design](naming-rule-design.md)）、新增约束类型 `DISPOSITION_TRIGGER`（[constraint-design](constraint-design.md)）。
+- **T9 Future Hold / 预置动作模板（[99-backlog T9-13](99-backlog.md)）**：原因码之上补「预置动作模板」（MDS 定义模板，MES 执行实例），覆盖 Future Hold、指定返工、指定扣留。避免 MES 硬编码。
+
+---
+
+## 附录 A · 晶圆图与 Zone 定义（R1 场景走查补）
+
+> **补的缺口**：本域已有 `mds_defect_code` / `mds_bin_code`，但**无「晶圆图」与「Zone（区域）」定义**。实务中：
+> - CP/FT 产出 **bin map**（每颗 die 的 bin 分类）；
+> - 缺陷检测产出 **defect map**（缺陷坐标 / 类型）；
+> - **Edge exclusion（边缘排除环）** 直接决定**良率分母**；
+> - **Zone（中心/中间/边缘）** 决定分区良率与缺陷分布分析。
+>
+> **边界（关键）**：**图本身（每片的具体 map）是实时/测试产出，归 MES/YMS**；**MDS 只定义「map 规格 + zone 划分 + 边缘排除」等口径**。这与「定义 vs 实时态」总原则一致（[realtime-contract-design](realtime-contract-design.md)）。
+
+### A.1 为什么需要
+
+| 场景 | 若不定义会怎样 |
+| --- | --- |
+| **CP 良率口径** | 各系统对"哪些 die 计入分母"理解不同 → **良率对不上** |
+| **边缘环判定** | edge exclusion 宽度因产品/工艺而异（3mm / 2mm / 1mm）→ 必须按规格定义 |
+| **分区分析** | 中心 vs 边缘的缺陷率差异是**工艺诊断核心** → zone 定义必须统一 |
+| **图格式互认** | SEMI **E142**（Wafer Map 格式）要求一致的 map 规格（grid / 坐标系 / 原点） |
+
+### A.2 新增表
+
+**`mds_wafer_map_spec`（晶圆图规格）**
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` / `tenant_id` / 审计列 | — | 继承 `BaseDefData` |
+| `code` | VARCHAR(64) | 唯一 `(code, tenant_id, deleted)` |
+| `name` | VARCHAR(128) | 名称 |
+| `map_type` | VARCHAR(16) | `BIN_MAP` / `DEFECT_MAP` / `PARAM_MAP` |
+| `wafer_size_code` | VARCHAR(16) | 码表引用（`WAFER_SIZE`，见 [00-blueprint §8.2](00-blueprint.md)） |
+| `die_pitch_x` / `die_pitch_y` | DECIMAL(10,4) | die 间距（mm） |
+| `die_offset_x` / `die_offset_y` | DECIMAL(10,4) | 首个 die 偏移 |
+| `grid_origin` | VARCHAR(16) | 坐标系原点：`CENTER` / `LOWER_LEFT` |
+| `edge_exclusion_mm` | DECIMAL(6,2) | **边缘排除环宽度**（良率分母依据） |
+| `notch_direction` | VARCHAR(16) | 缺口方向：`UP` / `DOWN` / `LEFT` / `RIGHT` |
+| `map_format_std` | VARCHAR(16) | `E142` / `CUSTOM` |
+| `status` | VARCHAR(16) | `DRAFT` / `ACTIVE` / `DEPRECATED` |
+
+**`mds_wafer_zone`（区域定义）**
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| `map_spec_id` | VARCHAR(32) | NOT NULL, FK→`mds_wafer_map_spec.id` |
+| `code` | VARCHAR(32) | `CENTER` / `MIDDLE` / `EDGE` / `RING1`… |
+| `name` | VARCHAR(128) | 名称 |
+| `zone_type` | VARCHAR(16) | `RADIAL`（按半径）/ `RECT`（按矩形） |
+| `radius_min_mm` / `radius_max_mm` | DECIMAL(6,2) | `RADIAL` 时有效 |
+| `rect_x` / `rect_y` / `rect_w` / `rect_h` | DECIMAL(8,3) | `RECT` 时有效 |
+| `seq` | INT | 顺序 |
+
+- 唯一：`(map_spec_id, code, tenant_id, deleted)`。
+
+### A.3 决策（WM1–WM3）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **WM1** | 每片实际 map 放 MDS 吗？ | **不放**。MDS 只存规格与 zone 定义 | 实际 map 量级可达 TB 级，属实时/测试产出（MES/YMS）；MDS 存会造成容量与职责双膨胀 |
+| **WM2** | `edge_exclusion` 按产品还是按 map 规格？ | **按 map 规格**（产品经引用间接继承） | 避免产品表被空间参数污染；同尺寸产品可共享规格 |
+| **WM3** | zone 与 bin 的关系？ | **正交**：zone 是空间划分、bin 是电性判定；良率分析按 `(zone × bin)` 交叉统计 | 二者维度不同，合并会丢失分析能力 |
+
+### A.4 与 MES 衔接
+
+- MES/YMS 生成 map 时**按 `map_spec_id` 取口径**（grid / edge / zone），保证跨系统一致；
+- **良率分母**（有效 die 数）由 `edge_exclusion_mm` + die grid 推导，口径唯一；
+- **不存实时 map**；如需存档，归 YMS 或对象存储，MDS 只存**引用**；
+- **约束**：新增 `MAP_SPEC_REQUIRED`（可选）——"产出具 map 的工序须指定 map 规格"。
+
+**待补**：
+- **`map_spec_id` 的挂载点**：建议挂 `mds_product`（产品默认规格）或 `mds_route_operation`（工序级覆盖），需在 [product-design](product-design.md) / [route-design](route-design.md) 确认；
+- **E142 字段映射细则**：本标准版本（E142-0712）的字段对应表，待与 YMS 对接时细化。

@@ -306,3 +306,4 @@ CREATE INDEX idx_closure_anc  ON mds_location_closure (ancestor_id);
 - **API 设计**（README §4）：位置树查询（子树/祖先链/按 Area 列设备）、设备位置变更接口（触发 Hist + 可选 move_event）。
 - **数据权限**（`@DataPermission(Scope.FACTORY)`）：按厂区/租户的数据行级权限接入平台 RBAC（M6）。
 - **种子数据 / 初始化**：SITE/FAB 由实施导入，Area/Bay 由工艺工程维护。
+- **T9 厂级轮廓（[99-backlog T9-5/T9-10](99-backlog.md)）**：§1.1 文案写 FAB 有「前道/后道、洁净等级」，表结构**无 `fab_type`**。**已拍板**：`fab_type` 落位（前道/后道）；**`wafer_sizes` 不落 location**——单一来源归 [OperatingProfile](operating-profile-design.md)（可 override 到设备/工序），避免与 [multi-site-design](multi-site-design.md) 双源。混线自动化挂 Area/设备，不能只挂 Fab。

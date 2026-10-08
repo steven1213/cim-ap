@@ -298,7 +298,7 @@ CREATE TABLE mds_route (
   effective_from DATETIME(3),
   effective_to   DATETIME(3),
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time   DATETIME(3), create_user VARCHAR(64),
   event_time    DATETIME(3), event_user  VARCHAR(64),
@@ -315,7 +315,7 @@ CREATE TABLE mds_process (
   name          VARCHAR(128),
   class_id      VARCHAR(32),
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time   DATETIME(3), create_user VARCHAR(64),
   event_time    DATETIME(3), event_user  VARCHAR(64),
@@ -342,7 +342,7 @@ CREATE TABLE mds_route_operation (
   is_rework     BIT          DEFAULT 0,
   sub_route_id  VARCHAR(32),
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time   DATETIME(3), create_user VARCHAR(64),
   event_time    DATETIME(3), event_user  VARCHAR(64),
@@ -370,7 +370,7 @@ CREATE TABLE mds_route_flow (
   flow_type     VARCHAR(16)  NOT NULL,
   condition_expr VARCHAR(512),
   priority      INT          DEFAULT 0,
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time   DATETIME(3), create_user VARCHAR(64),
   event_time    DATETIME(3), event_user  VARCHAR(64),
@@ -419,3 +419,4 @@ com.cim.mds.route
 - **约束层衔接**：route 的结构校验（图合法性）之后，还需经 [约束设计](constraint-design.md) 做**工艺红线**校验——`REWORK` 边须配 `REWORK_LIMIT`、跨区/洁净敏感边须配 `Q_TIME`/`CARRIER_AREA_COMPAT`（即约束的**覆盖分析 COVERAGE**，见 constraint-design §4.6.4）。
 - **API 设计**：route 查询 / 版本发布 / 克隆 / 图可视化导出。
 - **与既有文档闭环**：本设计引用的 `mds_location` / `mds_equipment_class|type` / `mds_logic_recipe`（逻辑配方）分别见 [位置设计](location-design.md) / [设备设计](equipment-design.md) / [配方设计](recipe-design.md)。
+- **T9 工序级作业模式覆盖（[99-backlog T9-8/T9-14](99-backlog.md)）**：`route_operation` 可覆盖 `job_exec_mode` / `tracking_grain`（默认继承 Area/Fab 剖面）。混线 8 寸：同一路线上光刻半自动、湿法手动。MDS 只声明；MES 的 `lot_route_instance` 钉死投料时的模式与版本。

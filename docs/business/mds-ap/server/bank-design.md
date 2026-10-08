@@ -320,3 +320,4 @@ com.cim.mds.bank
 - **route `out_bank_code` 落地**：在路线校验服务阶段补该列 + FK + 校验（本文 §0.2 / §4.5 已预留绑定语义）。
 - **Bank 与 Equipment 邻近调度**：基于共享 `location_id`（同 BAY/SUBBAY）推导「工序设备 ↔ 邻 bay 储位」的搬运距离优化（排程侧）。
 - **Bank 行政态 ↔ 容量联动**：`admin_status=MAINTENANCE` 时 AMHS 应禁止新 carrier 入该库（由 AMHS 侧消费 `admin_status`）。
+- **T9 去 300mm 默认（[99-backlog T9-9](99-backlog.md)）**：`wafer_size` 现为 `NOT NULL` 单值 200/300，**缺 150、不支持混尺寸**。`amhs_enabled=0` 的人工货架/推车（6 寸常态）**不强制** `mds_bank_slot` / `mds_bank_port`。「300mm=Stocker、200mm=人工 Bank」是经验观察，不是模型约束。

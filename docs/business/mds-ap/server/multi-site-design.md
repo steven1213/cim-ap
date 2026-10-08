@@ -206,7 +206,7 @@ CREATE TABLE mds_md_scope_policy (
   inheritance_rule      VARCHAR(16),
   is_active             BIT DEFAULT 1,
   description           VARCHAR(512),
-  version_              BIGINT NOT NULL DEFAULT 0,
+  version              BIGINT NOT NULL DEFAULT 0,
   deleted               BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -227,7 +227,7 @@ CREATE TABLE mds_md_localization (
   override_json JSON,
   is_enabled   BIT DEFAULT 1,
   description  VARCHAR(512),
-  version_     BIGINT NOT NULL DEFAULT 0,
+  version     BIGINT NOT NULL DEFAULT 0,
   deleted      BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -284,4 +284,5 @@ com.cim.mds.multisite
 - **审批与权限**：本地覆盖应由本 fab 责任人审批（可挂 [md-governance-design](md-governance-design.md) 的 steward 与工作流）。
 - **跨 fab 一致性巡检**：定期比对各 fab 生效视图，发现"非预期差异"告警。
 - **AREA 级本地化**：是否需要更细粒度（当前按 SITE/FAB）。
+- **T9 OperatingProfile（[99-backlog T9-5/T9-12/T9-14](99-backlog.md)）**：GLOBAL/FAB/Override 机制可复用为**运行体制剖面**（`wafer_sizes[]`、`job_exec_mode`、`tracking_grain`、`handling_modes[]`），并允许 Area/设备/工序 override（8 寸混线）。另：`domain_enabled` 按剖面裁剪必填域，避免 6 寸厂被 155 表全量强加。**不是**再建平行多厂域。
 - **与既有文档闭环**：本文引用 [md-governance-design §3.1](md-governance-design.md)、[md-distribution-design §3.2](md-distribution-design.md)、[location-design](location-design.md)、[process-flow-design §4.5](process-flow-design.md)（既有 `fab_code` 先例）、[constraint-design §4.4](constraint-design.md)（specificity 思路）、[change-mgmt-design](change-mgmt-design.md)、[00-blueprint §4](00-blueprint.md)。

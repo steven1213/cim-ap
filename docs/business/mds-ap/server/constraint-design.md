@@ -354,6 +354,9 @@ Constraint = ⟨ Type, Subject↔Object, Assertion, Condition, Params ⟩ + ⟨ 
 > | `DISPOSITION_TRIGGER` | OTHER | [reason-defect-design §4.5](reason-defect-design.md) | 命中条件触发处置动作 | `disposition_rule_ref` |
 > | `SPC_OOC_HOLD` | QUALITY | [sampling-spc-design §4.6](sampling-spc-design.md) | 判异未闭环前不得放行 | `spc_rule_ref` |
 > | `OPERATOR_QUALIFIED` | CAPABILITY | [org-personnel-design §4.4](org-personnel-design.md) | 操作人须持证上岗 | `skill_code`、`scope_ref` |
+> | `METAL_CONTAM_MATCH` | COMPATIBILITY | 本域（R3 走查新增） | **金属污染等级匹配**：接触过 Cu（或其他金属离子源）的设备 / 载具 / 光罩不得用于非 Cu 区工艺 | `contam_class`、`metal_contam_level` |
+> | `CROSS_CONTAMINATION` | COMPATIBILITY | 本域 | **交叉污染隔离**：不同污染分区（Cu / 非 Cu / 金属离子等级）之间不得混用设备与载具 | `from_zone`、`to_zone` |
+> | `FLOOR_LIFE` | TIMING | 本域 | **开封后使用时限**（MSL 湿敏器件 / 光刻胶 / 化学品）：开封起算超时须烘烤或报废 | `msl_level`、`floor_life_hours` |
 | `SAFETY_REQUIREMENT` | OTHER | [ehs-safety-design §4.3](ehs-safety-design.md) | 设备/工序/区域的安全要求须满足（PPE/联锁/通风/侦测/消防） | `scope_ref`、`req_type` |
 | `CHEMICAL_COMPAT` | COMPATIBILITY | [ehs-safety-design §4.2](ehs-safety-design.md) | 化学品不得禁配混放/混用 | `substance_a`、`substance_b` |
 >
@@ -555,7 +558,7 @@ CREATE TABLE mds_constraint (
   effective_from   DATETIME(3),
   effective_to     DATETIME(3),
   description      VARCHAR(512),
-  version_         BIGINT       NOT NULL DEFAULT 0,
+  version         BIGINT       NOT NULL DEFAULT 0,
   deleted          BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -577,7 +580,7 @@ CREATE TABLE mds_constraint_param (
   ref_type      VARCHAR(32),
   ref_value     VARCHAR(128),
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -597,7 +600,7 @@ CREATE TABLE mds_constraint_set (
   status       VARCHAR(16)  NOT NULL,
   revision      VARCHAR(16)  NOT NULL,
   description  VARCHAR(512),
-  version_     BIGINT       NOT NULL DEFAULT 0,
+  version     BIGINT       NOT NULL DEFAULT 0,
   deleted      BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -616,7 +619,7 @@ CREATE TABLE mds_constraint_set_member (
   severity_override VARCHAR(16),
   is_enabled        BIT          DEFAULT 1,
   description       VARCHAR(512),
-  version_          BIGINT       NOT NULL DEFAULT 0,
+  version          BIGINT       NOT NULL DEFAULT 0,
   deleted           BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -642,7 +645,7 @@ CREATE TABLE mds_constraint_binding (
   effective_from    DATETIME(3),
   effective_to      DATETIME(3),
   description       VARCHAR(512),
-  version_          BIGINT       NOT NULL DEFAULT 0,
+  version          BIGINT       NOT NULL DEFAULT 0,
   deleted           BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -670,7 +673,7 @@ CREATE TABLE mds_constraint_eval (
   reviewed_by  VARCHAR(64),
   reviewed_at  DATETIME(3),
   description  VARCHAR(512),
-  version_     BIGINT       NOT NULL DEFAULT 0,
+  version     BIGINT       NOT NULL DEFAULT 0,
   deleted      BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -692,7 +695,7 @@ CREATE TABLE mds_constraint_eval_item (
   message       VARCHAR(512),
   detail_json   JSON,
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -747,3 +750,7 @@ com.cim.mds.constraint
 - **约束影响分析**：改一条约束会影响哪些 route/product/设备（反向依赖图），可作为试算能力的第 5 类。
 - **管理端可视化**：约束矩阵（实例 × 约束族）、冲突/缺口高亮、规则包预览。
 - **与既有文档闭环**：本文引用 `mds_route_flow`（[route-design](route-design.md)）、`mds_equipment_recipe_qual` / `mds_equipment_capability` / `mds_equipment_tech_node`（[equipment-design](equipment-design.md)）、`mds_carrier_type_compat`（[carrier-design](carrier-design.md)）、`mds_bank`（[bank-design](bank-design.md)）、`mds_process_flow_step_param`（[process-flow-design](process-flow-design.md)）、`mds_product.tech_node`（[product-design](product-design.md)）、`naming-rule-design`（姊妹横切层）。
+- **T9 派工约束按作业模式分支（[99-backlog T9-6](99-backlog.md) / [00-blueprint §8.1](00-blueprint.md)）**：
+  - `WAFER_SIZE_MATCH` 依赖设备侧尺寸字段（T9-2，经 `mds_equipment_wafer_size`），当前求值无权威列。
+  - 「须 ONLINE-REMOTE 才接受主机派工」对手动/半自动不成立。建议 `DISPATCH_READY`：FULL_AUTO→REMOTE+载具到位；SEMI_AUTO→配方解析+人确认；MANUAL→批次合法+行政态 ACTIVE，**不查 GEM**。
+  - 登记扩展类型前须回写本目录权威表（与既有回写约定一致）。

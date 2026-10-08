@@ -243,7 +243,7 @@ CREATE TABLE mds_carrier_type (
   clean_interval_days INT,
   pm_interval_days    INT,
   description        VARCHAR(512),
-  version_           BIGINT       NOT NULL DEFAULT 0,
+  version           BIGINT       NOT NULL DEFAULT 0,
   deleted            BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -268,7 +268,7 @@ CREATE TABLE mds_carrier (
   last_pm_at        DATETIME(3),
   commissioned_at   DATETIME(3),
   description       VARCHAR(512),
-  version_          BIGINT       NOT NULL DEFAULT 0,
+  version          BIGINT       NOT NULL DEFAULT 0,
   deleted           BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -289,7 +289,7 @@ CREATE TABLE mds_carrier_type_compat (
   area_code          VARCHAR(64),
   process_id         VARCHAR(32),
   description        VARCHAR(512),
-  version_           BIGINT       NOT NULL DEFAULT 0,
+  version           BIGINT       NOT NULL DEFAULT 0,
   deleted            BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -313,7 +313,7 @@ CREATE TABLE mds_carrier_owner (
   effective_from DATETIME(3),
   effective_to   DATETIME(3),
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -357,6 +357,11 @@ com.cim.mds.carrier
 - **MES / AMHS 运行实例衔接契约**：`carrier` 实时位置/承载 lot/传输态（E87）的导出订阅格式；`carrier_hist` 与实时态的边界。
 - **载具-载具关系**：同批绑定（multiple carriers per lot / lot split-merge）由 MES 管理，MDS 仅登记单体。
 - **API 设计**：载具登记/查询、按 area/尺寸/洁净态列可用载具、compat 维护、E87 状态机定义查询（复用设备状态机）。
+- **T9 多尺寸 / 多自动化（[99-backlog T9](99-backlog.md) / [00-blueprint §8.1](00-blueprint.md)）**：
+  - **尺寸码表（T9-1）**：`wafer_size` 现为 INT `200`/`300`/`450`，**缺 150mm（6 寸）**；**已拍板改为开放码表引用**（`100`/`125`/`150`/`200`/`300` + `450` 预留），与产品/物料/探针卡统一。
+  - **载具类型扩展（T9-3，P0）**：权威枚举仅 `FOUP/SMIF_POD/CASSETTE`。6/8 寸需 `OPEN_CASSETTE` / `BOAT` / `MAGAZINE` / `FOSB`（**Boat 已拍板归 `carrier_type`**，见 [00-blueprint §8.2](00-blueprint.md)）；`capacity` 不再默认 25（舟按管位）。
+  - **槽位定义（T9-4）**：类型级 `slot_map`（槽位数、编号规则、缺口/notch 方向、空槽策略）。实时片位归 MES（E90）；MDS 只给定义。
+  - **三向一致性**：设备侧尺寸字段补齐前（T9-2），`CarrierValidator` 的「匹配设备尺寸」无法落地。
 
 ---
 

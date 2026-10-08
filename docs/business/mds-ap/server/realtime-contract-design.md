@@ -251,7 +251,7 @@ CREATE TABLE mds_realtime_registry (
   is_critical_for_dispatch BIT DEFAULT 0,
   source_doc              VARCHAR(128),
   description             VARCHAR(512),
-  version_                BIGINT NOT NULL DEFAULT 0,
+  version                BIGINT NOT NULL DEFAULT 0,
   deleted                 BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -290,3 +290,4 @@ com.cim.mds.realtime
 - **降级运行的可观测性**：下游需上报"当前是否处于降级运行"，供运维大盘。
 - **回写限流与审计报表**：白名单回写的频次统计与异常检测（防"频繁抖动"）。
 - **与既有文档闭环**：[equipment-design §3.10–§3.14](equipment-design.md)、[carrier-design §4.2](carrier-design.md)、[bank-design §4.6](bank-design.md)、[recipe-design §4.3](recipe-design.md)、[process-flow-design §0.2](process-flow-design.md)、[md-distribution-design](md-distribution-design.md)、[expression-dsl-design](expression-dsl-design.md)、[00-blueprint §5](00-blueprint.md)。
+- **T9 执行契约（[99-backlog T9-6/T9-8](99-backlog.md)）**：七阶段时序现按全自动假设（派工注入 E10/控制模式/端口态）。须按 `job_exec_mode` 分支：MANUAL 不注入 GEM 态、SEMI_AUTO 注入人确认、FULL_AUTO 才走 CJ/PJ。新增解析 `resolve-exec-contract`。片/槽位实时态仍归 MES（E90），MDS 只发槽位**定义**。另：`carrier_required=0` 的工序（6 寸湿法/显微检）允许**无载具直投**，lot 仍存在（[operating-profile §8.3](operating-profile-design.md)）。

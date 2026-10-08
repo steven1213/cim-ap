@@ -106,6 +106,8 @@
 | `POST /apc/resolve-model` | 产品 + 工序 + 设备 | 生效 APC/FDC 模型 | [apc-fdc-design §4.1](apc-fdc-design.md) |
 | `GET /multisite/resolve-for-fab?scopeRef=F1` | 站点 | 该站点生效的主数据集合（含本地覆盖） | [multi-site-design §4.4](multi-site-design.md) |
 | `POST /material/explode-bom` | 工序/配方/产品 | 用料清单 | [material-design §8](material-design.md) |
+| `POST /operating/resolve-exec-contract` | 设备 **或** 工序 | **执行契约**（`job_exec_mode` / 能力位 / `required_txns[]` / `carrier_required` / 追踪粒度 / 域启用） | [operating-profile §8.1](operating-profile-design.md) |
+| `GET /carrier/resolve-slot-map` | 载具类型 | 类型级槽位定义（槽位数/编号规则/缺口方向） | [carrier-design](carrier-design.md) |
 | `POST /product-bom/explode` | 父产品 + 层数 | 结构展开（含损耗） | [product-bom-design §8](product-bom-design.md) |
 | `POST /org/check-qualified` | 人 + 范围 | 是否持证可用 | [org-personnel-design §4.4](org-personnel-design.md) |
 | `POST /pm/next-due` | 设备 | 下次 PM/校准到期 | [pm-calibration-design §4.3](pm-calibration-design.md) |
@@ -210,3 +212,4 @@
 - **灰度与兼容**：下游版本分布监控（结合 [md-distribution-design](md-distribution-design.md) 的 `_delivery`）以决定旧版接口下线时间。
 - **GraphQL 评估**：管理端多表联查是否引入（当前用 `include` 参数 + 专用解析接口替代）。
 - **与既有文档闭环**：本文契约引用 [00-blueprint §1.1](00-blueprint.md) 的**全部 36 个域**的 §8/接口段；认证对齐 [README §1](README.md)；错误码与响应体对齐平台 `Result`/`BizCode`（[platform design](../../../platform/server/design.md)）。
+- **T9 MES 执行契约（[99-backlog T9-8](99-backlog.md)）**：新增解析接口 `POST /api/v1/mds/operating/resolve-exec-contract`（按设备或工序）：输出 `{job_exec_mode, protocol, capabilities, default_tracking_grain, handling_modes[], carrier_required, required_txns[], resolved_chain[]}`（详见 [operating-profile §8.1](operating-profile-design.md)）；`POST /api/v1/mds/carrier/resolve-slot-map` 返回类型级槽位定义。热路径仍走订阅，这两支允许低频直连。

@@ -257,7 +257,7 @@ CREATE TABLE mds_reticle_set (
   revision         VARCHAR(16) NOT NULL,
   footer_mask_info VARCHAR(128),
   description     VARCHAR(512),
-  version_        BIGINT NOT NULL DEFAULT 0,
+  version        BIGINT NOT NULL DEFAULT 0,
   deleted         BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -286,7 +286,7 @@ CREATE TABLE mds_reticle (
   status            VARCHAR(16) NOT NULL,
   ext_attrs         JSON,
   description       VARCHAR(512),
-  version_          BIGINT NOT NULL DEFAULT 0,
+  version          BIGINT NOT NULL DEFAULT 0,
   deleted           BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -314,7 +314,7 @@ CREATE TABLE mds_reticle_qual (
   qualified_at        DATETIME(3),
   requal_interval_days INT,
   description         VARCHAR(512),
-  version_            BIGINT NOT NULL DEFAULT 0,
+  version            BIGINT NOT NULL DEFAULT 0,
   deleted             BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -335,7 +335,7 @@ CREATE TABLE mds_reticle_layer (
   multi_pattern_seq INT,
   is_main          BIT DEFAULT 0,
   description      VARCHAR(512),
-  version_         BIGINT NOT NULL DEFAULT 0,
+  version         BIGINT NOT NULL DEFAULT 0,
   deleted          BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -357,7 +357,7 @@ CREATE TABLE mds_reticle_usage_policy (
   on_exhaust_action      VARCHAR(16) NOT NULL,
   warning_ratio          DECIMAL(4,2),
   description            VARCHAR(512),
-  version_               BIGINT NOT NULL DEFAULT 0,
+  version               BIGINT NOT NULL DEFAULT 0,
   deleted                BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -401,3 +401,45 @@ com.cim.mds.reticle
 - **寿命计数回写**：EAP 上报曝光次数/晶圆数，MDS 在 `warning_ratio` 处预警，到期触发 `admin_status` 变更或约束判定。
 - **光罩送修闭环**：`admin_status=REPAIR` → 清洗/修复记录 → 复检 → 恢复 `ACTIVE`（记录归维护系统，可经 [pm-calibration-design](pm-calibration-design.md) 统一）。
 - **与既有文档闭环**：本文引用 `mds_layer`（[layer-design](layer-design.md)）、`mds_equipment` / `mds_equipment_model`（[equipment-design](equipment-design.md)）、`mds_carrier_type`（[carrier-design](carrier-design.md)）、`mds_bank`（[bank-design](bank-design.md)）、`mds_product_family`（[product-design](product-design.md)）、`mds_vendor`（[org-personnel-design](org-personnel-design.md)）、新增 `entity_type=RETICLE`（[naming-rule-design](naming-rule-design.md)）、新增约束类型 `RETICLE_USAGE_LIMIT`/`RETICLE_QUAL`（[constraint-design](constraint-design.md)）。
+
+---
+
+## 附录 B · Pellicle（光罩保护膜，R1 场景走查补）
+
+> **补的缺口**：`mds_reticle` 已有 `mask_type` / `plate_size` / `critical_dimension` / `pod_type_code` / `usage_policy_id`，但**无 pellicle 属性**。实务中 pellicle 直接决定**曝光能量补偿**、有**独立寿命**（到期换膜而非换光罩），EUV pellicle 更是特殊资产。
+
+### B.1 为什么需要
+
+| 场景 | 说明 |
+| --- | --- |
+| **曝光补偿** | pellicle 有透过率损失（DUV ~99%，EUV 显著更低）→ 曝光能量/时间需补偿，属配方参数基线（DCP） |
+| **独立寿命** | pellicle 有使用次数/时长寿命，到期需**更换膜**（光罩本体继续用） |
+| **颗粒防护** | pellicle 的作用是把落尘挡在**焦平面之外**；一旦破损即失效，必须立即下线 |
+| **EUV 特殊性** | EUV pellicle 极薄（~50nm）、透过率低、成本极高，需单独管理 |
+| **缺陷判定** | 有膜时颗粒不在焦面 → 不转印；无膜/破膜时颗粒直接成像 → 缺陷分类与判定规则不同 |
+
+### B.2 字段扩展（`mds_reticle`）
+
+| 新增列 | 类型 | 说明 |
+| --- | --- | --- |
+| `pellicle_type` | VARCHAR(16) | `NONE` / `DUV` / `EUV` / `THIN`（无膜 / DUV 膜 / EUV 膜 / 薄膜） |
+| `pellicle_transmittance` | DECIMAL(6,3) | 透过率 %（供曝光补偿计算） |
+| `pellicle_install_date` | DATE | 最近一次安装日期 |
+| `pellicle_life_policy_id` | VARCHAR(32) | FK→`mds_reticle_usage_policy.id`（**复用**寿命策略，增加 pellicle 维度阈值） |
+
+### B.3 决策（PE1–PE2）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **PE1** | pellicle 独立成表还是扩展字段？ | **扩展字段 + 复用 `mds_reticle_usage_policy` 的寿命维度** | pellicle 与 reticle 是 **1:1 挂载**（同生共死），不是独立资产；更换记录归维护系统（可经 [pm-calibration-design](pm-calibration-design.md) 统一） |
+| **PE2** | pellicle 寿命是否与曝光次数同源？ | **同一计数器、不同阈值** | 曝光次数同时驱动 reticle 与 pellicle 寿命；在 `usage_policy` 增加 `pellicle_warning_ratio` / `pellicle_limit` 阈值组 |
+
+### B.4 与 MES 衔接
+
+- **派工**：`resolve-eligible` 返回光罩时**一并校验 pellicle 寿命余量**；
+- **曝光补偿**：`pellicle_transmittance` 供 [recipe-design](recipe-design.md) 的参数基线（DCP）消费；
+- **约束**：`RETICLE_USAGE_LIMIT` 扩展 pellicle 维度（同一约束类型，多阈值，不新增类型）。
+
+**待补**：
+- **pellicle 更换记录**：安装/拆卸/清洗历史归维护系统，MDS 只存**当前状态 + 寿命策略**（与光罩送修闭环同源）；
+- **膜破损上报路径**：EAP/MES 检测到破膜 → 触发 `admin_status=HOLD` 的**回写白名单**需在 [realtime-contract-design](realtime-contract-design.md) 确认。

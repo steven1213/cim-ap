@@ -1078,6 +1078,10 @@ com.cim.mds.server
 - **与位置设计联动**：设备停机（`lifecycle_status`/`admin_status`）是否反向影响位置可用性视图，需在位置设计 §7 补充。
 - **配方正文(body)**：SEMI E40 配方参数在外围 Recipe 系统；MDS 仅存资格引用（§3.8）。
 - **API 设计**（README §4）：设备树查询（含模块/端口/腔体行政态）、按 Area/Class/工艺节点/生命周期态列设备、所有权维护、E10 状态机定义查询（供 MES 拉取）、搬迁接口（触发 Hist + 可选 move_event）、配方资格维护。
+- **T9 多尺寸 / 多自动化（[99-backlog T9](99-backlog.md) / [00-blueprint §8.1](00-blueprint.md)）**：
+  - **设备尺寸断链（T9-2，P0）**：本表无 `wafer_size` / `wafer_sizes[]`，但 [carrier-design §4.3](carrier-design.md) 与约束 `WAFER_SIZE_MATCH` 均假定「设备对应尺寸」存在。**已拍板**：新增 `mds_equipment_wafer_size` 关联表（与 `mds_equipment_tech_node` 同范式），**型号级默认 + 设备级覆盖**；否则三向一致性无法求值。
+  - **`remote_capable` 不足以表达作业模式（T9-5/T9-6）**：**三维正交（T9-17）**：`process_mode`（物理架构）× `job_exec_mode`（作业模式）× GEM `Control State`（实时通信态）**三者正交、不可互推**（见 [operating-profile §2.1](operating-profile-design.md)）。手动/半自动设备允许 `ONLINE-LOCAL` 甚至无 SECS 仍生产；仅 FULL_AUTO 才强制 `ONLINE-REMOTE`。
+  - **派工事务集**：向 MES 声明本设备走 JobIn/JobOut 还是 Control Job/Process Job（定义归 MDS，实例归 MES）。
 
 ---
 
@@ -1121,3 +1125,126 @@ com.cim.mds.server
 | **新设备评估** | 设备验收时录入能力值，形成"设备能力台账"，支撑良率与工艺能力分析 |
 | **约束表达** | 定量要求可写成约束（`CAPABILITY_THRESHOLD`），由统一求值引擎执行 |
 - **数据权限**：`@DataPermission(Scope.FACTORY)` 按厂区行级权限接入平台 RBAC（M6）。
+
+---
+
+## 附录 B · 腔体匹配与腔体级配方资格（R1 场景走查补）
+
+> **补的缺口**：`mds_equipment_module` 已能表达腔体（`module_type=CHAMBER` + `chamber_no`），但**缺「腔体匹配」与「腔体级配方资格」**——这是多腔设备（刻蚀/CVD/PVD/清洗）的刚需：同型号不同腔体的工艺速率天然存在 ±1~3% 差异，同一 lot 必须只用**匹配组**内的腔体；且**A 腔合格不代表 B 腔合格**。
+
+### B.1 为什么需要（行业依据）
+
+| 场景 | 说明 |
+| --- | --- |
+| **Chamber matching** | 多腔设备同一 lot 只走同组腔体，避免腔间差异导致片内/片间不均；匹配组按实测 offset 划分 |
+| **腔体级配方资格** | 配方需按腔体分别 QUAL（新配方 / 新腔体 / 大修后）；设备级资格只是"至少一个腔合格"的粗粒度 |
+| **腔体级 PM/校准** | 腔体独立 PM 周期（已由 `mds_equipment_module.admin_status` 支撑），与匹配组联动（组内任一腔 DOWN → 组降级） |
+| **腔体 offset 补偿** | APC/RtR 的腔体偏移参数供 [apc-fdc-design](apc-fdc-design.md) 消费 |
+
+### B.2 实体
+
+```
+mds_equipment ──< mds_equipment_module (CHAMBER)
+      │                  │
+      │                  └──< mds_equipment_chamber_match_member >──┐
+      │                                                             │
+      └──< mds_equipment_chamber_match (匹配组: criteria / status) ─┘
+      │
+      └──< mds_equipment_recipe_qual (+module_id 可空 = 腔体级资格)
+```
+
+### B.3 新增表
+
+**`mds_equipment_chamber_match`（腔体匹配组）**
+
+| 列 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` / `tenant_id` / 审计列 | — | — | 继承 `BaseDefData`；`@History(SNAPSHOT)` |
+| `equipment_id` | VARCHAR(32) | NOT NULL, FK→`mds_equipment.id` | 所属设备 |
+| `code` | VARCHAR(64) | 唯一 `(equipment_id, code, tenant_id, deleted)` | 匹配组编码（如 `CH-A`） |
+| `name` | VARCHAR(128) | | 名称 |
+| `match_criteria` | JSON | | 匹配依据（如 `{"etch_rate_tolerance":"2%"}`） |
+| `match_status` | VARCHAR(16) | NOT NULL | `MATCHED` / `PENDING` / `BROKEN` |
+| `last_match_time` | DATETIME(3) | | 最近一次匹配时间 |
+| `status` | VARCHAR(16) | NOT NULL | `ACTIVE` / `DEPRECATED` |
+
+**`mds_equipment_chamber_match_member`（组成员）**
+
+| 列 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `match_id` | VARCHAR(32) | NOT NULL, FK→`mds_equipment_chamber_match.id` | 组 |
+| `module_id` | VARCHAR(32) | NOT NULL, FK→`mds_equipment_module.id` | 腔体 |
+| `chamber_offset` | DECIMAL(12,6) | | 相对组基准的偏移（供 APC 补偿） |
+| `is_primary` | BIT | DEFAULT 0 | 是否基准腔 |
+
+- 唯一：`(match_id, module_id, tenant_id, deleted)`。
+
+**`mds_equipment_recipe_qual` 扩展**（该表权威定义在 [recipe-design §3.4](recipe-design.md)）：
+
+| 新增列 | 类型 | 说明 |
+| --- | --- | --- |
+| `module_id` | VARCHAR(32) | 可空。**空 = 设备级资格**（任一腔可跑）；**非空 = 腔体级资格**（仅该腔合格） |
+
+- 唯一键由 `(equipment_id, recipe_id, tenant_id, deleted)` 调整为 **`(equipment_id, module_id, recipe_id, tenant_id, deleted)`**；
+- 派工时：若产品/工序要求腔体级，取 `module_id IS NOT NULL` 的记录并**限定在该设备的匹配组内**。
+
+### B.4 决策表（CM1–CM3）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **CM1** | 匹配组是设备内还是跨设备？ | **设备内**（归属 `equipment_id`） | 腔间匹配发生在同一台设备的腔体之间；跨设备的"tool matching"用 `mds_equipment_group`（派工组）表达 |
+| **CM2** | 腔体级资格是新建表还是扩展字段？ | **扩展 `mds_equipment_recipe_qual` 加 `module_id`** | 资格语义完全一致，仅粒度不同；新建表会产生两套资格逻辑 |
+| **CM3** | 匹配组状态是否驱动派工？ | **是**：`match_status=BROKEN` 的组不得用（约束 `CHAMBER_MATCH_REQUIRED`） | 失配组跑片是良率事故的常见根因 |
+
+### B.5 与 MES 衔接
+
+- **派工**：`resolve-eligible` 在候选设备内**再按匹配组**筛可用腔体；腔体级资格由 `resolve-ppid` 的腔体维度返回；
+- **实时态边界**：腔体 E10 态归 EAP/MES（MDS 不存），但**匹配组成员关系属定义**（MDS 存）；
+- **约束**：新增 `CHAMBER_MATCH_REQUIRED`（CAPABILITY 族）——"要求腔体匹配的工序，同一 lot 不得跨匹配组"。
+
+### B.6 代码结构（追加）
+
+```
+com/cim/mds/equipment/
+  ├── EquipmentChamberMatch.java          # @Entity 继承 BaseDefData + @History(SNAPSHOT)
+  ├── EquipmentChamberMatchMember.java    # @Entity 继承 BaseDefData
+  ├── ChamberMatchRepository.java
+  └── ChamberMatchService.java            # 匹配组维护 + 组内腔体可用性推导
+```
+
+**待补**：
+- **匹配度量接入**：`match_criteria` 的实测值来源（EAP/MES 汇总）与匹配计算（均值/方差/极差）归**分析系统**，MDS 只存准则与结果；
+- **tool matching（跨设备）**：与 `mds_equipment_group` 的分工需在 [process-flow-design](process-flow-design.md) 派工组处明确。
+
+---
+
+## 附录 C · 批容量（Batch Size）能力（R2 多厂型核验补）
+
+> **补的缺口**：`process_mode=BATCH` 已能表达"这台设备批量处理"，但**无批容量**。后果：组批无法校验"这一舟装不装得下"；6 寸炉管（常 100~150 片/舟）与 8 寸清洗（25/50 片）的差异无从表达。
+
+### C.1 落点：`mds_equipment_capability` 增能力种类
+
+在附录 A 的量化能力中增：
+
+| `capability_kind` | 单位 | 说明 |
+| --- | --- | --- |
+| `BATCH_SIZE` | `PCS` | **批容量**（一舟/一批可装晶圆数上限） |
+| `BATCH_SIZE_MIN` | `PCS` | **最小批量**（部分炉管有最小装载要求，空载/欠载运行会损伤炉管或影响均匀性） |
+
+- 唯一键 `(equipment_id, capability_kind, capability_key, tenant_id, deleted)` 不变；
+- 与 `process_mode=BATCH` 配套：非 BATCH 设备不填。
+
+### C.2 与 MES / 约束衔接
+
+- **组批**：`BATCHING` 约束的"批上限"取自 **`BATCH_SIZE`（设备侧权威）**，而非 `carrier_type.capacity`（载具侧）；三者需**交叉校验**：装载量 ≤ 载具容量 ≤ 设备批容量；
+- **与 OperatingProfile 的分工**：剖面的 `batch_capable`（布尔）只是"该作用域是否允许批量"的**开关**，**容量值仍在设备能力**（避免两处存值）；
+- **混装策略**：`BATCH_SIZE_MIN` 影响"凑批"决策（凑不满是否允许开炉）。
+
+### C.3 决策（BS1–BS2）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **BS1** | 批容量放设备能力还是 OperatingProfile？ | **设备能力**（`mds_equipment_capability`） | 容量是**设备事实**，不是运行体制策略；放剖面会导致同一设备多作用域重复存值 |
+| **BS2** | 批容量按设备还是按腔体？ | **设备级为主**；多舟位批处理（如双舟炉管）如需细化，用 `capability_key` 区分 | 保持能力表扁平，避免再引入"腔体级能力表" |
+
+**待补**：`BATCH_SIZE` 与 [lot-type-design](lot-type-design.md) 混批策略、[constraint-design](constraint-design.md) `BATCHING` 约束的联动规则需在组批实现时细化。

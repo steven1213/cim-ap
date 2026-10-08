@@ -4,9 +4,9 @@
 > **总纲（全局关系、术语表、编码唯一性、MES 消费视角）见 👉 [00-blueprint.md](00-blueprint.md)**。
 > MDS（主数据 / 设备主数据）是业务层的一个 ap，与 `iam-ap`、`mes-ap` 同构。
 >
-> 文档规模：**39 篇 design 文档**。**权威域清单见 👉 [00-blueprint §1.1](00-blueprint.md)**（26 业务主数据域 + 2 基础参考数据域 + 4 横切治理层 + 2 横切规范 + 2 集成接口 = 36 个域，另加 3 篇交付管理 + 1 篇总纲）。
+> 文档规模：**40 篇 design 文档**。**权威域清单见 👉 [00-blueprint §1.1](00-blueprint.md)**（27 业务主数据域 + 2 基础参考数据域 + 4 横切治理层 + 2 横切规范 + 2 集成接口 = 37 个域，另加 3 篇交付管理 + 1 篇总纲）。
 >
-> 📋 **最近一次评审**：[98-audit-report.md](98-audit-report.md)（第 2 轮五轮次深度审核，P0×3 / P1×4 / P2×7）；**待办与 DoD**：[99-backlog.md](99-backlog.md)。
+> 📋 **最近一次评审**：[98-audit-report.md](98-audit-report.md)（第 2 轮五轮次深度审核，P0×3 / P1×4 / P2×7）；**业务覆盖缺口**：[00-blueprint §8.1](00-blueprint.md) + [99-backlog T9](99-backlog.md)（6/8/12 寸、三自动化、MES 执行契约）；**待办与 DoD**：[99-backlog.md](99-backlog.md)。
 
 ## 0. 定位
 
@@ -280,12 +280,31 @@ MDS 的**第二条横切治理层**——与 [命名/编码规则](naming-rule-d
 
 **同期补强的既有域**：[pm-calibration 附录 B](pm-calibration-design.md)（**计量标准器台账与溯源链**，补 ISO 17025）、[md-governance 附录 A](md-governance-design.md)（**数据保留与归档策略**）。
 
+## 3.12 第四轮补充（业务覆盖 T9：多尺寸 / 多自动化）
+
+> 本节来自**业务覆盖评审**：现有文档按 **300mm 全自动前道**写透、向 200mm 外推，**150mm（6 寸）未建模**、自动化被压成 GEM `remote_capable` 一维、MES 执行契约不足。评审提出 18 条（T9-1…T9-18），**三项口径已拍板**（[00-blueprint §8.2](00-blueprint.md)）。
+
+| # | 名称 | 文档 | 核心内容 |
+| - | ---- | ---- | -------- |
+| 3.12.1 | **运行体制剖面 OperatingProfile** | [operating-profile-design.md](operating-profile-design.md) | **本轮唯一新建域**（第 40 篇）。挂 `GLOBAL/FAB/AREA/EQUIPMENT/ROUTE_OPERATION` 五作用域，越具体越优先；**权威是能力位**（`supports_host_start`/`ppid_download`/`job_create`/`carrier_id_read` + `protocol`），`job_exec_mode`（MANUAL/SEMI_AUTO/FULL_AUTO）为**派生摘要**；含 `handling_modes[]`、`carrier_required`、`batch_capable`、`default_tracking_grain`、`domain_profile`（域启用开关，**不裁表**） |
+
+**三项拍板结论**（[00-blueprint §8.2](00-blueprint.md)）：
+
+| 议题 | 结论 | 关键理由 |
+| --- | --- | --- |
+| `wafer_size` | **开放码表**（`100/125/150/200/300` + `450` 预留 + 租户可扩展），字段统一 `wafer_size_code` | 是**枚举码**非物理量；写死 INT 遇 4/5 寸或化合物半导体（SiC/GaN 主流 150）需改码 |
+| 自动化 | **L1 剖面 `OperatingProfile`**（非独立域）；**权威=能力位**，作业模式为派生 | 是策略数据非业务域；MES 需按**能力**分支而非按**等级**猜 |
+| Boat | **`carrier_type`**（kind=`BOAT`） | 本质是装片容器（槽位/容量/清洗/寿命/搬运），与 carrier 同构；`tooling` 不装片 |
+
+**四项补强**：④ 三维正交声明（`process_mode` × `job_exec_mode` × GEM `Control State`）⑤ 尺寸集合**单一来源**归剖面、`mds_location` 不冗余存 ⑥ 域裁剪**不裁表**，只做「启用开关 + 必填降级」⑦ 无载具直投路径与 6 寸批量工艺。
+
 ## 4. 待补章节（后续填充）
 
 | 章节 | 内容 | 状态 |
 | --- | --- | --- |
-| 业务域与实体 | MDS 主数据模型、与平台通用数据模型（§9）的衔接 | ✅ **39 篇设计文档**，覆盖 **7 块核心主数据**（位置/设备/工艺路线/产品/载具/配方/仓库）+ **工艺流展开层与流程对比**（[process-flow-design.md](process-flow-design.md)）+ 全部扩展域（§3.9 / §3.10 逐域列出，**权威清单见 [00-blueprint §1.1](00-blueprint.md)**：共 26 个业务主数据域 + 2 个基础参考数据域）+ **横切治理**（[编码](naming-rule-design.md) / [约束](constraint-design.md) / [变更](change-mgmt-design.md) / [元治理](md-governance-design.md)）+ **横切规范**（[表达式 DSL](expression-dsl-design.md) / [参数字典](param-def-design.md) / [实时态契约](realtime-contract-design.md)）+ **集成**（[分发订阅](md-distribution-design.md) / [设备接口](equipment-interface-design.md) / [API](api-design.md)）；**总纲见 [00-blueprint.md](00-blueprint.md)** |
+| 业务域与实体 | MDS 主数据模型、与平台通用数据模型（§9）的衔接 | ✅ **40 篇设计文档**，覆盖 **7 块核心主数据**（位置/设备/工艺路线/产品/载具/配方/仓库）+ **工艺流展开层与流程对比**（[process-flow-design.md](process-flow-design.md)）+ 全部扩展域（§3.9 / §3.10 逐域列出，**权威清单见 [00-blueprint §1.1](00-blueprint.md)**：共 27 个业务主数据域 + 2 个基础参考数据域）+ **横切治理**（[编码](naming-rule-design.md) / [约束](constraint-design.md) / [变更](change-mgmt-design.md) / [元治理](md-governance-design.md)）+ **横切规范**（[表达式 DSL](expression-dsl-design.md) / [参数字典](param-def-design.md) / [实时态契约](realtime-contract-design.md)）+ **集成**（[分发订阅](md-distribution-design.md) / [设备接口](equipment-interface-design.md) / [API](api-design.md)）；**总纲见 [00-blueprint.md](00-blueprint.md)** |
 | 认证与准入对接 | 验签、JWKS 拉取、`apps` claim 校验 | ✅ 见 §1/§2 |
 | 内部 RBAC | 菜单 / 按钮 / 数据权限（平台 §21.1） | 待 M6 |
 | API 设计 | 模块接口、版本策略 | ✅ 见 [api-design.md](api-design.md)（双通道、12 个解析接口、MES 消费接口清单、版本与契约测试） |
 | 快速开始与部署 | 基于 platform 的启动、部署形态 | 待补 |
+| **6/8/12 寸 + 三自动化覆盖（T9）** | 尺寸码表含 150、设备尺寸字段、载具 Boat/OpenCassette、OperatingProfile、派工按作业模式分支、MES 执行契约 | 🟡 已登记 [00-blueprint §8.1](00-blueprint.md) / [99-backlog T9](99-backlog.md)，**三项口径已拍板**（[00-blueprint §8.2](00-blueprint.md)），可落表 |

@@ -40,16 +40,16 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 
 | 类别 | 数量 | 内容 |
 | --- | --- | --- |
-| **业务主数据域** | **26** | 位置、设备、工艺路线、产品、载具、配方、仓库、**工艺流**（工艺展开层）、物料耗材、层、光罩、**测试资产**、**工装夹具**、设备接口点表、PM/校准、原因码与处置、组织/人员/日历、受控文档、采样与 SPC、**批次类型策略**、**洁净度与环境**、**产品结构 BOM**、**厂务 Utility**、**APC/FDC 模型**、**多工厂策略**（策略型域）、**EHS 与安全** |
+| **业务主数据域** | **27** | 位置、设备、工艺路线、产品、载具、配方、仓库、**工艺流**（工艺展开层）、物料耗材、层、光罩、**测试资产**、**工装夹具**、设备接口点表、PM/校准、原因码与处置、组织/人员/日历、受控文档、采样与 SPC、**批次类型策略**、**洁净度与环境**、**产品结构 BOM**、**厂务 Utility**、**APC/FDC 模型**、**多工厂策略**（策略型域）、**EHS 与安全**、**运行体制剖面**（[operating-profile](operating-profile-design.md)，策略型域） |
 | 基础参考数据域 | 2 | 单位与字典（[uom-dict-design](uom-dict-design.md)）、工艺参数字典（[param-def-design](param-def-design.md)） |
 | 横切治理层 | 4 | 编码治理（[naming-rule](naming-rule-design.md)）、约束治理（[constraint](constraint-design.md)）、变更治理（[change-mgmt](change-mgmt-design.md)）、元治理（[md-governance](md-governance-design.md)） |
 | 横切规范与契约 | 2 | 表达式 DSL（[expression-dsl](expression-dsl-design.md)）、实时态契约（[realtime-contract](realtime-contract-design.md)） |
 | 集成与接口 | 2 | 主数据分发与订阅（[md-distribution](md-distribution-design.md)）、接口总纲（[api-design](api-design.md)） |
 | 交付管理 | 2 | 待补清单与验收标准（[99-backlog](99-backlog.md)）、非功能设计（[nonfunctional-design](nonfunctional-design.md)） |
 | 总纲 | 1 | 主数据蓝图（本文） |
-| **合计** | **39** | = 39 篇 design 文档（本目录 README 另计） |
+| **合计** | **40** | = 40 篇 design 文档（本目录 README 另计） |
 
-> **域注册（[md-governance §3.1](md-governance-design.md) `mds_md_domain`）的种子以本表为准**：**36 个域**（26 + 2 + 4 + 2 + 2）＋交付管理与总纲不入域。四处口径（本表 / README / api-design / md-governance 种子）**已对齐**。
+> **域注册（[md-governance §3.1](md-governance-design.md) `mds_md_domain`）的种子以本表为准**：**37 个域**（27 + 2 + 4 + 2 + 2）＋交付管理与总纲不入域。四处口径（本表 / README / api-design / md-governance 种子）**已对齐**。
 
 ---
 
@@ -64,6 +64,7 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
    │ mds_location(树)       │      │              │               │
    │ mds_org_unit / vendor  │      │              │               │
    │ mds_work_calendar/shift│      │              │               │
+   │ mds_operating_profile  │      │              │               │
    └───────▲────────────────┘      │              │               │
            │ location_id           │              │               │
    ┌───────┴──── L2 资产主数据 ────┴──────────────┴───────────────┴────┐
@@ -139,6 +140,12 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | **处置（Disposition）** | 不合格品去向（放行/扣留/返工/报废） | [reason-defect-design](reason-defect-design.md) |
 | **约束 vs 处置** | 约束管「可否」（事前），处置管「怎么办」（事后） | 两篇 |
 | **规则包（Rule Pack）** | 编译后的只读规则快照，供下游缓存 | [md-distribution-design](md-distribution-design.md) |
+| **运行体制（Operating Regime）** | 厂/区/设备/工序四级作用域上的「尺寸集合 + 作业模式 + 追踪粒度 + 搬运模式 + 通信能力」综合声明 | [operating-profile-design](operating-profile-design.md) |
+| **能力位（Capability Flags）** | 设备客观**能不能**做某事（主机启动 / PPID 下发 / CJ-PJ 创建 / 载具读头）——**权威**；作业模式由其派生 | [operating-profile-design §2.2](operating-profile-design.md) |
+| **作业模式（Job Exec Mode）** | `MANUAL` / `SEMI_AUTO` / `FULL_AUTO`；与 `process_mode`（物理架构）、GEM Control State（实时通信态）**三者正交** | [operating-profile-design §2.1](operating-profile-design.md) |
+| **追踪粒度（Tracking Grain）** | `LOT` / `WAFER` / `DIE`；MDS 声明**默认 + 工序级 override**，实例（片在哪个槽）归 MES | [operating-profile-design](operating-profile-design.md) |
+| **搬运模式（Handling Mode）** | **集合** `WALK` / `CART` / `AGV` / `OHT`；Bank/载具是否强制 AMHS 端口据此裁剪 | [bank-design](bank-design.md) |
+| **载体必需性（carrier_required）** | 该工序是否**必须有载具**；6 寸部分工序为「无载具直投」，lot 仍存在 | [operating-profile-design §8.3](operating-profile-design.md) |
 
 ---
 
@@ -186,7 +193,7 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | 1 | **投料 lot release** | 产品、`tech_node`、可用路线、工艺流参数窗口、用料 BOM、**批次类型策略**、工艺规范、路线生效窗口 | product / route / process-flow / material / **lot-type** / constraint | 订阅快照 | `CAPABILITY` `WINDOW` `COMPATIBILITY` |
 | 2 | **选路线 route selection** | 产品↔路线（默认+备选）、路线状态与版本 | product / route | 订阅 | `WINDOW`（生效期） |
 | 3 | **组批 batch formation** | 设备 `process_mode`、组批上限、**混批策略**、批次类型优先级 | equipment / constraint / **lot-type** | 订阅 | `BATCHING` |
-| 4 | **派工 dispatch** | 设备组与成员、设备能力/工艺节点/尺寸、配方资格与 **PPID**、**光罩资格与寿命**、**测试资产资格与寿命**、设备日历与**认证矩阵**、控制模式、工艺参数窗口、**厂务就绪** | equipment / recipe / reticle / **test-asset** / org / equipment-interface / param-def / **facility-utility** | 订阅（**热路径本地求值**） | `COMPATIBILITY` `CAPABILITY` `CAPACITY` `WINDOW` `PM_INTERVAL` `OPERATOR_QUALIFIED` |
+| 4 | **派工 dispatch** | 设备组与成员、设备能力/工艺节点/**尺寸（设备侧权威字段待 T9-2）**、配方资格与 **PPID**、**光罩资格与寿命**、**测试资产资格与寿命**、设备日历与**认证矩阵**、控制模式、**作业模式（T9-5/T9-6）**、工艺参数窗口、**厂务就绪** | equipment / recipe / reticle / **test-asset** / org / equipment-interface / param-def / **facility-utility** | 订阅（**热路径本地求值**） | `COMPATIBILITY` `CAPABILITY` `CAPACITY` `WINDOW` `PM_INTERVAL` `OPERATOR_QUALIFIED`；**FULL_AUTO 才强制 ONLINE-REMOTE** |
 | 5 | **搬运 carrier assignment** | 载具类型兼容（可进区域）、归属库、库容、载具行政/洁净态 | carrier / bank / constraint | 订阅 | `CARRIER_AREA_COMPAT` |
 | 6 | **上机/下机 move-in / out** | 设备点表（变量与事件）、PPID 下发、工艺参数窗口、Q-Time 起点 | equipment-interface / recipe / process-flow / constraint | 订阅 | `TIMING` `QUALITY` |
 | 7 | **过程监控与判异** | **参数定义**（统一语义）、采样计划、SPC 判异规则、OCAP 动作链 | **param-def** / sampling-spc | 订阅 | `SPC_OOC_HOLD` |
@@ -196,8 +203,10 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | 11 | **环境合规** | 洁净等级、环境监控点与限值 | **cleanliness-env** | 订阅 | 与区域联动 |
 | 12 | **先进控制** | APC/FDC 模型与适用上下文 | **apc-fdc** | 订阅 | 下发 APC 系统 |
 | 13 | **追溯 genealogy** | 层、光罩、投入物料批次、载具、产品结构 BOM | layer / reticle / material / carrier / **product-bom** | **按需查询**（低频） | — |
+| 14 | **执行契约解析** | `job_exec_mode`、`tracking_grain`、`required_txns[]`（JobIn/Out vs CJ/PJ） | OperatingProfile / equipment / process-flow | 订阅 + `resolve-exec-contract` | 按作业模式分支，禁止用 REMOTE 一刀切 |
+| 15 | **片/槽位追踪定义** | 载具/舟的槽位目录（编号规则、缺口方向）；**实时片位归 MES（E90）** | carrier | 订阅（定义） | — |
 
-**结论**：场景 1–5 是**高频热路径**（必须本地缓存）；场景 6–12 是**事件驱动**；场景 13 是**低频查询**。详细时序、回写白名单与降级策略见 [realtime-contract-design](realtime-contract-design.md)。
+**结论**：场景 1–5 是**高频热路径**（必须本地缓存）；场景 6–12 是**事件驱动**；场景 13 是**低频查询**；场景 14–15 是 **6/8 寸与混线自动化补齐项**（[§8.1](#81-多尺寸与多自动化覆盖缺口t9)）。详细时序、回写白名单与降级策略见 [realtime-contract-design](realtime-contract-design.md)。
 
 ---
 
@@ -230,7 +239,7 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | --- | --- |
 | 总纲 | **00-blueprint.md（本文）**、[README.md](README.md) |
 | L0 基础参考 | [uom-dict-design](uom-dict-design.md)、[param-def-design](param-def-design.md) |
-| L1 空间与组织 | [location-design](location-design.md)、[org-personnel-design](org-personnel-design.md) |
+| L1 空间与组织 | [location-design](location-design.md)、[org-personnel-design](org-personnel-design.md)、[operating-profile-design](operating-profile-design.md) |
 | L2 资产 | [equipment-design](equipment-design.md)、[carrier-design](carrier-design.md)、[reticle-design](reticle-design.md)、[test-asset-design](test-asset-design.md)、[tooling-design](tooling-design.md)、[bank-design](bank-design.md) |
 | L3 工艺定义 | [product-design](product-design.md)、[route-design](route-design.md)、[layer-design](layer-design.md)、[process-flow-design](process-flow-design.md)、[recipe-design](recipe-design.md) |
 | L4 物料与产出 | [material-design](material-design.md)、[product-bom-design](product-bom-design.md)、[lot-type-design](lot-type-design.md) |
@@ -250,6 +259,9 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | 第二轮 | 13 个扩展域（物料…分发订阅）+ 四条横切层 | ✅ |
 | 第三轮 | 总纲 + DSL 规范 + 参数字典 + 实时态契约 + 测试资产 + 厂务 + 批次类型 + 洁净度 + 产品 BOM + APC/FDC + 多工厂 + 工装 + API | ✅（本文档集） |
 | 第四轮（待办） | 各域 API 细化实现契约、route 图校验服务、MES 侧 `lot_route_instance` 等运行态模型、平台 M4 剩余（i18n/cache/限流幂等/mq） | 🟡 |
+| **第五轮（业务覆盖，T9）** | **6/8/12 寸一等公民 + 手动/半自动/全自动运行体制 + MES 执行契约**。条目见 [99-backlog T9](99-backlog.md) | 🟡 **已拍板**（见 §8.2） |
+| **第六轮（场景走查，T10）** | **半导体特有主数据补齐**：腔体匹配 / 腔体级配方资格 / pellicle / 晶圆图与 Zone / `recipe_class` 码表。条目见 [99-backlog T10](99-backlog.md) | 🟡 文档已补，待落表 |
+| **第七轮（物理约束，T11）** | **金属污染等级 / 交叉污染隔离 / 湿敏 MSL 开封时限 / 热预算**。条目见 [99-backlog T11](99-backlog.md) | 🟡 类型已登记，待落字段 |
 
 **仍明确未建（有意留待）**：
 - 固定资产/折旧（归 ERP）；
@@ -257,6 +269,119 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 - 人员培训记录（归 HR/培训系统）；
 - 包装出货规格明细（视是否含封测段）；
 - 数据归档保留策略（归元治理的扩展）。
+
+### 8.1 多尺寸与多自动化覆盖缺口（T9）
+
+> **评审结论（2026-09-23）**：现有文档作为 **12 寸全自动前道 CIM 的 MDM 蓝图成立**；作为「6/8/12 寸 + 手动/半自动/全自动」统一建模、并对 MES 提供完整执行数据，**还不成立**。它更像 300mm HVM 先写透、再向 200mm 外推。6 寸和混线自动化不是配置差异，是另一套运行模型。
+>
+> **不要推翻的硬约束**：L0–L5 分层；MDS 出定义 / MES 出实例；Route ≠ Process Flow；行政态 / E10 / GEM Control State / 资格态正交；约束声明化；热路径零回查。T9 只补运行体制与断链。
+>
+> **已拍板（2026-09-23，决策依据见 §8.2）**：
+> ① `wafer_size` 采用**开放码表**（`WAFER_SIZE`，含 150 且可扩展）——**不是**"是否含 150"的二选一；
+> ② 运行体制**不独立成域**，落为 L1 剖面 **`OperatingProfile`**（[operating-profile-design.md](operating-profile-design.md)），**权威是能力位**、作业模式为派生摘要；
+> ③ Boat **归 `carrier_type`**（kind=`BOAT`）。
+>
+> 三项既定，T9 条目**可改权威枚举/表结构**（不再冻结）。
+
+#### 缺口 A · 6/8/12 寸未建成一等公民
+
+| 域 | 现状 | 待调整 |
+| --- | --- | --- |
+| 产品 | `wafer_size INT`：200/300/**450** | **纳入 150**；450 降为可选扩展 |
+| 载具 | 同左；类型仅 `FOUP/SMIF_POD/CASSETTE` | 增 `OPEN_CASSETTE`/`BOAT`/`MAGAZINE`/`FOSB`；容量不再默认 25 |
+| 仓库 | `200/300` 且 `NOT NULL` 单尺寸 | 多值或可空；人工货架不强制槽位/端口 |
+| 物料 / 探针卡 | `VARCHAR`：`200`/`300` | 与码表对齐（禁 INT/VARCHAR 混用） |
+| **设备** | **无 `wafer_size` 字段** | 补 `wafer_sizes[]`，否则 `WAFER_SIZE_MATCH` 无法求值 |
+| 位置 FAB | 文案有「前道/后道」，表无 `fab_type` / 尺寸 | 厂级轮廓或经 OperatingModel 引用，避免双源 |
+
+```
+# 建议（拍板后落表，非当前权威）
+WaferSize ∈ {150, 200, 300}          -- 450 可保留扩展，不能替代 150
+CarrierKind ∈ { FOUP, FOSB, SMIF_POD, CASSETTE, OPEN_CASSETTE, BOAT, MAGAZINE }
+capacity: FOUP=25；6" cassette 常 25/50；boat 按管位数
+```
+
+#### 缺口 B · 手动/半自动/全自动被压成一个 bit
+
+SEMI E30 的 OFFLINE / LOCAL / REMOTE **不是**工厂自动化等级。一台 6 寸炉管可以永远 `ONLINE-LOCAL`、甚至没有 SECS，MES 仍要管批次与配方。
+
+```
+# 与 GEM Control State 正交的三层（建议，拍板后落表）
+AutomationProfile
+  tracking_grain     LOT | WAFER | DIE
+  handling_mode      WALK | CART | AGV | OHT
+  control_mode_cap   NONE | LOCAL_ONLY | REMOTE_CAPABLE   -- 替代单 bit remote_capable
+  job_exec_mode      MANUAL | SEMI_AUTO | FULL_AUTO
+
+MANUAL:    人搬盒 → 人在面板选配方/按启动 → MES 只做 JobIn/JobOut；无 GEM 也合法
+SEMI_AUTO: MES 选设备+配方（可下发 PPID）→ 人确认上机 → Host Start 或人按启动
+FULL_AUTO: AMHS 到位 + GEM REMOTE + Control Job/Process Job；才要求 ONLINE-REMOTE
+```
+
+混线是 8 寸常态（光刻半自动、湿法手动、炉管舟、量测全自动）——自动化必须能挂在 **Area / Equipment / Route Operation**，不能只挂 Fab。
+
+#### 缺口 C · MES 完整执行数据：定义层够，执行契约不够
+
+已能支撑：产品→路线→Process Flow（PPID/设备组/窗口）、配方三层、组批、资格、处置/SPC、投料版本锁定。
+
+MES 会卡住的：设备尺寸断链、lot_type 孤儿、无 slot map（E90）、无作业模式、无 GEM 机台无路径、载具仅容量 25、无 Boat、无 Future Hold 动作模板、`lot_route_instance` 仍是口头契约。
+
+```
+MDS 必须给齐（定义 + 策略）
+  能造什么 / 用什么资产 / 规则是什么 / 作业模式是什么 / 追踪粒度是什么
+MES 自己持有（实例 + 实绩）
+  这个 lot 现在在哪一步、这片在哪个槽、这台机 E10、这次量测值
+```
+
+#### 建议最小增量（先改职责，再补表）
+
+不新铺 10 个域。只加一层运行体制 + 修断链：
+
+- L1：`FabProfile` / `AreaProfile`（复用 [multi-site-design](multi-site-design.md) 的 GLOBAL/FAB/Override）
+- L2：设备 `wafer_sizes[]`；载具 kind + `slot_map`；`protocol` 允许 `NONE`
+- L3：工序/工艺流可覆盖 `job_exec_mode`；约束 `DISPATCH_READY` 按模式分支
+- API：`resolve-exec-contract`、`resolve-carrier-slot-map`
+
+条目登记：[99-backlog T9](99-backlog.md)（T9-1 … T9-18）。
+
+### 8.2 拍板结论与依据（2026-09-23）
+
+#### 8.2.1 三项决策
+
+| # | 决策 | 依据 | 落地 |
+| --- | --- | --- | --- |
+| **①** | `WAFER_SIZE` 用**开放码表**（`100/125/150/200/300` + `450` 预留 + 租户可扩展），字段统一 `wafer_size_code VARCHAR(16)` | 它是**枚举码**而非物理量；写死 INT 枚举遇 4/5 寸或化合物半导体（SiC/GaN 主流 150）需改码；与 [uom-dict](uom-dict-design.md) UD3「码表：系统可扩展」同机制，不造轮子 | uom-dict 登记码表种子；6 域字段改 `*_code` |
+| **②** | 运行体制 **不独立成域**，落为 **L1 剖面 `OperatingProfile`**；**权威是能力位**，`job_exec_mode` 为**派生摘要** | 它是**策略数据**非资产/工艺定义；MES 必须按「能不能做这件事」分支，等级标签会掩盖差异（同 SEMI_AUTO 中有的能下发 PPID、有的不能） | **新建** [operating-profile-design.md](operating-profile-design.md) |
+| **③** | **Boat 归 `carrier_type`**（kind=`BOAT`） | Boat 本质是**装片容器**：有槽位/管位、容量、清洗与寿命、参与搬运——与 carrier 模型同构；`tooling` 是「**不装片**的辅助加工件」（CMP 垫/修整器/模具） | carrier-design 枚举扩展 |
+
+#### 8.2.2 四项补强（原建议缺失）
+
+| # | 补强 | 说明 |
+| --- | --- | --- |
+| **④** | **三维正交显式声明** | `process_mode`（物理架构）× `job_exec_mode`（作业模式）× GEM `Control State`（实时通信态）**三者正交、不可互推**。原文未点此条，下游极可能把"批次设备"当"手动设备"。见 [operating-profile §2.1](operating-profile-design.md) |
+| **⑤** | **尺寸集合单一来源** | `wafer_sizes` 权威 = `OperatingProfile`（FAB/AREA 级）；`mds_location` **不冗余存**（对齐 [location D3](location-design.md) 原则）。T9-10 的"或经剖面引用"**已决断** |
+| **⑥** | **域裁剪边界** | T9-12 限定为「**域启用开关 + 必填降级**」（复用 multi-site `mds_md_localization`），**不得裁剪表结构**，且变更留痕——防同一主数据跨 fab **语义漂移** |
+| **⑦** | **补齐两类路径** | 6 寸「**无载具直投**」（`carrier_required=0`，lot 仍存在）；6 寸**批量工艺为常态**（炉管一舟 100+ 片）对 `BATCHING` 约束的影响 |
+
+#### 8.2.3 修正的原建议内部矛盾
+
+- `T9-1`（措辞像"统一为 INT 枚举"）与 `T9-15`（"改为码表引用"）**自相矛盾** → 统一为**码表引用**；
+- `T9-5` 缺**能力位**（单靠等级不足以让 MES 分支）→ 新增 **`T9-16`**；
+- `handling_mode` / `tracking_grain` 单值 → 改为「**集合 + 默认值 + 工序级 override**」。
+
+#### 8.2.4 对既有文档的影响清单
+
+| 文档 | 影响 |
+| --- | --- |
+| [operating-profile-design.md](operating-profile-design.md) | **新建**（第 40 篇 design） |
+| [carrier-design](carrier-design.md) | `carrier_type` 枚举扩展（+`OPEN_CASSETTE`/`BOAT`/`MAGAZINE`/`FOSB`）；`capacity` 不再默认 25；类型级 `slot_map` |
+| [equipment-design](equipment-design.md) | 补**设备尺寸事实值**（型号级默认 + 设备级覆盖）；三维正交声明 |
+| [location-design](location-design.md) | `fab_type`（前道/后道）；**不存** `wafer_sizes`（单一来源） |
+| [product](product-design.md) / [material](material-design.md) / [bank](bank-design.md) / [test-asset](test-asset-design.md) | `wafer_size` → `wafer_size_code`（码表引用） |
+| [uom-dict-design](uom-dict-design.md) | 登记 `WAFER_SIZE` 系统码表种子 |
+| [constraint-design](constraint-design.md) | `WAFER_SIZE_MATCH` 依赖设备尺寸事实值；`DISPATCH_READY` 按 `job_exec_mode` 分支 |
+| [equipment-interface-design](equipment-interface-design.md) | `protocol` 允许 `NONE`/`BARCODE`；点表对手动机台非必填 |
+| [realtime-contract-design](realtime-contract-design.md) | 「无载具直投」路径；`Control State` 明确归 EAP |
 
 ---
 

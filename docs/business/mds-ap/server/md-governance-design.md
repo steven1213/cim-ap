@@ -281,7 +281,7 @@ CREATE TABLE mds_md_domain (
   depends_on_json    JSON,
   is_active          BIT DEFAULT 1,
   description        VARCHAR(512),
-  version_           BIGINT NOT NULL DEFAULT 0,
+  version           BIGINT NOT NULL DEFAULT 0,
   deleted            BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -302,7 +302,7 @@ CREATE TABLE mds_md_steward (
   effective_from DATETIME(3),
   effective_to   DATETIME(3),
   description    VARCHAR(512),
-  version_       BIGINT NOT NULL DEFAULT 0,
+  version       BIGINT NOT NULL DEFAULT 0,
   deleted        BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -321,7 +321,7 @@ CREATE TABLE mds_md_workflow (
   status      VARCHAR(16) NOT NULL,
   revision     VARCHAR(16) NOT NULL,
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -341,7 +341,7 @@ CREATE TABLE mds_md_workflow_step (
   is_required   BIT DEFAULT 1,
   timeout_hours INT,
   description   VARCHAR(512),
-  version_      BIGINT NOT NULL DEFAULT 0,
+  version      BIGINT NOT NULL DEFAULT 0,
   deleted       BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -364,7 +364,7 @@ CREATE TABLE mds_md_quality_rule (
   severity      VARCHAR(16) NOT NULL,
   status        VARCHAR(16) NOT NULL,
   description   VARCHAR(512),
-  version_      BIGINT NOT NULL DEFAULT 0,
+  version      BIGINT NOT NULL DEFAULT 0,
   deleted       BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -384,7 +384,7 @@ CREATE TABLE mds_md_signature (
   signed_at     DATETIME(3) NOT NULL,
   content_hash  VARCHAR(128),
   description   VARCHAR(512),
-  version_      BIGINT NOT NULL DEFAULT 0,
+  version      BIGINT NOT NULL DEFAULT 0,
   deleted       BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -432,6 +432,7 @@ com.cim.mds.governance
 - **依赖图服务**：`depends_on_json` + 各域外键 → 供 [change-mgmt-design §4.3](change-mgmt-design.md) 影响分析使用（两处共用，避免重复实现）。
 - **质量规则调度**：定时全量扫描 vs 写入时实时校验的策略配置。
 - **与既有文档闭环**：本文引用 `mds_org_unit`（[org-personnel-design](org-personnel-design.md)）、审批实例（[change-mgmt-design](change-mgmt-design.md)）、业务约束（[constraint-design](constraint-design.md)）、编码规则（[naming-rule-design](naming-rule-design.md)）、全篇各主数据域。
+- **T9 按剖面裁剪必填域（[99-backlog T9-12](99-backlog.md)）**：**限定为「域启用开关 + 必填降级」，不得裁剪表结构**（[00-blueprint §8.2](00-blueprint.md) 补强 ⑥）；`mds_md_domain` 增加按 [OperatingProfile](operating-profile-design.md) 的 `domain_enabled`（或实施剖面）。APC/FDC、OHT 端口、FOUP E87、光罩资格等对 6 寸功率/模拟厂可关闭，避免 155 表全量强加。
 
 ---
 

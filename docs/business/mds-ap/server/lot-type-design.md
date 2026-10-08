@@ -191,7 +191,7 @@ CREATE TABLE mds_lot_type (
   requires_approval    BIT DEFAULT 0,
   status               VARCHAR(16) NOT NULL,
   description          VARCHAR(512),
-  version_             BIGINT NOT NULL DEFAULT 0,
+  version             BIGINT NOT NULL DEFAULT 0,
   deleted              BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -212,7 +212,7 @@ CREATE TABLE mds_priority_class (
   max_ratio   DECIMAL(5,2),
   status      VARCHAR(16) NOT NULL,
   description VARCHAR(512),
-  version_    BIGINT NOT NULL DEFAULT 0,
+  version    BIGINT NOT NULL DEFAULT 0,
   deleted     BIT NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -263,7 +263,7 @@ com.cim.mds.lottype
 
 ## 9. 待补 / 后续
 
-- **产品默认批次类型**：在 [product-design](product-design.md) 增加可选字段（按产品默认投什么类型的批）。
+- **产品默认批次类型**：在 [product-design](product-design.md) 增加可选字段（按产品默认投什么类型的批）。**升级为 T0-2 / T9-11**：`mds_product.default_lot_type_id → mds_lot_type(id)`，否则本域仍是孤儿表（[98-audit-report P1-1](98-audit-report.md)）。
 - **Hot Lot 流程模板**：加急批的通知对象/审批链（可挂 [md-governance-design](md-governance-design.md) 的工作流）。
 - **与 die bank / 回收片**：`RECLAIM`/`DUMMY` 类型的循环使用规则（与 [material-design §4.4](material-design.md) 的 dummy wafer 联动）。
 - **与既有文档闭环**：本文引用 [product-design](product-design.md)、[route-design §4.3](route-design.md)、[constraint-design](constraint-design.md)、[sampling-spc-design](sampling-spc-design.md)、[expression-dsl-design §5](expression-dsl-design.md)、[naming-rule-design](naming-rule-design.md)。

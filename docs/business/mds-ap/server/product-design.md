@@ -215,7 +215,7 @@ CREATE TABLE mds_product_family (
   name        VARCHAR(128),
   tech_node   VARCHAR(16),
   description VARCHAR(512),
-  version_    BIGINT       NOT NULL DEFAULT 0,
+  version    BIGINT       NOT NULL DEFAULT 0,
   deleted     BIT          NOT NULL DEFAULT 0,
   create_time DATETIME(3), create_user VARCHAR(64),
   event_time  DATETIME(3), event_user  VARCHAR(64),
@@ -244,7 +244,7 @@ CREATE TABLE mds_product (
   effective_to   DATETIME(3),
   ext_attrs     JSON,
   description   VARCHAR(512),
-  version_      BIGINT       NOT NULL DEFAULT 0,
+  version      BIGINT       NOT NULL DEFAULT 0,
   deleted       BIT          NOT NULL DEFAULT 0,
   create_time   DATETIME(3), create_user VARCHAR(64),
   event_time    DATETIME(3), event_user  VARCHAR(64),
@@ -265,7 +265,7 @@ CREATE TABLE mds_product_route (
   is_default   BIT          DEFAULT 0,
   priority     INT          DEFAULT 0,
   description  VARCHAR(512),
-  version_     BIGINT       NOT NULL DEFAULT 0,
+  version     BIGINT       NOT NULL DEFAULT 0,
   deleted      BIT          NOT NULL DEFAULT 0,
   create_time  DATETIME(3), create_user VARCHAR(64),
   event_time   DATETIME(3), event_user  VARCHAR(64),
@@ -309,3 +309,53 @@ com.cim.mds.product
 - **route 图校验服务**：入参校验（无环/分叉配对/可达性），与 product 路线绑定校验（默认路线须 RELEASED）联动。
 - **API 设计**：product/route 查询、版本发布、克隆、跨主数据联动校验。
 - **与既有文档闭环**：本文引用的 `mds_location` / `mds_equipment_*` / `mds_logic_recipe`（逻辑配方） / `mds_route` 分别见 [位置设计](location-design.md) / [设备设计](equipment-design.md) / [配方设计](recipe-design.md) / [工艺路线](route-design.md)。
+- **T9 / T0-2（[99-backlog](99-backlog.md)）**：
+  - **尺寸码表（T9-1）**：`wafer_size` 现为 200/300/450，**缺 150**；须改为码表引用，与载具/设备/物料对齐。
+  - **默认批次类型（T9-11 = T0-2）**：补 `default_lot_type_id → mds_lot_type(id)`，否则「这个产品默认用哪类批」只能靠表达式猜测。
+
+---
+
+## 附录 A · 封装形式（Package Type）与测试适用性（R2 多厂型核验补）
+
+> **补的缺口**：产品封装信息目前**只在 `ext_attrs` JSON** 中自由表达（§4.5 的"封装/引脚/可靠性"），**无结构化主数据**。后果：① 测试资产（探针卡 / 负载板 / handler / socket）**无法按封装形式筛选**；② 封装形式是后道 BOM 与代工报价的**分类键**；③ `bom_type=PACKAGING` 的结构 BOM 缺少可引用的父件主数据。
+
+### A.1 为什么需要
+
+| 场景 | 说明 |
+| --- | --- |
+| **FT 派工** | 测试 handler 与 load board / socket 按**封装形式**选（QFN 与 FCBGA 完全不同） |
+| **结构 BOM** | 封装 BOM 的父件是"某封装形式的成品" → 需**可引用** |
+| **成本 / 报价** | 封装形式是后道代工报价的基本单元 |
+| **可靠性等级** | 车规 / 工规 / 商规常与封装形式绑定（与 [sampling-spc](sampling-spc-design.md) 的检验强度相关） |
+
+### A.2 新增表 `mds_package_type`
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| `code` | VARCHAR(32) | 唯一 `(code, tenant_id, deleted)`（如 `QFN32` / `FCBGA-1156`） |
+| `name` | VARCHAR(128) | 名称 |
+| `family` | VARCHAR(16) | `LEADFRAME`（QFN/QFP/SOP）/ `SUBSTRATE`（BGA/FCBGA）/ `WLCSP` / `SIP` / `OTHER` |
+| `pin_count_min` / `pin_count_max` | INT | 引脚 / 球数范围 |
+| `ball_pitch_mm` | DECIMAL(6,3) | 球距（BGA 类） |
+| `body_w_mm` / `body_l_mm` / `body_h_mm` | DECIMAL(8,3) | 本体尺寸 |
+| `is_flip_chip` | BIT | 是否倒装 |
+| `reliability_grade` | VARCHAR(16) | `COMMERCIAL` / `INDUSTRIAL` / `AUTOMOTIVE` / `MEDICAL` |
+| `status` | VARCHAR(16) | `DRAFT` / `ACTIVE` / `DEPRECATED` |
+
+### A.3 决策（PT1–PT2）
+
+| # | 议题 | 拍板 | 理由 |
+| --- | --- | --- | --- |
+| **PT1** | 封装形式独立成表还是继续放 `ext_attrs`？ | **独立成表** | 它是**筛选键**（test-asset / handler 派工需可查询），JSON 无法索引与做外键 |
+| **PT2** | 是否含先进封装（CoWoS / 2.5D / 3D）？ | **用 `family=SIP` + `is_flip_chip` 覆盖常见形态**；TSV / Interposer 用**结构 BOM + 工序**表达，**不另建封装体系** | 避免为先进封装再开一套模型（与「不重复造轮子」原则一致） |
+
+### A.4 与 MES 衔接
+
+- **FT 派工**：MES 按 `package_type` 筛 handler / load board / socket；
+- **产品字段**：增 `package_type_code`（**可空**——前道产品为空）；
+- **结构 BOM**：`bom_type=PACKAGING` 的父件引用 `package_type_code` 表达"成品形态"；
+- **边界声明**：**后道物理工艺步骤**（Die Attach / Wire Bond / Molding / Singulation）**不需要新域**——用 [route-design](route-design.md) + [process-flow-design](process-flow-design.md) 的通用机制表达；后道设备用 [equipment-design](equipment-design.md) 通用台账。
+
+**待补**：
+- `mds_product.package_type_code` 字段（可空）落位；
+- 与 [test-asset-design](test-asset-design.md) 的 `mds_test_interface_qual` 关联：接口资格按「tester 型号 × `package_type`」定义（当前是按 tester 型号）。
