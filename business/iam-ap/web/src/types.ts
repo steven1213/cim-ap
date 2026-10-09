@@ -8,12 +8,31 @@ export interface LoginResult {
   tokenType: string;
 }
 
+/** 组织摘要（用户归属 / 目录 API 共用）。 */
+export interface OrgBrief {
+  orgId: string;
+  code: string;
+  name: string;
+  nodeType: string | null;
+  primary: boolean;
+}
+
 /** GET /api/v1/me 返回。 */
 export interface MeDto {
   userId: string;
   username: string;
   tenantId: string | null;
-  /** 当前用户可进入的 ap 接入码列表（apps claim）。 */
+  /** 姓名（来自用户档案）。 */
+  displayName: string | null;
+  /** 工号（AD employeeID）。 */
+  employeeNo: string | null;
+  /** 岗位（IAM 维护）。 */
+  jobTitle: string | null;
+  /** 档案来源：AD_SYNCED / IAM_MANAGED（无档案时为 null）。 */
+  source: string | null;
+  /** 组织归属（支持多归属）。 */
+  orgs: OrgBrief[];
+  /** 当前用户可进入的 ap 接入码列表（个人授予 ∪ 组织授予）。 */
   apps: string[];
   /** 按 ap 分组的角色：{ "iam-ap": ["ADMIN"] }。 */
   roles: Record<string, string[]>;
@@ -74,19 +93,95 @@ export interface OverviewDto {
   lockedCount: number;
   loginSuccessCount: number;
   loginFailureCount: number;
+  /** 组织节点总数（含 AD 同步层与 IAM 自建层）。 */
+  orgCount: number;
+  /** IAM 自建组织节点数。 */
+  orgManagedCount: number;
+  /** 用户档案总数。 */
+  profileCount: number;
+  /** AD 同步来源的档案数。 */
+  adProfileCount: number;
   recentEvents: AuditEvent[];
 }
 
-/** 管理面用户行（GET /api/v1/admin/users）。 */
+/** 管理面用户行（GET /api/v1/admin/users，本地凭证 ∪ 用户档案）。 */
 export interface AdminUserRow {
   userId: string;
   username: string;
   enabled: boolean;
+  /** 是否有本地凭证（false 表示 AD 同步来的纯档案用户）。 */
+  hasCredential: boolean;
   locked: boolean;
   lockedUntil: string | null;
   failCount: number;
+  displayName: string | null;
+  employeeNo: string | null;
+  jobTitle: string | null;
+  /** AD_SYNCED / IAM_MANAGED / NONE（无档案）。 */
+  source: string;
+  /** ACTIVE / INACTIVE / null。 */
+  status: string | null;
+  orgNames: string[];
   apps: string[];
   roles: Record<string, string[]>;
+}
+
+/** 组织节点（GET /api/v1/admin/orgs，扁平含 parentId）。 */
+export type OrgStatus = 'ENABLED' | 'DISABLED';
+export type OrgNodeType = 'AREA' | 'WORKSHOP' | 'LINE' | 'PROCESS' | 'TEAM' | 'DEPT';
+export type DataOrigin = 'AD_SYNCED' | 'IAM_MANAGED';
+
+export interface OrgNode {
+  id: string;
+  parentId: string | null;
+  code: string;
+  name: string;
+  nodeType: OrgNodeType;
+  path: string;
+  sortNo: number;
+  source: DataOrigin;
+  status: OrgStatus;
+  updatedAt: string | null;
+}
+
+/** 组织级准入授予（GET /api/v1/admin/org-grants）。 */
+export interface OrgGrantRow {
+  orgId: string;
+  orgName: string | null;
+  orgCode: string | null;
+  appCode: string;
+  roles: string[];
+  includeChildren: boolean;
+  status: string;
+}
+
+/** 用户档案行（GET /api/v1/admin/profiles）。 */
+export interface ProfileRow {
+  userId: string;
+  employeeNo: string | null;
+  displayName: string | null;
+  email: string | null;
+  mobile: string | null;
+  jobTitle: string | null;
+  status: string;
+  source: DataOrigin;
+  syncedAt: string | null;
+  orgNames: string[];
+}
+
+/** 目录水位（GET /api/v1/admin/sync/watermark）。 */
+export interface WatermarkDto {
+  user: number;
+  org: number;
+}
+
+/** AD 同步结果（POST /api/v1/admin/sync/ad）。 */
+export interface SyncResult {
+  skipped: boolean;
+  reason: string | null;
+  orgCount: number;
+  userCount: number;
+  deactivated: number;
 }
 
 /** 在线会话行（GET /api/v1/admin/sessions）。 */
@@ -142,4 +237,12 @@ export interface SettingsDto {
   bootstrapAdminUsername: string;
   webAllowedOrigins: string[];
   jwksPath: string;
+  /** 目录只读 API 是否启用（配置了共享密钥即启用）。 */
+  directoryApiEnabled: boolean;
+  /** AD 同步开关。 */
+  adSyncEnabled: boolean;
+  /** AD 是否已具备可连接配置（未配置则同步跳过，IAM 自建照常可用）。 */
+  adSyncConfigured: boolean;
+  adBaseDn: string;
+  adSyncIntervalMs: number;
 }

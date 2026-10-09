@@ -274,3 +274,66 @@ export function IconPower(p: IconProps) {
   );
 }
 
+/** 组织架构（层级树） */
+export function IconTree(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="9" y="3" width="6" height="4.4" rx="1.2" />
+      <rect x="2.5" y="16.6" width="6" height="4.4" rx="1.2" />
+      <rect x="15.5" y="16.6" width="6" height="4.4" rx="1.2" />
+      <path d="M12 7.4V13M5.5 13h13M5.5 13v3.6M18.5 13v3.6" />
+    </svg>
+  );
+}
+
+/** 组织授权（盾牌 + 授予） */
+export function IconOrgGrant(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3l7 3v5c0 4.3-2.9 7.7-7 9.4-4.1-1.7-7-5.1-7-9.4V6l7-3z" />
+      <path d="M9.4 12h5.2M12 9.4v5.2" />
+    </svg>
+  );
+}
+
+/** 展开/折叠箭头（默认指向右，展开时旋转 90°） */
+export function IconChevron(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M9.5 6.5l6 5.5-6 5.5" />
+    </svg>
+  );
+}
+
+/** 编辑（铅笔） */
+export function IconEdit(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M4.5 19.5h4l10-10a2 2 0 00-2.8-2.8l-10 10v2.8z" />
+      <path d="M14.5 8.5l1.8 1.8" />
+    </svg>
+  );
+}
+
+/** 同步（双向箭头） */
+export function IconSync(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M4.5 9.4A7.6 7.6 0 0117 6.6l2.4 2.4" />
+      <path d="M19.5 5.2v3.8h-3.8" />
+      <path d="M19.5 14.6A7.6 7.6 0 017 17.4l-2.4-2.4" />
+      <path d="M4.5 18.8v-3.8h3.8" />
+    </svg>
+  );
+}
+
+/** 保存（磁盘） */
+export function IconSave(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M5.4 4.5h10l3.1 3.1v11.9H5.4z" />
+      <path d="M8.4 4.5v5h6.2v-5M8.6 19.5v-5.4h6.8v5.4" />
+    </svg>
+  );
+}
+

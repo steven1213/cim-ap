@@ -8,6 +8,8 @@ import DashboardPage from '@/pages/DashboardPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AppMgmtPage from '@/pages/AppMgmtPage';
 import UsersPage from '@/pages/UsersPage';
+import OrgPage from '@/pages/OrgPage';
+import OrgGrantsPage from '@/pages/OrgGrantsPage';
 import LockoutsPage from '@/pages/LockoutsPage';
 import AdmissionsPage from '@/pages/AdmissionsPage';
 import RolesPage from '@/pages/RolesPage';
@@ -33,10 +35,12 @@ export default function App() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/orgs" element={<Admin><OrgPage /></Admin>} />
         <Route path="/users" element={<Admin><UsersPage /></Admin>} />
         <Route path="/lockouts" element={<Admin><LockoutsPage /></Admin>} />
         <Route path="/apps" element={<Admin><AppMgmtPage /></Admin>} />
         <Route path="/admissions" element={<Admin><AdmissionsPage /></Admin>} />
+        <Route path="/org-grants" element={<Admin><OrgGrantsPage /></Admin>} />
         <Route path="/roles" element={<Admin><RolesPage /></Admin>} />
         <Route path="/sessions" element={<Admin><SessionsPage /></Admin>} />
         <Route path="/audit" element={<Admin><AuditPage /></Admin>} />

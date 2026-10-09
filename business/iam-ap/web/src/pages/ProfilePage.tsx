@@ -4,8 +4,9 @@ import { useAuthStore } from '@/store/authStore';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import * as api from '@/lib/api';
 import type { ChangePasswordRequest, SaltResponse } from '@/types';
+import { orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
-import { IconAlert } from '@/components/Icons';
+import { IconAlert, IconTree } from '@/components/Icons';
 
 /**
  * 自助改密：与登录一致，浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 clientHash
@@ -23,6 +24,11 @@ export default function ProfilePage() {
   const username = useAuthStore((s) => s.user?.username);
   const userId = useAuthStore((s) => s.user?.userId);
   const tenantId = useAuthStore((s) => s.user?.tenantId);
+  const displayName = useAuthStore((s) => s.user?.displayName);
+  const employeeNo = useAuthStore((s) => s.user?.employeeNo);
+  const jobTitle = useAuthStore((s) => s.user?.jobTitle);
+  const source = useAuthStore((s) => s.user?.source);
+  const orgs = useAuthStore((s) => s.user?.orgs) ?? [];
   const appCount = useAuthStore((s) => s.user?.apps?.length ?? 0);
   const clearSession = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
@@ -66,17 +72,44 @@ export default function ProfilePage() {
   return (
     <div className="page">
       <div className="grid-2">
-        <Panel title="账户信息" sub="当前登录身份">
+        <Panel title="账户信息" sub="当前登录身份与档案">
           <dl className="meta">
             <dt className="meta-k">用户 ID</dt>
             <dd className="meta-v mono">{userId ?? '—'}</dd>
             <dt className="meta-k">用户名</dt>
             <dd className="meta-v">{username ?? '—'}</dd>
+            <dt className="meta-k">姓名</dt>
+            <dd className="meta-v">{displayName ?? '—'}</dd>
+            <dt className="meta-k">工号</dt>
+            <dd className="meta-v mono">{employeeNo ?? '—'}</dd>
+            <dt className="meta-k">岗位</dt>
+            <dd className="meta-v">{jobTitle ?? '—'}</dd>
+            <dt className="meta-k">档案来源</dt>
+            <dd className="meta-v">{originLabel(source)}</dd>
             <dt className="meta-k">租户</dt>
             <dd className="meta-v mono">{tenantId ?? '—'}</dd>
             <dt className="meta-k">准入应用</dt>
             <dd className="meta-v mono">{appCount}</dd>
           </dl>
+
+          <div className="sub-block">
+            <div className="sub-title">我的组织归属</div>
+            {orgs.length ? (
+              <div className="tag-list">
+                {orgs.map((o) => (
+                  <span key={o.orgId} className={'tag' + (o.primary ? ' pri' : '')} title={o.code}>
+                    {o.name}
+                    <span className="dim"> · {orgTypeLabel(o.nodeType)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="hint" style={{ marginTop: 4 }}>
+                <IconTree width={13} height={13} /> 尚未归属任何组织——归属由管理员在「组织架构」中维护。
+              </p>
+            )}
+          </div>
+
           <div className="sub-block">
             <div className="sub-title">安全提示</div>
             <ul className="note-list">

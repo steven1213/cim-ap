@@ -4,18 +4,18 @@ import * as api from '@/lib/api';
 import type { OverviewDto } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { isIamAdmin } from '@/lib/permissions';
-import { auditLabel, auditTone, fmtRelative } from '@/lib/format';
+import { auditLabel, auditTone, fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
 import {
   IconAlert,
   IconApps,
   IconGauge,
   IconInbox,
-  IconKey,
   IconList,
   IconLock,
   IconMonitor,
   IconShield,
+  IconTree,
   IconUser,
   IconUsers,
 } from '@/components/Icons';
@@ -73,6 +73,8 @@ function AdminOverview() {
     <div className="page">
       <div className="kpi-grid">
         <Kpi icon={<IconUsers width={16} height={16} />} label="用户账号" value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={`${ov.disabledUserCount} 已禁用`} />
+        <Kpi icon={<IconUser width={16} height={16} />} tone="info" label="用户档案" value={ov.profileCount} sub={`${ov.adProfileCount} AD 同步`} />
+        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label="组织节点" value={ov.orgCount} sub={`${ov.orgManagedCount} IAM 自建`} />
         <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label="接入应用" value={`${ov.enabledAppCount} / ${ov.appCount}`} sub="启用 / 总数" />
         <Kpi icon={<IconMonitor width={16} height={16} />} tone="info" label="在线会话" value={ov.activeSessionCount} sub="活跃刷新令牌" />
         <Kpi icon={<IconLock width={16} height={16} />} tone={ov.lockedCount > 0 ? 'warn' : 'ok'} label="锁定账户" value={ov.lockedCount} sub="暴力破解防护" />
@@ -146,6 +148,7 @@ function PersonalOverview() {
   const apps = user.apps ?? [];
   const roleEntries = Object.entries(user.roles ?? {});
   const roleCount = roleEntries.reduce((sum, [, roles]) => sum + roles.length, 0);
+  const orgs = user.orgs ?? [];
 
   return (
     <div className="page">
@@ -153,38 +156,79 @@ function PersonalOverview() {
         <Kpi icon={<IconUser width={16} height={16} />} label="用户 ID" value={user.userId} />
         <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label="可进入应用" value={apps.length} />
         <Kpi icon={<IconShield width={16} height={16} />} tone="info" label="角色组" value={roleCount} />
-        <Kpi icon={<IconKey width={16} height={16} />} tone="warn" label="租户" value={user.tenantId ?? '-'} />
+        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label="组织归属" value={orgs.length} sub={orgs.filter((o) => o.primary).map((o) => o.name).join('，') || undefined} />
       </div>
 
       <div className="grid-2">
-        <Panel title="身份信息" sub="来自当前会话与 IAM 令牌 claim">
+        <Panel title="身份信息" sub="来自用户档案与会话">
           <dl className="meta">
             <dt className="meta-k">用户 ID</dt>
             <dd className="meta-v mono">{user.userId}</dd>
             <dt className="meta-k">用户名</dt>
             <dd className="meta-v">{user.username}</dd>
+            <dt className="meta-k">姓名</dt>
+            <dd className="meta-v">{user.displayName ?? '—'}</dd>
+            <dt className="meta-k">工号</dt>
+            <dd className="meta-v mono">{user.employeeNo ?? '—'}</dd>
+            <dt className="meta-k">岗位</dt>
+            <dd className="meta-v">{user.jobTitle ?? '—'}</dd>
+            <dt className="meta-k">档案来源</dt>
+            <dd className="meta-v">{originLabel(user.source)}</dd>
             <dt className="meta-k">租户</dt>
             <dd className="meta-v mono">{user.tenantId ?? '—'}</dd>
-            <dt className="meta-k">准入应用</dt>
-            <dd className="meta-v mono">{apps.length ? apps.join(' , ') : '—'}</dd>
           </dl>
         </Panel>
 
-        <Panel title="会话与安全" sub="令牌签发与验证方式">
-          <dl className="meta">
-            <dt className="meta-k">认证源</dt>
-            <dd className="meta-v">本地凭证（两层 PBKDF2）</dd>
-            <dt className="meta-k">签名算法</dt>
-            <dd className="meta-v mono">RS256 / JWT</dd>
-            <dt className="meta-k">验签方式</dt>
-            <dd className="meta-v">JWKS 公钥，业务侧本地验签</dd>
-            <dt className="meta-k">准入判定</dt>
-            <dd className="meta-v mono">apps claim</dd>
-            <dt className="meta-k">失效机制</dt>
-            <dd className="meta-v">版本号校验 + 黑名单（jti）</dd>
-          </dl>
+        <Panel title="我的组织归属" sub="支持多归属（多能工 / 跨线支援）">
+          {orgs.length ? (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>组织</th>
+                    <th style={{ width: 84 }}>类型</th>
+                    <th style={{ width: 76 }}>主属</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgs.map((o) => (
+                    <tr key={o.orgId}>
+                      <td>
+                        {o.name} <span className="mono dim">{o.code}</span>
+                      </td>
+                      <td>
+                        <span className="tag">{orgTypeLabel(o.nodeType)}</span>
+                      </td>
+                      <td>{o.primary ? <span className="tag ok">是</span> : <span className="dim">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty">
+              <IconTree width={22} height={22} />
+              <b>尚未归属任何组织</b>
+              <span>请联系管理员在「组织架构」中把你挂到工序/产线</span>
+            </div>
+          )}
         </Panel>
       </div>
+
+      <Panel title="会话与安全" sub="令牌签发与验证方式">
+        <dl className="meta">
+          <dt className="meta-k">认证源</dt>
+          <dd className="meta-v">本地凭证（两层 PBKDF2）</dd>
+          <dt className="meta-k">签名算法</dt>
+          <dd className="meta-v mono">RS256 / JWT</dd>
+          <dt className="meta-k">验签方式</dt>
+          <dd className="meta-v">JWKS 公钥，业务侧本地验签</dd>
+          <dt className="meta-k">准入判定</dt>
+          <dd className="meta-v mono">apps claim（个人授予 ∪ 组织授予）</dd>
+          <dt className="meta-k">失效机制</dt>
+          <dd className="meta-v">版本号校验 + 黑名单（jti）</dd>
+        </dl>
+      </Panel>
 
       <Panel
         title="准入与角色矩阵"

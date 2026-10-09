@@ -1,17 +1,38 @@
 import { useEffect, useState } from 'react';
 import * as api from '@/lib/api';
-import type { SettingsDto } from '@/types';
+import type { SettingsDto, SyncResult } from '@/types';
 import Panel from '@/components/Panel';
-import { IconAlert, IconSliders } from '@/components/Icons';
+import { IconAlert, IconSliders, IconSync } from '@/components/Icons';
 
 /** 系统设置（需 iam-ap:ADMIN）：只读展示当前生效的运行时策略参数。 */
 export default function SettingsPage() {
   const [s, setS] = useState<SettingsDto | null>(null);
   const [err, setErr] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
   useEffect(() => {
     api.get<SettingsDto>('/admin/settings').then(setS).catch((e: any) => setErr(e?.msg || '加载设置失败'));
   }, []);
+
+  async function onSync() {
+    setErr('');
+    setSyncBusy(true);
+    try {
+      const r = await api.post<SyncResult>('/admin/sync/ad');
+      if (r.skipped) {
+        setSyncMsg(`已跳过：${r.reason}`);
+      } else if (r.reason) {
+        setSyncMsg(r.reason);
+      } else {
+        setSyncMsg(`同步完成：组织 ${r.orgCount}、人员 ${r.userCount}、停用 ${r.deactivated}`);
+      }
+    } catch (e: any) {
+      setErr(e?.msg || '同步失败');
+    } finally {
+      setSyncBusy(false);
+    }
+  }
 
   if (err) {
     return (
@@ -104,6 +125,57 @@ export default function SettingsPage() {
           ) : (
             <span className="dim">未配置</span>
           )}
+        </Panel>
+      </div>
+
+      <div className="grid-2">
+        <Panel title="身份目录 · 只读 API" sub="供业务 ap 拉取档案与组织（服务身份认证）">
+          <dl className="meta">
+            <dt className="meta-k">目录 API</dt>
+            <dd className="meta-v">
+              {s.directoryApiEnabled ? (
+                <span className="tag ok">已启用</span>
+              ) : (
+                <span className="tag err">未启用（未配置密钥）</span>
+              )}
+            </dd>
+            <dt className="meta-k">认证方式</dt>
+            <dd className="meta-v mono">X-Directory-Key（方案 A）</dd>
+            <dt className="meta-k">目录端点</dt>
+            <dd className="meta-v mono">/api/v1/directory/*</dd>
+            <dt className="meta-k">水位机制</dt>
+            <dd className="meta-v">user / org 单调版本号，业务侧比对后重拉</dd>
+          </dl>
+        </Panel>
+
+        <Panel title="身份目录 · AD 同步" sub="只读同步人员与行政组织（未配置即跳过）">
+          <dl className="meta">
+            <dt className="meta-k">同步开关</dt>
+            <dd className="meta-v">
+              {s.adSyncEnabled ? <span className="tag ok">开启</span> : <span className="tag">关闭</span>}
+            </dd>
+            <dt className="meta-k">可连接配置</dt>
+            <dd className="meta-v">
+              {s.adSyncConfigured ? (
+                <span className="tag ok">已就绪</span>
+              ) : (
+                <span className="tag warn">未配置 → 同步跳过</span>
+              )}
+            </dd>
+            <dt className="meta-k">检索基址</dt>
+            <dd className="meta-v mono">{s.adBaseDn || '—'}</dd>
+            <dt className="meta-k">同步间隔</dt>
+            <dd className="meta-v mono">{Math.round(s.adSyncIntervalMs / 1000)} 秒</dd>
+            <dt className="meta-k">跨源保护</dt>
+            <dd className="meta-v">只写 AD_SYNCED，绝不覆盖 IAM 自建节点</dd>
+          </dl>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button type="button" className="btn-sm" onClick={onSync} disabled={syncBusy}>
+              <IconSync width={13} height={13} />
+              {syncBusy ? '同步中…' : '立即同步'}
+            </button>
+            {syncMsg && <span className="hint" style={{ margin: 0 }}>{syncMsg}</span>}
+          </div>
         </Panel>
       </div>
 
