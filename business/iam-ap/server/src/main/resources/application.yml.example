@@ -1,0 +1,109 @@
+# =============================================================================
+# IAM 统一登录与跨业务准入服务（business/iam-ap/server）—— 生产配置模板
+# -----------------------------------------------------------------------------
+# 约定（见 docs/repo/structure.md）：本文件入库；本地实际运行的 application.yml 不入库。
+# 开发/演示直接用 H2 内存库与临时 RSA 密钥（见 README §快速开始），无需本模板。
+# 复制为 application.yml 后按环境填写；生产务必替换所有占位与默认值。
+# =============================================================================
+
+server:
+  # IAM 约定端口 8081（与 docs 及 business/iam-ap/web 的 vite 代理 target 对齐）。
+  # ⚠️ 不配置会退化为 Spring Boot 默认 8080，导致前端 8081 代理连不上 → 500。
+  port: 8081
+
+spring:
+  application:
+    name: iam-ap
+  datasource:
+    # MySQL 示例（PostgreSQL：jdbc:postgresql://host:5432/cim_iam；达梦按驱动调整）
+    url: jdbc:mysql://localhost:3306/cim_iam?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: cim
+    password: ${CIM_DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    # 表结构由 Flyway 管（平台基线 + 本 ap 自带脚本），Hibernate 只校验
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+# =============================================================================
+# cim-* 框架配置键（完整定义见各 starter 的 *Properties javadoc；
+# 认证/准入契约见 docs/platform/server/design.md §8）
+# =============================================================================
+cim:
+  # 认证（cim-auth-starter）：IAM 是签发方，自身也基于 platform 框架实现
+  auth:
+    enabled: true
+    # IAM 自身是签发方：验证自己的令牌优先走 in-JVM 公钥（IamJwksKeyProvider），
+    # 此 URI 仅作为回退/对外发布地址。
+    jwks-uri: http://localhost:8081/.well-known/jwks.json
+    jwks-cache-minutes: 60
+    # IAM 不对「自己」做准入（它是签发方），app-code 留空即放行
+    admission:
+      app-code: ""
+      enabled: true
+
+  # 持久化（cim-jpa-starter）
+  jpa:
+    id:
+      mode: SNOWFLAKE             # SNOWFLAKE | UUIDV7
+      worker-id: 1                # 生产由部署平台下发，保证同数据中心唯一（后端 §3.1）
+      datacenter-id: 1
+    history:
+      enabled: true
+      write-mode: IN_TRANSACTION  # IN_TRANSACTION | OUTBOX
+    naming:
+      lowercase-snake: true
+    flyway:
+      enabled: true
+
+  # IAM 自身配置（令牌签发 / 准入注册 / 登录认证源）
+  iam:
+    # 管理面前端（business/iam-ap/web）跨域白名单；生产按部署域名收紧
+    web:
+      allowed-origins:
+        - https://iam.example.com
+
+    jwt:
+      kid: iam-rsa-1
+      issuer: cim-iam
+      access-token-ttl-minutes: 30
+      # 生产由 KMS 注入 RSA 私钥/公钥 PEM（private-key-pem / public-key-pem）；
+      # 留空则每次启动生成临时密钥对（仅本地联调，重启即失效、旧令牌全废）。
+      # 建议以环境变量注入，例如：
+      # private-key-pem: ${IAM_JWT_PRIVATE_KEY_PEM}
+      # public-key-pem: ${IAM_JWT_PUBLIC_KEY_PEM}
+
+    # 登录认证（M-login：认证源 / 两层派生 / AD-LDAP）
+    auth:
+      source: ldap                # local | ldap（企业内员工身份托管在 AD/LDAP）
+      password:
+        # 服务端 pepper：第二层派生盐。生产务必由 KMS/环境变量注入，严禁入库、严禁写死提交。
+        pepper: ${IAM_PASSWORD_PEPPER}
+        rounds: 100000            # PBKDF2-HMAC-SHA256 迭代轮数
+      ldap:
+        # 生产使用 ldaps://（隐式 TLS）保护口令传输
+        url: ldaps://ad.corp.example.com:636
+        # 整段主体模板：{0}=用户名。AD 可用 {0}@corp.example.com；OpenLDAP 可用 uid={0},ou=people,dc=corp,dc=com
+        user-dn-pattern: "{0}@corp.example.com"
+
+      # 首管理员引导（首次启动时若库内无该管理员则创建并赋 iam-ap:ADMIN）
+      # 生产务必注入强口令（admin-password），切勿留空（留空将生成随机口令并打印于启动日志）。
+      bootstrap:
+        admin-username: admin
+        admin-password: ${IAM_BOOTSTRAP_ADMIN_PASSWORD}
+        # 引导完成后可置 false 关闭（或用后即改口令）
+        enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,readiness,liveness,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized

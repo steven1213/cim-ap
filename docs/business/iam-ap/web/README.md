@@ -18,6 +18,8 @@
 - **路由**：`react-router-dom` v6（`BrowserRouter` + `ProtectedRoute` 守卫）。
 - **别名**：`tsconfig.json` 配 `@/*` → `src/*`；`vite.config.ts` 同配，`dev` 端口 `5171`。
 - **开发代理**：`vite.config.ts` 将 `/api` 代理到 `http://localhost:8081`（iam-ap server 端口），避免跨域联调。
+  - ⚠️ iam-ap server 必须监听 **8081**（`application.yml` 的 `server.port: 8081`；缺省会退化为 Spring Boot 默认 8080 → 代理连不上，浏览器见 500）。模板见 `server/src/main/resources/application.yml.example`。
+- **API 基址**：`src/lib/api.ts` 的 axios `baseURL = '/api/v1'`（后端所有端点均带 `/api/v1` 前缀），页面内调用只写资源段（如 `/login`、`/apps`、`/me`）。
 
 ```
 business/iam-ap/web/
