@@ -14,7 +14,9 @@ export interface Result<T> {
   errors?: Record<string, string>;
 }
 
-const http: AxiosInstance = axios.create({ baseURL: '/api' });
+// 后端所有端点均带 /api/v1 前缀（见 server 各 Controller 的 @RequestMapping），
+// 故 baseURL 取 /api/v1；页面内调用只写资源段（如 '/login/salt'、'/apps'）。
+const http: AxiosInstance = axios.create({ baseURL: '/api/v1' });
 
 http.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;

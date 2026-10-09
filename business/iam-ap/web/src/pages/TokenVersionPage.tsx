@@ -31,7 +31,7 @@ export default function TokenVersionPage() {
     <div className="card">
       <h2>令牌踢人（强制下线）</h2>
       <p className="hint">
-        bump 该用户的令牌版本号，使其所有存量令牌在验证端缓存到期后即时失效，需重新登录。本地账号的用户ID即用户名。
+        bump 该用户的令牌版本号，使其实时失效其所有存量令牌（IAM 进程内校验版本，无缓存滞后），需重新登录。本地账号的用户ID即用户名。
       </p>
       <form className="row" onSubmit={onKick}>
         <input
