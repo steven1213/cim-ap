@@ -23,19 +23,27 @@
 
 ### 3. cim-mq-starter（统一消息抽象）
 - **范围**：`platform/server/cim-mq-starter/**`（outbox / resilience(Resilience4j) / idempotent / provider(Pulsar·Kafka·RabbitMQ) / listener / observability / serialize / spi / autoconfigure + 测试）。
-- **验证**：**本次未重跑测试（待回归）**——属前期会话落地、本轮统一提交。
+- **验证**：**2026-10-09 全量回归通过**——随 platform 整仓 `mvn install`（13 模块全绿）运行，`cim-mq-starter` 模块 `BUILD SUCCESS`（含其单测），无编译/测试漂移。
 - **风险 / 待办**：需补 provider 级集成测试，确认 outbox→broker 投递语义、幂等去重、乱序处理；`cim-mq-starter-usage.md` 同步纳入。
 
 ### 4. cim-cache-starter（多级缓存与集群）
 - **范围**：`platform/server/cim-cache-starter/**`（cluster / config / guard / multi / support + resources + test）。
-- **验证**：**本次未重跑测试（待回归）**。
+- **验证**：**2026-10-09 全量回归通过**——随 platform 整仓 `mvn install`（13 模块全绿）运行，`cim-cache-starter` 模块 `BUILD SUCCESS`（含其单测），无编译/测试漂移。
 - **风险 / 待办**：集群模式一致性、guard 限流/击穿防护需补测试。
 
 ### 5. platform 底座（server 侧其余模块）
 - **范围**：`cim-system`（域模块：rbac/role/user/permission/menu/dict/log/autoconfigure 等，删除 `CimSystemMarker` 占位）、`cim-jpa-starter`（Flyway 多目录 locations 定制、`DbCapabilities` 方言派生）、`cim-bootstrap`（装配 + `application.yml.example`）、根 `pom.xml`、平台文档 `docs/platform/server/README.md`、`docs/repo/{roadmap,structure}.md`。
-- **验证**：**本次未重跑测试（待回归）**。
-- **风险 / 待办**：`cim-system` 域模块需确认与 `cim-bootstrap` 装配冒烟通过；Flyway 多目录追加顺序需回归。
+- **验证**：**2026-10-09 全量回归通过**——platform 整仓 `mvn install` 13 模块全部 `BUILD SUCCESS`；其中 `cim-system` 16 测（1 跳过）、`cim-bootstrap` 装配冒烟 5 测全绿，确认域模块与 bootstrap 装配通过、Flyway 多目录追加顺序正常。
+- **风险 / 待办**：无遗留回归风险。
+
+## 2026-10-09 全量回归记录
+- **范围**：整仓（platform 13 模块 + iam-ap/server）。
+- **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
+- **结果**：
+  - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
+  - iam-ap：`24/24` 测试全绿，`BUILD SUCCESS`。
+- **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
 
 ## 通用风险
-- 本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。
-- 仓库根存在误入的 `docs/business/mds-ap/server/截图.lnk` 快捷方式文件，**本次不纳入提交**，需人工确认是否删除。
+- ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
+- 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
