@@ -25,7 +25,8 @@ import java.util.Set;
  *
  * <p>{@code GET /api/v1/me}：返回当前登录用户身份（uid/uname/tenant）、可进入的 ap 与按 ap 分组的角色。
  * {@code POST /api/v1/me/password}：本地凭证账号自助改密（仅 {@code local} 认证源账号支持，
- * AD/LDAP 账号改密在目录侧进行）。</p>
+ * AD/LDAP 账号改密在目录侧进行）。与登录一致，请求体携带客户端第一层派生的 {@code clientHash}
+ * （{@code oldCredential}/{@code newCredential}）+ 新口令随机盐 {@code newClientSalt}，明文口令不出浏览器。</p>
  */
 @RestController
 @RequestMapping("/api/v1/me")
@@ -57,7 +58,7 @@ public class ProfileController {
         if (credentialService.findByUsername(username).isEmpty()) {
             throw BizException.paramInvalid("非本地账号，改密请联系目录（AD/LDAP）管理员");
         }
-        credentialService.changePassword(username, req.oldPassword(), req.newPassword());
+        credentialService.changePassword(username, req.oldCredential(), req.newCredential(), req.newClientSalt());
         return Result.ok();
     }
 
@@ -73,6 +74,6 @@ public class ProfileController {
                        Set<String> apps, Map<String, Set<String>> roles) {
     }
 
-    public record ChangePasswordRequest(String oldPassword, String newPassword) {
+    public record ChangePasswordRequest(String oldCredential, String newCredential, String newClientSalt) {
     }
 }

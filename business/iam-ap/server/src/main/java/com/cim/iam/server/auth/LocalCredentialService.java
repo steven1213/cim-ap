@@ -66,19 +66,24 @@ public class LocalCredentialService {
                 .orElse(false);
     }
 
-    /** 自助改密：校验旧口令后重新派生并入库（仅本地凭证账号）。 */
+    /**
+     * 自助改密（与登录一致，明文口令不出浏览器）。
+     *
+     * <p>入参 {@code oldCredential}/{@code newCredential} 为客户端第一层派生的 {@code clientHash}，
+     * 服务端仅做第二层派生校验与入库：先用 {@code pepper} 对 {@code oldCredential} 二次派生并与已存
+     * {@code serverHash} 恒定时间比对，再对 {@code newCredential} 二次派生后入库，并写入新的
+     * {@code newClientSalt}（由客户端随机生成，随新口令的第一层派生一起下发）。</p>
+     */
     @Transactional
-    public void changePassword(String username, String oldRawPassword, String newRawPassword) {
+    public void changePassword(String username, String oldCredential, String newCredential, String newClientSalt) {
         LocalCredential c = findByUsername(username)
                 .orElseThrow(() -> BizException.paramInvalid("本地账号不存在: " + username));
-        if (!verifyPassword(username, oldRawPassword)) {
+        // 旧口令校验：第二层派生 oldCredential 并与已存 serverHash 恒定时间比对
+        if (!PasswordDerivation.constantTimeEquals(deriveServerHash(oldCredential), c.getServerHash())) {
             throw BizException.paramInvalid("原口令校验失败");
         }
-        String newSalt = randomHex(16);
-        String newClientHash = PasswordDerivation.derive(
-                newRawPassword, newSalt, properties.getPassword().getRounds());
-        c.setClientSalt(newSalt);
-        c.setServerHash(deriveServerHash(newClientHash));
+        c.setClientSalt(newClientSalt);
+        c.setServerHash(deriveServerHash(newCredential));
         repository.save(c);
         log.info("[local-cred] 用户 {} 修改口令", username);
     }
