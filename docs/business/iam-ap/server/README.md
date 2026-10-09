@@ -87,16 +87,17 @@
 - `LoginService.login` 接入：进入即 `isLocked` 预检（已锁定直接抛 `ACCOUNT_LOCKED` 1004，不区分用户是否存在）；认证失败 `onFailure`；成功 `onSuccess`。
 - 配置项（默认：`cim.iam.auth.lockout.max-attempts=5`、`lock-minutes=15`、`window-minutes=15`）。
 
-**(i) 管理面鉴权（自签发 JWT + `iam-ap:ADMIN`）** — 边界③管理端点守护（对应 design.md §8.1）
+**(i) 管理面鉴权（自签发 JWT + 库内 RBAC 权限码）** — 边界③管理端点守护（对应 design.md §8.1）
 - `IamJwksKeyProvider extends JwksKeyProvider`（`config` 包）：覆盖 cim-auth-starter 默认的 HTTP JWKS 提供器（starter 该 Bean 为 `@ConditionalOnMissingBean`），使 IAM **验证自身签发的令牌走 in-JVM 公钥**（`RsaKeyService.getPublicKey()`），免环回网络依赖、MockMvc 测试无需真实端口即可验签。父类按 kid 缓存，IAM 单密钥场景直接读内存公钥返回。
 - `IamSecurityConfig`（`config` 包）：注册 `IamJwksKeyProvider` Bean（顶替默认）；并独立 `CorsFilter`（`@Order(HIGHEST_PRECEDENCE)`）放行 `cim.iam.web.allowed-origins`（默认 `http://localhost:5171`，生产按域名收紧），使 business/iam-ap/web 可调用本服务。
-- 管理端点守护：`AppRegistrationController` 全部端点加 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`。IAM 自签 RS256 令牌的 `authorities`/`roles` claim 含 `iam-ap:ADMIN`（由 `BootstrapAdminRunner` 赋权 / 业务赋权写入）；验证侧 JWT 过滤器解析 claim → 方法级鉴权放行/拒绝。
-- 行为：`/api/v1/apps` 无令牌 → 401；持 `iam-ap:ADMIN` 令牌 → 200；持非管理员令牌（如仅 `mds-ap:ADMIN`）→ 403。`AdminSecurityTest`×4 覆盖上述三态。
+- 管理端点守护（**W2 已迁移到库内 RBAC**）：各 `*AdminController` / `AppRegistrationController` 的**类级**注解为 `@PreAuthorize("hasAuthority('iam:console:admin')")`（安全网），各方法另标**方法级**细粒度码 `iam:xxx:yyy`（如 `iam:user:create`、`iam:app:update`），集中定义于 `com.cim.iam.server.support.IamPermissionCodes`。权限**权威源不再是令牌 claim**，而是**本 ap 库内的 RBAC**——`cim-auth-starter` 的 `LocalAuthorityLoader` 被 IAM 侧 `DbLocalAuthorityLoader` 顶替，从 `sys_user_role → sys_role_perm → sys_permission` 解析出权限码集合（见 [console-menu-perm-i18n.md](./console-menu-perm-i18n.md) §4.5）。由此「新增端点忘写方法级注解」的最坏后果是「只有控制台管理员能调」，而非「任何人都能调」。
+- 类级兜底码 `iam:console:admin` 刻意采用合法**三段式**（`module:res:action`）以通过 `cim-system` 的 `PermissionCodes` 校验；旧的**两段式 `iam-ap:ADMIN` 已不作鉴权依据**。注意区分两套语义：`BootstrapAdminRunner` 仍会把 `iam-ap:ADMIN` 作为**准入角色**写入 `iam-ap` 的 `roles` claim，那是「能否进入 IAM 控制台这个 ap」（跨 ap 准入），与「控制台内部按钮/接口权限」是两回事。
+- 行为：`/api/v1/apps` 无令牌 → 401；持控制台管理员令牌 → 200；持非管理员令牌 → 403。`AdminSecurityTest`×4 覆盖上述三态。
 
 **(j) 首管理员引导 + 当前用户端点 + 自助改密** — 管理面初始化与账户自助（对应 design.md §8.1）
-- `BootstrapAdminRunner`（`ApplicationRunner`，`config` 包）：库内无引导管理员时（`cim.iam.auth.bootstrap.admin-username`，默认 `admin`）自动创建首管理员——① 注册 `iam-ap` 应用（管理端点鉴权依赖 `iam-ap:ADMIN`）② 两层派生建本地凭证（服务端完成 clientHash+serverHash）③ 赋 `iam-ap:ADMIN`。`admin-password` 为空则生成随机 16 位口令并打印日志（仅 dev；生产务必注入强口令）。`bootstrap.enabled=false` 可禁用。重复启动自动跳过。
+- `BootstrapAdminRunner`（`ApplicationRunner`，`config` 包）：库内无引导管理员时（`cim.iam.auth.bootstrap.admin-username`，默认 `admin`）自动创建首管理员——① 注册 `iam-ap` 应用 ② 两层派生建本地凭证（服务端完成 clientHash+serverHash）③ 赋 `iam-ap:ADMIN` **准入角色**（写入令牌 `roles` claim，用于进入控制台）。控制台**内部**权限（菜单/按钮/接口码）由 `IamConsoleSeedService` 另行为该用户建立 RBAC 绑定（`sys_user` 档案 + `IAM_ADMIN` 角色）。`admin-password` 为空则生成随机 16 位口令并打印日志（仅 dev；生产务必注入强口令）。`bootstrap.enabled=false` 可禁用。重复启动自动跳过。
 - `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 与登录一致接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，服务端仅做第二层派生校验旧口令 + 入库新 clientHash/newClientSalt（明文口令不出浏览器）。**改密成功后 `bump` 该用户令牌版本**（见 §4(k)），使全部旧会话即时失效。`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」与「错误旧 clientHash 被拒」。
-- 测试：`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
+- 测试：`BootstrapAdminTest`×1 端到端验证「引导创建 admin（`roles` claim 含 `iam-ap:ADMIN` 准入角色）→ 用引导口令登录成功拿令牌」。
 
 **(k) 改密后强制作废旧会话（令牌版本校验本体）** — 让「改密 / 踢人 / 改权限」的失效真正在 IAM 自身生效
 - 背景：JWT 过滤器链路为「验签 → **版本失效判定(401)** → `apps` 准入(403) → 加载权限 → `SecurityContext`」，其中版本判定由 `TokenVersionChecker` SPI 承担；platform 默认实现 `acceptAll()`（不校验），需接入方顶替方能生效。
@@ -106,7 +107,7 @@
 - 行为：改密后**当前会话令牌亦失效**（版本整体 +1）→ 前端 `ProfilePage` 收到成功回执后清空本地会话并跳登录页，用户以新口令重登。`ChangePasswordInvalidatesSessionTest` 端到端验证「改密前 `/me` 200 → 改密 → 旧令牌 `/me` 401 → 新口令重登 → 新令牌 `/me` 200」。
 
 **(l) 管理控制台端点（`admin` 包）+ 审计流水（`audit` 包）** — 管理面可运营、可观测
-> 全部端点类级 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`，非管理员一律 403（`AdminConsoleTest` 覆盖）。
+> 全部端点**类级** `@PreAuthorize("hasAuthority('iam:console:admin')")` 作安全网，各方法另标方法级 `iam:xxx:yyy`；非管理员一律 403（`AdminConsoleTest` 覆盖）。权限码清单见 `IamPermissionCodes` 与 [console-menu-perm-i18n.md](./console-menu-perm-i18n.md) §4。
 
 - **审计（`audit` 包）**：`AuditEvent`（`audit_event` 表，V5 迁移）+ `AuditEventRepository` + `AuditService`。`AuditService.record` 采用 **`REQUIRES_NEW` 独立事务**——审计常出现在「业务即将抛异常」的路径（登录失败、锁定拒绝），同事务会随之回滚导致「失败事件查不到」；独立事务确保审计先落地，且审计自身异常不影响业务（内部 try/catch + 日志）。`AuditType` 为受控词表（`LOGIN_SUCCESS/FAILURE/REJECTED`、`LOGOUT`、`PASSWORD_CHANGED/RESET`、`USER_CREATED/ENABLED/DISABLED/DELETED/UNLOCKED`、`APP_REGISTERED/UPDATED`、`ADMISSION_GRANTED/REVOKED`、`SESSION_REVOKED`）。埋点位点：`LoginService`（登录成功/失败/锁定拒绝/登出）、`LocalCredentialService`（创建/启停/重置/删除/自助改密）、`AppRegistrationService`（注册/更新/授予/撤销）、`UserAdminController`/`LockoutAdminController`/`SessionAdminController`（解锁、强制下线）。
 - **概览**：`GET /api/v1/admin/overview` → 用户数（启用/禁用）、应用数（启用）、活跃会话数、锁定数、登录成功/失败累计、最近 8 条审计事件。
@@ -148,6 +149,7 @@
 | §2 令牌颁发与 JWKS | 登录颁发、刷新轮换、即时吊销 | **首批已落地（签发+JWKS 见 §4(c)；登录颁发见 §4(d)；刷新轮换见 §4(f)；登出/黑名单/吊销见 §4(g)）** |
 | §5.1 口令两层派生 | 前端加密 + 服务端二次派生 | **首批已落地（见 §4(e)）** |
 | §6 身份目录与组织架构（Wave 0） | 用户档案 + 组织树（AD 部门层打底 / IAM 制造组织）+ 组织级准入授予 + 目录水位与只读同步接口 | **Wave 0 已落地（见 §4(m)）→ [identity-directory.md](./identity-directory.md)** |
+| §7 控制台菜单 · 按钮权限 · 多语言 | 菜单父子树入库（复用 `cim-system` 的 `sys_menu`）+ 按钮/接口权限码入库（`sys_permission`/`sys_role_perm`）+ 两表 i18n（`sys_locale` + `sys_i18n`，`zh-CN` 兜底） | **设计稿待评审 → [console-menu-perm-i18n.md](./console-menu-perm-i18n.md)** |
 
 > 能力补齐路线见 `identity-directory.md`：**Wave 0 地基**（用户创建 + 组织架构 + 同步到业务系统）→ Wave 1/2 并行（车间特性 / 治理与集成 / 合规与审计）→ Wave 3 闭环（权限复核与证据导出）。已确认前提：**内部系统、不做 MFA**；权威源为 **AD 管人 + IAM 管制造组织**；同步方式为 **只读接口拉 + 版本水位**。
 | §3 准入模型 | `apps` / `roles` 数据模型与分配管理 | **首批已落地（见 §4(b)）** |

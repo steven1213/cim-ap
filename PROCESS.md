@@ -21,6 +21,7 @@
 | cim-mq-starter | `platform/server/cim-mq-starter/**` | ✅ 完成 | 2026-10-09 整仓 `mvn install` 13 模块全绿（含本模块，含其单测） | `feat(mq): 落地 cim-mq-starter 统一消息抽象与韧性/幂等/Outbox` |
 | cim-cache-starter | `platform/server/cim-cache-starter/**` | ✅ 完成 | 2026-10-09 整仓 `mvn install` 13 模块全绿（含本模块，含其单测） | `feat(cache): 落地 cim-cache-starter 多级缓存与集群能力` |
 | platform 底座(server) | `cim-system` + `cim-jpa-starter` + `cim-bootstrap` + 根 `pom.xml` + `docs/platform/server/README.md` + `docs/repo/*` | ✅ 完成 | 2026-10-09 整仓 `mvn install` 13 模块全绿；`cim-system` 16 测(1 跳过)+`cim-bootstrap` 5 测冒烟全绿 | `feat(platform): 落地 cim-system 域模块、Flyway 多目录与 bootstrap 装配` |
+| **IAM 控制台配置化（W4：菜单/权限/角色/多语言自助闭环）** | `business/iam-ap/server`（`console`: `IamConsoleCatalog`/`IamConsoleSeedRunner`/`IamConsoleSeedService`/`IamConsoleProperties`、`support/IamPermissionCodes`、`admin/I18nAdminController` + 双闸门 `@PreAuthorize` 重构）、`business/iam-ap/web`（菜单/权限/角色/多语言四配置页 + `Perms`/`RequirePerm`/`permCodes`/`iconRegistry`/`usePermission`/`i18n`/`BootGate` + 渲染契约 `test/`）、`docs/business/iam-ap/**` | ✅ 完成 | iam-ap **68/68** 绿（新增 `UserListProjectionTest`×9、`ConsoleMenuIconContractTest`×2、`ConsolePermissionI18nTest`×9 钉死双闸门）；web `tsc`+`vite build` 全绿；**渲染契约 21/21**（`test/run.mjs`，无需浏览器）；早前 e2e 33/33、视觉 19/19 | `feat(iam): 控制台配置化后端支撑；feat(iam-web): 四配置页+渲染契约测试；docs(iam): 配置化自助闭环文档` |
 
 ## 审计索引
 - 详见 [AUDIT.md](./AUDIT.md)（按模块记录范围、验证证据、风险与待办）。
@@ -44,4 +45,10 @@
   - **目录只读 API + AD 同步器**：`/api/v1/directory/{watermark,users/{id},users/batch,orgs}`（服务密钥守护）；`AdDirectorySyncService` 沿用 JNDI + 分页 + DN 深度排序 + `userAccountControl` 禁用位映射 + 删除置 `INACTIVE`（不物理删）。
   - **前端 IA v4**：身份管理改为「**组织架构 → 用户与档案 → 登录锁定**」（先建组织再挂人），接入管理新增「**组织授权**」；新增 `OrgPage`/`OrgGrantsPage`，`UsersPage`/`DashboardPage`/`ProfilePage`/`SettingsPage` 改造。
   - **验证**：iam-ap **48/48 绿**；web `tsc` + `vite build` 全绿（128 模块，CSS 22.60 kB / JS 309.01 kB）；浅/深双主题 11 页 CDP 实拍**零横向溢出**，组织树层级几何核验（`padding-left` 8/25/42/59px，`薄膜车间` 与 `蚀刻车间` 同级）—— 纠正了此前对低分辨率截图的误读。
+- **2026-10-09（续）IAM 控制台配置化（W4：菜单/权限/角色/多语言自助闭环）**：把「菜单、按钮权限、角色授权、界面文案」从**前端硬编码**改为**由界面自助维护、无需发版**。
+  - **后端**（`business/iam-ap/server`）：新增 `console` 包 —— `IamConsoleCatalog`（菜单树 `MenuDef` + 界面文案 `TextDef` 种子，菜单实体只存 `i18n_code` 与图标注册表键、不存名称/图标组件）、`IamConsoleSeedRunner`/`IamConsoleSeedService`（首启幂等种子：菜单 + 文案 + 权限目录 + 角色授权）、`IamConsoleProperties`；`support/IamPermissionCodes`（细粒度 `iam:*` 权限码常量，取代旧两段式 `iam-ap:ADMIN`）；`admin/I18nAdminController`（语种/译文/缺失汇总端点）；并对所有 `admin/*` 控制器做**双闸门鉴权重构**（类级 `iam:console:admin` 兜底 + 方法级 `iam:<域>:<动作>`）。
+  - **前端**（`business/iam-ap/web`）：新增菜单/权限/角色/多语言四配置页（数据面复用平台 `cim-system` 的 `/sys/**` 端点 + IAM 自己的 `/api/v1/admin/i18n/**`）；`Perms`/`RequirePerm`（AND 语义 `codes` 闸门）、`permCodes.ts`（`SYS` 镜像平台码）、`iconRegistry.ts`、`usePermission.ts`、`i18n.ts`（整包缓存 + 不用 Suspense + 中文兜底四层）、`BootGate`（权限就绪再渲染路由）；删除旧的 `RequireAdmin`/`menu.tsx` 硬编码守卫。
+  - **验证**：iam-ap **68/68** 绿（含 `UserListProjectionTest`×9 钉死「方法级 `@PreAuthorize` 覆盖类级」、`ConsoleMenuIconContractTest`×2 跨端图标契约、`ConsolePermissionI18nTest`×9 钉死双闸门）；web `tsc`+`vite build` 全绿；**渲染契约 21/21**（SSR 断言闸门+骨架+文案键，无需浏览器）；e2e 33/33 + 视觉 19/19（早前）。
+  - **双闸门（关键设计）**：菜单/权限/角色三页数据面复用平台 `sys:*` 端点，IAM 的 `iam:*` 仅管入口显隐 → `能读/写 ⟺ 持有 IAM 控制台码 ∧ 持有对应平台码`；只读运维角色由种子补授平台只读码；`/i18n` 页单闸门（数据面即 IAM 端点）。
+  - **W4b 存量页面 i18n 迁移**：未纳入本次（约 537 行硬编码中文 / 17 个存量页面），列为后续 wave。
 - 后续每次增量提交继续遵守上方纪律并更新本表。

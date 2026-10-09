@@ -117,6 +117,45 @@
 - **验证**：iam-ap **48/48 绿**（新增 `IdentityDirectoryTest`×7：① 组织授予经祖先链展开到成员；② 跨源保护使 AD 节点只读；③ 组织变更 bump 令牌版本 + 水位；④ 未配置 AD 时同步跳过；⑤ 目录 API 强制服务密钥；⑥ 批量用户与组织/档案管理端点；⑦ 组织授予变更使存量令牌失效）。web `tsc -p tsconfig.json` EXIT=0；`vite build` 128 模块、CSS 22.60 kB、JS 309.01 kB，EXIT=0。
 - **视觉回归**：独立验证实例（后端 :8082 + 临时 vite :5172）种子化数据（3 应用 / 组织树 8 节点 / 5 账号含档案 / 多归属 / 3 条组织授予 / AD 同步返回 `skipped:true`），以 CDP 实拍**浅/深双主题共 11 页 + 登录页**；并量化检测**全部 11 页零横向溢出**（`scrollWidth === clientWidth`，越界元素计数 0）。**额外**对组织树做层级几何核验：`padding-left` 依次 8 / 25 / 42 / 59px（每级 +17px），`薄膜车间` 与 `蚀刻车间` **同为 25px（证实同级）**、`B厂` 回到 8px —— 量化纠正了此前对低分辨率截图的误读（曾误判 `薄膜车间` 缩进多一级）。
 
+## 2026-10-09（续）IAM 控制台配置化（W4：菜单/权限/角色/多语言自助闭环）
+
+### 11. 后端（server）
+- **范围**：`business/iam-ap/server`
+  - 新增 `console` 包：`IamConsoleCatalog`（菜单树 `MenuDef` + 界面文案 `TextDef` 种子；菜单实体只存 `i18n_code` 与图标注册表键 `icon`、`visible`/`permCode`/`type`，**不存名称与图标组件**）、`IamConsoleSeedRunner`（`ApplicationRunner` 首启种子）、`IamConsoleSeedService`（幂等 seed：菜单 + 文案 + 权限目录 + 角色授权）、`IamConsoleProperties`（开关与超时）。
+  - 新增 `support/IamPermissionCodes`（细粒度 `iam:*` 权限码常量，取代旧两段式 `iam-ap:ADMIN`）。
+  - 新增 `admin/I18nAdminController`（`/api/v1/admin/i18n/**`：语种目录 GET、译文分页 GET、缺失汇总 GET、保存/删除/缺失清除 PUT/DELETE）。
+  - **双闸门鉴权重构**：`admin/*` 全部控制器类级 `@PreAuthorize("hasAuthority('iam:console:admin')")` 兜底 + 方法级 `@PreAuthorize("hasAuthority('iam:<域>:<动作>')")`；`IamSecurityConfig` javadoc 同步。
+- **验证（已跑通）**：iam-ap **68/68** 绿。
+  - `ConsolePermissionI18nTest`×9：`/sys/menus/tree`、`/sys/permissions/page`、`/sys/roles/{id}/permissions|menus` 对 admin 返回 200（钉死双闸门前提）；`IAM_OPERATOR`（非超管）实测持有 `iam:menu:list`+`sys:menu:list`+`sys:permission:list`+`sys:role:list`（种子补授平台只读码）。
+  - `UserListProjectionTest`×9：覆盖「本地凭证 ∪ 用户档案」并集投影的 service/repository 两层；**实测钉死**「方法级 `@PreAuthorize` **覆盖**类级（非 AND）」——只持 `iam:user:list`、无 `iam:console:admin` 亦返回 200。
+  - `ConsoleMenuIconContractTest`×2：跨端契约，直接读前端 `lib/iconRegistry.ts` 解析键集比对 `IamConsoleCatalog.menus()` 的 `icon`，断言种子图标全部命中注册表、注册表键不重复且解析非退化。
+- **关键设计决策**：
+  1. **双闸门（写操作必备）**：菜单/权限/角色三页数据面复用平台 `cim-system` 的 `sys:*` 端点，而 IAM 的 `iam:*` 仅控制**入口显隐**；二者同时满足才可读写 → `能读/写 ⟺ 持 IAM 控制台码 ∧ 持对应平台码`。前端用 `<Perms codes={[IAM码, SYS码]}>`（AND）+ 页级 `useHasAllPermissions([...])` 判读，缺平台码即整页提示、不发起注定 403 的请求。`/i18n` 页单闸门（数据面即 IAM 自己的端点）。
+  2. **方法级覆盖类级（反直觉）**：Spring Security 的方法级 `@PreAuthorize` **覆盖**类级而非 AND 叠加；故「只持细码、无伞码」仍 200。已用测试钉死该语义，避免误以为「类级伞码提供兜底 AND」。
+  3. **菜单不存名称/图标组件**：`sys_menu` 仅 `i18n_code` + `icon`（注册表键）；名称由 `t(i18n_code)`、副标题 `t(i18n_code+'.desc')`、图标由 `iconRegistry` 解析，未知回落 `IconAlert`。新增菜单后须去「多语言」页补译文。
+  4. **seed 幂等**：`IamConsoleSeedService` 按 `i18n_code`/`code` 存在性 upsert，重复启动不重复插入。
+
+### 12. 前端（web）
+- **范围**：`business/iam-ap/web`
+  - 四配置页：`MenusAdminPage`（树面板 + 编辑表单，含 `BUTTON` 必须绑 `perm_code`）、`PermissionsAdminPage`（按模块分组 + 三段校验 `module:res:action`）、`RolesAdminPage`（角色 CRUD + 两个独立授权面板：权限勾选 + 菜单树勾选）、`I18nAdminPage`（语种/译文/缺失汇总 + 单闸门）。
+  - 基础设施：`components/Perms.tsx`（新增 `codes?: readonly string[]` 多码 AND 闸门）、`components/RequirePerm.tsx`、`lib/permCodes.ts`（`SYS` 镜像平台 `PermissionCodes`）、`lib/iconRegistry.ts`、`lib/usePermission.ts`、`lib/i18n.ts`（整包本地缓存 + `initImmediate:false` + 不用 Suspense + 中文兜底四层）、`components/BootGate.tsx`（权限就绪再渲染路由）。
+  - 删除：`components/RequireAdmin.tsx`、`lib/menu.tsx`（硬编码菜单/守卫，由注册表驱动 + `Perms`/`RequirePerm` 取代）。
+- **验证**：`tsc -p tsconfig.json` EXIT=0；`vite build` 全绿。**渲染契约 21/21**（`test/run.mjs` + `test/render-contract.tsx` + `test/setup.ts`）：用 `react-dom/server` 的 `renderToStaticMarkup` 在 Node 断言「给定权限码集时页面渲染哪些元素、请求哪些文案键」——**无需浏览器**；关键断言即双闸门（只持 `iam:menu:list` 缺 `sys:menu:list` → 仅无权限提示；两码齐备 → 渲染主体与写按钮），`/i18n` 反向断言单闸门。
+- **关键设计决策**：
+  1. **zustand SSR 快照坑**：`useStore` 的 `getServerSnapshot` 默认读初始快照，`setState` 对 SSR 不可见 → 测试须就地改写 `getServerState`。已固化在 `test/setup.ts` 注释。
+  2. **esbuild 产物 CJS 动态 require 坑**：`react-dom` 等运行期 `require('stream')` 撞 esbuild「Dynamic require not supported」→ 在 `run.mjs` 顶部用 `createRequire` 注入真实 `require`。
+  3. **i18next 插值 `{{n}}`**（非 `{n}`）：节点计数/缺失计数用 `{{n}}`，修复「显示为字面量」缺陷。
+
+### 13. 文档与验证
+- `docs/business/iam-ap/web/README.md` §3.1（配置化闭环 + 双闸门表 + 实现口径）、§3.2（四层验证与渲染契约测试设计）。
+- `docs/business/iam-ap/server/console-menu-perm-i18n.md` §7.4（双闸门数据面/入口闸门表）、§9（权限族/双闸门风险行）、§11（风险表新增双闸门行 + 图标契约测试已补）。
+- `docs/business/iam-ap/server/README.md`/`identity-directory.md`：把 `iam-ap:ADMIN` 旧称统一改为 `iam:console:admin` + 方法级 `iam:xxx:yyy`，并澄清 `iam-ap:ADMIN` 仅作准入角色 claim、非控制台权限。
+- 验证产物（`.verify/` 脚本与截图、`vite.smoke.config.ts`）**未入库**，已清理。
+
+### 14. 风险 / 待办
+- **W4b 存量页面 i18n 迁移**：4 个配置页已 i18n，但 17 个存量页面（OrgPage/UsersPage/Dashboard/Settings 等）约 537 行硬编码中文，**未纳入本次**，列为后续 wave；届时需逐页配 `t()` + `TextDef`，使切 `en-US` 无中文残留。
+- 平台 `cim-system` 迁移版本号 V1→V1000（ADR-10）、`cim-mq-starter`/`cim-cache-starter`/MDS 文档等早年会话产物的未提交改动仍在工作区（见 PROCESS 表与通用风险），本次按用户决策**仅提交 W4**，其余保留待后续独立 wave 收口。
+
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。

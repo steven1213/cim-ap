@@ -122,7 +122,7 @@ effectiveRoles(uid, app) =                                   上述来源的 rol
 
 > 返回体不含任何凭证与权限内部结构；档案字段可按需裁剪。
 
-### 5.2 管理侧（`hasAuthority('iam-ap:ADMIN')`）
+### 5.2 管理侧（方法级 `iam:xxx:yyy` 为实际闸门；类级 `iam:console:admin` 为兜底）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
