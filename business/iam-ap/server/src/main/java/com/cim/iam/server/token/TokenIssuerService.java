@@ -11,7 +11,6 @@ import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * 令牌签发（RS256，design.md §8.1(c) claim 契约）。
@@ -39,9 +38,12 @@ public class TokenIssuerService {
 
         long ver = tokenVersionService.currentVersion(req.userId());
         Set<String> apps = appRegistrationService.enabledAppsForUser(req.userId());
-        Set<String> roles = appRegistrationService.rolesByAppForUser(req.userId()).values().stream()
-                .flatMap(Set::stream)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // 角色以 appCode:ROLE 形式编码，消除跨 app 同名角色的歧义（如 iam-ap:ADMIN 与 mds-ap:ADMIN）。
+        // 同时写入 roles 与 authorities 两个 claim：authorities 交由 cim-auth-starter 的
+        // ClaimLocalAuthorityLoader 直接加载为 Spring Security 权威（@PreAuthorize 据此判定）。
+        Set<String> qualifiedRoles = new LinkedHashSet<>();
+        appRegistrationService.rolesByAppForUser(req.userId()).forEach((appCode, appRoles) ->
+                appRoles.forEach(r -> qualifiedRoles.add(appCode + ":" + r)));
 
         // jti：令牌唯一标识，用于登出 / 主动吊销时写入黑名单（design.md §8.1(h)）
         String jti = java.util.UUID.randomUUID().toString();
@@ -53,7 +55,8 @@ public class TokenIssuerService {
                 .claim("uid", req.userId())
                 .claim("uname", req.username() != null ? req.username() : req.userId())
                 .claim("apps", apps)
-                .claim("roles", roles)
+                .claim("roles", qualifiedRoles)
+                .claim("authorities", qualifiedRoles)
                 .claim("tenantId", req.tenantId())
                 .claim("jti", jti)
                 .claim("ver", ver)

@@ -54,4 +54,43 @@ public class LocalCredentialService {
                 properties.getPassword().getPepper(),
                 properties.getPassword().getRounds());
     }
+
+    /** 校验本地账号明文口令（两层派生后恒定时间比对），不存在的账号返回 false。 */
+    public boolean verifyPassword(String username, String rawPassword) {
+        return findByUsername(username)
+                .map(c -> {
+                    String clientHash = PasswordDerivation.derive(
+                            rawPassword, c.getClientSalt(), properties.getPassword().getRounds());
+                    return PasswordDerivation.constantTimeEquals(deriveServerHash(clientHash), c.getServerHash());
+                })
+                .orElse(false);
+    }
+
+    /** 自助改密：校验旧口令后重新派生并入库（仅本地凭证账号）。 */
+    @Transactional
+    public void changePassword(String username, String oldRawPassword, String newRawPassword) {
+        LocalCredential c = findByUsername(username)
+                .orElseThrow(() -> BizException.paramInvalid("本地账号不存在: " + username));
+        if (!verifyPassword(username, oldRawPassword)) {
+            throw BizException.paramInvalid("原口令校验失败");
+        }
+        String newSalt = randomHex(16);
+        String newClientHash = PasswordDerivation.derive(
+                newRawPassword, newSalt, properties.getPassword().getRounds());
+        c.setClientSalt(newSalt);
+        c.setServerHash(deriveServerHash(newClientHash));
+        repository.save(c);
+        log.info("[local-cred] 用户 {} 修改口令", username);
+    }
+
+    private static String randomHex(int bytes) {
+        java.security.SecureRandom r = new java.security.SecureRandom();
+        byte[] b = new byte[bytes];
+        r.nextBytes(b);
+        StringBuilder sb = new StringBuilder(bytes * 2);
+        for (byte x : b) {
+            sb.append(String.format("%02x", x));
+        }
+        return sb.toString();
+    }
 }

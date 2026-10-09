@@ -50,12 +50,14 @@ class IamApIntegrationTest {
     void fullFlowIssueTokenWithAppsAndVersion() throws Exception {
         // 1) 注册 ap
         mvc.perform(post("/api/v1/apps")
+                        .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(new RegisterAppRequest("mds-ap", "MDS", 1))))
                 .andExpect(status().isOk());
 
         // 2) 分配用户到 ap（粗角色 ADMIN）
         mvc.perform(post("/api/v1/apps/mds-ap/users")
+                        .header("Authorization", "Bearer " + adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(new AssignRequest("u1", Set.of("ADMIN")))))
                 .andExpect(status().isOk());
@@ -82,7 +84,8 @@ class IamApIntegrationTest {
 
         // 7) 撤销分配后，apps claim 不再包含 mds-ap
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/api/v1/apps/mds-ap/users/u1"))
+                        .delete("/api/v1/apps/mds-ap/users/u1")
+                        .header("Authorization", "Bearer " + adminToken()))
                 .andExpect(status().isOk());
         String token3 = issue("u1", "u1", null);
         assertClaims(token3, "u1", Set.of(), 3L); // ver 因撤销 bump 到 3，apps 为空
@@ -112,5 +115,21 @@ class IamApIntegrationTest {
 
     private String json(Object o) throws Exception {
         return objectMapper.writeValueAsString(o);
+    }
+
+    /** 用 IAM 私钥签发一个具 iam-ap:ADMIN 权威的管理员令牌（经 in-JVM 公钥本地验签）。 */
+    private String adminToken() {
+        return Jwts.builder()
+                .header().keyId(rsaKeyService.getKid()).and()
+                .subject("admin")
+                .claim("uid", "admin")
+                .claim("apps", java.util.List.of("iam-ap"))
+                .claim("roles", java.util.List.of("iam-ap:ADMIN"))
+                .claim("authorities", java.util.List.of("iam-ap:ADMIN"))
+                .claim("ver", 1L)
+                .issuedAt(new java.util.Date())
+                .expiration(new java.util.Date(System.currentTimeMillis() + 3_600_000L))
+                .signWith(rsaKeyService.getPrivateKey(), io.jsonwebtoken.Jwts.SIG.RS256)
+                .compact();
     }
 }

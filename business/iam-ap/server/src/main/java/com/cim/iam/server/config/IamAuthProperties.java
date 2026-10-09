@@ -22,6 +22,7 @@ public class IamAuthProperties {
     private Password password = new Password();
     private Ldap ldap = new Ldap();
     private Lockout lockout = new Lockout();
+    private Bootstrap bootstrap = new Bootstrap();
 
     public String getSource() {
         return source;
@@ -53,6 +54,14 @@ public class IamAuthProperties {
 
     public void setLockout(Lockout lockout) {
         this.lockout = lockout;
+    }
+
+    public Bootstrap getBootstrap() {
+        return bootstrap;
+    }
+
+    public void setBootstrap(Bootstrap bootstrap) {
+        this.bootstrap = bootstrap;
     }
 
     public static class Password {
@@ -148,6 +157,42 @@ public class IamAuthProperties {
                 throw new IllegalArgumentException("lockout.window-minutes 必须 >= 1");
             }
             this.windowMinutes = windowMinutes;
+        }
+    }
+
+    /**
+     * 首管理员引导（{@code cim.iam.auth.bootstrap.*}）。
+     *
+     * <p>库内无引导管理员时由 {@code BootstrapAdminRunner} 据此创建首管理员并赋 {@code iam-ap:ADMIN}。
+     * 生产环境务必注入强口令（admin-password），切勿留空（留空将生成随机口令并仅打印于启动日志）。</p>
+     */
+    public static class Bootstrap {
+        private boolean enabled = true;
+        private String adminUsername = "admin";
+        private String adminPassword = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getAdminUsername() {
+            return adminUsername;
+        }
+
+        public void setAdminUsername(String adminUsername) {
+            this.adminUsername = adminUsername;
+        }
+
+        public String getAdminPassword() {
+            return adminPassword;
+        }
+
+        public void setAdminPassword(String adminPassword) {
+            this.adminPassword = adminPassword;
         }
     }
 }
