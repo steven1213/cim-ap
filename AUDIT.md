@@ -66,6 +66,21 @@
   - npm 缓存损坏 → `npm install --ignore-scripts --cache "E:/Software/tmp/npm-iam-cache" --prefer-online` 重建。
 - **范围说明**：仅承载「登录门户 + 准入/粗角色管理 + 令牌踢人 + 自助改密」；业务菜单/按钮管理仍由各业务 ap 前端负责（与 IAM 边界一致）。
 
+### 8. IAM 前端 UI 重构（工业级控制台 v2）
+- **动因**：初版为「顶部导航 + 单列卡片」的扁平布局，信息密度低、缺乏工程感，不符合半导体 / CIM 场景对表格密度与编码可读性的要求。
+- **范围**：`business/iam-ap/web/src`（`styles.css` 全量重写 + `Layout.tsx` 重写 + 页面重排 + 新增 3 文件）。
+- **界面外壳**：改为标准四段式 —— **顶部 header**（模块标题 + 面包屑路径 + 环境标识 + 主题切换 + 用户菜单）、**左侧可收缩菜单**（232px ⇄ 64px，收缩态持久化于 `localStorage`；`≤900px` 转抽屉式）、**内容区**、**底部 footer**。
+- **设计体系（v2）**：
+  - **等宽字体承载编码类信息**：接入码、用户 ID、租户、角色组、算法名、版本号等统一走 `--font-mono` 栈；UI 正文走无衬线栈。
+  - **数字对齐**：全局 `font-variant-numeric: tabular-nums`；数据表数字列右对齐。
+  - **小号大写字母标签**：表头 / 字段标签 / KPI 标签 `uppercase + letter-spacing`。
+  - **信息密度**：正文 13px，表行高 8px 内边距，卡片留白压缩（一屏信息量显著提升）。
+  - **浅深双主题**：全部走 CSS 变量令牌，`<html data-theme>` 驱动；`index.html` 内联脚本首屏抢先应用，**消除主题闪烁**。
+  - **组件化**：新增 `components/Panel.tsx`（统一面板标题栏 + 内容区）、`components/Icons.tsx`（内联 SVG 图标集，**零图标库依赖**）、`lib/theme.ts`（主题读写）。
+- **登录页**：保留品牌分栏版式并精修交互 —— 记住用户名（仅存用户名，**口令从不落盘**）、口令可见性切换、Caps Lock 提示、回车提交、按是否记住用户名自动聚焦、失败自动聚焦并全选口令框。
+- **验证**：`tsc -p tsconfig.json` EXIT=0；`vite build` 116 模块、CSS 19.8 kB / gzip 4.9 kB、JS 252 kB / gzip 84 kB，EXIT=0。另用无头 Chrome（CDP pipe）实拍浅色/深色/收缩态/移动端 9 张界面截图做视觉回归，发现并修复 2 处渲染缺陷（原生复选框继承全局 `input` 样式被撑成实心块 → 改为 `appearance:none` 自绘；行内表单字段无上限拉伸 → 加 `max-width`）。截图与临时预览工程均未入库。
+- **范围说明**：仅改前端表现层与交互，**未改动任何后端契约与 API 调用**（`/api/v1/*` 路径、请求体、`Result<T>` 解包逻辑保持原样）。
+
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
