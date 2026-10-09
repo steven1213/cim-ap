@@ -41,3 +41,13 @@ export interface TokenVersionBump {
   uid: string;
   version: number;
 }
+
+/** POST /api/v1/me/password 请求体（自助改密，与登录一致收客户端第一层派生后的 clientHash）。 */
+export interface ChangePasswordRequest {
+  /** 旧口令第一层派生后的 clientHash。 */
+  oldCredential: string;
+  /** 新口令第一层派生后的 clientHash。 */
+  newCredential: string;
+  /** 新口令第一层派生所用的随机盐（由客户端生成，随请求下发）。 */
+  newClientSalt: string;
+}
