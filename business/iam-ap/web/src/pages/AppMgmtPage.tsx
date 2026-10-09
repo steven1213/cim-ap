@@ -1,10 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import * as api from '@/lib/api';
-import type { AppRegistration } from '@/types';
+import type { AppRegistration, AppStatus } from '@/types';
 import Panel from '@/components/Panel';
-import { IconAlert, IconApps, IconCheckCircle, IconInbox, IconRefresh } from '@/components/Icons';
+import {
+  IconAlert,
+  IconApps,
+  IconCheckCircle,
+  IconPower,
+  IconRefresh,
+} from '@/components/Icons';
 
-/** 应用注册与准入管理（需 iam-ap:ADMIN）。 */
+/** 应用注册（需 iam-ap:ADMIN）：登记业务接入码、维护状态。准入分配见「准入授权」。 */
 export default function AppMgmtPage() {
   const [apps, setApps] = useState<AppRegistration[]>([]);
   const [msg, setMsg] = useState('');
@@ -15,13 +21,6 @@ export default function AppMgmtPage() {
   const [appCode, setAppCode] = useState('');
   const [appName, setAppName] = useState('');
   const [sortNo, setSortNo] = useState(0);
-
-  const [assignApp, setAssignApp] = useState('');
-  const [assignUser, setAssignUser] = useState('');
-  const [assignRoles, setAssignRoles] = useState('');
-
-  const [queryUser, setQueryUser] = useState('');
-  const [userApps, setUserApps] = useState<string[] | null>(null);
 
   async function loadApps() {
     setLoading(true);
@@ -39,14 +38,18 @@ export default function AppMgmtPage() {
     loadApps();
   }, []);
 
+  function flash(t: string) {
+    setMsg(t);
+    setTimeout(() => setMsg(''), 3000);
+  }
+
   async function onRegister(e: FormEvent) {
     e.preventDefault();
-    setMsg('');
     setErr('');
     setBusy(true);
     try {
-      await api.post<AppRegistration>('/apps', { appCode, appName, sortNo: Number(sortNo) });
-      setMsg(`已注册应用 ${appCode}`);
+      await api.post<AppRegistration>('/apps', { appCode: appCode.trim(), appName, sortNo: Number(sortNo) });
+      flash(`已注册应用 ${appCode}`);
       setAppCode('');
       setAppName('');
       setSortNo(0);
@@ -58,47 +61,18 @@ export default function AppMgmtPage() {
     }
   }
 
-  async function onAssign(e: FormEvent) {
-    e.preventDefault();
-    setMsg('');
+  async function toggleStatus(a: AppRegistration) {
     setErr('');
-    setBusy(true);
-    try {
-      const roles = assignRoles
-        .split(',')
-        .map((r) => r.trim())
-        .filter(Boolean);
-      await api.post<void>(`/apps/${encodeURIComponent(assignApp)}/users`, { userId: assignUser, roles });
-      setMsg(`已为用户 ${assignUser} 分配 ${assignApp}（角色：${roles.join(', ') || '无'}）`);
-      setAssignUser('');
-      setAssignRoles('');
-    } catch (e: any) {
-      setErr(e?.msg || '分配失败');
-    } finally {
-      setBusy(false);
+    const next: AppStatus = a.status === 'ENABLED' ? 'DISABLED' : 'ENABLED';
+    if (next === 'DISABLED' && !window.confirm(`确认停用 ${a.appCode}？其下所有用户对该应用的准入将立即失效。`)) {
+      return;
     }
-  }
-
-  async function onRevoke(app: string, userId: string) {
-    setMsg('');
-    setErr('');
     try {
-      await api.del<void>(`/apps/${encodeURIComponent(app)}/users/${encodeURIComponent(userId)}`);
-      setMsg(`已撤销 ${userId} 在 ${app} 的准入`);
-      if (queryUser === userId) setUserApps((prev) => (prev ? prev.filter((a) => a !== app) : prev));
+      await api.put(`/apps/${encodeURIComponent(a.appCode)}`, { appName: a.appName, status: next });
+      flash(`${a.appCode} 已${next === 'ENABLED' ? '启用' : '停用'}`);
+      await loadApps();
     } catch (e: any) {
-      setErr(e?.msg || '撤销失败');
-    }
-  }
-
-  async function onQueryUser(e: FormEvent) {
-    e.preventDefault();
-    setUserApps(null);
-    setErr('');
-    try {
-      setUserApps(await api.get<string[]>(`/apps/users/${encodeURIComponent(queryUser)}/apps`));
-    } catch (e: any) {
-      setErr(e?.msg || '查询失败');
+      setErr(e?.msg || '更新失败');
     }
   }
 
@@ -121,7 +95,7 @@ export default function AppMgmtPage() {
 
       <Panel
         title="应用清单"
-        sub="已注册的业务接入码及其准入状态"
+        sub="已注册的业务接入码；接入码即令牌 apps claim 的取值"
         flush
         actions={
           <>
@@ -141,9 +115,11 @@ export default function AppMgmtPage() {
                 <tr>
                   <th>接入码</th>
                   <th>应用名称</th>
-                  <th>状态</th>
-                  <th className="num">排序</th>
-                  <th>注册 ID</th>
+                  <th style={{ width: 100 }}>状态</th>
+                  <th className="num" style={{ width: 80 }}>
+                    排序
+                  </th>
+                  <th style={{ width: 120 }}>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,7 +134,12 @@ export default function AppMgmtPage() {
                       </span>
                     </td>
                     <td className="num">{a.sortNo}</td>
-                    <td className="mono">{a.id}</td>
+                    <td>
+                      <button className="btn-ghost btn-sm" onClick={() => toggleStatus(a)}>
+                        <IconPower width={13} height={13} />
+                        {a.status === 'ENABLED' ? '停用' : '启用'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -173,166 +154,58 @@ export default function AppMgmtPage() {
         )}
       </Panel>
 
-      <div className="grid-2">
-        <Panel title="注册应用" sub="接入码将写入令牌的 apps claim">
-          <form onSubmit={onRegister}>
-            <div className="form-grid">
-              <div className="field">
-                <label className="field-label" htmlFor="reg-code">
-                  接入码
-                </label>
-                <input
-                  id="reg-code"
-                  className="mono"
-                  placeholder="mds-ap"
-                  value={appCode}
-                  onChange={(e) => setAppCode(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="reg-name">
-                  应用名称
-                </label>
-                <input
-                  id="reg-name"
-                  placeholder="MDS 设备数据服务"
-                  value={appName}
-                  onChange={(e) => setAppName(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="reg-sort">
-                  排序号
-                </label>
-                <input
-                  id="reg-sort"
-                  type="number"
-                  placeholder="0"
-                  value={sortNo}
-                  onChange={(e) => setSortNo(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <p className="hint">接入码全局唯一，注册后即纳入 IAM 的 ap 注册表，用于准入判定。</p>
-            <button type="submit" className="btn-block" disabled={busy || !appCode || !appName} style={{ marginTop: 12 }}>
-              注册应用
-            </button>
-          </form>
-        </Panel>
-
-        <Panel title="分配准入" sub="授予用户进入某应用的准入与角色组">
-          <form onSubmit={onAssign}>
+      <Panel title="注册应用" sub="接入码将写入令牌的 apps claim">
+        <form onSubmit={onRegister}>
+          <div className="form-grid">
             <div className="field">
-              <label className="field-label" htmlFor="as-app">
-                目标应用
-              </label>
-              <select id="as-app" value={assignApp} onChange={(e) => setAssignApp(e.target.value)}>
-                <option value="">选择应用…</option>
-                {apps.map((a) => (
-                  <option key={a.id} value={a.appCode}>
-                    {a.appCode} · {a.appName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="as-user">
-                用户 ID
+              <label className="field-label" htmlFor="reg-code">
+                接入码
               </label>
               <input
-                id="as-user"
+                id="reg-code"
                 className="mono"
-                placeholder="admin"
-                value={assignUser}
-                onChange={(e) => setAssignUser(e.target.value)}
+                placeholder="mds-ap"
+                value={appCode}
+                onChange={(e) => setAppCode(e.target.value)}
               />
             </div>
             <div className="field">
-              <label className="field-label" htmlFor="as-roles">
-                角色组
-                <span className="opt">逗号分隔，可留空</span>
+              <label className="field-label" htmlFor="reg-name">
+                应用名称
               </label>
               <input
-                id="as-roles"
-                className="mono"
-                placeholder="ADMIN, OPERATOR"
-                value={assignRoles}
-                onChange={(e) => setAssignRoles(e.target.value)}
+                id="reg-name"
+                placeholder="MDS 设备数据服务"
+                value={appName}
+                onChange={(e) => setAppName(e.target.value)}
               />
             </div>
-            <button
-              type="submit"
-              className="btn-block"
-              disabled={busy || !assignApp || !assignUser}
-              style={{ marginTop: 12 }}
-            >
-              分配准入
-            </button>
-          </form>
-        </Panel>
-      </div>
-
-      <Panel title="用户准入查询" sub="按用户 ID 查询其已准入的应用，并支持逐条撤销">
-        <form className="row" onSubmit={onQueryUser}>
-          <div className="field">
-            <label className="field-label" htmlFor="q-user">
-              用户 ID
-            </label>
-            <input
-              id="q-user"
-              className="mono"
-              placeholder="admin"
-              value={queryUser}
-              onChange={(e) => setQueryUser(e.target.value)}
-            />
+            <div className="field">
+              <label className="field-label" htmlFor="reg-sort">
+                排序号
+              </label>
+              <input
+                id="reg-sort"
+                type="number"
+                placeholder="0"
+                value={sortNo}
+                onChange={(e) => setSortNo(Number(e.target.value))}
+              />
+            </div>
           </div>
-          <button type="submit" disabled={!queryUser}>
-            查询
+          <p className="hint">接入码全局唯一，注册后即纳入 IAM 的 ap 注册表，用于准入判定。</p>
+          <button type="submit" className="btn-block" disabled={busy || !appCode.trim() || !appName} style={{ marginTop: 12 }}>
+            注册应用
           </button>
         </form>
+      </Panel>
 
-        {userApps && (
-          <div style={{ marginTop: 14 }}>
-            {userApps.length ? (
-              <div className="table-wrap">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>接入码</th>
-                      <th>准入状态</th>
-                      <th style={{ width: 96 }} />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {userApps.map((app) => (
-                      <tr key={app}>
-                        <td className="mono">{app}</td>
-                        <td>
-                          <span className="status">
-                            <i className="led ok" />
-                            <b>已准入</b>
-                          </span>
-                        </td>
-                        <td>
-                          <div className="cell-actions">
-                            <button className="btn-danger btn-sm" onClick={() => onRevoke(app, queryUser)}>
-                              撤销准入
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="empty">
-                <IconInbox width={22} height={22} />
-                <b>用户 {queryUser} 暂无准入应用</b>
-              </div>
-            )}
-          </div>
-        )}
+      <Panel title="接入指引" sub="业务 ap 如何对接 IAM 令牌">
+        <ul className="note-list">
+          <li>业务 ap 从 <code>/.well-known/jwks.json</code> 拉取公钥，本地验签（RS256），无需每请求回查 IAM。</li>
+          <li>准入判定：令牌 <code>apps</code> claim 含本 ap 接入码即放行；否则 403。</li>
+          <li>角色组：令牌 <code>roles</code> claim 携带本 ap 内的粗角色组，业务内部权限据此再细分。</li>
+        </ul>
       </Panel>
     </div>
   );

@@ -1,12 +1,24 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import RequireAdmin from '@/components/RequireAdmin';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AppMgmtPage from '@/pages/AppMgmtPage';
-import TokenVersionPage from '@/pages/TokenVersionPage';
+import UsersPage from '@/pages/UsersPage';
+import LockoutsPage from '@/pages/LockoutsPage';
+import AdmissionsPage from '@/pages/AdmissionsPage';
+import RolesPage from '@/pages/RolesPage';
+import SessionsPage from '@/pages/SessionsPage';
+import AuditPage from '@/pages/AuditPage';
+import SettingsPage from '@/pages/SettingsPage';
+
+/** 管理页统一包裹：仅 IAM 管理员可访问。 */
+function Admin({ children }: { children: React.ReactNode }) {
+  return <RequireAdmin>{children}</RequireAdmin>;
+}
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
@@ -21,8 +33,14 @@ export default function App() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/apps" element={<AppMgmtPage />} />
-        <Route path="/token-version" element={<TokenVersionPage />} />
+        <Route path="/users" element={<Admin><UsersPage /></Admin>} />
+        <Route path="/lockouts" element={<Admin><LockoutsPage /></Admin>} />
+        <Route path="/apps" element={<Admin><AppMgmtPage /></Admin>} />
+        <Route path="/admissions" element={<Admin><AdmissionsPage /></Admin>} />
+        <Route path="/roles" element={<Admin><RolesPage /></Admin>} />
+        <Route path="/sessions" element={<Admin><SessionsPage /></Admin>} />
+        <Route path="/audit" element={<Admin><AuditPage /></Admin>} />
+        <Route path="/settings" element={<Admin><SettingsPage /></Admin>} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

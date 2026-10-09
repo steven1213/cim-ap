@@ -170,3 +170,107 @@ export function IconSearch(p: IconProps) {
     </svg>
   );
 }
+
+/** 用户账号（多用户） */
+export function IconUsers(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="9" cy="8.4" r="3.2" />
+      <path d="M3.6 19.4c.7-2.9 2.9-4.6 5.4-4.6s4.7 1.7 5.4 4.6" />
+      <path d="M16 5.6a3 3 0 010 5.8M17.4 19.4c-.2-1.5-.6-2.7-1.3-3.7 2 .1 3.6 1.6 4.1 3.7" />
+    </svg>
+  );
+}
+
+/** 登录锁定（挂锁） */
+export function IconLock(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="4.5" y="10" width="15" height="10" rx="2" />
+      <path d="M8 10V7.4a4 4 0 018 0V10M12 14v2.4" />
+    </svg>
+  );
+}
+
+/** 准入授权（链环） */
+export function IconLink(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M9.6 14.4l4.8-4.8" />
+      <path d="M8.4 11.2l-1.6 1.6a3.4 3.4 0 004.8 4.8l1.6-1.6" />
+      <path d="M15.6 12.8l1.6-1.6a3.4 3.4 0 00-4.8-4.8l-1.6 1.6" />
+    </svg>
+  );
+}
+
+/** 在线会话（显示器） */
+export function IconMonitor(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="4.4" width="18" height="12" rx="2" />
+      <path d="M8.4 20h7.2M12 16.4V20" />
+    </svg>
+  );
+}
+
+/** 审计日志（列表） */
+export function IconList(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M8 6.5h12M8 12h12M8 17.5h12" />
+      <path d="M4 6.5h.01M4 12h.01M4 17.5h.01" />
+    </svg>
+  );
+}
+
+/** 系统设置（滑杆） */
+export function IconSliders(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 3.6v6.4M6 14.4v6M12 3.6v3.2M12 10.8v9.6M18 3.6v10M18 17.6v2.8" />
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="12" cy="9" r="2" />
+      <circle cx="18" cy="15.6" r="2" />
+    </svg>
+  );
+}
+
+/** 新增 */
+export function IconPlus(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 5.5v13M5.5 12h13" />
+    </svg>
+  );
+}
+
+/** 删除 / 移除 */
+export function IconTrash(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M4.5 6.5h15M9.5 6.5V4.8h5v1.7M6.4 6.5l.9 12.2a1.6 1.6 0 001.6 1.5h6.2a1.6 1.6 0 001.6-1.5l.9-12.2" />
+      <path d="M10.2 10.4v6M13.8 10.4v6" />
+    </svg>
+  );
+}
+
+/** 禁用（禁止） */
+export function IconBan(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M6.1 6.1l11.8 11.8" />
+    </svg>
+  );
+}
+
+/** 电源（启用/停用） */
+export function IconPower(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3.6v8" />
+      <path d="M17.2 6.6a7 7 0 11-10.4 0" />
+    </svg>
+  );
+}
+
