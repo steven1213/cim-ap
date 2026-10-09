@@ -4,6 +4,16 @@ import type { AdminUserRow, OrgNode } from '@/types';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import { fmtDateTime, orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import {
+  USER_CREATE,
+  USER_DELETE,
+  USER_ORGS,
+  USER_RESET_PWD,
+  USER_STATUS,
+  USER_UNLOCK,
+  USER_UPDATE,
+} from '@/lib/permCodes';
 import {
   IconAlert,
   IconBan,
@@ -19,7 +29,7 @@ import {
 } from '@/components/Icons';
 
 /**
- * 用户与档案（需 iam-ap:ADMIN）。
+ * 用户与档案。
  *
  * <p>把「本地凭证账号」与「用户档案」合并成统一视图：AD 同步来的员工（无本地凭证）也会出现，
  * 每行标注档案来源与组织归属。口令相关操作沿用与登录一致的两层派生——浏览器内先做第一层 PBKDF2，
@@ -318,16 +328,18 @@ export default function UsersPage() {
               <IconRefresh width={13} height={13} />
               {loading ? '刷新中' : '刷新'}
             </button>
-            <button
-              className="btn-sm"
-              onClick={() => {
-                setPanel('create');
-                setTarget(null);
-              }}
-            >
-              <IconPlus width={13} height={13} />
-              新建账号
-            </button>
+            <Perms code={USER_CREATE}>
+              <button
+                className="btn-sm"
+                onClick={() => {
+                  setPanel('create');
+                  setTarget(null);
+                }}
+              >
+                <IconPlus width={13} height={13} />
+                新建账号
+              </button>
+            </Perms>
           </>
         }
       >
@@ -388,40 +400,52 @@ export default function UsersPage() {
                     <td className="num">{r.apps?.length ?? 0}</td>
                     <td>
                       <div className="cell-actions">
-                        <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
-                          <IconEdit width={13} height={13} />
-                          档案
-                        </button>
-                        <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
-                          <IconTree width={13} height={13} />
-                          归属
-                        </button>
-                        <button className="btn-ghost btn-sm" onClick={() => onToggleStatus(r)}>
-                          {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
-                          {r.enabled ? '禁用' : '启用'}
-                        </button>
-                        {r.hasCredential && (
-                          <button
-                            className="btn-ghost btn-sm"
-                            onClick={() => {
-                              setTarget(r);
-                              setRp('');
-                              setPanel('reset');
-                            }}
-                          >
-                            <IconKey width={13} height={13} />
-                            重置
+                        <Perms code={USER_UPDATE}>
+                          <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
+                            <IconEdit width={13} height={13} />
+                            档案
                           </button>
+                        </Perms>
+                        <Perms code={USER_ORGS}>
+                          <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
+                            <IconTree width={13} height={13} />
+                            归属
+                          </button>
+                        </Perms>
+                        <Perms code={USER_STATUS}>
+                          <button className="btn-ghost btn-sm" onClick={() => onToggleStatus(r)}>
+                            {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
+                            {r.enabled ? '禁用' : '启用'}
+                          </button>
+                        </Perms>
+                        {r.hasCredential && (
+                          <Perms code={USER_RESET_PWD}>
+                            <button
+                              className="btn-ghost btn-sm"
+                              onClick={() => {
+                                setTarget(r);
+                                setRp('');
+                                setPanel('reset');
+                              }}
+                            >
+                              <IconKey width={13} height={13} />
+                              重置
+                            </button>
+                          </Perms>
                         )}
                         {r.locked && (
-                          <button className="btn-ghost btn-sm" onClick={() => onUnlock(r)}>
-                            <IconKey width={13} height={13} />
-                            解锁
-                          </button>
+                          <Perms code={USER_UNLOCK}>
+                            <button className="btn-ghost btn-sm" onClick={() => onUnlock(r)}>
+                              <IconKey width={13} height={13} />
+                              解锁
+                            </button>
+                          </Perms>
                         )}
-                        <button className="btn-danger btn-sm" onClick={() => onDelete(r)} disabled={!r.hasCredential}>
-                          <IconTrash width={13} height={13} />
-                        </button>
+                        <Perms code={USER_DELETE}>
+                          <button className="btn-danger btn-sm" onClick={() => onDelete(r)} disabled={!r.hasCredential}>
+                            <IconTrash width={13} height={13} />
+                          </button>
+                        </Perms>
                       </div>
                     </td>
                   </tr>

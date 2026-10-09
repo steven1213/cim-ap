@@ -3,6 +3,8 @@ import * as api from '@/lib/api';
 import type { AppRegistration, OrgGrantRow, OrgNode } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { GRANT_GRANT, GRANT_REVOKE } from '@/lib/permCodes';
 import {
   IconAlert,
   IconCheckCircle,
@@ -14,11 +16,11 @@ import {
 } from '@/components/Icons';
 
 /**
- * 组织授权（组织 × 应用，需 iam-ap:ADMIN）。
+ * 组织授权（组织 × 应用）。
  *
  * <p>「给某个组织授予某 ap + 粗角色组」，IAM 在签发令牌时按用户归属（含祖先链）<b>运行时展开</b>到人，
  * 不落派生行——组织一改，受影响用户令牌版本 bump，重签即带新准入。
- * 个人授予与组织授予取<b>并集</b>（个人只能追加、不能扣减）。</p>
+ * 个人授予与组织授予取<b>并集</b>（个人只能追加、不能扣减）。写操作按 `iam:grant:*` 显隐。</p>
  */
 export default function OrgGrantsPage() {
   const [grants, setGrants] = useState<OrgGrantRow[]>([]);
@@ -190,10 +192,12 @@ export default function OrgGrantsPage() {
                     <td>{g.includeChildren ? <span className="tag ok">是</span> : <span className="tag">否</span>}</td>
                     <td>
                       <div className="cell-actions">
-                        <button className="btn-danger btn-sm" onClick={() => onRevoke(g)}>
-                          <IconTrash width={13} height={13} />
-                          撤销
-                        </button>
+                        <Perms code={GRANT_REVOKE}>
+                          <button className="btn-danger btn-sm" onClick={() => onRevoke(g)}>
+                            <IconTrash width={13} height={13} />
+                            撤销
+                          </button>
+                        </Perms>
                       </div>
                     </td>
                   </tr>
@@ -210,8 +214,9 @@ export default function OrgGrantsPage() {
         )}
       </Panel>
 
-      <Panel title="授予组织准入" sub="先把组织树建对并挂人，再给组织授权——人员进出组织自动继承/失去准入">
-        <form onSubmit={onGrant}>
+      <Perms code={GRANT_GRANT}>
+        <Panel title="授予组织准入" sub="先把组织树建对并挂人，再给组织授权——人员进出组织自动继承/失去准入">
+          <form onSubmit={onGrant}>
           <div className="row">
             <div className="field">
               <label className="field-label" htmlFor="go">
@@ -276,7 +281,8 @@ export default function OrgGrantsPage() {
             </>
           )}
         </p>
-      </Panel>
+        </Panel>
+      </Perms>
 
       <Panel title="与「准入授权」的分工" sub="个人 vs 组织">
         <ul className="note-list">

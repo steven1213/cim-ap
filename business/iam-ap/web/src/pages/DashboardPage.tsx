@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '@/lib/api';
 import type { OverviewDto } from '@/types';
 import { useAuthStore } from '@/store/authStore';
-import { isIamAdmin } from '@/lib/permissions';
+import { hasPermission } from '@/lib/permissions';
+import { OVERVIEW_VIEW } from '@/lib/permCodes';
 import { auditLabel, auditTone, fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
 import {
@@ -22,12 +23,15 @@ import {
 
 /**
  * 概览：
- * - 管理员 → 平台态势（用户/接入/会话/锁定 + 最近审计事件）；
- * - 普通用户 → 个人身份、准入矩阵与会话安全属性。
+ * - 具备 `iam:overview:view` → 平台态势（用户/接入/会话/锁定 + 最近审计事件）；
+ * - 否则 → 个人身份、准入矩阵与会话安全属性。
+ *
+ * <p>用**权限码**而非「角色名」分支：角色是可配置的（管理端能新建角色），
+ * 判据必须落在权限码上，否则自定义角色拿不到管理视角、或越权看到管理视角。</p>
  */
 export default function DashboardPage() {
-  const user = useAuthStore((s) => s.user);
-  const admin = isIamAdmin(user);
+  const permissions = useAuthStore((s) => s.permissions);
+  const admin = hasPermission(permissions, OVERVIEW_VIEW);
 
   if (admin) return <AdminOverview />;
   return <PersonalOverview />;

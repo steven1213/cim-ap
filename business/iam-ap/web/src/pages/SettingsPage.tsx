@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import * as api from '@/lib/api';
 import type { SettingsDto, SyncResult } from '@/types';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { SYNC_RUN } from '@/lib/permCodes';
 import { IconAlert, IconSliders, IconSync } from '@/components/Icons';
 
-/** 系统设置（需 iam-ap:ADMIN）：只读展示当前生效的运行时策略参数。 */
+/** 系统设置：只读展示当前生效的运行时策略参数（目录同步按钮按 `iam:sync:run` 显隐）。 */
 export default function SettingsPage() {
   const [s, setS] = useState<SettingsDto | null>(null);
   const [err, setErr] = useState('');
@@ -170,10 +172,12 @@ export default function SettingsPage() {
             <dd className="meta-v">只写 AD_SYNCED，绝不覆盖 IAM 自建节点</dd>
           </dl>
           <div className="row" style={{ marginTop: 12 }}>
-            <button type="button" className="btn-sm" onClick={onSync} disabled={syncBusy}>
-              <IconSync width={13} height={13} />
-              {syncBusy ? '同步中…' : '立即同步'}
-            </button>
+            <Perms code={SYNC_RUN}>
+              <button type="button" className="btn-sm" onClick={onSync} disabled={syncBusy}>
+                <IconSync width={13} height={13} />
+                {syncBusy ? '同步中…' : '立即同步'}
+              </button>
+            </Perms>
             {syncMsg && <span className="hint" style={{ margin: 0 }}>{syncMsg}</span>}
           </div>
         </Panel>

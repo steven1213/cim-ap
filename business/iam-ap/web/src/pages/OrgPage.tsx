@@ -3,6 +3,8 @@ import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
 import { fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { ORG_CREATE, ORG_DELETE, ORG_MEMBER, ORG_MOVE, ORG_UPDATE } from '@/lib/permCodes';
 import {
   IconAlert,
   IconChevron,
@@ -16,10 +18,11 @@ import {
 } from '@/components/Icons';
 
 /**
- * 组织架构（制造组织树，需 iam-ap:ADMIN）。
+ * 组织架构（制造组织树）。
  *
  * <p>厂区 → 车间 → 产线 → 工序 → 班组由 IAM 自建；AD 同步来的行政部门为只读。
- * 组织是「按组织批量授权」与数据权限的上游——先把树建对，再挂人与授权。</p>
+ * 组织是「按组织批量授权」与数据权限的上游——先把树建对，再挂人与授权。
+ * 各写操作按 `iam:org:*` 权限显隐。</p>
  */
 
 interface TreeNode {
@@ -316,10 +319,12 @@ export default function OrgPage() {
                 <IconRefresh width={13} height={13} />
                 {loading ? '刷新中' : '刷新'}
               </button>
-              <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
-                <IconPlus width={13} height={13} />
-                新建节点
-              </button>
+              <Perms code={ORG_CREATE}>
+                <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
+                  <IconPlus width={13} height={13} />
+                  新建节点
+                </button>
+              </Perms>
             </>
           }
         >
@@ -401,10 +406,12 @@ export default function OrgPage() {
                           <option value="DISABLED">停用</option>
                         </select>
                       </div>
-                      <button type="submit" className="btn-sm" disabled={busy}>
-                        <IconEdit width={13} height={13} />
-                        保存
-                      </button>
+                      <Perms code={ORG_UPDATE}>
+                        <button type="submit" className="btn-sm" disabled={busy}>
+                          <IconEdit width={13} height={13} />
+                          保存
+                        </button>
+                      </Perms>
                     </div>
                   </form>
 
@@ -424,13 +431,17 @@ export default function OrgPage() {
                           ))}
                       </select>
                     </div>
-                    <button type="button" className="btn-ghost btn-sm" onClick={onMove}>
-                      移动
-                    </button>
-                    <button type="button" className="btn-danger btn-sm" onClick={onDelete}>
-                      <IconTrash width={13} height={13} />
-                      删除
-                    </button>
+                    <Perms code={ORG_MOVE}>
+                      <button type="button" className="btn-ghost btn-sm" onClick={onMove}>
+                        移动
+                      </button>
+                    </Perms>
+                    <Perms code={ORG_DELETE}>
+                      <button type="button" className="btn-danger btn-sm" onClick={onDelete}>
+                        <IconTrash width={13} height={13} />
+                        删除
+                      </button>
+                    </Perms>
                   </div>
                 </>
               ) : (
@@ -461,18 +472,22 @@ export default function OrgPage() {
                       ))}
                     </datalist>
                   </div>
-                  <button type="button" className="btn-sm" onClick={onAddMember} disabled={!addUser.trim()}>
-                    <IconPlus width={13} height={13} />
-                    挂到该组织
-                  </button>
+                  <Perms code={ORG_MEMBER}>
+                    <button type="button" className="btn-sm" onClick={onAddMember} disabled={!addUser.trim()}>
+                      <IconPlus width={13} height={13} />
+                      挂到该组织
+                    </button>
+                  </Perms>
                 </div>
                 <div className="tag-list" style={{ marginTop: 10 }}>
                   {members.map((m) => (
                     <span key={m} className="role-chip">
                       <span className="mono">{m}</span>
-                      <button type="button" className="chip-x" onClick={() => onRemoveMember(m)} aria-label="移除">
-                        ×
-                      </button>
+                      <Perms code={ORG_MEMBER}>
+                        <button type="button" className="chip-x" onClick={() => onRemoveMember(m)} aria-label="移除">
+                          ×
+                        </button>
+                      </Perms>
                     </span>
                   ))}
                   {!members.length && <span className="dim">暂无成员</span>}
@@ -545,9 +560,11 @@ export default function OrgPage() {
                   onChange={(e) => setSortNo(Number(e.target.value))}
                 />
               </div>
-              <button type="submit" disabled={busy || !code.trim() || !name.trim()}>
-                {busy ? '创建中…' : '创建'}
-              </button>
+              <Perms code={ORG_CREATE}>
+                <button type="submit" disabled={busy || !code.trim() || !name.trim()}>
+                  {busy ? '创建中…' : '创建'}
+                </button>
+              </Perms>
             </div>
           </form>
           <p className="hint">

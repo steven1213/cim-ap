@@ -220,6 +220,112 @@ export interface AssignmentDto {
   roles: string[];
 }
 
+// ---------------------------------------------------------------- 菜单 / 权限 / 多语言
+// 以下三块与平台侧契约对齐：菜单与权限来自 cim-system（无 /api/v1 前缀，见 lib/api.ts 的 rootApi），
+// 译文来自 cim-i18n-starter 的公开端点 /api/i18n/**。
+
+/** 菜单节点类型（对齐 com.cim.system.menu.MenuType）。 */
+export type MenuNodeType = 'DIR' | 'MENU' | 'BUTTON';
+
+/**
+ * 菜单实体（`GET /sys/me/menus` 的节点载荷，对齐 com.cim.system.menu.SysMenu）。
+ *
+ * <p>名称走 i18n：本表**只存 `i18nCode`**，前端用 `t(i18nCode)` 渲染，
+ * 故列表里的 `SysMenuDto` 没有任何中文字面量字段。</p>
+ */
+export interface SysMenuDto {
+  id: string;
+  parentId: string | null;
+  /** 前端路由（DIR/BUTTON 为 null）。 */
+  path: string | null;
+  /** 前端组件标识（供 `pageRegistry` 映射）。 */
+  component: string | null;
+  /** 名称 i18n 键。 */
+  i18nCode: string | null;
+  /** 图标注册表键。 */
+  icon: string | null;
+  type: MenuNodeType;
+  /** 关联权限码（BUTTON 必有；MENU 可有）。 */
+  permCode: string | null;
+  sortNo: number;
+  visible: boolean;
+  status: 'ENABLED' | 'DISABLED';
+}
+
+/** 菜单树节点（对齐 com.cim.system.menu.MenuNode）。 */
+export interface MenuTreeNode {
+  menu: SysMenuDto;
+  children: MenuTreeNode[];
+}
+
+/**
+ * 平台权限点（对齐 com.cim.system.permission.SysPermission）。
+ *
+ * <p>三段被 {@code applyCode} 从 `code` 拆出后落库，保证「注解里的码」与「库里的码」永不漂移。</p>
+ */
+export interface SysPermissionDto {
+  id: string;
+  /** 权限码 `module:res:action`。 */
+  code: string;
+  module: string | null;
+  res: string | null;
+  action: string | null;
+  name: string | null;
+  status: 'ENABLED' | 'DISABLED';
+}
+
+/** 平台角色（对齐 com.cim.system.role.SysRole）。 */
+export interface SysRoleDto {
+  id: string;
+  code: string;
+  name: string | null;
+  /** 超管：解析时短路展开为「库内全部启用权限码」。 */
+  isSuper: boolean;
+  sortNo: number;
+  status: 'ENABLED' | 'DISABLED';
+}
+
+/** 译文行（对齐 com.cim.i18n.model.SysI18n）。 */
+export interface SysI18nDto {
+  id: string;
+  localeCode: string;
+  code: string;
+  /** 级别：SYSTEM（程序种子）/ USER（业务维护）。 */
+  scope: 'SYSTEM' | 'USER';
+  module: string | null;
+  content: string | null;
+}
+
+/** 平台分页结果（对齐 com.cim.core.shared.PageResult）。 */
+export interface PageResultDto<T> {
+  records: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+/**
+ * 语言目录（`GET /api/i18n/locales` 公开端点，对齐 com.cim.i18n.model.SysLocale）。
+ */
+export interface SysLocaleDto {
+  id: string;
+  code: string;
+  name: string | null;
+  isDefault: boolean;
+  sortNo: number;
+  status: 'ENABLED' | 'DISABLED';
+}
+
+/** 译文包（`GET /api/i18n/messages?lang=&v=`，对齐 I18nController.I18nBundle）。 */
+export interface I18nBundle {
+  /** 译文版本号（前端本地缓存比对用）。 */
+  version: string;
+  /** 实际生效语言。 */
+  lang: string;
+  /** 键 → 译文；版本未变时为空对象（省流量）。 */
+  messages: Record<string, string>;
+}
+
 /** 系统设置（GET /api/v1/admin/settings，只读的生效参数）。 */
 export interface SettingsDto {
   authSource: string;

@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import * as api from '@/lib/api';
 import type { AppRegistration, AppStatus } from '@/types';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { APP_CREATE, APP_UPDATE } from '@/lib/permCodes';
 import {
   IconAlert,
   IconApps,
@@ -10,7 +12,7 @@ import {
   IconRefresh,
 } from '@/components/Icons';
 
-/** 应用注册（需 iam-ap:ADMIN）：登记业务接入码、维护状态。准入分配见「准入授权」。 */
+/** 应用注册：登记业务接入码、维护状态（按钮按 `iam:app:*` 权限显隐）。准入分配见「准入授权」。 */
 export default function AppMgmtPage() {
   const [apps, setApps] = useState<AppRegistration[]>([]);
   const [msg, setMsg] = useState('');
@@ -135,10 +137,12 @@ export default function AppMgmtPage() {
                     </td>
                     <td className="num">{a.sortNo}</td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => toggleStatus(a)}>
-                        <IconPower width={13} height={13} />
-                        {a.status === 'ENABLED' ? '停用' : '启用'}
-                      </button>
+                      <Perms code={APP_UPDATE}>
+                        <button className="btn-ghost btn-sm" onClick={() => toggleStatus(a)}>
+                          <IconPower width={13} height={13} />
+                          {a.status === 'ENABLED' ? '停用' : '启用'}
+                        </button>
+                      </Perms>
                     </td>
                   </tr>
                 ))}
@@ -154,8 +158,9 @@ export default function AppMgmtPage() {
         )}
       </Panel>
 
-      <Panel title="注册应用" sub="接入码将写入令牌的 apps claim">
-        <form onSubmit={onRegister}>
+      <Perms code={APP_CREATE}>
+        <Panel title="注册应用" sub="接入码将写入令牌的 apps claim">
+          <form onSubmit={onRegister}>
           <div className="form-grid">
             <div className="field">
               <label className="field-label" htmlFor="reg-code">
@@ -197,8 +202,9 @@ export default function AppMgmtPage() {
           <button type="submit" className="btn-block" disabled={busy || !appCode.trim() || !appName} style={{ marginTop: 12 }}>
             注册应用
           </button>
-        </form>
-      </Panel>
+          </form>
+        </Panel>
+      </Perms>
 
       <Panel title="接入指引" sub="业务 ap 如何对接 IAM 令牌">
         <ul className="note-list">

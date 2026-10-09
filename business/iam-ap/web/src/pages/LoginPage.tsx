@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import { useAuthStore } from '@/store/authStore';
 import * as api from '@/lib/api';
 import type { LoginResult, SaltResponse } from '@/types';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import {
   IconAlert,
   IconApps,
@@ -19,12 +21,14 @@ const REMEMBER_KEY = 'iam-last-user';
 /**
  * 统一登录：取服务端盐 → 浏览器内第一层 PBKDF2 派生 → 提交 clientHash（明文口令不出浏览器）。
  *
- * 交互按常用登录习惯设计：
- * - 记住用户名（仅本地保存用户名，不保存口令）
- * - 口令可见性切换、Caps Lock 提示
- * - 回车提交、自动聚焦（已记住用户名时聚焦口令框）
+ * <p>交互按常用登录习惯设计：记住用户名（仅本地保存用户名，不保存口令）、口令可见性切换、
+ * Caps Lock 提示、回车提交、自动聚焦（已记住用户名时聚焦口令框）。</p>
+ *
+ * <p>文案全部走 i18n，且顶栏提供语言切换——登录页是**登录前**唯一的界面，
+ * 译文包端点 `/api/i18n/**` 属公开端点（未认证可访问），故语言切换在这里同样可用。</p>
  */
 export default function LoginPage() {
+  const { t } = useTranslation();
   const [username, setUsername] = useState(() => localStorage.getItem(REMEMBER_KEY) ?? '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(() => !!localStorage.getItem(REMEMBER_KEY));
@@ -75,7 +79,7 @@ export default function LoginPage() {
       await loadMe();
       navigate('/');
     } catch (err: any) {
-      setError(err?.msg || err?.message || '登录失败');
+      setError(err?.msg || err?.message || t('iam.login.failed'));
       pwdRef.current?.focus();
       pwdRef.current?.select();
     } finally {
@@ -88,26 +92,24 @@ export default function LoginPage() {
       <section className="login-visual">
         <div className="lg-brand">
           <div className="logo">IA</div>
-          <span>CIM · 统一身份与准入</span>
+          <span>{t('iam.login.brand')}</span>
         </div>
 
         <div className="login-hero">
-          <h2>一次登录，通达各业务系统</h2>
-          <p>
-            企业内统一身份认证与跨业务准入控制中枢。令牌由 IAM 签发，各业务系统本地验签并据此判定准入。
-          </p>
+          <h2>{t('iam.login.hero.title')}</h2>
+          <p>{t('iam.login.hero.desc')}</p>
           <ul className="login-points">
             <li>
               <IconShield width={16} height={16} />
-              RS256 令牌签发 · JWKS 公钥分发 · 业务侧本地验签
+              {t('iam.login.point.rs256')}
             </li>
             <li>
               <IconKey width={16} height={16} />
-              口令两层派生（PBKDF2），明文口令不出浏览器
+              {t('iam.login.point.pbkdf2')}
             </li>
             <li>
               <IconApps width={16} height={16} />
-              应用准入注册 · 用户角色分配 · 令牌即时踢下线
+              {t('iam.login.point.admission')}
             </li>
           </ul>
         </div>
@@ -116,14 +118,17 @@ export default function LoginPage() {
       </section>
 
       <section className="login-panel">
+        <div className="login-lang">
+          <LanguageSwitcher />
+        </div>
         <div className="login-card">
-          <h1>登录</h1>
-          <p className="lead">请输入企业账号以进入 IAM 控制台</p>
+          <h1>{t('iam.login.title')}</h1>
+          <p className="lead">{t('iam.login.lead')}</p>
 
           <form onSubmit={onSubmit}>
             <div className="field">
               <label className="field-label" htmlFor="login-user">
-                用户名
+                {t('iam.login.username')}
               </label>
               <input
                 id="login-user"
@@ -138,7 +143,7 @@ export default function LoginPage() {
 
             <div className="field">
               <label className="field-label" htmlFor="login-pwd">
-                口令
+                {t('iam.login.password')}
               </label>
               <div className="pwd-wrap">
                 <input
@@ -150,26 +155,26 @@ export default function LoginPage() {
                   onKeyUp={detectCaps}
                   onKeyDown={detectCaps}
                   autoComplete="current-password"
-                  placeholder="请输入口令"
+                  placeholder={t('iam.login.passwordPlaceholder')}
                 />
                 <button
                   type="button"
                   className="pwd-toggle"
                   onClick={() => setShowPwd((v) => !v)}
-                  title={showPwd ? '隐藏口令' : '显示口令'}
-                  aria-label={showPwd ? '隐藏口令' : '显示口令'}
+                  title={showPwd ? t('iam.login.hidePwd') : t('iam.login.showPwd')}
+                  aria-label={showPwd ? t('iam.login.hidePwd') : t('iam.login.showPwd')}
                   tabIndex={-1}
                 >
                   {showPwd ? <IconEyeOff width={16} height={16} /> : <IconEye width={16} height={16} />}
                 </button>
               </div>
-              {capsOn && <p className="caps-hint">大写锁定（Caps Lock）已开启</p>}
+              {capsOn && <p className="caps-hint">{t('iam.login.capsOn')}</p>}
             </div>
 
             <div className="login-row">
               <label className="check">
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-                记住用户名
+                {t('iam.login.remember')}
               </label>
             </div>
 
@@ -187,11 +192,11 @@ export default function LoginPage() {
             )}
 
             <button type="submit" disabled={busy || !username || !password}>
-              {busy ? '登录中…' : '登录'}
+              {busy ? t('iam.login.submitting') : t('iam.login.submit')}
             </button>
           </form>
 
-          <p className="hint">口令在浏览器内完成第一层 PBKDF2 派生，明文不会上传到服务端。</p>
+          <p className="hint">{t('iam.login.hint')}</p>
         </div>
       </section>
     </div>

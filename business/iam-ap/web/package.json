@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --port 5171",
     "build": "tsc -p tsconfig.json && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node test/run.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -3,6 +3,8 @@ import * as api from '@/lib/api';
 import type { KickResult, SessionRow, TokenVersionBump } from '@/types';
 import { fmtDateTime } from '@/lib/format';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { SESSION_KICK } from '@/lib/permCodes';
 import {
   IconAlert,
   IconCheckCircle,
@@ -11,7 +13,7 @@ import {
   IconRefresh,
 } from '@/components/Icons';
 
-/** 在线会话（需 iam-ap:ADMIN）：活跃会话列表 + 强制下线（bump 令牌版本）。 */
+/** 在线会话：活跃会话列表 + 强制下线（bump 令牌版本）。下线按钮按 `iam:session:kick` 显隐。 */
 export default function SessionsPage() {
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [err, setErr] = useState('');
@@ -120,10 +122,12 @@ export default function SessionsPage() {
                     <td className="mono dim">{r.accessTokenJti ?? '—'}</td>
                     <td className="mono">{fmtDateTime(r.expiresAt)}</td>
                     <td>
-                      <button className="btn-danger btn-sm" onClick={() => kick(r.userId, r.username)}>
-                        <IconKick width={13} height={13} />
-                        强制下线
-                      </button>
+                      <Perms code={SESSION_KICK}>
+                        <button className="btn-danger btn-sm" onClick={() => kick(r.userId, r.username)}>
+                          <IconKick width={13} height={13} />
+                          强制下线
+                        </button>
+                      </Perms>
                     </td>
                   </tr>
                 ))}
@@ -139,33 +143,35 @@ export default function SessionsPage() {
         )}
       </Panel>
 
-      <Panel
-        title="按用户 ID 强制下线"
-        sub="bump 令牌版本，验证端进程内即时校验，无缓存滞后"
-        actions={
-          <span className="tag warn">
-            <IconKick width={12} height={12} />
-            高危操作
-          </span>
-        }
-      >
-        <form className="row" onSubmit={onManualBump}>
-          <div className="field">
-            <label className="field-label" htmlFor="kick-uid">
-              用户 ID
-            </label>
-            <input
-              id="kick-uid"
-              className="mono"
-              placeholder="admin（本地账号即用户名）"
-              value={uid}
-              onChange={(e) => setUid(e.target.value)}
-            />
-          </div>
-          <button className="btn-danger" type="submit" disabled={busy || !uid}>
-            {busy ? '处理中…' : '踢下线'}
-          </button>
-        </form>
+      <Perms code={SESSION_KICK}>
+        <Panel
+          title="按用户 ID 强制下线"
+          sub="bump 令牌版本，验证端进程内即时校验，无缓存滞后"
+          actions={
+            <span className="tag warn">
+              <IconKick width={12} height={12} />
+              高危操作
+            </span>
+          }
+        >
+          <form className="row" onSubmit={onManualBump}>
+            <div className="field">
+              <label className="field-label" htmlFor="kick-uid">
+                用户 ID
+              </label>
+              <input
+                id="kick-uid"
+                className="mono"
+                placeholder="admin（本地账号即用户名）"
+                value={uid}
+                onChange={(e) => setUid(e.target.value)}
+              />
+            </div>
+            <button className="btn-danger" type="submit" disabled={busy || !uid}>
+              {busy ? '处理中…' : '踢下线'}
+            </button>
+          </form>
+
 
         {bump && (
           <div className="alert ok" style={{ marginTop: 12 }}>
@@ -181,7 +187,8 @@ export default function SessionsPage() {
           <li>生效方式：验证端比对令牌 <code>ver</code> claim 与库内版本号，不一致即返回 401。</li>
           <li>后续影响：用户需重新登录；令牌版本号单调递增，不回滚。</li>
         </ul>
-      </Panel>
+        </Panel>
+      </Perms>
     </div>
   );
 }

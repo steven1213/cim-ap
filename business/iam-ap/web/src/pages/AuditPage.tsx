@@ -5,7 +5,7 @@ import { AUDIT_LABELS, auditLabel, auditTone, fmtDateTime } from '@/lib/format';
 import Panel from '@/components/Panel';
 import { IconAlert, IconList, IconRefresh } from '@/components/Icons';
 
-/** 审计日志（需 iam-ap:ADMIN）：关键动作流水，支持按类型过滤。 */
+/** 审计日志（路由级 `RequirePerm(i18n)`，需 `iam:audit:list`）：关键动作流水，支持按类型过滤。 */
 export default function AuditPage() {
   const [rows, setRows] = useState<AuditEvent[]>([]);
   const [type, setType] = useState('');

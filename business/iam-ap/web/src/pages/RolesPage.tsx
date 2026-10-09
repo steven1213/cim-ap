@@ -4,7 +4,7 @@ import type { AppRoleGroup } from '@/types';
 import Panel from '@/components/Panel';
 import { IconAlert, IconRefresh, IconShield } from '@/components/Icons';
 
-/** 角色组视图（需 iam-ap:ADMIN）：按接入码聚合实际在用的粗角色组与人数分布。 */
+/** 角色组视图（路由级 `RequirePerm`，需 `iam:role:list`）：按接入码聚合实际在用的粗角色组与人数分布。 */
 export default function RolesPage() {
   const [groups, setGroups] = useState<AppRoleGroup[]>([]);
   const [err, setErr] = useState('');

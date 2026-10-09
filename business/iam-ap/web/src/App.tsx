@@ -1,53 +1,60 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useMenuStore } from '@/store/menuStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import RequireAdmin from '@/components/RequireAdmin';
+import BootGate from '@/components/BootGate';
+import RequirePerm from '@/components/RequirePerm';
 import Layout from '@/components/Layout';
 import LoginPage from '@/pages/LoginPage';
-import DashboardPage from '@/pages/DashboardPage';
-import ProfilePage from '@/pages/ProfilePage';
-import AppMgmtPage from '@/pages/AppMgmtPage';
-import UsersPage from '@/pages/UsersPage';
-import OrgPage from '@/pages/OrgPage';
-import OrgGrantsPage from '@/pages/OrgGrantsPage';
-import LockoutsPage from '@/pages/LockoutsPage';
-import AdmissionsPage from '@/pages/AdmissionsPage';
-import RolesPage from '@/pages/RolesPage';
-import SessionsPage from '@/pages/SessionsPage';
-import AuditPage from '@/pages/AuditPage';
-import SettingsPage from '@/pages/SettingsPage';
+import ForbiddenPage from '@/pages/ForbiddenPage';
+import NotFoundPage from '@/pages/NotFoundPage';
+import { resolvePage } from '@/pages/pageRegistry';
+import type { SysMenuDto } from '@/types';
 
-/** 管理页统一包裹：仅 IAM 管理员可访问。 */
-function Admin({ children }: { children: React.ReactNode }) {
-  return <RequireAdmin>{children}</RequireAdmin>;
+/**
+ * 单个菜单对应的页面：`component` 标识 → 组件，再按 `permCode` 加一道路由守卫。
+ *
+ * <p>「菜单可见性」与「接口/按钮权限」是两套授权（`sys_role_menu` / `sys_role_perm`），
+ * 允许交叉配置，故此处两层都要过。</p>
+ */
+function RoutePage({ menu }: { menu: SysMenuDto }) {
+  const Page = resolvePage(menu.component);
+  return (
+    <RequirePerm code={menu.permCode}>
+      <Page />
+    </RequirePerm>
+  );
 }
 
+/**
+ * 应用路由。
+ *
+ * <p><b>路由由后端菜单派生</b>：`GET /sys/me/menus` 的 `path` + `component` 决定「有哪些页面」，
+ * 前端不再维护路由清单（原 `lib/menu.tsx` 已删除）。未授权/未知地址落到 404，
+ * 已登录但无权限落到 403。</p>
+ */
 export default function App() {
   const token = useAuthStore((s) => s.token);
+  const menus = useMenuStore((s) => s.flat);
+
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route
         element={
           <ProtectedRoute>
-            <Layout />
+            <BootGate>
+              <Layout />
+            </BootGate>
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/orgs" element={<Admin><OrgPage /></Admin>} />
-        <Route path="/users" element={<Admin><UsersPage /></Admin>} />
-        <Route path="/lockouts" element={<Admin><LockoutsPage /></Admin>} />
-        <Route path="/apps" element={<Admin><AppMgmtPage /></Admin>} />
-        <Route path="/admissions" element={<Admin><AdmissionsPage /></Admin>} />
-        <Route path="/org-grants" element={<Admin><OrgGrantsPage /></Admin>} />
-        <Route path="/roles" element={<Admin><RolesPage /></Admin>} />
-        <Route path="/sessions" element={<Admin><SessionsPage /></Admin>} />
-        <Route path="/audit" element={<Admin><AuditPage /></Admin>} />
-        <Route path="/settings" element={<Admin><SettingsPage /></Admin>} />
-        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/403" element={<ForbiddenPage />} />
+        {menus.map((m) => (
+          <Route key={m.id} path={m.path as string} element={<RoutePage menu={m} />} />
+        ))}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

@@ -2,13 +2,15 @@ import { useEffect, useState, type FormEvent } from 'react';
 import * as api from '@/lib/api';
 import type { AppRegistration, AssignmentDto } from '@/types';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { ADMISSION_GRANT, ADMISSION_REVOKE } from '@/lib/permCodes';
 import { IconAlert, IconCheckCircle, IconInbox, IconLink } from '@/components/Icons';
 
 /**
- * 准入授权（需 iam-ap:ADMIN）：以「用户」为主线，查看并编辑其可进入的 ap 与角色组。
+ * 准入授权：以「用户」为主线，查看并编辑其可进入的 ap 与角色组。
  *
  * <p>任何授予 / 撤销都会 bump 该用户令牌版本（后端自动），其存量令牌立即失效、需重新登录 —
- * 这正是「准入变更即时生效」的落点。</p>
+ * 这正是「准入变更即时生效」的落点。写操作按钮按 `iam:admission:grant|revoke` 权限显隐。</p>
  */
 export default function AdmissionsPage() {
   const [apps, setApps] = useState<AppRegistration[]>([]);
@@ -150,14 +152,18 @@ export default function AdmissionsPage() {
                       </td>
                       <td>
                         <div className="cell-actions">
-                          <button className="btn-sm" disabled={busy} onClick={() => grant(a.appCode)}>
-                            <IconLink width={13} height={13} />
-                            {admitted ? '更新' : '授予'}
-                          </button>
-                          {admitted && (
-                            <button className="btn-danger btn-sm" onClick={() => revoke(a.appCode)}>
-                              撤销
+                          <Perms code={ADMISSION_GRANT}>
+                            <button className="btn-sm" disabled={busy} onClick={() => grant(a.appCode)}>
+                              <IconLink width={13} height={13} />
+                              {admitted ? '更新' : '授予'}
                             </button>
+                          </Perms>
+                          {admitted && (
+                            <Perms code={ADMISSION_REVOKE}>
+                              <button className="btn-danger btn-sm" onClick={() => revoke(a.appCode)}>
+                                撤销
+                              </button>
+                            </Perms>
                           )}
                         </div>
                       </td>

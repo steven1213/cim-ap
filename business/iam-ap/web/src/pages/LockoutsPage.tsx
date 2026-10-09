@@ -3,9 +3,11 @@ import * as api from '@/lib/api';
 import type { LockRow } from '@/types';
 import { fmtDateTime } from '@/lib/format';
 import Panel from '@/components/Panel';
+import Perms from '@/components/Perms';
+import { USER_UNLOCK } from '@/lib/permCodes';
 import { IconAlert, IconCheckCircle, IconKey, IconLock, IconRefresh } from '@/components/Icons';
 
-/** 登录锁定管理（需 iam-ap:ADMIN）：列出被锁账号并支持手动解锁。 */
+/** 登录锁定管理：列出被锁账号并支持手动解锁（解锁按钮按 `iam:user:unlock` 显隐）。 */
 export default function LockoutsPage() {
   const [rows, setRows] = useState<LockRow[]>([]);
   const [err, setErr] = useState('');
@@ -92,10 +94,12 @@ export default function LockoutsPage() {
                     <td className="mono dim">{fmtDateTime(r.lastFailAt)}</td>
                     <td className="mono">{fmtDateTime(r.lockedUntil)}</td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => onUnlock(r.username)}>
-                        <IconKey width={13} height={13} />
-                        解锁
-                      </button>
+                      <Perms code={USER_UNLOCK}>
+                        <button className="btn-ghost btn-sm" onClick={() => onUnlock(r.username)}>
+                          <IconKey width={13} height={13} />
+                          解锁
+                        </button>
+                      </Perms>
                     </td>
                   </tr>
                 ))}
