@@ -66,8 +66,9 @@ business/iam-ap/web/
   - 分配 `POST /api/v1/apps/{appCode}/users {userId, roles:Set<String>}`（逗号分隔解析）；
   - 撤销 `DELETE /api/v1/apps/{appCode}/users/{userId}`；
   - 查询用户已准入应用 `GET /api/v1/apps/users/{userId}/apps`。
-- **令牌踢人（TokenVersionPage）**：`POST /api/v1/internal/token-version/bump?uid=`（`postRaw` 透传裸对象）→ 该用户令牌版本 +1，验证端缓存到期后所有存量令牌失效、需重新登录。本地账号 userId 即用户名。
+- **令牌踢人（TokenVersionPage）**：`POST /api/v1/internal/token-version/bump?uid=`（`postRaw` 透传裸对象）→ 该用户令牌版本 +1，验证端版本判定不通过即拒绝该用户全部存量令牌、需重新登录（IAM 自身经 §4(k) 的 `LocalTokenVersionChecker` 进程内直查库比对，无缓存 TTL 滞后）。本地账号 userId 即用户名。
 - **自助改密（ProfilePage）**：`POST /api/v1/me/password`，与登录一致在浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 `clientHash`——请求体 `{ oldCredential, newCredential, newClientSalt }`（旧口令派生前先 `GET /api/v1/login/salt?username=` 取服务端盐，新口令由客户端 `randomClientSalt()` 生成随机盐后派生）。明文口令不出浏览器，已与登录对齐。
+  - **改密后强制重登**：服务端改密成功即 `bump` 该用户令牌版本（旧会话全部失效，含当前会话）。前端收到成功回执后**清空本地会话（`authStore.clear()`）并跳转登录页**，提示「口令已更新，请用新口令重新登录」，避免用户停留在已失效的会话上。
 
 ## 4. 构建与运行
 

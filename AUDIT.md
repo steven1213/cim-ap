@@ -40,18 +40,21 @@
 
 ### 6. IAM 管理面（server 扩展）
 - **范围**：`business/iam-ap/server`
-  - 新增 `config` 包：`IamSecurityConfig`（注册 in-JVM 验签 Bean + `CorsFilter`）、`IamJwksKeyProvider extends JwksKeyProvider`（覆盖 starter 默认 HTTP JWKS，验证自身令牌走内存公钥）、`IamWebProperties`（`cim.iam.web.allowed-origins`，默认 `http://localhost:5171`）、`BootstrapAdminRunner`（`ApplicationRunner` 首管理员引导）。
+  - 新增 `config` 包：`IamSecurityConfig`（注册 in-JVM 验签 Bean + `TokenVersionChecker` Bean + `CorsFilter`）、`IamJwksKeyProvider extends JwksKeyProvider`（覆盖 starter 默认 HTTP JWKS，验证自身令牌走内存公钥）、`IamWebProperties`（`cim.iam.web.allowed-origins`，默认 `http://localhost:5171`）、`BootstrapAdminRunner`（`ApplicationRunner` 首管理员引导）。
+  - 新增 `token/LocalTokenVersionChecker`（实现 `TokenVersionChecker` SPI，进程内直查库比对令牌 `ver` 与 `TokenVersionService.currentVersion(uid)`，不一致 → 401），顶替 platform 默认 `acceptAll()`；`LocalCredentialService.changePassword` 改密成功后 `bump` 该用户令牌版本（旧会话全失效）。
   - 新增 `auth/ProfileController`（`GET /api/v1/me`、`POST /api/v1/me/password`）。
   - `AppRegistrationController` 全端点加 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`；`IamAuthProperties` 增 `bootstrap` / 原 `web` 配置；`LocalCredentialService` 增 `registerLocalUser` / `changePassword`。
   - `pom.xml`：`maven-compiler-plugin` 显式 `<version>3.13.0</version>` + `<compilerArgs>` 强制 Lombok 处理器（见关键修复①）。
-- **验证**：iam-ap `31/31` 绿。`AdminSecurityTest`×4 覆盖「无令牌 401 / `iam-ap:ADMIN` 200 / 非管理员 403」三态；`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」；`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」「错误旧 clientHash 被拒」（改密接口已切到 clientHash，与登录一致）。
+- **验证**：iam-ap `36/36` 绿。`AdminSecurityTest`×4 覆盖「无令牌 401 / `iam-ap:ADMIN` 200 / 非管理员 403」三态；`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」；`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」「错误旧 clientHash 被拒」（改密接口已切到 clientHash，与登录一致）；`LocalTokenVersionCheckerTest`（版本比对单元）+ `ChangePasswordInvalidatesSessionTest`（端到端：改密前 `/me` 200 → 改密 → 旧令牌 `/me` 401 → 新口令重登 → 新令牌 `/me` 200）覆盖「改密强制作废旧会话」。
 - **关键修复 / 设计决策**：
   1. **Lombok SPI 非发现（编译层，阻塞级）**：沙箱 JDK21 + `maven-compiler-plugin` 下，Lombok 经 `annotationProcessorPaths` 进 `-processorpath` 后，javac **未通过 SPI(META-INF/services) 自动发现**该处理器，导致 `@Getter/@Setter/@Slf4j` 静默失效、满屏「找不到符号」。根因非版本问题（pin 3.13.0 未解）。**修复**：在 `maven-compiler-plugin` 显式 `<compilerArgs><arg>-processor</arg><arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg></compilerArgs>` 强制触发。BUILD SUCCESS。
   2. **`IamJwksKeyProvider` 继承关系**：`JwksKeyProvider`（cim-auth-starter）是**具体类**非接口，原 `implements` 编译报错 → 改为 `extends`，`super(() -> "{\"keys\":[]}", Duration.ofHours(1))` 占位、实际公钥由 `getPublicKey` 读 `RsaKeyService` 内存公钥返回。
   3. **首管理员引导模型**：`bootstrap.admin-password` 为空 → 生成随机 16 位口令并打印日志（仅 dev）；`enabled=false` 禁用；重复启动按 `admin-username` 存在性跳过。引导创建「注册 `iam-ap` 应用 → 两层派生建本地凭证 → 赋 `iam-ap:ADMIN`」三步。
   4. **CORS**：独立 `CorsFilter`（`@Order(HIGHEST_PRECEDENCE)`）先于安全链放行前端开发源，使 `business/iam-ap/web`(5171) 可跨域调用。
+  5. **令牌版本失效的验证侧落地**：platform 的 `TokenVersionChecker` 默认 `acceptAll()`（不校验），故「改密/踢人」在 IAM 自身并不生效。新增 `LocalTokenVersionChecker`（进程内直查库，无 HTTP/TTL 滞后）经 `@ConditionalOnMissingBean` 顶替，使 `JwtAuthenticationFilter` 的「版本失效判定 → 401」在本服务内真正生效。`ver` claim 由 `TokenIssuerService` 写入、`JwtVerifier` 解析为 `TokenClaims.version()`。
 - **风险 / 待办**：
   - ✅ `/me/password` 已改为接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，明文口令不出浏览器，与登录对齐；前端 `ProfilePage` 同步改为先取盐派生后提交。
+  - ✅ 改密后强制旧会话失效已落地：`changePassword` 入库后 `bump` 令牌版本 + IAM 注册 `LocalTokenVersionChecker` 强制校验；前端改密成功即清态跳登录。
   - AD 真实联调、刷新/锁定 TTL 灰度与监控仍待补。
 
 ### 7. IAM 前端控制台（web 新建）
@@ -68,7 +71,7 @@
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
 - **结果**：
   - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
-  - iam-ap：`29/29` 测试全绿，`BUILD SUCCESS`。
+  - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → **当前 36/36**）。
 - **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
 
 ## 通用风险

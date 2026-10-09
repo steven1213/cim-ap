@@ -34,9 +34,11 @@
 
 ## 4. 已落地能力（首批实现 · 2026-10-08；管理面与前端于后续扩展）
 
-> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**31 个测试全绿**：
+> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**36 个测试全绿**：
 > - 首批 24（`AccountLockServiceTest`×4 / `LoginLockoutTest`×2 / 登录·刷新·签发·会话端到端若干）；
-> - 扩展 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）。
+> - 管理面 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）；
+> - 改密派生 2：`LocalCredentialServiceChangePasswordTest`×2（clientHash 改密正确/错误两态）；
+> - 改密失效 5：`LocalTokenVersionCheckerTest`（版本比对单元）+ `ChangePasswordInvalidatesSessionTest`（改密后旧令牌 401 → 重登恢复端到端）。
 > 包结构：`com.cim.iam.server.{token,app,auth,config}`（新增 `config` 包承载安全/CORS/引导/Web 配置）。
 
 **(a) 令牌版本存储 / 递增 / 下发（`token` 包）** — T6.5 在 IAM 侧的落点（对应 design.md §8.1(g)）
@@ -91,11 +93,15 @@
 
 **(j) 首管理员引导 + 当前用户端点 + 自助改密** — 管理面初始化与账户自助（对应 design.md §8.1）
 - `BootstrapAdminRunner`（`ApplicationRunner`，`config` 包）：库内无引导管理员时（`cim.iam.auth.bootstrap.admin-username`，默认 `admin`）自动创建首管理员——① 注册 `iam-ap` 应用（管理端点鉴权依赖 `iam-ap:ADMIN`）② 两层派生建本地凭证（服务端完成 clientHash+serverHash）③ 赋 `iam-ap:ADMIN`。`admin-password` 为空则生成随机 16 位口令并打印日志（仅 dev；生产务必注入强口令）。`bootstrap.enabled=false` 可禁用。重复启动自动跳过。
-- `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 与登录一致接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，服务端仅做第二层派生校验旧口令 + 入库新 clientHash/newClientSalt（明文口令不出浏览器）。`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」与「错误旧 clientHash 被拒」。
+- `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 与登录一致接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，服务端仅做第二层派生校验旧口令 + 入库新 clientHash/newClientSalt（明文口令不出浏览器）。**改密成功后 `bump` 该用户令牌版本**（见 §4(k)），使全部旧会话即时失效。`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」与「错误旧 clientHash 被拒」。
 - 测试：`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
 
-> 已落地（与登录一致）：`/me/password` 现已接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，明文口令不出浏览器。`LocalCredentialServiceChangePasswordTest`×2 覆盖正确/错误旧 clientHash 两态。
-> 可选增强（非阻塞）：改密后是否 `bump` 令牌版本以使旧会话即时失效，当前未实现（行为保持与既有 `changePassword` 一致）；如需强制重登可做为后续项。
+**(k) 改密后强制作废旧会话（令牌版本校验本体）** — 让「改密 / 踢人 / 改权限」的失效真正在 IAM 自身生效
+- 背景：JWT 过滤器链路为「验签 → **版本失效判定(401)** → `apps` 准入(403) → 加载权限 → `SecurityContext`」，其中版本判定由 `TokenVersionChecker` SPI 承担；platform 默认实现 `acceptAll()`（不校验），需接入方顶替方能生效。
+- `LocalTokenVersionChecker`（`token` 包，实现 `TokenVersionChecker`）：**进程内直查库**比对令牌 `ver` claim 与 `TokenVersionService.currentVersion(uid)`，不一致即拒绝（过滤器返回 401）。相比 HTTP 回查 IAM 无 TTL 滞后、无网络往返。`ver` claim 由 `TokenIssuerService` 写入、`JwtVerifier` 解析为 `TokenClaims.version()`。
+- 注册：`IamSecurityConfig` 以 `@Bean` 注册 `LocalTokenVersionChecker`，凭 `@ConditionalOnMissingBean` 顶替 platform 默认 `acceptAll()`。
+- 触发点：`LocalCredentialService.changePassword` 在入库新凭证后立即 `tokenVersionService.bump(userId)`；因用户名即本地账号 `userId`（`ProfileController` 从 `CimUserPrincipal.username()` 取，与令牌 `uname`/`uid` 同源），bump 目标与令牌主体一致。使用者亦可是 `AppRegistrationService` 的分配/撤销（§4(b)）与登出（§4(g)）。
+- 行为：改密后**当前会话令牌亦失效**（版本整体 +1）→ 前端 `ProfilePage` 收到成功回执后清空本地会话并跳登录页，用户以新口令重登。`ChangePasswordInvalidatesSessionTest` 端到端验证「改密前 `/me` 200 → 改密 → 旧令牌 `/me` 401 → 新口令重登 → 新令牌 `/me` 200」。
 
 > 端到端已覆盖（会话生命周期）：`SessionIntegrationTest` 以真实端口启动 IAM，把验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 都指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路；与 `RefreshTokenServiceTest`/`TokenBlacklistServiceTest` 共同覆盖刷新与吊销分支。
 
@@ -114,7 +120,7 @@
 | §5.1 口令两层派生 | 前端加密 + 服务端二次派生 | **首批已落地（见 §4(e)）** |
 | §3 准入模型 | `apps` / `roles` 数据模型与分配管理 | **首批已落地（见 §4(b)）** |
 | §4 ap 注册接入 | 接入表、密钥 / 公钥登记、scope 约定 | **首批已落地（见 §4(b)）** |
-| §5 会话与吊销 | 刷新令牌、黑名单、登出、令牌版本失效 | **首批已落地（版本失效见 §4(a)；刷新见 §4(f)；登出/黑名单/吊销见 §4(g)；端到端见 SessionIntegrationTest）** |
+| §5 会话与吊销 | 刷新令牌、黑名单、登出、令牌版本失效 | **首批已落地（版本存储/递增见 §4(a)、验证侧强制失效见 §4(k)；刷新见 §4(f)；登出/黑名单/吊销见 §4(g)；端到端见 SessionIntegrationTest / ChangePasswordInvalidatesSessionTest）** |
 | §6 快速开始与部署 | 基于 platform 的启动、部署形态 | 骨架已具备（H2 + Flyway 本地起） |
 
 > 设计合理性已在总文档评审中确认：IAM 只管准入、业务自管内部权限，是 OAuth2 `audience` 与业务 RBAC 的标准分层。
