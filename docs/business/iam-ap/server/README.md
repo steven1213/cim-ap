@@ -34,7 +34,7 @@
 
 ## 4. 已落地能力（首批实现 · 2026-10-08；管理面与前端于后续扩展）
 
-> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**29 个测试全绿**：
+> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**31 个测试全绿**：
 > - 首批 24（`AccountLockServiceTest`×4 / `LoginLockoutTest`×2 / 登录·刷新·签发·会话端到端若干）；
 > - 扩展 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）。
 > 包结构：`com.cim.iam.server.{token,app,auth,config}`（新增 `config` 包承载安全/CORS/引导/Web 配置）。
@@ -91,10 +91,11 @@
 
 **(j) 首管理员引导 + 当前用户端点 + 自助改密** — 管理面初始化与账户自助（对应 design.md §8.1）
 - `BootstrapAdminRunner`（`ApplicationRunner`，`config` 包）：库内无引导管理员时（`cim.iam.auth.bootstrap.admin-username`，默认 `admin`）自动创建首管理员——① 注册 `iam-ap` 应用（管理端点鉴权依赖 `iam-ap:ADMIN`）② 两层派生建本地凭证（服务端完成 clientHash+serverHash）③ 赋 `iam-ap:ADMIN`。`admin-password` 为空则生成随机 16 位口令并打印日志（仅 dev；生产务必注入强口令）。`bootstrap.enabled=false` 可禁用。重复启动自动跳过。
-- `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 两步派生 + bump 令牌版本（旧令牌即时失效）。
+- `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 与登录一致接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，服务端仅做第二层派生校验旧口令 + 入库新 clientHash/newClientSalt（明文口令不出浏览器）。`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」与「错误旧 clientHash 被拒」。
 - 测试：`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
 
-> 待优化项（非阻塞）：`/me/password` 当前接收**明文口令**（与登录第一层 PBKDF2 不一致）；后续拟改为客户端先派生后传 `clientHash`（复用 web 端 `crypto.ts` 的 `deriveClientHash`），以保持「明文口令不出浏览器」的一致性。前端 `ProfilePage` 已标注该差异。
+> 已落地（与登录一致）：`/me/password` 现已接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，明文口令不出浏览器。`LocalCredentialServiceChangePasswordTest`×2 覆盖正确/错误旧 clientHash 两态。
+> 可选增强（非阻塞）：改密后是否 `bump` 令牌版本以使旧会话即时失效，当前未实现（行为保持与既有 `changePassword` 一致）；如需强制重登可做为后续项。
 
 > 端到端已覆盖（会话生命周期）：`SessionIntegrationTest` 以真实端口启动 IAM，把验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 都指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路；与 `RefreshTokenServiceTest`/`TokenBlacklistServiceTest` 共同覆盖刷新与吊销分支。
 

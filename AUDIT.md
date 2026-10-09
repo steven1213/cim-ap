@@ -44,14 +44,14 @@
   - 新增 `auth/ProfileController`（`GET /api/v1/me`、`POST /api/v1/me/password`）。
   - `AppRegistrationController` 全端点加 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`；`IamAuthProperties` 增 `bootstrap` / 原 `web` 配置；`LocalCredentialService` 增 `registerLocalUser` / `changePassword`。
   - `pom.xml`：`maven-compiler-plugin` 显式 `<version>3.13.0</version>` + `<compilerArgs>` 强制 Lombok 处理器（见关键修复①）。
-- **验证**：iam-ap `29/29` 绿。`AdminSecurityTest`×4 覆盖「无令牌 401 / `iam-ap:ADMIN` 200 / 非管理员 403」三态；`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
+- **验证**：iam-ap `31/31` 绿。`AdminSecurityTest`×4 覆盖「无令牌 401 / `iam-ap:ADMIN` 200 / 非管理员 403」三态；`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」；`LocalCredentialServiceChangePasswordTest`×2 覆盖「正确旧 clientHash 改密成功且新口令可验/旧口令失效」「错误旧 clientHash 被拒」（改密接口已切到 clientHash，与登录一致）。
 - **关键修复 / 设计决策**：
   1. **Lombok SPI 非发现（编译层，阻塞级）**：沙箱 JDK21 + `maven-compiler-plugin` 下，Lombok 经 `annotationProcessorPaths` 进 `-processorpath` 后，javac **未通过 SPI(META-INF/services) 自动发现**该处理器，导致 `@Getter/@Setter/@Slf4j` 静默失效、满屏「找不到符号」。根因非版本问题（pin 3.13.0 未解）。**修复**：在 `maven-compiler-plugin` 显式 `<compilerArgs><arg>-processor</arg><arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg></compilerArgs>` 强制触发。BUILD SUCCESS。
   2. **`IamJwksKeyProvider` 继承关系**：`JwksKeyProvider`（cim-auth-starter）是**具体类**非接口，原 `implements` 编译报错 → 改为 `extends`，`super(() -> "{\"keys\":[]}", Duration.ofHours(1))` 占位、实际公钥由 `getPublicKey` 读 `RsaKeyService` 内存公钥返回。
   3. **首管理员引导模型**：`bootstrap.admin-password` 为空 → 生成随机 16 位口令并打印日志（仅 dev）；`enabled=false` 禁用；重复启动按 `admin-username` 存在性跳过。引导创建「注册 `iam-ap` 应用 → 两层派生建本地凭证 → 赋 `iam-ap:ADMIN`」三步。
   4. **CORS**：独立 `CorsFilter`（`@Order(HIGHEST_PRECEDENCE)`）先于安全链放行前端开发源，使 `business/iam-ap/web`(5171) 可跨域调用。
 - **风险 / 待办**：
-  - ⚠️ `/me/password` 当前接收**明文口令**（与登录第一层 PBKDF2 不一致），前端 `ProfilePage` 已标注；后续拟改客户端先派生后传 `clientHash`。
+  - ✅ `/me/password` 已改为接收客户端第一层派生的 `clientHash`（`oldCredential`/`newCredential`）+ 新随机盐 `newClientSalt`，明文口令不出浏览器，与登录对齐；前端 `ProfilePage` 同步改为先取盐派生后提交。
   - AD 真实联调、刷新/锁定 TTL 灰度与监控仍待补。
 
 ### 7. IAM 前端控制台（web 新建）

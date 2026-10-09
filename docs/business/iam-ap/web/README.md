@@ -67,8 +67,7 @@ business/iam-ap/web/
   - 撤销 `DELETE /api/v1/apps/{appCode}/users/{userId}`；
   - 查询用户已准入应用 `GET /api/v1/apps/users/{userId}/apps`。
 - **令牌踢人（TokenVersionPage）**：`POST /api/v1/internal/token-version/bump?uid=`（`postRaw` 透传裸对象）→ 该用户令牌版本 +1，验证端缓存到期后所有存量令牌失效、需重新登录。本地账号 userId 即用户名。
-- **自助改密（ProfilePage）**：`POST /api/v1/me/password {oldPassword, newPassword}`。
-  - ⚠️ **已知不一致（非阻塞）**：当前改密接口按服务端契约接收**明文口令**（与登录第一层 PBKDF2 不一致）；已在 `ProfilePage` 标注，后端列为待优化项（后续拟改为客户端先派生后传 `clientHash`）。
+- **自助改密（ProfilePage）**：`POST /api/v1/me/password`，与登录一致在浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 `clientHash`——请求体 `{ oldCredential, newCredential, newClientSalt }`（旧口令派生前先 `GET /api/v1/login/salt?username=` 取服务端盐，新口令由客户端 `randomClientSalt()` 生成随机盐后派生）。明文口令不出浏览器，已与登录对齐。
 
 ## 4. 构建与运行
 
