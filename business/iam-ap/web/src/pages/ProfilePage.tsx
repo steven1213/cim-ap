@@ -4,6 +4,8 @@ import { useAuthStore } from '@/store/authStore';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import * as api from '@/lib/api';
 import type { ChangePasswordRequest, SaltResponse } from '@/types';
+import Panel from '@/components/Panel';
+import { IconAlert } from '@/components/Icons';
 
 /**
  * 自助改密：与登录一致，浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 clientHash
@@ -15,9 +17,13 @@ import type { ChangePasswordRequest, SaltResponse } from '@/types';
 export default function ProfilePage() {
   const [oldPassword, setOld] = useState('');
   const [newPassword, setNew] = useState('');
+  const [confirmPassword, setConfirm] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const username = useAuthStore((s) => s.user?.username);
+  const userId = useAuthStore((s) => s.user?.userId);
+  const tenantId = useAuthStore((s) => s.user?.tenantId);
+  const appCount = useAuthStore((s) => s.user?.apps?.length ?? 0);
   const clearSession = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
 
@@ -26,6 +32,10 @@ export default function ProfilePage() {
     setErr('');
     if (!username) {
       setErr('当前会话缺失用户名，请重新登录');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErr('两次输入的新口令不一致');
       return;
     }
     setBusy(true);
@@ -50,26 +60,87 @@ export default function ProfilePage() {
     }
   }
 
+  const mismatch = !!confirmPassword && newPassword !== confirmPassword;
+  const canSubmit = !!oldPassword && !!newPassword && !!confirmPassword && !mismatch;
+
   return (
-    <div className="card">
-      <h2>修改口令</h2>
-      <form onSubmit={onSubmit}>
-        <label>
-          原口令
-          <input type="password" value={oldPassword} onChange={(e) => setOld(e.target.value)} />
-        </label>
-        <label>
-          新口令
-          <input type="password" value={newPassword} onChange={(e) => setNew(e.target.value)} />
-        </label>
-        {err && <div className="err">{err}</div>}
-        <button type="submit" disabled={busy || !oldPassword || !newPassword}>
-          提交
-        </button>
-        <p className="hint">
-          口令在浏览器内做第一层 PBKDF2 派生，明文不上传（与登录一致）。
-        </p>
-      </form>
+    <div className="page">
+      <div className="grid-2">
+        <Panel title="账户信息" sub="当前登录身份">
+          <dl className="meta">
+            <dt className="meta-k">用户 ID</dt>
+            <dd className="meta-v mono">{userId ?? '—'}</dd>
+            <dt className="meta-k">用户名</dt>
+            <dd className="meta-v">{username ?? '—'}</dd>
+            <dt className="meta-k">租户</dt>
+            <dd className="meta-v mono">{tenantId ?? '—'}</dd>
+            <dt className="meta-k">准入应用</dt>
+            <dd className="meta-v mono">{appCount}</dd>
+          </dl>
+          <div className="sub-block">
+            <div className="sub-title">安全提示</div>
+            <ul className="note-list">
+              <li>改密后全部已签发令牌立即失效，需重新登录。</li>
+              <li>AD / LDAP 账号的口令变更请在目录侧完成。</li>
+            </ul>
+          </div>
+        </Panel>
+
+        <Panel title="修改口令" sub="修改成功后需以新口令重新登录">
+          <form onSubmit={onSubmit}>
+            <div className="field">
+              <label className="field-label" htmlFor="pw-old">
+                原口令
+              </label>
+              <input
+                id="pw-old"
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOld(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pw-new">
+                新口令
+              </label>
+              <input
+                id="pw-new"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNew(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pw-confirm">
+                确认新口令
+              </label>
+              <input
+                id="pw-confirm"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirm(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+
+            {err && (
+              <div className="alert err" style={{ marginTop: 12 }}>
+                <IconAlert width={15} height={15} />
+                <span>{err}</span>
+              </div>
+            )}
+
+            <button type="submit" className="btn-block" disabled={busy || !canSubmit} style={{ marginTop: 14 }}>
+              {busy ? '提交中…' : '提交修改'}
+            </button>
+          </form>
+          <p className="hint">
+            口令在浏览器内完成第一层 PBKDF2 派生（与登录一致），仅密文派生值上传；明文口令不离开浏览器。
+          </p>
+        </Panel>
+      </div>
     </div>
   );
 }
