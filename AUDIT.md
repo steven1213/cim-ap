@@ -7,14 +7,14 @@
 ### 1. IAM 统一登录（M-login / M-refresh / M-lockout）
 - **范围**：`business/iam-ap/server`（token/app/auth/config 包 + 迁移 V1–V4）、`cim-auth-starter`（SPI 校验链：版本/黑名单检查器 + 过滤器插入）、`cim-spring-support`（`BizCode`/`BizException` 新增 `ACCOUNT_LOCKED`，`GlobalExceptionHandler` 映射）。
 - **验证（已跑通）**：
-  - iam-ap：`24/24` 测试全绿（M-login 15 + M-refresh 3 + M-lockout 6）。
+  - iam-ap：`29/29` 测试全绿（M-login 15 + M-refresh 3 + M-lockout 6 + 管理面 `AdminSecurityTest`×4 + 首管理员引导 `BootstrapAdminTest`×1）。
   - platform：`27/27` 测试全绿（cim-auth-starter 含新增 `IamTokenVersionChecker`/`IamTokenBlacklistChecker` 各 4 测 + 集成测试）。
 - **关键修复 / 设计决策**：
   - `SecurityAutoConfiguration` 装配顺序陷阱：默认 `acceptAll` Bean 原带 `havingValue=""` 条件，配真 URL 时仍命中 → 改为具体 IAM 实现声明在前、默认仅 `@ConditionalOnMissingBean`（版本/黑名单两处同修）。
   - `jti` claim 接入 + 按 jti 黑名单跨模块契约，经 `SessionIntegrationTest` 真实端口端到端验证（IAM 拉黑 → 验证侧 401）。
   - 刷新令牌轮转（仅存 SHA-256 散列、防重放）+ 用户级 `ver` bump 兜底，与黑名单正交。
   - 登录失败锁定：滑动窗口计数，达阈值锁定，成功清零；预检不区分用户是否存在（防账号枚举）。
-- **风险 / 待办**：AD 真实联调、前端登录页 + 第一层派生 JS、`cim-iam-ap` web 端、刷新/锁定 TTL 灰度与监控。
+- **风险 / 待办**：AD 真实联调、刷新/锁定 TTL 灰度与监控。（前端登录页 + 第一层派生 JS、`cim-iam-ap` web 端已于 2026-10-09 落地，详见下方新增章节。）
 
 ### 2. MDS 主数据设计文档集
 - **范围**：`docs/business/mds-ap/server/**`（39 篇设计文档 + 新增 `operating-profile-design.md`、蓝图/backlog/README）。
@@ -36,12 +36,39 @@
 - **验证**：**2026-10-09 全量回归通过**——platform 整仓 `mvn install` 13 模块全部 `BUILD SUCCESS`；其中 `cim-system` 16 测（1 跳过）、`cim-bootstrap` 装配冒烟 5 测全绿，确认域模块与 bootstrap 装配通过、Flyway 多目录追加顺序正常。
 - **风险 / 待办**：无遗留回归风险。
 
+## 2026-10-09（续）IAM 管理面 + 前端控制台 + 编译修复
+
+### 6. IAM 管理面（server 扩展）
+- **范围**：`business/iam-ap/server`
+  - 新增 `config` 包：`IamSecurityConfig`（注册 in-JVM 验签 Bean + `CorsFilter`）、`IamJwksKeyProvider extends JwksKeyProvider`（覆盖 starter 默认 HTTP JWKS，验证自身令牌走内存公钥）、`IamWebProperties`（`cim.iam.web.allowed-origins`，默认 `http://localhost:5171`）、`BootstrapAdminRunner`（`ApplicationRunner` 首管理员引导）。
+  - 新增 `auth/ProfileController`（`GET /api/v1/me`、`POST /api/v1/me/password`）。
+  - `AppRegistrationController` 全端点加 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`；`IamAuthProperties` 增 `bootstrap` / 原 `web` 配置；`LocalCredentialService` 增 `registerLocalUser` / `changePassword`。
+  - `pom.xml`：`maven-compiler-plugin` 显式 `<version>3.13.0</version>` + `<compilerArgs>` 强制 Lombok 处理器（见关键修复①）。
+- **验证**：iam-ap `29/29` 绿。`AdminSecurityTest`×4 覆盖「无令牌 401 / `iam-ap:ADMIN` 200 / 非管理员 403」三态；`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
+- **关键修复 / 设计决策**：
+  1. **Lombok SPI 非发现（编译层，阻塞级）**：沙箱 JDK21 + `maven-compiler-plugin` 下，Lombok 经 `annotationProcessorPaths` 进 `-processorpath` 后，javac **未通过 SPI(META-INF/services) 自动发现**该处理器，导致 `@Getter/@Setter/@Slf4j` 静默失效、满屏「找不到符号」。根因非版本问题（pin 3.13.0 未解）。**修复**：在 `maven-compiler-plugin` 显式 `<compilerArgs><arg>-processor</arg><arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg></compilerArgs>` 强制触发。BUILD SUCCESS。
+  2. **`IamJwksKeyProvider` 继承关系**：`JwksKeyProvider`（cim-auth-starter）是**具体类**非接口，原 `implements` 编译报错 → 改为 `extends`，`super(() -> "{\"keys\":[]}", Duration.ofHours(1))` 占位、实际公钥由 `getPublicKey` 读 `RsaKeyService` 内存公钥返回。
+  3. **首管理员引导模型**：`bootstrap.admin-password` 为空 → 生成随机 16 位口令并打印日志（仅 dev）；`enabled=false` 禁用；重复启动按 `admin-username` 存在性跳过。引导创建「注册 `iam-ap` 应用 → 两层派生建本地凭证 → 赋 `iam-ap:ADMIN`」三步。
+  4. **CORS**：独立 `CorsFilter`（`@Order(HIGHEST_PRECEDENCE)`）先于安全链放行前端开发源，使 `business/iam-ap/web`(5171) 可跨域调用。
+- **风险 / 待办**：
+  - ⚠️ `/me/password` 当前接收**明文口令**（与登录第一层 PBKDF2 不一致），前端 `ProfilePage` 已标注；后续拟改客户端先派生后传 `clientHash`。
+  - AD 真实联调、刷新/锁定 TTL 灰度与监控仍待补。
+
+### 7. IAM 前端控制台（web 新建）
+- **范围**：`business/iam-ap/web`（新建，React18 + TS5.6 + Vite5）。核心文件：`src/lib/crypto.ts`（第一层 PBKDF2 派生，与 server `PasswordDerivation` 对齐）、`src/lib/api.ts`（axios 拦截器解包 `Result<T>` + 401 清态跳登录 + `postRaw` 透传裸对象）、`src/store/authStore.ts`（zustand persist localStorage）、`src/pages/{LoginPage,AppMgmtPage,TokenVersionPage,ProfilePage,DashboardPage}.tsx`、`src/components/{ProtectedRoute,Layout}.tsx`。
+- **验证**：`tsc -p tsconfig.json` 类型检查 EXIT=0；`vite build` 产出 `dist/`（113 模块，EXIT=0）。`package-lock.json` 入库，`node_modules/`、`dist/` 由根 `.gitignore` 忽略。
+- **关键修复**：
+  - TS 工程配置：删除冲突的 `tsconfig.node.json`（`composite:true`+`noEmit:true` → TS6310），`tsconfig.json` 去 `references`，`build` 改为 `tsc -p tsconfig.json && vite build`。
+  - TS5.7 `Uint8Array<ArrayBufferLike>` 与 `BufferSource` 不兼容 → `crypto.ts` 的 `utf8Bytes` 返回值显式标注 `Uint8Array<ArrayBuffer>`。
+  - npm 缓存损坏 → `npm install --ignore-scripts --cache "E:/Software/tmp/npm-iam-cache" --prefer-online` 重建。
+- **范围说明**：仅承载「登录门户 + 准入/粗角色管理 + 令牌踢人 + 自助改密」；业务菜单/按钮管理仍由各业务 ap 前端负责（与 IAM 边界一致）。
+
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
 - **结果**：
   - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
-  - iam-ap：`24/24` 测试全绿，`BUILD SUCCESS`。
+  - iam-ap：`29/29` 测试全绿，`BUILD SUCCESS`。
 - **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
 
 ## 通用风险

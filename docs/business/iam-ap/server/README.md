@@ -32,10 +32,12 @@
 
 - IAM 维护**应用接入表**，新增 `mds-ap` / `mes-ap` 时注册即可，动态纳入并下发对应准入，无需改 IAM 代码。
 
-## 4. 已落地能力（首批实现 · 2026-10-08）
+## 4. 已落地能力（首批实现 · 2026-10-08；管理面与前端于后续扩展）
 
-> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**24 个测试全绿**（M-login 15 + M-refresh 3 + M-lockout 6：`AccountLockServiceTest`×4 / `LoginLockoutTest`×2）。
-> 包结构：`com.cim.iam.server.{token,app,auth,config}`。
+> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**29 个测试全绿**：
+> - 首批 24（`AccountLockServiceTest`×4 / `LoginLockoutTest`×2 / 登录·刷新·签发·会话端到端若干）；
+> - 扩展 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）。
+> 包结构：`com.cim.iam.server.{token,app,auth,config}`（新增 `config` 包承载安全/CORS/引导/Web 配置）。
 
 **(a) 令牌版本存储 / 递增 / 下发（`token` 包）** — T6.5 在 IAM 侧的落点（对应 design.md §8.1(g)）
 - `TokenVersion` 实体（`token_version` 表，`user_id` 唯一）+ `TokenVersionRepository` + `TokenVersionService`：`currentVersion(userId)`（首访建 1）/ `bump(userId)`（改权限/改密/踢人后 +1）。
@@ -80,6 +82,19 @@
 - 滑动窗口：`firstFailAt + windowMinutes < now` 时历史失败清零，避免旧失败永久累计。
 - `LoginService.login` 接入：进入即 `isLocked` 预检（已锁定直接抛 `ACCOUNT_LOCKED` 1004，不区分用户是否存在）；认证失败 `onFailure`；成功 `onSuccess`。
 - 配置项（默认：`cim.iam.auth.lockout.max-attempts=5`、`lock-minutes=15`、`window-minutes=15`）。
+
+**(i) 管理面鉴权（自签发 JWT + `iam-ap:ADMIN`）** — 边界③管理端点守护（对应 design.md §8.1）
+- `IamJwksKeyProvider extends JwksKeyProvider`（`config` 包）：覆盖 cim-auth-starter 默认的 HTTP JWKS 提供器（starter 该 Bean 为 `@ConditionalOnMissingBean`），使 IAM **验证自身签发的令牌走 in-JVM 公钥**（`RsaKeyService.getPublicKey()`），免环回网络依赖、MockMvc 测试无需真实端口即可验签。父类按 kid 缓存，IAM 单密钥场景直接读内存公钥返回。
+- `IamSecurityConfig`（`config` 包）：注册 `IamJwksKeyProvider` Bean（顶替默认）；并独立 `CorsFilter`（`@Order(HIGHEST_PRECEDENCE)`）放行 `cim.iam.web.allowed-origins`（默认 `http://localhost:5171`，生产按域名收紧），使 business/iam-ap/web 可调用本服务。
+- 管理端点守护：`AppRegistrationController` 全部端点加 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`。IAM 自签 RS256 令牌的 `authorities`/`roles` claim 含 `iam-ap:ADMIN`（由 `BootstrapAdminRunner` 赋权 / 业务赋权写入）；验证侧 JWT 过滤器解析 claim → 方法级鉴权放行/拒绝。
+- 行为：`/api/v1/apps` 无令牌 → 401；持 `iam-ap:ADMIN` 令牌 → 200；持非管理员令牌（如仅 `mds-ap:ADMIN`）→ 403。`AdminSecurityTest`×4 覆盖上述三态。
+
+**(j) 首管理员引导 + 当前用户端点 + 自助改密** — 管理面初始化与账户自助（对应 design.md §8.1）
+- `BootstrapAdminRunner`（`ApplicationRunner`，`config` 包）：库内无引导管理员时（`cim.iam.auth.bootstrap.admin-username`，默认 `admin`）自动创建首管理员——① 注册 `iam-ap` 应用（管理端点鉴权依赖 `iam-ap:ADMIN`）② 两层派生建本地凭证（服务端完成 clientHash+serverHash）③ 赋 `iam-ap:ADMIN`。`admin-password` 为空则生成随机 16 位口令并打印日志（仅 dev；生产务必注入强口令）。`bootstrap.enabled=false` 可禁用。重复启动自动跳过。
+- `ProfileController`（`auth` 包，`/api/v1/me`）：`GET /me`（需 `isAuthenticated()`）返回 `MeDto{userId,username,tenantId,apps,roles}`（apps/roles 由 `AppRegistrationService` 计算）；`POST /me/password` 自助改密（仅本地凭证账号，AD/LDAP 账号改密在目录侧）。`changePassword` 两步派生 + bump 令牌版本（旧令牌即时失效）。
+- 测试：`BootstrapAdminTest`×1 端到端验证「引导创建 admin（含 `iam-ap:ADMIN`）→ 用引导口令登录成功拿令牌」。
+
+> 待优化项（非阻塞）：`/me/password` 当前接收**明文口令**（与登录第一层 PBKDF2 不一致）；后续拟改为客户端先派生后传 `clientHash`（复用 web 端 `crypto.ts` 的 `deriveClientHash`），以保持「明文口令不出浏览器」的一致性。前端 `ProfilePage` 已标注该差异。
 
 > 端到端已覆盖（会话生命周期）：`SessionIntegrationTest` 以真实端口启动 IAM，把验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 都指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路；与 `RefreshTokenServiceTest`/`TokenBlacklistServiceTest` 共同覆盖刷新与吊销分支。
 
