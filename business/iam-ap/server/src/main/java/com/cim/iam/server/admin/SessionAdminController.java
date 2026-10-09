@@ -5,6 +5,7 @@ import com.cim.iam.server.audit.AuditType;
 import com.cim.iam.server.auth.LocalCredentialService;
 import com.cim.iam.server.auth.RefreshToken;
 import com.cim.iam.server.auth.RefreshTokenService;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.iam.server.token.TokenVersionService;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
@@ -19,15 +20,16 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 在线会话管理（管理面，需 {@code iam-ap:ADMIN}）。
+ * 在线会话管理（管理面）。
  *
- * <p>「在线会话」以**未撤销且未过期的刷新令牌**近似表示（一个刷新令牌 ≈ 一个登录会话）。
+ * <p>方法级 {@code iam:session:list} / {@code iam:session:kick}，类级 {@code iam:console:admin} 兜底。
+ * 「在线会话」以**未撤销且未过期的刷新令牌**近似表示（一个刷新令牌 ≈ 一个登录会话）。
  * 强制下线 = bump 该用户令牌版本，验证端进程内即时判定，旧访问令牌立即 401。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/sessions")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class SessionAdminController {
 
     private final RefreshTokenService refreshTokenService;
@@ -43,6 +45,7 @@ public class SessionAdminController {
 
     /** 活跃会话清单（按到期时间升序）。 */
     @GetMapping
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.SESSION_LIST + "')")
     public Result<List<SessionRow>> list() {
         List<SessionRow> rows = refreshTokenService.listActiveSessions().stream()
                 .map(this::toRow)
@@ -52,6 +55,7 @@ public class SessionAdminController {
 
     /** 强制下线：bump 该用户令牌版本，使其所有存量令牌失效。 */
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.SESSION_KICK + "')")
     public Result<KickResult> kick(@PathVariable String userId) {
         long version = tokenVersionService.bump(userId);
         auditService.success(AuditType.SESSION_REVOKED, null, userId,

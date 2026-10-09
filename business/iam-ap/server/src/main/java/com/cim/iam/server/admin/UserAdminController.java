@@ -11,6 +11,7 @@ import com.cim.iam.server.org.UserOrg;
 import com.cim.iam.server.profile.ProfileService;
 import com.cim.iam.server.profile.UserProfile;
 import com.cim.iam.server.profile.UserStatus;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,7 +34,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * 用户账号与档案管理（管理面，需 {@code iam-ap:ADMIN}）。
+ * 用户账号与档案管理（管理面）。方法级细粒度权限码，类级 {@code iam:console:admin} 兜底。
  *
  * <p>承载本地账号生命周期（创建/启停/重置口令/解锁/删除），并<b>与用户档案合并成统一视图</b>：
  * 列表取自「本地凭证 ∪ 用户档案」的并集，因此 AD 同步来的员工（无本地凭证）也会出现，
@@ -45,7 +46,7 @@ import java.util.TreeSet;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class UserAdminController {
 
     private final LocalCredentialService credentialService;
@@ -84,6 +85,7 @@ public class UserAdminController {
 
     /** 用户清单（本地凭证 ∪ 用户档案，含锁定状态、档案摘要与有效准入）。 */
     @GetMapping
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_LIST + "')")
     public Result<List<UserRow>> list() {
         Map<String, LocalCredential> creds = new HashMap<>();
         for (LocalCredential c : credentialService.listAll()) {
@@ -109,6 +111,7 @@ public class UserAdminController {
      * <p>可同时建立用户档案（displayName / employeeNo / jobTitle）；不传则仅建凭证。</p>
      */
     @PostMapping
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_CREATE + "')")
     public Result<Void> create(@RequestBody CreateUserRequest req) {
         credentialService.registerLocalUser(req.username(), req.credential(), req.clientSalt());
         if (req.displayName() != null && !req.displayName().isBlank()
@@ -121,6 +124,7 @@ public class UserAdminController {
 
     /** 启用 / 禁用账号（禁用即强制下线）。 */
     @PutMapping("/{userId}/status")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_STATUS + "')")
     public Result<Void> setStatus(@PathVariable String userId, @RequestBody StatusRequest req) {
         if (credentialService.findByUserId(userId).isPresent()) {
             credentialService.setEnabled(userId, req.enabled());
@@ -133,6 +137,7 @@ public class UserAdminController {
 
     /** 管理员重置口令（credential 为客户端第一层派生后的 clientHash；重置即强制下线）。 */
     @PutMapping("/{userId}/password")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_RESET_PWD + "')")
     public Result<Void> resetPassword(@PathVariable String userId, @RequestBody ResetPasswordRequest req) {
         credentialService.resetPassword(userId, req.credential(), req.clientSalt());
         return Result.ok();
@@ -140,6 +145,7 @@ public class UserAdminController {
 
     /** 解除登录锁定。 */
     @PostMapping("/{userId}/unlock")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_UNLOCK + "')")
     public Result<Boolean> unlock(@PathVariable String userId) {
         boolean cleared = accountLockService.unlock(userId);
         auditService.success(AuditType.USER_UNLOCKED, null, userId, cleared ? "解除登录锁定" : "无锁定记录");
@@ -148,6 +154,7 @@ public class UserAdminController {
 
     /** 删除本地账号（删除即强制下线；档案保留）。 */
     @DeleteMapping("/{userId}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_DELETE + "')")
     public Result<Void> delete(@PathVariable String userId) {
         credentialService.deleteUser(userId);
         return Result.ok();

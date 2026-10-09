@@ -77,8 +77,27 @@
             <version>${cim.version}</version>
         </dependency>
 
-        <!-- 注：cache/mq/obs/i18n 等 starter 按生产需要再引入；本里程碑聚焦「令牌版本 + ap 准入」，
-             仅需基础底座（spring-support / jpa / auth），避免引入 Redis/MQ/OTLP 等外部依赖耦合。 -->
+        <!-- 控制台自身的菜单 / 按钮权限 / 角色（= IAM 这个 ap 的**内部权限**，非跨业务准入）。
+             复用平台域模块 cim-system（sys_menu 父子树 + sys_permission(module:res:action) + RBAC），
+             不另造表；其 DbLocalAuthorityLoader 会顶替 cim-auth-starter 的默认
+             ClaimLocalAuthorityLoader，使控制台权限源由「令牌 roles claim」转「本 ap 库内 RBAC」。
+             见 docs/business/iam-ap/server/console-menu-perm-i18n.md §0/§4。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-system</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+
+        <!-- 系统整体多语言（sys_locale + sys_i18n 两表，DB 驱动 + 中文兜底四级链）。
+             平台级 starter，所有 ap 复用；见 docs/platform/server/README.md §7。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-i18n-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+
+        <!-- 注：cache/mq/obs 等 starter 按生产需要再引入；本里程碑聚焦「令牌版本 + ap 准入
+             + 控制台菜单/按钮权限/多语言」，故仅引入上述必要底座，避免耦合 Redis/MQ/OTLP。 -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -91,6 +110,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- 鉴权「分层契约」测试用：以 @PreAuthorize 的**显式授权集**发起请求，
+             验证「类级伞码 ∧ 方法级细码」两闸门语义（而非只对超管/匿名做黑盒断言）。
+             版本由 Boot BOM 统一管理（3.3.5 → Spring Security 6.3.x）。 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
 

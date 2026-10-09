@@ -1,5 +1,6 @@
 package com.cim.iam.server.app;
 
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,6 +25,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/v1/apps")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class AppRegistrationController {
 
     private final AppRegistrationService service;
@@ -33,47 +35,47 @@ public class AppRegistrationController {
     public record AssignRequest(String userId, Set<String> roles) {}
     public record AssignmentDto(String appCode, java.util.Set<String> roles) {}
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.APP_CREATE + "')")
     @PostMapping
     public Result<AppRegistration> register(@RequestBody RegisterAppRequest req) {
         return Result.ok(service.registerApp(req.appCode(), req.appName(), req.sortNo()));
     }
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.APP_LIST + "')")
     @GetMapping
     public Result<List<AppRegistration>> list() {
         return Result.ok(service.listApps());
     }
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.APP_UPDATE + "')")
     @PutMapping("/{appCode}")
     public Result<AppRegistration> update(@PathVariable String appCode,
                                          @RequestBody UpdateAppRequest req) {
         return Result.ok(service.updateApp(appCode, req.appName(), req.status()));
     }
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ADMISSION_GRANT + "')")
     @PostMapping("/{appCode}/users")
     public Result<Void> assign(@PathVariable String appCode, @RequestBody AssignRequest req) {
         service.assignUserToApp(req.userId(), appCode, req.roles());
         return Result.ok();
     }
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ADMISSION_REVOKE + "')")
     @DeleteMapping("/{appCode}/users/{userId}")
     public Result<Void> revoke(@PathVariable String appCode, @PathVariable String userId) {
         service.revokeUserFromApp(userId, appCode);
         return Result.ok();
     }
 
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ADMISSION_LIST + "')")
     @GetMapping("/users/{userId}/apps")
     public Result<Set<String>> appsForUser(@PathVariable String userId) {
         return Result.ok(service.enabledAppsForUser(userId));
     }
 
     /** 用户的准入明细（含各 app 的角色组），供管理面「准入授权」查看/编辑。 */
-    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ADMISSION_LIST + "')")
     @GetMapping("/users/{userId}/assignments")
     public Result<List<AssignmentDto>> assignmentsForUser(@PathVariable String userId) {
         return Result.ok(service.listAssignmentsForUser(userId).stream()

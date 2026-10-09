@@ -28,8 +28,9 @@ import java.util.List;
  *       使 business/iam-ap/web（端口 5171）可调用本服务。</li>
  * </ul>
  *
- * <p>管理端点（{@code /api/v1/apps/**}）的鉴权由 cim-auth-starter 的 JWT 过滤器 + 方法级
- * {@code @PreAuthorize("hasAuthority('iam-ap:ADMIN')")} 负责，不在此处重复配置。</p>
+ * <p>管理端点的鉴权由 cim-auth-starter 的 JWT 过滤器 + 方法级
+ * {@code @PreAuthorize("hasAuthority('iam:xxx:yyy')")}（类级兜底 {@code iam:console:admin}）负责，
+ * 权限权威源为本 ap 库内 RBAC（{@code DbLocalAuthorityLoader}），不在此处重复配置。</p>
  */
 @Configuration
 public class IamSecurityConfig {

@@ -3,6 +3,7 @@ package com.cim.iam.server.admin;
 import com.cim.iam.server.audit.AuditService;
 import com.cim.iam.server.audit.AuditType;
 import com.cim.iam.server.auth.AccountLockService;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,14 +17,15 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 登录锁定管理（管理面，需 {@code iam-ap:ADMIN}）。
+ * 登录锁定管理（管理面）。
  *
- * <p>列出当前处于锁定状态的用户名（暴力破解防护触发），支持管理员手动解锁。</p>
+ * <p>方法级 {@code iam:user:list} / {@code iam:user:unlock}，类级 {@code iam:console:admin} 兜底。
+ * 列出当前处于锁定状态的用户名（暴力破解防护触发），支持管理员手动解锁。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/lockouts")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class LockoutAdminController {
 
     private final AccountLockService accountLockService;
@@ -34,6 +36,7 @@ public class LockoutAdminController {
 
     /** 当前锁定中的账号（lockedUntil 升序）。 */
     @GetMapping
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_LIST + "')")
     public Result<List<LockRow>> list() {
         List<LockRow> rows = accountLockService.listActiveLocks().stream()
                 .map(l -> new LockRow(l.getUsername(), l.getFailCount(),
@@ -44,6 +47,7 @@ public class LockoutAdminController {
 
     /** 手动解锁。 */
     @DeleteMapping("/{username}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_UNLOCK + "')")
     public Result<Boolean> unlock(@PathVariable String username) {
         boolean cleared = accountLockService.unlock(username);
         auditService.success(AuditType.USER_UNLOCKED, null, username,

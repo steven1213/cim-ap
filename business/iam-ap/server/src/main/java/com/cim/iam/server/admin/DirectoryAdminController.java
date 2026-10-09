@@ -10,6 +10,7 @@ import com.cim.iam.server.org.OrgNode;
 import com.cim.iam.server.org.OrgNodeService;
 import com.cim.iam.server.profile.ProfileService;
 import com.cim.iam.server.profile.UserProfile;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 
 import lombok.RequiredArgsConstructor;
@@ -28,12 +29,14 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 档案 / 组织授予 / 目录同步管理（管理面，需 {@code iam-ap:ADMIN}，identity-directory.md §5.2）。
+ * 档案 / 组织授予 / 目录同步管理（管理面，identity-directory.md §5.2）。
+ *
+ * <p>方法级细粒度权限码；类级 {@code iam:console:admin} 兜底。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class DirectoryAdminController {
 
     private final ProfileService profileService;
@@ -65,12 +68,14 @@ public class DirectoryAdminController {
     // ---------- 档案 ----------
 
     @GetMapping("/profiles")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_LIST + "')")
     public Result<List<ProfileRow>> profiles() {
         return Result.ok(profileService.listAll().stream().map(this::toRow).toList());
     }
 
     /** 新建 IAM 自建档案（设备厂商 / 访客 / 服务账号）。 */
     @PostMapping("/profiles")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_CREATE + "')")
     public Result<Void> createProfile(@RequestBody CreateProfileRequest req) {
         profileService.createManaged(req.userId(), req.displayName(), req.employeeNo(),
                 req.email(), req.mobile(), req.jobTitle());
@@ -79,6 +84,7 @@ public class DirectoryAdminController {
 
     /** 更新档案（AD 来源仅可改岗位等 IAM 属性）。 */
     @PutMapping("/profiles/{userId}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_UPDATE + "')")
     public Result<Void> updateProfile(@PathVariable String userId, @RequestBody UpdateProfileRequest req) {
         profileService.updateProfile(userId, req.displayName(), req.email(), req.mobile(), req.jobTitle());
         return Result.ok();
@@ -87,12 +93,14 @@ public class DirectoryAdminController {
     // ---------- 组织授予 ----------
 
     @GetMapping("/org-grants")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.GRANT_LIST + "')")
     public Result<List<OrgGrantRow>> grants() {
         return Result.ok(orgGrantService.listAll().stream().map(this::toRow).toList());
     }
 
     /** 授予组织级准入（组织 → ap + 粗角色组）。 */
     @PostMapping("/org-grants")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.GRANT_GRANT + "')")
     public Result<Void> grant(@RequestBody GrantRequest req) {
         appRegistrationService.requireApp(req.appCode()); // 校验接入码已登记
         orgGrantService.grant(req.orgId(), req.appCode(), req.roles(), req.includeChildren());
@@ -100,6 +108,7 @@ public class DirectoryAdminController {
     }
 
     @DeleteMapping("/org-grants/{orgId}/{appCode}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.GRANT_REVOKE + "')")
     public Result<Void> revoke(@PathVariable String orgId, @PathVariable String appCode) {
         orgGrantService.revoke(orgId, appCode);
         return Result.ok();
@@ -109,12 +118,14 @@ public class DirectoryAdminController {
 
     /** 当前水位（供排障：业务侧比对值）。 */
     @GetMapping("/sync/watermark")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.SETTINGS_VIEW + "')")
     public Result<WatermarkDto> watermark() {
         return Result.ok(directoryService.watermark());
     }
 
     /** 手动触发一次 AD 同步；未配置 AD 时返回 {@code skipped=true}（正常态）。 */
     @PostMapping("/sync/ad")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.SYNC_RUN + "')")
     public Result<AdDirectorySyncService.SyncResult> syncAd() {
         return Result.ok(adSyncService.syncNow());
     }

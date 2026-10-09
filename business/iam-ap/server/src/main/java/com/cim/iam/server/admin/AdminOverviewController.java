@@ -15,6 +15,7 @@ import com.cim.iam.server.org.OrgNode;
 import com.cim.iam.server.org.OrgNodeService;
 import com.cim.iam.server.profile.ProfileService;
 import com.cim.iam.server.profile.UserProfile;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,14 +26,18 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 平台态势概览（管理面，需 {@code iam-ap:ADMIN}）。
+ * 平台态势概览（管理面）。
+ *
+ * <p><b>鉴权：方法级 {@code iam:overview:view}，类级 {@code iam:console:admin} 兜底</b>
+ * （方法级优先）。控制台内部权限由本 ap 库内 RBAC 决定，见
+ * {@code console-menu-perm-i18n.md} §4。</p>
  *
  * <p>聚合身份、接入、会话、锁定与近期审计事件，作为登录后首页的「总览」。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/overview")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class AdminOverviewController {
 
     private final LocalCredentialService credentialService;
@@ -61,6 +66,7 @@ public class AdminOverviewController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.OVERVIEW_VIEW + "')")
     public Result<OverviewDto> overview() {
         List<LocalCredential> users = credentialService.listAll();
         int enabledUsers = (int) users.stream().filter(LocalCredential::isEnabled).count();

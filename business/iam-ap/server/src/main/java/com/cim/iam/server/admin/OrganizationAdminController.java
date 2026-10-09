@@ -7,6 +7,7 @@ import com.cim.iam.server.org.OrgNodeService;
 import com.cim.iam.server.org.OrgNodeType;
 import com.cim.iam.server.org.OrgStatus;
 import com.cim.iam.server.profile.ProfileService;
+import com.cim.iam.server.support.IamPermissionCodes;
 import com.cim.spring.support.web.Result;
 
 import lombok.RequiredArgsConstructor;
@@ -23,16 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 组织架构管理（管理面，需 {@code iam-ap:ADMIN}，identity-directory.md §5.2）。
+ * 组织架构管理（管理面，identity-directory.md §5.2）。
  *
- * <p>制造组织（厂区→车间→产线→工序→班组）在此维护；AD 同步的行政组织为只读，
+ * <p>方法级细粒度权限码；类级 {@code iam:console:admin} 兜底。
+ * 制造组织（厂区→车间→产线→工序→班组）在此维护；AD 同步的行政组织为只读，
  * 任何本地修改会被 {@link OrgNodeService} 的跨源保护拒绝。
  * 组织变更（含移动）会 bump 受影响用户令牌版本 + ORG 水位。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+@PreAuthorize("hasAuthority('" + IamPermissionCodes.CONSOLE_ADMIN + "')")
 public class OrganizationAdminController {
 
     private final OrgNodeService orgNodeService;
@@ -56,12 +58,14 @@ public class OrganizationAdminController {
 
     /** 全部组织节点（扁平，含 parentId 供前端建树）。 */
     @GetMapping("/orgs")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_LIST + "')")
     public Result<List<OrgNodeDto>> list() {
         return Result.ok(directoryService.orgs(null));
     }
 
     /** 新建 IAM 自建组织节点。 */
     @PostMapping("/orgs")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_CREATE + "')")
     public Result<OrgNodeDto> create(@RequestBody CreateOrgRequest req) {
         OrgNode n = orgNodeService.createManaged(req.parentId(), req.code(), req.name(),
                 req.nodeType(), req.sortNo());
@@ -72,6 +76,7 @@ public class OrganizationAdminController {
 
     /** 更新名称 / 排序 / 状态（仅 IAM 自建节点）。 */
     @PutMapping("/orgs/{id}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_UPDATE + "')")
     public Result<Void> update(@PathVariable String id, @RequestBody UpdateOrgRequest req) {
         orgNodeService.update(id, req.name(), req.sortNo(), req.status());
         return Result.ok();
@@ -79,6 +84,7 @@ public class OrganizationAdminController {
 
     /** 移动节点（改父，含子树路径重写）。 */
     @PutMapping("/orgs/{id}/move")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_MOVE + "')")
     public Result<Void> move(@PathVariable String id, @RequestBody MoveOrgRequest req) {
         orgNodeService.move(id, req.newParentId());
         return Result.ok();
@@ -86,6 +92,7 @@ public class OrganizationAdminController {
 
     /** 删除节点（须无子节点 / 无归属 / 无组织授予）。 */
     @DeleteMapping("/orgs/{id}")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_DELETE + "')")
     public Result<Void> delete(@PathVariable String id) {
         orgNodeService.delete(id);
         return Result.ok();
@@ -93,12 +100,14 @@ public class OrganizationAdminController {
 
     /** 组织内人员 ID（含子组织）。 */
     @GetMapping("/orgs/{id}/users")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_MEMBER + "')")
     public Result<List<String>> users(@PathVariable String id) {
         return Result.ok(orgNodeService.userIdsInOrg(id, true));
     }
 
     /** 设置用户组织归属（替换式，支持多归属）。 */
     @PutMapping("/users/{userId}/orgs")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_ORGS + "')")
     public Result<Void> setUserOrgs(@PathVariable String userId, @RequestBody SetUserOrgsRequest req) {
         List<ProfileService.OrgRef> refs = req.orgs() == null ? List.of()
                 : req.orgs().stream().map(r -> new ProfileService.OrgRef(r.orgId(), r.primary())).toList();
@@ -108,6 +117,7 @@ public class OrganizationAdminController {
 
     /** 用户当前组织归属。 */
     @GetMapping("/users/{userId}/orgs")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.USER_ORGS + "')")
     public Result<List<UserOrgRef>> userOrgs(@PathVariable String userId) {
         return Result.ok(profileService.orgsOfUser(userId).stream()
                 .map(uo -> new UserOrgRef(uo.getOrgId(), uo.isPrimary()))

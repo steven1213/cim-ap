@@ -59,8 +59,33 @@ cim:
     flyway:
       enabled: true
 
+  # 系统域（cim-system 域模块）——IAM 控制台自身的菜单/按钮权限/角色（本 ap 内部权限）。
+  system:
+    enabled: true
+    seed-permissions: true          # 启动种子平台权限目录（sys:*），供超管精确串匹配
+    rbac:
+      # 生产建议 false：本 ap 权限以本 ap 授权表为准，未建档即拒绝。
+      # 首次切换/灰度期可置 true 回退令牌 claim，建档后收紧。
+      fallback-to-claims: false
+      super-authority: SUPER_ADMIN
+    menu:
+      include-buttons: false
+
+  # 多语言（cim-i18n-starter）：sys_locale + sys_i18n 两表，DB 驱动 + zh-CN 强制兜底
+  i18n:
+    enabled: true
+    default-locale: zh-CN
+    seed-enabled: true
+
   # IAM 自身配置（令牌签发 / 准入注册 / 登录认证源）
   iam:
+    # 控制台种子（菜单树 / 权限码 / 角色 / 译文；幂等）
+    console:
+      seed-enabled: true
+      seed-english: true
+      seed-admin-profile: true
+      admin-display-name: IAM 管理员
+
     # 管理面前端（business/iam-ap/web）跨域白名单；生产按部署域名收紧
     web:
       allowed-origins:
@@ -89,7 +114,8 @@ cim:
         # 整段主体模板：{0}=用户名。AD 可用 {0}@corp.example.com；OpenLDAP 可用 uid={0},ou=people,dc=corp,dc=com
         user-dn-pattern: "{0}@corp.example.com"
 
-      # 首管理员引导（首次启动时若库内无该管理员则创建并赋 iam-ap:ADMIN）
+      # 首管理员引导（首次启动时若库内无该管理员则创建；控制台权限由 cim-system 的
+      # IAM_ADMIN 角色授予，见 IamConsoleSeedRunner）
       # 生产务必注入强口令（admin-password），切勿留空（留空将生成随机口令并打印于启动日志）。
       bootstrap:
         admin-username: admin
