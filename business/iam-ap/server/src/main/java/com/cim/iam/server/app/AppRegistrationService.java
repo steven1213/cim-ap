@@ -1,6 +1,8 @@
 package com.cim.iam.server.app;
 
 import com.cim.core.port.IdGenerator;
+import com.cim.iam.server.audit.AuditService;
+import com.cim.iam.server.audit.AuditType;
 import com.cim.iam.server.token.TokenVersionService;
 import com.cim.spring.support.web.BizException;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -30,6 +33,7 @@ public class AppRegistrationService {
     private final UserAppAssignmentRepository assignRepo;
     private final IdGenerator idGenerator;
     private final TokenVersionService tokenVersionService;
+    private final AuditService auditService;
 
     @Transactional
     public AppRegistration registerApp(String appCode, String appName, int sortNo) {
@@ -43,7 +47,9 @@ public class AppRegistrationService {
         app.setSortNo(sortNo);
         app.setStatus(AppStatus.ENABLED);
         app.setDeleted(false);
-        return appRepo.save(app);
+        AppRegistration saved = appRepo.save(app);
+        auditService.success(AuditType.APP_REGISTERED, null, appCode, "注册应用：" + appName);
+        return saved;
     }
 
     @Transactional
@@ -51,7 +57,10 @@ public class AppRegistrationService {
         AppRegistration app = requireApp(appCode);
         app.setAppName(appName);
         app.setStatus(status);
-        return appRepo.save(app);
+        AppRegistration saved = appRepo.save(app);
+        auditService.success(AuditType.APP_UPDATED, null, appCode,
+                "更新应用：" + appName + "，状态 " + status);
+        return saved;
     }
 
     @Transactional
@@ -85,6 +94,8 @@ public class AppRegistrationService {
         a.setStatus(AppStatus.ENABLED);
         assignRepo.save(a);
         tokenVersionService.bump(userId); // 触发重新签发
+        auditService.success(AuditType.ADMISSION_GRANTED, null, userId,
+                "授予 " + appCode + " 准入，角色组 " + (a.getRoles() == null ? "无" : a.getRoles()) + "（已强制下线）");
     }
 
     @Transactional
@@ -92,6 +103,8 @@ public class AppRegistrationService {
         assignRepo.findByUserIdAndAppCode(userId, appCode).ifPresent(a -> {
             assignRepo.deleteByUserIdAndAppCode(userId, appCode);
             tokenVersionService.bump(userId); // 已含该 app 的令牌立即失效
+            auditService.success(AuditType.ADMISSION_REVOKED, null, userId,
+                    "撤销 " + appCode + " 准入（已强制下线）");
         });
     }
 
@@ -123,6 +136,38 @@ public class AppRegistrationService {
 
     public List<AppRegistration> listApps() {
         return appRepo.findAll();
+    }
+
+    /** 全部准入分配记录（管理面用）。 */
+    public List<UserAppAssignment> listAllAssignments() {
+        return assignRepo.findAll();
+    }
+
+    /**
+     * 角色组聚合：{ 接入码 → { 角色名 → 使用该角色的用户数 } }。
+     *
+     * <p>用于「角色组」页展示各 ap 实际在用的粗角色组分布，避免凭空造字典。</p>
+     */
+    public Map<String, Map<String, Integer>> roleAggregate() {
+        Map<String, Map<String, Integer>> result = new TreeMap<>();
+        for (UserAppAssignment a : assignRepo.findAll()) {
+            if (a.getRoles() == null || a.getRoles().isBlank()) {
+                continue;
+            }
+            Map<String, Integer> perApp = result.computeIfAbsent(a.getAppCode(), k -> new TreeMap<>());
+            for (String r : a.getRoles().split(",")) {
+                String role = r.trim();
+                if (!role.isEmpty()) {
+                    perApp.merge(role, 1, Integer::sum);
+                }
+            }
+        }
+        return result;
+    }
+
+    /** 用户的准入明细（含角色组），管理面查看/编辑用。 */
+    public List<UserAppAssignment> listAssignmentsForUser(String userId) {
+        return assignRepo.findByUserIdAndStatus(userId, AppStatus.ENABLED);
     }
 
     private AppRegistration requireApp(String appCode) {

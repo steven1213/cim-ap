@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * 登录失败锁定服务（暴力破解防护，design.md §8.1(i) 逻辑端）。
@@ -99,6 +101,46 @@ public class AccountLockService {
     public void onSuccess(String rawUsername) {
         String username = normalize(rawUsername);
         repository.findByUsername(username).ifPresent(repository::delete);
+    }
+
+    /**
+     * 当前仍处于锁定状态的账号（管理面「登录锁定」列表用）。
+     *
+     * <p>只返回 {@code lockedUntil} 尚未过期的记录；同时顺带清理已过期的锁定（懒清理）。</p>
+     */
+    @Transactional
+    public List<AccountLock> listActiveLocks() {
+        Instant now = Instant.now();
+        List<AccountLock> all = repository.findAll();
+        List<AccountLock> active = new java.util.ArrayList<>();
+        for (AccountLock l : all) {
+            if (l.getLockedUntil() != null && l.getLockedUntil().isAfter(now)) {
+                active.add(l);
+            } else if (l.getLockedUntil() != null) {
+                repository.delete(l); // 懒清理过期锁定
+            }
+        }
+        active.sort(Comparator.comparing(AccountLock::getLockedUntil));
+        return active;
+    }
+
+    /** 管理员手动解锁：删除该用户名的锁定记录，返回是否确有记录被清除。 */
+    @Transactional
+    public boolean unlock(String rawUsername) {
+        String username = normalize(rawUsername);
+        return repository.findByUsername(username)
+                .map(l -> {
+                    repository.delete(l);
+                    log.info("[lockout] 管理员解锁 user={}", username);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /** 查询某用户名的锁定记录（只读，管理面展示失败次数等）。 */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AccountLock> find(String rawUsername) {
+        return repository.findByUsername(normalize(rawUsername));
     }
 
     private static String normalize(String username) {

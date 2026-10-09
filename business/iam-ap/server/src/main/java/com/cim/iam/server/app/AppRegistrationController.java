@@ -31,6 +31,7 @@ public class AppRegistrationController {
     public record RegisterAppRequest(String appCode, String appName, int sortNo) {}
     public record UpdateAppRequest(String appName, AppStatus status) {}
     public record AssignRequest(String userId, Set<String> roles) {}
+    public record AssignmentDto(String appCode, java.util.Set<String> roles) {}
 
     @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
     @PostMapping
@@ -69,5 +70,28 @@ public class AppRegistrationController {
     @GetMapping("/users/{userId}/apps")
     public Result<Set<String>> appsForUser(@PathVariable String userId) {
         return Result.ok(service.enabledAppsForUser(userId));
+    }
+
+    /** 用户的准入明细（含各 app 的角色组），供管理面「准入授权」查看/编辑。 */
+    @PreAuthorize("hasAuthority('iam-ap:ADMIN')")
+    @GetMapping("/users/{userId}/assignments")
+    public Result<List<AssignmentDto>> assignmentsForUser(@PathVariable String userId) {
+        return Result.ok(service.listAssignmentsForUser(userId).stream()
+                .map(a -> new AssignmentDto(a.getAppCode(), roleSet(a.getRoles())))
+                .toList());
+    }
+
+    private static Set<String> roleSet(String roles) {
+        if (roles == null || roles.isBlank()) {
+            return Set.of();
+        }
+        Set<String> set = new java.util.LinkedHashSet<>();
+        for (String r : roles.split(",")) {
+            String v = r.trim();
+            if (!v.isEmpty()) {
+                set.add(v);
+            }
+        }
+        return set;
     }
 }

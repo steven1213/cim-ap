@@ -17,6 +17,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -94,6 +95,12 @@ public class RefreshTokenService {
             rt.setRevokedAt(Instant.now());
             repository.save(rt);
         });
+    }
+
+    /** 在线会话（未撤销且未过期的刷新令牌）清单，按到期时间升序。 */
+    @Transactional(readOnly = true)
+    public List<RefreshToken> listActiveSessions() {
+        return repository.findByRevokedFalseAndExpiresAtAfterOrderByExpiresAtAsc(Instant.now());
     }
 
     /** 从已签发访问令牌（本 IAM 签发）中提取 jti，用于关联刷新令牌。 */

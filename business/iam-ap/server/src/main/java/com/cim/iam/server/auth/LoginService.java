@@ -1,5 +1,7 @@
 package com.cim.iam.server.auth;
 
+import com.cim.iam.server.audit.AuditService;
+import com.cim.iam.server.audit.AuditType;
 import com.cim.iam.server.config.IamAuthProperties;
 import com.cim.iam.server.config.IamProperties;
 import com.cim.iam.server.token.RsaKeyService;
@@ -43,10 +45,12 @@ public class LoginService {
     private final RefreshTokenService refreshTokenService;
     private final TokenBlacklistService tokenBlacklistService;
     private final AccountLockService accountLockService;
+    private final AuditService auditService;
 
     public LoginResult login(LoginCredentials creds) {
         // 0. 锁定预检：已锁定直接拒绝（不泄露是否为口令错误；消息不区分用户是否存在）
         if (accountLockService.isLocked(creds.username())) {
+            auditService.failure(AuditType.LOGIN_REJECTED, creds.username(), creds.username(), "账户处于锁定状态");
             throw BizException.accountLocked(creds.username());
         }
 
@@ -58,6 +62,9 @@ public class LoginService {
         AuthenticationResult result = source.authenticate(creds);
         if (!result.success()) {
             accountLockService.onFailure(creds.username());
+            int remaining = accountLockService.remainingAttempts(creds.username());
+            auditService.failure(AuditType.LOGIN_FAILURE, creds.username(), creds.username(),
+                    "登录失败（剩余尝试 " + remaining + " 次）");
             throw BizException.noAdmission("用户名或口令错误");
         }
 
@@ -71,6 +78,8 @@ public class LoginService {
                 new TokenIssueRequest(result.userId(), result.username(), null));
         String refresh = refreshTokenService.issue(result.userId(), access);
 
+        auditService.success(AuditType.LOGIN_SUCCESS, result.username(), result.userId(),
+                "登录成功（来源 " + source.sourceType() + "）");
         log.info("[login] 登录成功 user={} source={}", result.username(), source.sourceType());
         return new LoginResult(access, refresh, jwtProperties.getAccessTokenTtlMinutes() * 60L, "Bearer");
     }
@@ -114,6 +123,7 @@ public class LoginService {
         if (uid != null) {
             tokenVersionService.bump(uid);
         }
+        auditService.success(AuditType.LOGOUT, uid, uid, "登出（拉黑当前令牌 + 撤销刷新令牌 + bump 版本）");
         log.info("[logout] 登出 user={}", uid);
     }
 
