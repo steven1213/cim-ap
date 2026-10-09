@@ -7,7 +7,7 @@
 ## 0. 定位
 
 - **归属**：`docs/business/iam-ap/web/`，基于平台前端框架（`docs/platform/web`）构建，不另起炉灶。
-- **职责**：统一登录门户 + IAM 管理后台（应用接入管理、准入分配、粗角色组分配、令牌踢人、自助改密）。
+- **职责**：统一登录门户 + IAM 管理控制台（概览、用户账号、登录锁定、应用注册、准入授权、角色组、在线会话、审计日志、系统设置、账户自助）。菜单由**注册表驱动并按权限过滤**（见 §1.2），不再硬编码固定几项。
 - **不负责**：业务系统的菜单 / 按钮管理 UI —— 由各业务 ap 自己的前端承载。
 - **无三方登录**：认证源为 IAM 后端（LDAP / AD 或本地凭证），前端只对接 `iam-ap` 后端。
 
@@ -27,26 +27,36 @@ business/iam-ap/web/
 ├── package.json / tsconfig.json / vite.config.ts
 └── src/
     ├── main.tsx              # 挂载 BrowserRouter + App
-    ├── App.tsx               # 路由表（/login + 受保护路由）
+    ├── App.tsx               # 路由表（/login + 受保护路由；管理页统一套 RequireAdmin）
     ├── types.ts              # 与 server Result/Controller 对齐的共享类型
     ├── styles.css            # 设计体系 v2（令牌/外壳/KPI/面板/数据表/表单/登录页，浅深双主题）
     ├── lib/
     │   ├── crypto.ts         # 口令第一层 PBKDF2 派生（浏览器侧）
     │   ├── theme.ts          # 主题读写（localStorage + <html data-theme>）
-    │   └── api.ts            # axios 实例 + 拦截器 + get/post/put/del/postRaw
+    │   ├── api.ts            # axios 实例 + 拦截器 + get/post/put/del/postRaw
+    │   ├── permissions.ts    # isIamAdmin()：依据 apps + roles 判定管理面权限
+    │   ├── menu.tsx          # 菜单注册表（分组 + 权限可见性），信息架构的唯一来源
+    │   └── format.ts         # 审计类型标签/语义色 + 时间格式化
     ├── store/
     │   └── authStore.ts      # zustand 登录态（token/refreshToken/user）
     ├── components/
     │   ├── ProtectedRoute.tsx# 未登录跳 /login
-    │   ├── Layout.tsx        # 控制台外壳：顶部 header + 可收缩侧栏 + 内容区 + footer
+    │   ├── RequireAdmin.tsx  # 非 IAM 管理员跳 /（管理页路由守卫）
+    │   ├── Layout.tsx        # 控制台外壳：顶部 header + 可收缩分组侧栏 + 内容区 + footer
     │   ├── Panel.tsx         # 工程化面板（统一标题栏 + 内容区）
     │   └── Icons.tsx         # 内联 SVG 图标集（不引入图标库依赖）
     └── pages/
         ├── LoginPage.tsx     # 统一登录（第一层 PBKDF2）
-        ├── DashboardPage.tsx # 概览（身份/apps/roles）
-        ├── AppMgmtPage.tsx   # 应用与准入管理
-        ├── TokenVersionPage.tsx # 令牌踢人（bump 版本）
-        └── ProfilePage.tsx   # 自助改密
+        ├── DashboardPage.tsx # 概览（管理员=平台态势 / 普通用户=个人准入矩阵）
+        ├── UsersPage.tsx     # 用户账号（创建/启停/重置口令/解锁/删除）
+        ├── LockoutsPage.tsx  # 登录锁定（锁定清单 + 手动解锁）
+        ├── AppMgmtPage.tsx   # 应用注册（接入码、状态、接入指引）
+        ├── AdmissionsPage.tsx# 准入授权（用户 × 应用 × 角色组）
+        ├── RolesPage.tsx     # 角色组（按 ap 聚合角色分布）
+        ├── SessionsPage.tsx  # 在线会话（活跃会话 + 强制下线）
+        ├── AuditPage.tsx     # 审计日志（类型筛选）
+        ├── SettingsPage.tsx  # 系统设置（只读生效参数）
+        └── ProfilePage.tsx   # 自助改密与账户信息
 ```
 
 ### 1.1 界面外壳与设计体系（v2 · 工业级控制台）
@@ -80,6 +90,34 @@ business/iam-ap/web/
 
 > 图标全部为 `Icons.tsx` 中的内联 SVG（`currentColor` 描边），**不引入任何图标库依赖**，包体与许可都更可控。
 
+### 1.2 信息架构（IA）与菜单注册表
+
+**功能全景（IAM = 统一身份 + 跨业务准入）**：概览 → 身份管理（账号、锁定）→ 接入管理（应用、准入、角色组）→ 安全与会话（会话、审计、设置）→ 我的。
+
+**菜单由 `lib/menu.tsx` 注册表驱动**（不再在组件里硬编码）：
+
+| 分组 | 菜单项 | 路由 | 权限 | 对应后端 |
+| --- | --- | --- | --- | --- |
+| — | 概览 | `/` | 登录即可 | `GET /admin/overview`（管理员）/ `GET /me`（普通用户） |
+| 身份管理 | 用户账号 | `/users` | ADMIN | `/admin/users` CRUD |
+| 身份管理 | 登录锁定 | `/lockouts` | ADMIN | `/admin/lockouts` |
+| 接入管理 | 应用注册 | `/apps` | ADMIN | `/apps` |
+| 接入管理 | 准入授权 | `/admissions` | ADMIN | `/apps/{code}/users`、`/apps/users/{uid}/assignments` |
+| 接入管理 | 角色组 | `/roles` | ADMIN | `/admin/roles` |
+| 安全与会话 | 在线会话 | `/sessions` | ADMIN | `/admin/sessions`、`/internal/token-version/bump` |
+| 安全与会话 | 审计日志 | `/audit` | ADMIN | `/admin/audit` |
+| 安全与会话 | 系统设置 | `/settings` | ADMIN | `/admin/settings` |
+| — | 我的 | `/profile` | 登录即可 | `/me/password` |
+
+- **权限可见性**：菜单项声明 `admin?: boolean`；`Layout` 用 `isIamAdmin(user)`（apps 含 `iam-ap` 且 roles 含 `ADMIN`）过滤，被过滤空的分组不渲染。管理员在顶栏额外显示 `ADMIN` 标识。
+- **路由守卫**：管理页统一套 `RequireAdmin`（非管理员重定向到 `/`）。前端守卫只负责体验，**真正鉴权始终在后端**（无令牌 401 / 非管理员 403）。
+- **按使用习惯设计的核心流程**：
+  - *入职*：用户账号「新建」→ 准入授权「授予」ap + 角色组 → 通知登录；
+  - *停用/离职*：用户账号「禁用」（自动 bump 强制下线）→ 准入授权「撤销」；
+  - *排障*：审计日志定位 → 登录锁定「解锁」/ 在线会话「强制下线」；
+  - *自助*：我的 → 改密（改密后强制重登）。
+- **内容区布局**：`.content` 不设居中宽度上限，铺满可用宽度，仅保留 14px gutter（高密度工业后台观感）。
+
 ## 2. 登录门户（统一登录）
 
 - **第一层派生（明文口令不出浏览器）**：`lib/crypto.ts` 的 `deriveClientHash(password, clientSalt)` 用 `crypto.subtle` 做 `PBKDF2-SHA256(password, utf8(clientSalt), rounds=100_000)` → 256bit → hex。**与 server 端 `PasswordDerivation` 严格对齐**（salt 取 UTF-8 字节；rounds 与 `cim.iam.auth.password.rounds` 一致）。
@@ -97,19 +135,20 @@ business/iam-ap/web/
   - **自动聚焦**：已记住用户名 → 直接聚焦口令框，否则聚焦用户名框；**回车即可提交**；
   - **失败回填友好**：登录失败自动聚焦并全选口令框，便于立即重输。
 
-## 3. 管理后台（准入与账户自助）
+## 3. 管理控制台（功能页）
 
-所有管理端点受 server 端 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")` 保护；前端仅做展示与调用。
+所有管理端点受 server 端 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")` 保护；前端仅做展示与调用（无令牌 401、非管理员 403）。后端端点详见 `docs/business/iam-ap/server/README.md` §4(l)。
 
-- **概览（DashboardPage）**：从 `authStore.user`（来自 `GET /me`）呈现三层信息 —— ① **KPI 指标块**（用户 ID / 可进入应用数 / 角色组数 / 租户）；② **身份信息**与**会话与安全**两个只读面板（认证源、签名算法、验签方式、准入判定、失效机制）；③ **准入与角色矩阵**数据表（按接入码列出准入状态 LED 与角色组标签）。
-- **应用与准入（AppMgmtPage）**：
-  - 列表 `GET /api/v1/apps`；
-  - 注册 `POST /api/v1/apps {appCode, appName, sortNo}`；
-  - 分配 `POST /api/v1/apps/{appCode}/users {userId, roles:Set<String>}`（逗号分隔解析）；
-  - 撤销 `DELETE /api/v1/apps/{appCode}/users/{userId}`；
-  - 查询用户已准入应用 `GET /api/v1/apps/users/{userId}/apps`。
-- **令牌踢人（TokenVersionPage）**：`POST /api/v1/internal/token-version/bump?uid=`（`postRaw` 透传裸对象）→ 该用户令牌版本 +1，验证端版本判定不通过即拒绝该用户全部存量令牌、需重新登录（IAM 自身经 §4(k) 的 `LocalTokenVersionChecker` 进程内直查库比对，无缓存 TTL 滞后）。本地账号 userId 即用户名。
-- **自助改密（ProfilePage）**：`POST /api/v1/me/password`，与登录一致在浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 `clientHash`——请求体 `{ oldCredential, newCredential, newClientSalt }`（旧口令派生前先 `GET /api/v1/login/salt?username=` 取服务端盐，新口令由客户端 `randomClientSalt()` 生成随机盐后派生）。明文口令不出浏览器，已与登录对齐。
+- **概览（DashboardPage）**：按权限二分呈现。**管理员** → `GET /admin/overview` 的平台态势（6 个 KPI：用户账号启用/总数、接入应用启用/总数、在线会话、锁定账户、登录成功、登录失败）+ 最近审计事件表（可跳转审计页）。**普通用户** → 个人身份信息、会话与安全属性、准入与角色矩阵（来自 `GET /me`）。
+- **用户账号（UsersPage）**：`GET /admin/users` 清单（含启用态、锁定态、准入数、角色组）；「新建账号」在浏览器内对初始口令做第一层 PBKDF2 后 `POST /admin/users`；行内操作 = 启用/禁用（`PUT /{userId}/status`）、解锁（`POST /{userId}/unlock`）、重置口令（`PUT /{userId}/password`，浏览器内派生）、删除（`DELETE /{userId}`，二次确认）。**禁用 / 重置 / 删除均会 bump 令牌版本 → 该用户所有会话立即失效**。
+- **登录锁定（LockoutsPage）**：`GET /admin/lockouts` 锁定清单（失败次数、首末失败时间、锁定至）；`DELETE /admin/lockouts/{username}` 手动解锁。
+- **应用注册（AppMgmtPage）**：`GET/POST /apps` 注册接入码；行内启用/停用（`PUT /apps/{appCode}`，停用前二次确认——其下所有用户对该 ap 的准入立即失效）；附「接入指引」（JWKS 拉取、`apps` claim 准入、`roles` claim 角色组）。
+- **准入授权（AdmissionsPage）**：以用户为主线，进入页面默认查询 `admin`（可见即所得）；`GET /apps/users/{userId}/assignments` 拉取该用户在全部已注册应用上的准入与角色组，逐行编辑角色组后「授予/更新」（`POST /apps/{appCode}/users`）或「撤销」（`DELETE /apps/{appCode}/users/{userId}`）。任何变更都会 bump 该用户令牌版本。
+- **角色组（RolesPage）**：`GET /admin/roles` 按接入码聚合**实际在用**的角色名与人数（不维护独立字典表，避免定义与实际脱节）。
+- **在线会话（SessionsPage）**：`GET /admin/sessions` 活跃会话（未撤销未过期的刷新令牌 ≈ 一个登录会话）；行内「强制下线」（`DELETE /admin/sessions/{userId}`）与「按用户 ID 强制下线」（`POST /internal/token-version/bump?uid=`，`postRaw` 透传裸对象）。两者都是 bump 令牌版本 → 验证端（IAM 自身经 `LocalTokenVersionChecker` 进程内直查库）即时判定，无缓存 TTL 滞后。
+- **审计日志（AuditPage）**：`GET /admin/audit?limit=&type=` 动作流水（登录成功/失败/被拒、登出、改密、账号增删改、应用注册/更新、准入授予/撤销、强制下线），类型/结果以标签 + LED 双色标识，支持按类型与条数过滤。
+- **系统设置（SettingsPage）**：`GET /admin/settings` **只读**展示生效中的运行时策略（认证源、PBKDF2 轮数与 pepper 是否已配（不回显值）、访问/刷新令牌 TTL、issuer/kid、RSA 私钥是否 KMS 注入、锁定阈值/时长/窗口、跨域白名单、JWKS 路径）；刻意不支持在线修改（避免与已签发令牌/验证端漂移）。
+- **自助改密（ProfilePage）**：`POST /api/v1/me/password`，与登录一致在浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 `clientHash`——请求体 `{ oldCredential, newCredential, newClientSalt }`（旧口令派生前先 `GET /api/v1/login/salt?username=` 取服务端盐，新口令由客户端 `randomClientSalt()` 生成随机盐后派生）。明文口令不出浏览器。
   - **改密后强制重登**：服务端改密成功即 `bump` 该用户令牌版本（旧会话全部失效，含当前会话）。前端收到成功回执后**清空本地会话（`authStore.clear()`）并跳转登录页**，提示「口令已更新，请用新口令重新登录」，避免用户停留在已失效的会话上。
 
 ## 4. 构建与运行

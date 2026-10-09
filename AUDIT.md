@@ -81,12 +81,27 @@
 - **验证**：`tsc -p tsconfig.json` EXIT=0；`vite build` 116 模块、CSS 19.8 kB / gzip 4.9 kB、JS 252 kB / gzip 84 kB，EXIT=0。另用无头 Chrome（CDP pipe）实拍浅色/深色/收缩态/移动端 9 张界面截图做视觉回归，发现并修复 2 处渲染缺陷（原生复选框继承全局 `input` 样式被撑成实心块 → 改为 `appearance:none` 自绘；行内表单字段无上限拉伸 → 加 `max-width`）。截图与临时预览工程均未入库。
 - **范围说明**：仅改前端表现层与交互，**未改动任何后端契约与 API 调用**（`/api/v1/*` 路径、请求体、`Result<T>` 解包逻辑保持原样）。
 
+### 9. IAM 功能全景梳理与管理控制台（IA v3 + 审计/用户/会话后端）
+- **动因**：菜单为硬编码 4 项（概览 / 应用与准入 / 令牌踢人 / 我的），功能面不完整 —— 无「用户账号管理」「审计日志」「在线会话」「登录锁定」等身份域必备能力；信息架构缺少分组与权限可见性。
+- **设计（用户使用习惯导向）**：功能域 = 概览 → 身份管理（用户账号、登录锁定）→ 接入管理（应用注册、准入授权、角色组）→ 安全与会话（在线会话、审计日志、系统设置）→ 我的。核心流程：入职（建号 → 授权 → 通知登录）/ 停用离职（禁用即强制下线 → 撤销准入）/ 排障（审计定位 → 解锁 / 强制下线）/ 自助（改密）。
+- **后端范围（`business/iam-ap/server`）**：
+  - 新增 `audit` 包：`AuditEvent`（`audit_event` 表，V5 迁移 h2+mysql）+ `AuditEventRepository` + `AuditService` + `AuditType`（16 种受控类型）+ `AuditEventDto`。**关键决策**：`AuditService.record` 用 `Propagation.REQUIRES_NEW` —— 审计埋点常位于「业务即将抛异常」的路径（登录失败、锁定拒绝、参数校验失败），若与业务同事务，业务回滚会把审计一并回滚，导致「失败事件查不到」；独立事务保证审计先落地，且审计自身异常经内部 try/catch + 日志隔离，不影响业务。
+  - 新增 `admin` 包 7 个控制器（全部类级 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`）：概览 / 用户账号 / 在线会话 / 登录锁定 / 角色组 / 审计查询 / 系统设置（只读）；`AppRegistrationController` 增 `GET /apps/users/{userId}/assignments`。
+  - 服务扩展：`AccountLockService.listActiveLocks/unlock/find`、`LocalCredentialService.listAll/findByUserId/setEnabled/resetPassword/deleteUser`、`RefreshTokenService.listActiveSessions`、`AppRegistrationService.roleAggregate/listAllAssignments/listAssignmentsForUser`。
+  - 安全语义：**禁用 / 重置口令 / 删除账号 / 撤销准入 / 强制下线均 bump 令牌版本**，配合 `LocalTokenVersionChecker` 使存量令牌即时 401。
+- **前端范围（`business/iam-ap/web`）**：
+  - 菜单改为**注册表驱动**（`lib/menu.tsx`：分组 + `admin?` 可见性；`lib/permissions.ts`：`isIamAdmin()`；`components/RequireAdmin.tsx`：路由守卫），`Layout` 按权限过滤分组并显示 `ADMIN` 标识。
+  - 新增 7 页：用户账号 / 登录锁定 / 准入授权 / 角色组 / 在线会话 / 审计日志 / 系统设置；概览按权限二分（管理员=平台态势 + 最近审计；普通用户=个人准入矩阵）；应用页拆分出「准入授权」；原「令牌踢人」并入「在线会话」（列表 + 按 uid 强制下线）。
+  - 内容区 `.content` 去掉居中 `max-width` 上限（改为铺满 + 14px gutter），消除宽屏两侧留白。
+- **验证**：iam-ap **41/41 绿**（新增 `AdminConsoleTest`×5：① 管理员可视用户清单并创建账号；② 禁用后该账号登录 403；③ 锁定清单可见且可解锁；④ 审计记录登录成功 + 概览/设置/角色组/会话端点可用；⑤ 非管理员访问管理台 403）。web `tsc -p tsconfig.json` EXIT=0；`vite build` 126 模块、CSS 20.76 kB / gzip 5.05 kB、JS 279 kB / gzip 91 kB，EXIT=0。
+- **视觉回归**：以独立验证实例（后端 :8082 + 临时 vite :5172，代理指向该实例）种子化数据（3 应用 / 3 账号 / 5 条准入 / 若干审计事件与 1 次锁定），用无头 Chrome CDP 实拍浅色与深色全页截图；并以 CDP 量化检测**无横向溢出**（4 个页面 `document.scrollWidth === clientWidth`，概览 6 张 KPI 卡各 192px、末卡右边界 1446 ≤ 内容右边界 1460）。修复 2 处问题：系统设置页说明文案误用 Markdown `**` 字面量（改为 `<b>`）；用户列表操作列过窄致按钮竖排（列宽 240→300）。临时验证工程（`vite.visual.config.ts`）与截图、种子脚本**均未入库**。
+
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
 - **结果**：
   - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
-  - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → **当前 36/36**）。
+  - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → 36/36，管理控制台 +5 → **当前 41/41**）。
 - **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
 
 ## 通用风险

@@ -34,12 +34,13 @@
 
 ## 4. 已落地能力（首批实现 · 2026-10-08；管理面与前端于后续扩展）
 
-> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**36 个测试全绿**：
+> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**41 个测试全绿**：
 > - 首批 24（`AccountLockServiceTest`×4 / `LoginLockoutTest`×2 / 登录·刷新·签发·会话端到端若干）；
 > - 管理面 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）；
 > - 改密派生 2：`LocalCredentialServiceChangePasswordTest`×2（clientHash 改密正确/错误两态）；
-> - 改密失效 5：`LocalTokenVersionCheckerTest`（版本比对单元）+ `ChangePasswordInvalidatesSessionTest`（改密后旧令牌 401 → 重登恢复端到端）。
-> 包结构：`com.cim.iam.server.{token,app,auth,config}`（新增 `config` 包承载安全/CORS/引导/Web 配置）。
+> - 改密失效 5：`LocalTokenVersionCheckerTest`（版本比对单元）+ `ChangePasswordInvalidatesSessionTest`（改密后旧令牌 401 → 重登恢复端到端）；
+> - 管理控制台 5：`AdminConsoleTest`×5（用户清单/创建、禁用后登录被拒、锁定列表与解锁、审计与概览/设置/角色组/会话、非管理员 403）。
+> 包结构：`com.cim.iam.server.{token,app,auth,config,admin,audit}`（新增 `admin` 管理面与 `audit` 审计包）。
 
 **(a) 令牌版本存储 / 递增 / 下发（`token` 包）** — T6.5 在 IAM 侧的落点（对应 design.md §8.1(g)）
 - `TokenVersion` 实体（`token_version` 表，`user_id` 唯一）+ `TokenVersionRepository` + `TokenVersionService`：`currentVersion(userId)`（首访建 1）/ `bump(userId)`（改权限/改密/踢人后 +1）。
@@ -102,6 +103,19 @@
 - 注册：`IamSecurityConfig` 以 `@Bean` 注册 `LocalTokenVersionChecker`，凭 `@ConditionalOnMissingBean` 顶替 platform 默认 `acceptAll()`。
 - 触发点：`LocalCredentialService.changePassword` 在入库新凭证后立即 `tokenVersionService.bump(userId)`；因用户名即本地账号 `userId`（`ProfileController` 从 `CimUserPrincipal.username()` 取，与令牌 `uname`/`uid` 同源），bump 目标与令牌主体一致。使用者亦可是 `AppRegistrationService` 的分配/撤销（§4(b)）与登出（§4(g)）。
 - 行为：改密后**当前会话令牌亦失效**（版本整体 +1）→ 前端 `ProfilePage` 收到成功回执后清空本地会话并跳登录页，用户以新口令重登。`ChangePasswordInvalidatesSessionTest` 端到端验证「改密前 `/me` 200 → 改密 → 旧令牌 `/me` 401 → 新口令重登 → 新令牌 `/me` 200」。
+
+**(l) 管理控制台端点（`admin` 包）+ 审计流水（`audit` 包）** — 管理面可运营、可观测
+> 全部端点类级 `@PreAuthorize("hasAuthority('iam-ap:ADMIN')")`，非管理员一律 403（`AdminConsoleTest` 覆盖）。
+
+- **审计（`audit` 包）**：`AuditEvent`（`audit_event` 表，V5 迁移）+ `AuditEventRepository` + `AuditService`。`AuditService.record` 采用 **`REQUIRES_NEW` 独立事务**——审计常出现在「业务即将抛异常」的路径（登录失败、锁定拒绝），同事务会随之回滚导致「失败事件查不到」；独立事务确保审计先落地，且审计自身异常不影响业务（内部 try/catch + 日志）。`AuditType` 为受控词表（`LOGIN_SUCCESS/FAILURE/REJECTED`、`LOGOUT`、`PASSWORD_CHANGED/RESET`、`USER_CREATED/ENABLED/DISABLED/DELETED/UNLOCKED`、`APP_REGISTERED/UPDATED`、`ADMISSION_GRANTED/REVOKED`、`SESSION_REVOKED`）。埋点位点：`LoginService`（登录成功/失败/锁定拒绝/登出）、`LocalCredentialService`（创建/启停/重置/删除/自助改密）、`AppRegistrationService`（注册/更新/授予/撤销）、`UserAdminController`/`LockoutAdminController`/`SessionAdminController`（解锁、强制下线）。
+- **概览**：`GET /api/v1/admin/overview` → 用户数（启用/禁用）、应用数（启用）、活跃会话数、锁定数、登录成功/失败累计、最近 8 条审计事件。
+- **用户账号**（`UserAdminController`，`/api/v1/admin/users`）：`GET` 清单（含启用态、锁定态、准入数、角色组）；`POST` 创建本地账号（收客户端第一层派生的 `clientHash` + `clientSalt`）；`PUT /{userId}/status` 启用/禁用（**禁用即 bump 强制下线**）；`PUT /{userId}/password` 管理员重置口令（**重置即 bump 强制下线**）；`POST /{userId}/unlock` 解锁；`DELETE /{userId}` 删除（**删除即 bump 强制下线**）。
+- **在线会话**（`SessionAdminController`，`/api/v1/admin/sessions`）：`GET` 活跃会话（未撤销且未过期的刷新令牌 ≈ 一个登录会话，回填用户名）；`DELETE /{userId}` 强制下线（bump 版本 → 返回 `{uid,version}`）。
+- **登录锁定**（`LockoutAdminController`，`/api/v1/admin/lockouts`）：`GET` 当前锁定账号（`lockedUntil`/失败次数/首末失败时间，含过期懒清理）；`DELETE /{username}` 手动解锁。`AccountLockService` 相应新增 `listActiveLocks()` / `unlock()` / `find()`。
+- **角色组**（`RoleAdminController`，`/api/v1/admin/roles`）：按接入码聚合**实际在用**的粗角色组与人数（不落独立字典表，避免定义与实际脱节）。
+- **审计查询**（`AuditAdminController`，`/api/v1/admin/audit`）：`GET ?limit=&type=` → 最近事件（`AuditEventDto`，不直接暴露含审计列的实体）。
+- **系统设置**（`SettingsAdminController`，`/api/v1/admin/settings`）：只读暴露**生效中**的运行时参数（认证源、PBKDF2 轮数、pepper 是否已配（不回显值）、访问/刷新令牌 TTL、issuer/kid、RSA 私钥是否 KMS 注入、锁定阈值/时长/窗口、跨域白名单、JWKS 路径）。刻意不支持在线修改（改配置走发布流程，避免与已签发令牌/验证端漂移）。
+- **准入明细**：`GET /api/v1/apps/users/{userId}/assignments` → 该用户各 ap 的角色组（供前端「准入授权」页编辑）。
 
 > 端到端已覆盖（会话生命周期）：`SessionIntegrationTest` 以真实端口启动 IAM，把验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 都指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路；与 `RefreshTokenServiceTest`/`TokenBlacklistServiceTest` 共同覆盖刷新与吊销分支。
 
