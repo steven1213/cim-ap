@@ -37,5 +37,25 @@ public enum AuditType {
     /** 撤销准入。 */
     ADMISSION_REVOKED,
     /** 强制下线（bump 令牌版本）。 */
-    SESSION_REVOKED
+    SESSION_REVOKED,
+    /** 新建组织节点。 */
+    ORG_CREATED,
+    /** 更新组织节点。 */
+    ORG_UPDATED,
+    /** 移动组织节点（含子树路径重写）。 */
+    ORG_MOVED,
+    /** 删除组织节点。 */
+    ORG_DELETED,
+    /** 新建用户档案（IAM 自建人员）。 */
+    PROFILE_CREATED,
+    /** 更新用户档案。 */
+    PROFILE_UPDATED,
+    /** 变更用户组织归属。 */
+    USER_ORGS_CHANGED,
+    /** 授予组织级准入。 */
+    ORG_GRANT_GRANTED,
+    /** 撤销组织级准入。 */
+    ORG_GRANT_REVOKED,
+    /** 执行目录同步（AD）。 */
+    DIRECTORY_SYNCED
 }

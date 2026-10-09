@@ -170,7 +170,7 @@ public class AppRegistrationService {
         return assignRepo.findByUserIdAndStatus(userId, AppStatus.ENABLED);
     }
 
-    private AppRegistration requireApp(String appCode) {
+    public AppRegistration requireApp(String appCode) {
         return appRepo.findByAppCode(appCode)
                 .orElseThrow(() -> BizException.notFound("app 不存在: " + appCode));
     }

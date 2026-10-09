@@ -10,6 +10,11 @@ import com.cim.iam.server.auth.AccountLockService;
 import com.cim.iam.server.auth.LocalCredential;
 import com.cim.iam.server.auth.LocalCredentialService;
 import com.cim.iam.server.auth.RefreshTokenService;
+import com.cim.iam.server.common.DataOrigin;
+import com.cim.iam.server.org.OrgNode;
+import com.cim.iam.server.org.OrgNodeService;
+import com.cim.iam.server.profile.ProfileService;
+import com.cim.iam.server.profile.UserProfile;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +40,8 @@ public class AdminOverviewController {
     private final RefreshTokenService refreshTokenService;
     private final AccountLockService accountLockService;
     private final AuditService auditService;
+    private final OrgNodeService orgNodeService;
+    private final ProfileService profileService;
 
     public record OverviewDto(
             int userCount,
@@ -46,6 +53,10 @@ public class AdminOverviewController {
             int lockedCount,
             long loginSuccessCount,
             long loginFailureCount,
+            int orgCount,
+            int orgManagedCount,
+            int profileCount,
+            int adProfileCount,
             List<AuditEventDto> recentEvents) {
     }
 
@@ -57,6 +68,13 @@ public class AdminOverviewController {
         List<AppRegistration> apps = appRegistrationService.listApps();
         int enabledApps = (int) apps.stream().filter(a -> a.getStatus() == AppStatus.ENABLED).count();
 
+        List<OrgNode> orgs = orgNodeService.listAll();
+        int managedOrgs = (int) orgs.stream()
+                .filter(o -> o.getSource() == DataOrigin.IAM_MANAGED).count();
+        List<UserProfile> profiles = profileService.listAll();
+        int adProfiles = (int) profiles.stream()
+                .filter(p -> p.getSource() == DataOrigin.AD_SYNCED).count();
+
         return Result.ok(new OverviewDto(
                 users.size(),
                 enabledUsers,
@@ -67,6 +85,10 @@ public class AdminOverviewController {
                 accountLockService.listActiveLocks().size(),
                 auditService.countByType(AuditType.LOGIN_SUCCESS),
                 auditService.countByType(AuditType.LOGIN_FAILURE),
+                orgs.size(),
+                managedOrgs,
+                profiles.size(),
+                adProfiles,
                 auditService.recent(8, null).stream().map(AuditEventDto::of).toList()));
     }
 }

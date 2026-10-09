@@ -4,6 +4,8 @@ import com.cim.iam.server.config.IamAuthProperties;
 import com.cim.iam.server.config.IamProperties;
 import com.cim.iam.server.config.IamTokenProperties;
 import com.cim.iam.server.config.IamWebProperties;
+import com.cim.iam.server.directory.AdDirectorySyncProperties;
+import com.cim.iam.server.directory.DirectoryApiProperties;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +31,8 @@ public class SettingsAdminController {
     private final IamProperties jwtProperties;
     private final IamTokenProperties tokenProperties;
     private final IamWebProperties webProperties;
+    private final DirectoryApiProperties directoryApiProperties;
+    private final AdDirectorySyncProperties adSyncProperties;
 
     public record SettingsDto(
             String authSource,
@@ -45,7 +49,12 @@ public class SettingsAdminController {
             boolean bootstrapEnabled,
             String bootstrapAdminUsername,
             List<String> webAllowedOrigins,
-            String jwksPath) {
+            String jwksPath,
+            boolean directoryApiEnabled,
+            boolean adSyncEnabled,
+            boolean adSyncConfigured,
+            String adBaseDn,
+            long adSyncIntervalMs) {
     }
 
     @GetMapping
@@ -67,6 +76,11 @@ public class SettingsAdminController {
                 authProperties.getBootstrap().isEnabled(),
                 authProperties.getBootstrap().getAdminUsername(),
                 webProperties.getAllowedOrigins(),
-                "/.well-known/jwks.json"));
+                "/.well-known/jwks.json",
+                directoryApiProperties.isEnabled(),
+                adSyncProperties.isEnabled(),
+                adSyncProperties.isConfigured(),
+                adSyncProperties.getBaseDn(),
+                adSyncProperties.getSyncIntervalMs()));
     }
 }

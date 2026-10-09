@@ -97,6 +97,23 @@ cim:
         # 引导完成后可置 false 关闭（或用后即改口令）
         enabled: true
 
+    # 身份目录（Wave 0：组织架构 + 用户档案 + 同步到业务系统，见 identity-directory.md）
+    directory:
+      # 目录只读 API 的服务身份（方案 A：双方配置同一共享密钥；请求头 X-Directory-Key）。
+      # 未配置 key → 目录 API 拒绝访问（安全默认）；生产由 KMS/环境变量注入并可轮换。
+      # 后续可平滑替换为方案 B（OAuth2 client_credentials 服务令牌 / NHI），接口契约不变。
+      api:
+        key: ${IAM_DIRECTORY_API_KEY}
+      # AD 目录同步（只读）：未配置即跳过，纯 IAM 自建目录照常可用（不阻塞启动）。
+      # 只写 source=AD_SYNCED 的组织与人员，绝不覆盖 IAM 自建数据。
+      ad:
+        enabled: true
+        url: ldaps://ad.corp.example.com:636
+        bind-dn: CN=iam-sync,OU=Service,DC=corp,DC=example,DC=com
+        bind-password: ${IAM_AD_BIND_PASSWORD}
+        base-dn: DC=corp,DC=example,DC=com
+        sync-interval-ms: 300000
+
 management:
   endpoints:
     web:
