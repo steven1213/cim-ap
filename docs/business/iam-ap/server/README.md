@@ -34,13 +34,14 @@
 
 ## 4. 已落地能力（首批实现 · 2026-10-08；管理面与前端于后续扩展）
 
-> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**41 个测试全绿**：
+> 基于 platform 框架（`cim-spring-support` / `cim-jpa-starter` / `cim-auth-starter`）落地，**48 个测试全绿**：
 > - 首批 24（`AccountLockServiceTest`×4 / `LoginLockoutTest`×2 / 登录·刷新·签发·会话端到端若干）；
 > - 管理面 5：`AdminSecurityTest`×4（管理面鉴权）+ `BootstrapAdminTest`×1（首管理员引导端到端）；
 > - 改密派生 2：`LocalCredentialServiceChangePasswordTest`×2（clientHash 改密正确/错误两态）；
 > - 改密失效 5：`LocalTokenVersionCheckerTest`（版本比对单元）+ `ChangePasswordInvalidatesSessionTest`（改密后旧令牌 401 → 重登恢复端到端）；
-> - 管理控制台 5：`AdminConsoleTest`×5（用户清单/创建、禁用后登录被拒、锁定列表与解锁、审计与概览/设置/角色组/会话、非管理员 403）。
-> 包结构：`com.cim.iam.server.{token,app,auth,config,admin,audit}`（新增 `admin` 管理面与 `audit` 审计包）。
+> - 管理控制台 5：`AdminConsoleTest`×5（用户清单/创建、禁用后登录被拒、锁定列表与解锁、审计与概览/设置/角色组/会话、非管理员 403）；
+> - **身份目录与组织架构 7**：`IdentityDirectoryTest`×7（组织授予经祖先链展开到成员、跨源保护、组织变更 bump + 水位、未配置 AD 跳过、目录 API 服务密钥、批量用户与组织/档案管理端点、组织授予变更使存量令牌失效）。
+> 包结构：`com.cim.iam.server.{token,app,auth,config,admin,audit,org,profile,watermark,directory,common}`（新增 `org`/`profile`/`watermark`/`directory` 与 `common`）。
 
 **(a) 令牌版本存储 / 递增 / 下发（`token` 包）** — T6.5 在 IAM 侧的落点（对应 design.md §8.1(g)）
 - `TokenVersion` 实体（`token_version` 表，`user_id` 唯一）+ `TokenVersionRepository` + `TokenVersionService`：`currentVersion(userId)`（首访建 1）/ `bump(userId)`（改权限/改密/踢人后 +1）。
@@ -117,6 +118,20 @@
 - **系统设置**（`SettingsAdminController`，`/api/v1/admin/settings`）：只读暴露**生效中**的运行时参数（认证源、PBKDF2 轮数、pepper 是否已配（不回显值）、访问/刷新令牌 TTL、issuer/kid、RSA 私钥是否 KMS 注入、锁定阈值/时长/窗口、跨域白名单、JWKS 路径）。刻意不支持在线修改（改配置走发布流程，避免与已签发令牌/验证端漂移）。
 - **准入明细**：`GET /api/v1/apps/users/{userId}/assignments` → 该用户各 ap 的角色组（供前端「准入授权」页编辑）。
 
+**(m) 身份目录与组织架构（Wave 0：用户的创建 + 组织架构的创建 + 同步到业务系统）** — 设计/决策见 [identity-directory.md](./identity-directory.md)
+> 权威源划分：**AD/HR 管「人」**（只读同步，不新建员工）；**IAM 管「制造组织」**（厂区→车间→产线→工序，AD 无此维度）+ **非 AD 人员**（厂商/服务账号）。
+
+- **数据模型（V6 迁移，h2 + mysql，5 张表）**：`org_node`（单表自引用树 + **物化路径** `path`）、`user_profile`（档案，`user_id` 与 `local_credential.user_id`/令牌 `uid` 同源）、`user_org`（用户↔组织，**一对多**，多能工/跨线支援）、`org_app_assignment`（组织级准入授予）、`directory_watermark`（目录水位 `USER`/`ORG`，与 `token_version` 同构）。
+- **同树混源隔离（关键）**：组织节点带 `source ∈ {AD_SYNCED, IAM_MANAGED}`；AD 同步器**只写自己那份**（`guardManaged` 拦截对 AD 节点的本地改/删/移动，抛 `PARAM_INVALID`），两者共用一棵树但互不覆盖。
+- **`org` 包**：`OrgNodeService` 树 CRUD + `path = parent.path + selfId + "/"`（**绝对路径**）维护；`move` 重写整棵子树路径且禁止移到自身/子孙下；`delete` 校验无子节点/无归属/无授予。变更后 `watermarkService.bump(ORG)` + 审计。
+- **`profile` 包**：`ProfileService.createManaged`（IAM 自建人员）/ `updateProfile`（AD 来源**仅 `jobTitle` 可改**，其余只读）/ `setUserOrgs`（**替换式**，只删 `IAM_MANAGED` 行）；AD 侧 `upsertAdProfile`/`upsertAdMembership`/`deactivateMissingAdProfiles`。
+- **准入解析（`app/EffectiveAccessResolver`，运行时展开、不落派生行）**：`effectiveApps/effectiveRoles(uid) = 个人授予 ∪ 组织授予（含 `path` 祖先链，受 `include_children` 控制）`。`TokenIssuerService` 与 `ProfileController` 均改走该解析器，**个人与组织取并集**（个人只能加、不能减；收回须撤销组织授予）。
+- **失效闭环（复用既有）**：组织移动/删除、组织授予变更、用户归属变更、档案停用 → `TokenVersionService.bump` → 旧令牌经 `LocalTokenVersionChecker` 即时 **401** → 重签即带新准入。**无新增失效机制**。
+- **目录只读 API（供业务 ap 消费）**：`GET /api/v1/directory/watermark`、`GET /users/{userId}`、`POST /users/batch`、`GET /orgs?since=`。**服务身份（方案 A）**：`DirectoryApiKeyFilter` 校验 `X-Directory-Key`（常量时间比较）；**未配置密钥 → 503**（拒绝而非放行），不匹配 → 401。业务 ap **不落用户主数据**，只存 `uid` 引用 + 可失效缓存，靠水位决定是否重拉。
+- **AD 同步器（`directory/AdDirectorySyncService`）**：沿用 JNDI（**不引新依赖**）+ `PagedResultsControl` 分页；按 DN 深度排序保证父节点先落地；`userAccountControl` 禁用位（`0x0002`）→ `INACTIVE`；AD 侧删除 **置 `INACTIVE` 不物理删除**（保留审计与准入历史）。**未配置 AD 时 `syncNow()` 返回 `SyncResult{skipped:true}`，不连接、不报错、不阻塞启动**，纯 IAM 自建照常可用（`@EnableScheduling` 亦由配置门控）。
+- **管理端点**：`admin/OrganizationAdminController`（`/admin/orgs` CRUD + `move` + 成员挂人/移除 + 用户归属）、`admin/DirectoryAdminController`（`/admin/profiles`、`/admin/org-grants`、`/sync/watermark`、`/sync/ad` 手动触发）；`UserAdminController` 列表改为「本地凭证 ∪ 用户档案」并集并带来源/档案/组织列；`AdminOverviewController`/`SettingsAdminController` 增组织/档案/AD 同步态字段。
+- **验证**：`IdentityDirectoryTest`×7 → iam-ap **48/48 绿**。
+
 > 端到端已覆盖（会话生命周期）：`SessionIntegrationTest` 以真实端口启动 IAM，把验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 都指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路；与 `RefreshTokenServiceTest`/`TokenBlacklistServiceTest` 共同覆盖刷新与吊销分支。
 
 > 端到端已覆盖（失败锁定）：`LoginLockoutTest`（`max-attempts=2`）跑通「连续错误 2 次触发锁定 → 第 3 次即便口令正确也 `ACCOUNT_LOCKED`」与「成功登录清零计数后可重试」；`AccountLockServiceTest` 覆盖窗口内计数、滑动窗口重置、成功清零、剩余次数等分支。
@@ -132,6 +147,9 @@
 | §1 认证源对接 | LDAP / AD 接入、绑定、失败锁定 | **首批已落地（local 模式 + LDAP/AD 适配器见 §4(d)；失败锁定见 §4(h)）** |
 | §2 令牌颁发与 JWKS | 登录颁发、刷新轮换、即时吊销 | **首批已落地（签发+JWKS 见 §4(c)；登录颁发见 §4(d)；刷新轮换见 §4(f)；登出/黑名单/吊销见 §4(g)）** |
 | §5.1 口令两层派生 | 前端加密 + 服务端二次派生 | **首批已落地（见 §4(e)）** |
+| §6 身份目录与组织架构（Wave 0） | 用户档案 + 组织树（AD 部门层打底 / IAM 制造组织）+ 组织级准入授予 + 目录水位与只读同步接口 | **Wave 0 已落地（见 §4(m)）→ [identity-directory.md](./identity-directory.md)** |
+
+> 能力补齐路线见 `identity-directory.md`：**Wave 0 地基**（用户创建 + 组织架构 + 同步到业务系统）→ Wave 1/2 并行（车间特性 / 治理与集成 / 合规与审计）→ Wave 3 闭环（权限复核与证据导出）。已确认前提：**内部系统、不做 MFA**；权威源为 **AD 管人 + IAM 管制造组织**；同步方式为 **只读接口拉 + 版本水位**。
 | §3 准入模型 | `apps` / `roles` 数据模型与分配管理 | **首批已落地（见 §4(b)）** |
 | §4 ap 注册接入 | 接入表、密钥 / 公钥登记、scope 约定 | **首批已落地（见 §4(b)）** |
 | §5 会话与吊销 | 刷新令牌、黑名单、登出、令牌版本失效 | **首批已落地（版本存储/递增见 §4(a)、验证侧强制失效见 §4(k)；刷新见 §4(f)；登出/黑名单/吊销见 §4(g)；端到端见 SessionIntegrationTest / ChangePasswordInvalidatesSessionTest）** |

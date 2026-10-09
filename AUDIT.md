@@ -96,12 +96,33 @@
 - **验证**：iam-ap **41/41 绿**（新增 `AdminConsoleTest`×5：① 管理员可视用户清单并创建账号；② 禁用后该账号登录 403；③ 锁定清单可见且可解锁；④ 审计记录登录成功 + 概览/设置/角色组/会话端点可用；⑤ 非管理员访问管理台 403）。web `tsc -p tsconfig.json` EXIT=0；`vite build` 126 模块、CSS 20.76 kB / gzip 5.05 kB、JS 279 kB / gzip 91 kB，EXIT=0。
 - **视觉回归**：以独立验证实例（后端 :8082 + 临时 vite :5172，代理指向该实例）种子化数据（3 应用 / 3 账号 / 5 条准入 / 若干审计事件与 1 次锁定），用无头 Chrome CDP 实拍浅色与深色全页截图；并以 CDP 量化检测**无横向溢出**（4 个页面 `document.scrollWidth === clientWidth`，概览 6 张 KPI 卡各 192px、末卡右边界 1446 ≤ 内容右边界 1460）。修复 2 处问题：系统设置页说明文案误用 Markdown `**` 字面量（改为 `<b>`）；用户列表操作列过窄致按钮竖排（列宽 240→300）。临时验证工程（`vite.visual.config.ts`）与截图、种子脚本**均未入库**。
 
+### 10. IAM 身份目录与组织架构（Wave 0：用户创建 + 组织架构 + 同步到业务系统）
+- **动因**：IAM 此前只有「登录 + 准入」，缺最基础的一环 —— **人在哪个组织、组织如何批量准入、业务系统如何拿到人员/组织数据**。设计稿 `docs/business/iam-ap/server/identity-directory.md` 的 4 项分叉经用户拍板后**同日落码**。
+- **决策定稿（原 §9「待确认问题」全部关闭）**：
+  1. **多归属存在** → `user_org` **保留一对多**（多能工 / 跨线支援），不简化为 `user_profile.org_id`；`is_primary` 仅作主属标记，不限制行数；多归属取**并集**。
+  2. **本地/沙箱无 AD 可连** → 同步器**未配置即跳过**：`AdDirectorySyncProperties.isConfigured()` 为假时 `syncNow()` 返回 `SyncResult{skipped:true}`，**不连接、不报错、不阻塞启动**；`@EnableScheduling` 由 `@ConditionalOnProperty(cim.iam.directory.ad.enabled)` 门控（未启用连定时任务都不注册），**纯 IAM 自建照常可用**。
+  3. **MES 侧编码** → 经查 `docs/business/mes-ap/` **仅有骨架 README、无既定编码规则** → `org_node.code` **即唯一编码载体**，未来 MES 直接复用，**不发明第二套**。
+  4. **服务身份选型** → **方案 A 起步**（`X-Directory-Key` + `MessageDigest.isEqual` 常量时间比较）、**方案 B（OAuth2 `client_credentials` / NHI 服务令牌）作为后续替换**，**接口契约不变**（只换认证头）。
+- **范围（`business/iam-ap/server`）**：
+  - **迁移**：`db/migration/{h2,mysql}/V6__identity_directory.sql` —— 5 张新表：`org_node`（`parent_id` + **物化路径 `path`** `/rootId/.../selfId/` + `source` + `external_id`，索引 `uk(source,code)`/`idx(parent_id)`/`idx(path)`）、`user_profile`（`user_id` 与 `local_credential.user_id`/令牌 `uid` **同源**）、`user_org`（多归属，`uk(user_id,org_id)`）、`org_app_assignment`（`uk(org_id,app_code)`）、`directory_watermark`（`scope` `USER`/`ORG`，`uk(scope)`）。
+  - **新增包**：`common`（`DataOrigin`）、`org`（`OrgNode`/`OrgNodeType`/`OrgStatus`/仓储/`OrgNodeService`/`UserOrg`/`OrgAppAssignment`/`OrgGrantService`）、`profile`（`UserProfile`/`UserStatus`/仓储/`ProfileService`）、`watermark`（`WatermarkScope`/`DirectoryWatermark`/仓储/Service）、`directory`（`DirectoryApiProperties`/`DirectoryApiKeyFilter`/`DirectoryDtos`/`DirectoryService`/`DirectoryController`/`AdDirectorySyncProperties`/`DirectorySyncConfig`/`AdDirectorySyncService`）。
+  - **改动**：`app/EffectiveAccessResolver`（**新增，核心**）+ `TokenIssuerService` 改走它；`admin` 新增 `OrganizationAdminController`/`DirectoryAdminController`，`UserAdminController` 列表改为「本地凭证 ∪ 用户档案」并集并带来源/档案/组织列（新增档案字段与 `profileService.setStatus`），`AdminOverviewController`/`SettingsAdminController` 扩展；`auth/ProfileController` 的 `MeDto` 增档案摘要 + 组织归属；`audit/AuditType` 增 10 种类型。
+- **关键设计（务必保持）**：
+  - ⚠️ **同树混源隔离**：`org_node.source ∈ {AD_SYNCED, IAM_MANAGED}`；同步器**只写 `AD_SYNCED`**（`upsertAdSynced`），`guardManaged` 使对 AD 节点的本地改/删/移抛 `PARAM_INVALID`（测试断言用 `extracting("bizCode")`，因 `BizException.paramInvalid(msg)` 走 varargs 构造、`getMessage()` 返回默认文案）。
+  - ⚠️ **准入解析「运行时展开、不落派生行」**：`effectiveApps/effectiveRoles(uid) = 个人授予 ∪ 组织授予`；祖先判定为 `userOrg.path.startsWith(grantedOrg.path)`（**`path` 是从根算起的绝对路径** —— 曾误用 `startsWith("/"+orgId+"/")` 导致祖先链不生效、`mds-ap` 缺失，已修）。
+  - ⚠️ **失效闭环复用既有机制**：组织移动/删除、组织授予变更、归属变更、档案停用 → `TokenVersionService.bump` → 旧令牌经 `LocalTokenVersionChecker` 即时 401，**无新增失效机制**。
+  - ⚠️ **目录 API 安全默认拒绝**：`DirectoryApiKeyFilter` 未配置密钥 → **503**（不是放行）、密钥不匹配 → 401、比较用**常量时间**比较。
+  - **路径索引与跨源改写**：`move`/`upsertAdSynced` 改父节点时先存 `oldPath` 再按前缀重写整棵子树（两者实现保持一致）。
+- **前端范围（`business/iam-ap/web`）**：IA v4 —— 身份管理改为「**组织架构 → 用户与档案 → 登录锁定**」（先建组织再挂人），接入管理新增「**组织授权**」；新增 `OrgPage`（组织树 + 节点详情 + CRUD/move + 挂人，AD 节点标只读）、`OrgGrantsPage`（组织授予清单 + 授予表单 + 受影响人数 + 与个人准入的分工说明）；`UsersPage` 重写（来源/档案/组织列 + 多面板 + 归属多选）、`DashboardPage`（8 KPI + 我的组织归属）、`ProfilePage`（档案 + 组织标签）、`SettingsPage`（目录 API 与 AD 同步面板 + 立即同步）；`types.ts`/`format.ts`/`menu.tsx`/`App.tsx`/`styles.css` 同步（新增 `.split`/`.tree*`/`.kv`/`.org-pick` 等）。
+- **验证**：iam-ap **48/48 绿**（新增 `IdentityDirectoryTest`×7：① 组织授予经祖先链展开到成员；② 跨源保护使 AD 节点只读；③ 组织变更 bump 令牌版本 + 水位；④ 未配置 AD 时同步跳过；⑤ 目录 API 强制服务密钥；⑥ 批量用户与组织/档案管理端点；⑦ 组织授予变更使存量令牌失效）。web `tsc -p tsconfig.json` EXIT=0；`vite build` 128 模块、CSS 22.60 kB、JS 309.01 kB，EXIT=0。
+- **视觉回归**：独立验证实例（后端 :8082 + 临时 vite :5172）种子化数据（3 应用 / 组织树 8 节点 / 5 账号含档案 / 多归属 / 3 条组织授予 / AD 同步返回 `skipped:true`），以 CDP 实拍**浅/深双主题共 11 页 + 登录页**；并量化检测**全部 11 页零横向溢出**（`scrollWidth === clientWidth`，越界元素计数 0）。**额外**对组织树做层级几何核验：`padding-left` 依次 8 / 25 / 42 / 59px（每级 +17px），`薄膜车间` 与 `蚀刻车间` **同为 25px（证实同级）**、`B厂` 回到 8px —— 量化纠正了此前对低分辨率截图的误读（曾误判 `薄膜车间` 缩进多一级）。
+
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
 - **命令**：`/tmp/mvnx.sh install`（platform）→ `/tmp/mvnx2.sh <iam-ap/server> test`。
 - **结果**：
   - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
-  - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → 36/36，管理控制台 +5 → **当前 41/41**）。
+  - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → 36/36，管理控制台 +5 → 41/41，身份目录 Wave 0 +7 → **当前 48/48**）。
 - **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
 
 ## 通用风险
