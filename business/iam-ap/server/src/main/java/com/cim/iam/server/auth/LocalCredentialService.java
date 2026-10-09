@@ -2,6 +2,7 @@ package com.cim.iam.server.auth;
 
 import com.cim.core.port.IdGenerator;
 import com.cim.iam.server.config.IamAuthProperties;
+import com.cim.iam.server.token.TokenVersionService;
 import com.cim.spring.support.web.BizException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class LocalCredentialService {
     private final LocalCredentialRepository repository;
     private final IdGenerator idGenerator;
     private final IamAuthProperties properties;
+    private final TokenVersionService tokenVersionService;
 
     /** 注册本地用户（入参为客户端第一层派生后的 clientHash）。 */
     @Transactional
@@ -85,7 +87,10 @@ public class LocalCredentialService {
         c.setClientSalt(newClientSalt);
         c.setServerHash(deriveServerHash(newCredential));
         repository.save(c);
-        log.info("[local-cred] 用户 {} 修改口令", username);
+        // 改密即让该用户所有已签发令牌失效：bump 令牌版本，验证端旧 ver 不再匹配 → 401 强制重登
+        // （本地用户 userId == username，与令牌 uid claim 一致）。
+        tokenVersionService.bump(c.getUserId());
+        log.info("[local-cred] 用户 {} 修改口令（已 bump 令牌版本强制旧会话失效）", username);
     }
 
     private static String randomHex(int bytes) {

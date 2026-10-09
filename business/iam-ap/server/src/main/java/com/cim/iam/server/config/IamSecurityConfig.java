@@ -1,7 +1,10 @@
 package com.cim.iam.server.config;
 
 import com.cim.auth.token.JwksKeyProvider;
+import com.cim.auth.token.TokenVersionChecker;
+import com.cim.iam.server.token.LocalTokenVersionChecker;
 import com.cim.iam.server.token.RsaKeyService;
+import com.cim.iam.server.token.TokenVersionService;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +37,19 @@ public class IamSecurityConfig {
     @Bean
     public JwksKeyProvider iamJwksKeyProvider(RsaKeyService rsaKeyService) {
         return new IamJwksKeyProvider(rsaKeyService);
+    }
+
+    /**
+     * 令牌版本失效判定（验证端，design.md §8.1(f) / §8 边界表）。
+     *
+     * <p>顶替 cim-auth-starter 的默认 {@code acceptAll()}（@ConditionalOnMissingBean 兜底），使 IAM
+     * 验证自身签发的 admin 令牌时按 in-JVM 版本表严格比对 {@code ver} claim；改密 / 踢人后版本 bump，
+     * 旧令牌即被过滤器判为失效（→ 401）。与 {@link IamJwksKeyProvider} 同理：验证侧密钥与版本存储
+     * 都走本地，避免每请求回查 IAM。</p>
+     */
+    @Bean
+    public TokenVersionChecker iamLocalTokenVersionChecker(TokenVersionService tokenVersionService) {
+        return new LocalTokenVersionChecker(tokenVersionService);
     }
 
     @Bean
