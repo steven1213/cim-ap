@@ -33,8 +33,20 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <!--
+                  沙箱 JDK21 + maven-compiler-plugin 环境下，Lombok 经 annotationProcessorPaths
+                  放到 -processorpath 后，javac 未通过 SPI(META-INF/services) 自动发现该处理器，
+                  导致 @Getter/@Setter/@Slf4j 静默失效（满屏「找不到符号」）。
+                  显式用 -processor 指定 Lombok 处理器类名可稳定触发（绕开 SPI 发现失效）。
+                  版本钉死 3.13.0 仍保留：避免解析到 3.16.0 时其它注解处理器行为漂移。
+                -->
+                <version>3.13.0</version>
                 <configuration>
                     <parameters>true</parameters>
+                    <compilerArgs>
+                        <arg>-processor</arg>
+                        <arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
