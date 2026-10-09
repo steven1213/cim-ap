@@ -1,0 +1,216 @@
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --line: #e3e6eb;
+  --primary: #2563eb;
+  --primary-d: #1d4ed8;
+  --text: #1f2933;
+  --muted: #6b7280;
+  --err: #dc2626;
+  --ok: #16a34a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.nav a {
+  color: var(--text);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.nav a:hover {
+  background: #eef2ff;
+  color: var(--primary);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.content {
+  padding: 24px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+label {
+  display: block;
+  margin: 10px 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+input,
+select,
+button {
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+}
+
+input,
+select {
+  width: 100%;
+}
+
+button {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.row input,
+.row select {
+  width: auto;
+  flex: 1;
+  min-width: 160px;
+}
+
+.err {
+  color: var(--err);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+
+.ok {
+  color: var(--ok);
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  row-gap: 8px;
+  column-gap: 12px;
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--muted);
+}
+
+.kv dd {
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+.login-card {
+  width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.login-card button {
+  width: 100%;
+  margin-top: 8px;
+}
