@@ -42,6 +42,7 @@ export default function Layout() {
   const clearMenus = useMenuStore((s) => s.clear);
   const openTab = useTabStore((s) => s.open);
   const clearTabs = useTabStore((s) => s.clear);
+  const requestScroll = useTabStore((s) => s.requestScroll);
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -192,6 +193,7 @@ export default function Layout() {
                         end={m.path === '/'}
                         title={t(m.i18nCode ?? '')}
                         className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
+                        onClick={() => requestScroll()}
                       >
                         <span className="side-ico">
                           <Icon width={18} height={18} />

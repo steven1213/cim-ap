@@ -24,6 +24,14 @@ function homeTab(): TabItem[] {
 interface TabState {
   tabs: TabItem[];
   activePath: string;
+  /**
+   * 滚动票证：每次递增，请求 TabBar 把激活签滚入可视区。
+   * <p>导航会变 `location.key`（TabBar 已监听），但「点击已激活路由的菜单」
+   * 等场景下激活签与页签列表都不变，必须靠显式票证兜底。</p>
+   */
+  scrollTicket: number;
+  /** 递增滚动票证（侧栏/页签点击时调用）。 */
+  requestScroll: () => void;
   /** 打开（或激活）一个页签；已存在则仅激活并更新文案码。 */
   open: (tab: TabItem) => void;
   /** 仅切换激活签（点击既有签时，导航由调用方完成）。 */
@@ -49,6 +57,9 @@ interface TabState {
 export const useTabStore = create<TabState>()((set, get) => ({
   tabs: homeTab(),
   activePath: HOME_PATH,
+  scrollTicket: 0,
+
+  requestScroll: () => set((s) => ({ scrollTicket: s.scrollTicket + 1 })),
 
   open: (tab) => {
     const { tabs } = get();

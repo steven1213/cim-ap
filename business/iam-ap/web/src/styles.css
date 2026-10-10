@@ -635,7 +635,8 @@ button.side-cap.page-cap {
 }
 
 /* 页签 chip：紧凑等宽（100px）、贴底、顶部两角圆弧（浏览器页签式）；
-   文字居中；相对定位承载右上角关闭徽标 */
+   未激活=浅底+细描边（每签边界清晰），激活=primary-soft 底+底部主题色横条；
+   相对定位承载右上角关闭徽标与签间分隔线 */
 .tab-item {
   position: relative;
   display: inline-flex;
@@ -645,8 +646,9 @@ button.side-cap.page-cap {
   width: 100px;
   flex: 0 0 100px;
   border-radius: 9px 9px 0 0;
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-bottom: 0;
+  background: var(--panel-2);
   font-size: var(--fs-xs);
   color: var(--text-2);
   cursor: pointer;
@@ -655,15 +657,44 @@ button.side-cap.page-cap {
   justify-content: center;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
+/* 签间细分隔线（位于 8px 间距正中）：相邻签激活/悬停时淡出 */
+.tab-item + .tab-item::before {
+  content: '';
+  position: absolute;
+  left: -4.5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 14px;
+  background: var(--line-strong);
+  transition: opacity 0.12s ease;
+}
+.tab-item:hover::before,
+.tab-item.active::before,
+.tab-item:hover + .tab-item::before,
+.tab-item.active + .tab-item::before {
+  opacity: 0;
+}
 .tab-item:hover {
   background: var(--panel-3);
   color: var(--text);
 }
 .tab-item.active {
+  z-index: 1;
   background: var(--primary-soft);
-  border-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 26%, transparent);
   color: var(--primary-d);
   font-weight: 600;
+}
+/* 激活签底部横条：贴底式中最醒目的选中指示，滚到哪里都能认出当前页 */
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--primary);
 }
 
 .tab-label {

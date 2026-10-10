@@ -31,6 +31,8 @@ export default function TabBar() {
   const location = useLocation();
   const tabs = useTabStore((s) => s.tabs);
   const activePath = useTabStore((s) => s.activePath);
+  const scrollTicket = useTabStore((s) => s.scrollTicket);
+  const requestScroll = useTabStore((s) => s.requestScroll);
   const setActive = useTabStore((s) => s.setActive);
   const close = useTabStore((s) => s.close);
   const closeOthers = useTabStore((s) => s.closeOthers);
@@ -75,28 +77,37 @@ export default function TabBar() {
   /**
    * 把激活签滚入可视区（贴左/右缘留 24px 余量）。
    *
-   * <p>触发时机不能只看 `activePath`/`tabs`——「激活签未变但滚动位置被
-   * 挪走」（如用箭头翻页后再点同一菜单，`location.key` 仍会变）时也必须
-   * 拉回，否则激活签滞留在可视区外。</p>
+   * <p>双 rAF 延后一帧再量几何，等 flex/字体布局稳定。触发时机覆盖：
+   * 激活签变化、页签增删、任意路由跳转（`location.key`）、以及侧栏/页签
+   * 点击发出的滚动票证（`scrollTicket`）——最后者是「点击已激活路由菜单」
+   * 等激活签与路由都没变场景下的兜底。</p>
    */
   const ensureActiveVisible = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const active = el.querySelector<HTMLElement>('[data-active="true"]');
-    if (!active) return;
-    const l = active.offsetLeft;
-    const r = l + active.offsetWidth;
-    if (l < el.scrollLeft + 8) {
-      el.scrollTo({ left: Math.max(0, l - 24), behavior: 'smooth' });
-    } else if (r > el.scrollLeft + el.clientWidth - 8) {
-      el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
-    }
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const el = scrollerRef.current;
+          if (!el) return;
+          const active = el.querySelector<HTMLElement>('[data-active="true"]');
+          if (!active) return;
+          // 相对滚动容器精确测量：offsetLeft 相对 offsetParent（受祖先定位影响），
+          // rect 差值 + scrollLeft 才是签在滚动内容里的真实位置
+          const l =
+            active.getBoundingClientRect().left -
+            el.getBoundingClientRect().left +
+            el.scrollLeft;
+          const r = l + active.offsetWidth;
+          if (l < el.scrollLeft + 8) {
+            el.scrollTo({ left: Math.max(0, l - 24), behavior: 'smooth' });
+          } else if (r > el.scrollLeft + el.clientWidth - 8) {
+            el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
+          }
+        }),
+      );
   }, []);
 
-  // 激活签变化、页签增删、以及任意路由跳转（含重复点击同一菜单）后滚入可视区
   useEffect(() => {
     ensureActiveVisible();
-  }, [ensureActiveVisible, activePath, tabs, location.key]);
+  }, [ensureActiveVisible, activePath, tabs, location.key, scrollTicket]);
 
   // 右键菜单：点击外部 / Escape 关闭
   useEffect(() => {
@@ -122,7 +133,10 @@ export default function TabBar() {
   }
 
   function onTab(path: string) {
-    if (path === activePath) return;
+    if (path === activePath) {
+      requestScroll(); // 已激活：无状态变化，仍要滚回可视区
+      return;
+    }
     setActive(path);
     navigate(path);
   }
