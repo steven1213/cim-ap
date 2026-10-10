@@ -546,6 +546,635 @@ public final class IamConsoleCatalog {
                 "口令在浏览器内完成第一层 PBKDF2 派生，明文不会上传到服务端。",
                 "The first PBKDF2 layer runs in your browser; the plain password is never uploaded."));
         t.add(new TextDef("iam.login.failed", "登录失败", "Sign-in failed"));
+        // ============================================================ W4b：存量业务页文案
+        // 命名空间 iam.<page>.* 与页面组件一一对应；动态文案用 {{var}} 占位（i18next 插值）。
+        // 仅在「用户可见」处使用；代码注释/键名（ASCII）不在此列。
+
+        // —— format.ts 枚举标签（被多页复用，集中在此）——
+        t.add(new TextDef("iam.audit.type.LOGIN_SUCCESS", "登录成功", "Sign-in succeeded"));
+        t.add(new TextDef("iam.audit.type.LOGIN_FAILURE", "登录失败", "Sign-in failed"));
+        t.add(new TextDef("iam.audit.type.LOGIN_REJECTED", "登录被拒", "Sign-in rejected"));
+        t.add(new TextDef("iam.audit.type.LOGOUT", "登出", "Signed out"));
+        t.add(new TextDef("iam.audit.type.PASSWORD_CHANGED", "自助改密", "Self password change"));
+        t.add(new TextDef("iam.audit.type.PASSWORD_RESET", "重置口令", "Password reset"));
+        t.add(new TextDef("iam.audit.type.USER_CREATED", "创建账号", "Account created"));
+        t.add(new TextDef("iam.audit.type.USER_ENABLED", "启用账号", "Account enabled"));
+        t.add(new TextDef("iam.audit.type.USER_DISABLED", "禁用账号", "Account disabled"));
+        t.add(new TextDef("iam.audit.type.USER_DELETED", "删除账号", "Account deleted"));
+        t.add(new TextDef("iam.audit.type.USER_UNLOCKED", "解除锁定", "Unlocked"));
+        t.add(new TextDef("iam.audit.type.APP_REGISTERED", "注册应用", "App registered"));
+        t.add(new TextDef("iam.audit.type.APP_UPDATED", "更新应用", "App updated"));
+        t.add(new TextDef("iam.audit.type.ADMISSION_GRANTED", "授予准入", "Admission granted"));
+        t.add(new TextDef("iam.audit.type.ADMISSION_REVOKED", "撤销准入", "Admission revoked"));
+        t.add(new TextDef("iam.audit.type.SESSION_REVOKED", "强制下线", "Forced logout"));
+        t.add(new TextDef("iam.audit.type.ORG_CREATED", "新建组织", "Org created"));
+        t.add(new TextDef("iam.audit.type.ORG_UPDATED", "更新组织", "Org updated"));
+        t.add(new TextDef("iam.audit.type.ORG_MOVED", "移动组织", "Org moved"));
+        t.add(new TextDef("iam.audit.type.ORG_DELETED", "删除组织", "Org deleted"));
+        t.add(new TextDef("iam.audit.type.PROFILE_CREATED", "新建档案", "Profile created"));
+        t.add(new TextDef("iam.audit.type.PROFILE_UPDATED", "更新档案", "Profile updated"));
+        t.add(new TextDef("iam.audit.type.USER_ORGS_CHANGED", "变更归属", "Membership changed"));
+        t.add(new TextDef("iam.audit.type.ORG_GRANT_GRANTED", "授予组织准入", "Org admission granted"));
+        t.add(new TextDef("iam.audit.type.ORG_GRANT_REVOKED", "撤销组织准入", "Org admission revoked"));
+        t.add(new TextDef("iam.audit.type.DIRECTORY_SYNCED", "目录同步", "Directory synced"));
+        t.add(new TextDef("iam.org.type.AREA", "厂区", "Site"));
+        t.add(new TextDef("iam.org.type.WORKSHOP", "车间", "Workshop"));
+        t.add(new TextDef("iam.org.type.LINE", "产线", "Line"));
+        t.add(new TextDef("iam.org.type.PROCESS", "工序", "Process"));
+        t.add(new TextDef("iam.org.type.TEAM", "班组", "Team"));
+        t.add(new TextDef("iam.org.type.DEPT", "部门", "Department"));
+        t.add(new TextDef("iam.source.AD_SYNCED", "AD 同步", "AD synced"));
+        t.add(new TextDef("iam.source.IAM_MANAGED", "IAM 自建", "IAM managed"));
+        t.add(new TextDef("iam.common.justNow", "刚刚", "Just now"));
+        t.add(new TextDef("iam.common.minutesAgo", "{{n}} 分钟前", "{{n}} min ago"));
+        t.add(new TextDef("iam.common.hoursAgo", "{{n}} 小时前", "{{n}} h ago"));
+        t.add(new TextDef("iam.common.daysAgo", "{{n}} 天前", "{{n}} d ago"));
+        t.add(new TextDef("iam.common.dash", "—", "—"));
+
+        // —— UsersPage（iam.users.*）——
+        t.add(new TextDef("iam.users.title", "用户与档案", "Users & profiles"));
+        t.add(new TextDef("iam.users.sub", "本地凭证账号 ∪ 用户档案（AD 同步来的员工无本地凭证，改密在目录侧）",
+                "Local credentials ∪ profiles (AD-synced staff have no local credential; password change is on the directory side)"));
+        t.add(new TextDef("iam.users.count", "{{n}} 人", "{{n}} users"));
+        t.add(new TextDef("iam.users.enabled", "{{n}} 启用", "{{n}} enabled"));
+        t.add(new TextDef("iam.users.adSynced", "{{n}} AD 同步", "{{n}} AD synced"));
+        t.add(new TextDef("iam.users.locked", "{{n}} 锁定", "{{n}} locked"));
+        t.add(new TextDef("iam.users.searchPH", "搜索 姓名/工号/组织", "Search name / emp no / org"));
+        t.add(new TextDef("iam.users.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.users.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.users.newAccount", "新建账号", "New account"));
+        t.add(new TextDef("iam.users.th.user", "用户", "User"));
+        t.add(new TextDef("iam.users.th.empNo", "工号", "Emp No."));
+        t.add(new TextDef("iam.users.th.source", "来源", "Source"));
+        t.add(new TextDef("iam.users.th.org", "组织", "Org"));
+        t.add(new TextDef("iam.users.th.status", "状态", "Status"));
+        t.add(new TextDef("iam.users.th.admission", "准入", "Admission"));
+        t.add(new TextDef("iam.users.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.users.statusEnabled", "启用", "Enabled"));
+        t.add(new TextDef("iam.users.statusDisabled", "禁用", "Disabled"));
+        t.add(new TextDef("iam.users.tagLocked", "锁定", "Locked"));
+        t.add(new TextDef("iam.users.tagProfileDisabled", "档案停用", "Profile disabled"));
+        t.add(new TextDef("iam.users.tagProfileOnly", "仅档案", "Profile only"));
+        t.add(new TextDef("iam.users.noOrg", "未归属", "Unassigned"));
+        t.add(new TextDef("iam.users.btnProfile", "档案", "Profile"));
+        t.add(new TextDef("iam.users.btnOrgs", "归属", "Org"));
+        t.add(new TextDef("iam.users.btnDisable", "禁用", "Disable"));
+        t.add(new TextDef("iam.users.btnEnable", "启用", "Enable"));
+        t.add(new TextDef("iam.users.btnReset", "重置", "Reset"));
+        t.add(new TextDef("iam.users.btnUnlock", "解锁", "Unlock"));
+        t.add(new TextDef("iam.users.emptyMatch", "无匹配用户", "No matching users"));
+        t.add(new TextDef("iam.users.emptyNone", "暂无用户", "No users yet"));
+        t.add(new TextDef("iam.users.emptyHintMatch", "换个关键词试试", "Try another keyword"));
+        t.add(new TextDef("iam.users.emptyHintNone", "点击右上「新建账号」创建第一个账号", "Click “New account” to create the first one"));
+        t.add(new TextDef("iam.users.createTitle", "新建账号", "New account"));
+        t.add(new TextDef("iam.users.createSub", "口令在浏览器内完成第一层 PBKDF2 派生后上传；档案字段可留空后续补充",
+                "Password is first-layer PBKDF2 derived in the browser before upload; profile fields may be filled later"));
+        t.add(new TextDef("iam.users.f.username", "用户名", "Username"));
+        t.add(new TextDef("iam.users.f.password", "初始口令", "Initial password"));
+        t.add(new TextDef("iam.users.f.name", "姓名", "Name"));
+        t.add(new TextDef("iam.users.f.empNo", "工号", "Emp No."));
+        t.add(new TextDef("iam.users.f.job", "岗位", "Job title"));
+        t.add(new TextDef("iam.users.createSubmit", "创建", "Create"));
+        t.add(new TextDef("iam.users.creating", "创建中…", "Creating…"));
+        t.add(new TextDef("iam.users.cancel", "取消", "Cancel"));
+        t.add(new TextDef("iam.users.createHint",
+                "新建账号默认无任何准入。建议：在「组织架构」把该用户挂到工序 → 由「组织授权」自动获得准入；或到「准入授权」单独授予。",
+                "New accounts have no admission by default. Suggest: attach the user to a process in “Organization”, then “Org Grants” grants admission automatically; or grant directly in “Admissions”."));
+        t.add(new TextDef("iam.users.resetTitle", "重置口令 · {{id}}", "Reset password · {{id}}"));
+        t.add(new TextDef("iam.users.resetSub", "重置成功后该用户所有会话立即失效，需以新口令重登",
+                "After reset, all sessions are invalidated; the user must sign in again"));
+        t.add(new TextDef("iam.users.resetNew", "新口令", "New password"));
+        t.add(new TextDef("iam.users.resetSubmit", "确认重置", "Confirm reset"));
+        t.add(new TextDef("iam.users.submitting", "提交中…", "Submitting…"));
+        t.add(new TextDef("iam.users.profileTitle", "档案 · {{id}}", "Profile · {{id}}"));
+        t.add(new TextDef("iam.users.profileSubAd", "AD 同步档案：姓名/邮箱/手机只读，仅岗位可在 IAM 侧维护",
+                "AD-synced profile: name/email/phone are read-only; only job title is maintained on IAM"));
+        t.add(new TextDef("iam.users.profileSubIam", "IAM 自建档案：可自由维护", "IAM-managed profile: freely maintained"));
+        t.add(new TextDef("iam.users.f.email", "邮箱", "Email"));
+        t.add(new TextDef("iam.users.f.mobile", "手机", "Mobile"));
+        t.add(new TextDef("iam.users.save", "保存", "Save"));
+        t.add(new TextDef("iam.users.saving", "保存中…", "Saving…"));
+        t.add(new TextDef("iam.users.profileHint", "工号 {{no}}、来源 {{src}}。岗位由 IAM 维护（AD 常无此维度），可用于按岗位批量授权。",
+                "Emp No. {{no}}, source {{src}}. Job title is maintained by IAM (AD often lacks this dimension) and can drive batch authorization by job."));
+        t.add(new TextDef("iam.users.orgsTitle", "组织归属 · {{id}}", "Org membership · {{id}}"));
+        t.add(new TextDef("iam.users.orgsSub", "支持多归属（多能工 / 跨线支援）；保存后该用户会话失效，重登即按新归属获得准入",
+                "Supports multiple memberships (multi-skill / cross-line); after save the session is invalidated and re-login applies the new membership"));
+        t.add(new TextDef("iam.users.primaryOrg", "主属组织", "Primary org"));
+        t.add(new TextDef("iam.users.primaryNone", "（不指定）", "(none)"));
+        t.add(new TextDef("iam.users.saveOrgs", "保存归属", "Save membership"));
+        t.add(new TextDef("iam.users.orgsNone", "尚未建立组织，请先到「组织架构」创建", "No org yet; create one in “Organization” first"));
+        t.add(new TextDef("iam.users.orgsHint", "主属组织用于展示与默认数据权限范围。归属变更会 bump 该用户令牌版本 → 旧令牌 401 → 重登即带新准入。",
+                "Primary org is used for display and default data scope. Membership change bumps the token version → old tokens 401 → re-login carries new admission."));
+        t.add(new TextDef("iam.users.usageTitle", "使用说明", "Usage notes"));
+        t.add(new TextDef("iam.users.usageSub", "身份生命周期", "Identity lifecycle"));
+        t.add(new TextDef("iam.users.usageOnboard", "入职：建账号（或由 AD 同步自动建档案）→ 在「组织架构」挂到工序 → 组织授权自动生效；例外再走「准入授权」。",
+                "Onboarding: create an account (or AD sync auto-creates the profile) → attach to a process in “Organization” → org grant applies automatically; exceptions go through “Admissions”."));
+        t.add(new TextDef("iam.users.usageTransfer", "转岗：调整组织归属即可——组织授权随归属自动增减（个人授予需手动处理）。",
+                "Transfer: just adjust org membership — org grants follow automatically (personal grants need manual handling)."));
+        t.add(new TextDef("iam.users.usageOffboard", "停用/离职：禁用账号或把档案置为停用，会自动 bump 令牌版本 → 所有存量令牌立即失效。",
+                "Offboarding: disable the account or set the profile inactive; this bumps the token version → all existing tokens are invalidated immediately."));
+        t.add(new TextDef("iam.users.usagePwd", "口令遗忘：重置口令（自动强制下线）；AD 账号请在企业目录侧改密，IAM 不代管。",
+                "Forgot password: reset it (forces logout automatically); for AD accounts change it in the corporate directory — IAM does not manage it."));
+        t.add(new TextDef("iam.users.msgCreated", "已创建账号 {{name}}", "Account {{name}} created"));
+        t.add(new TextDef("iam.users.msgEnabled", "已启用", "Enabled"));
+        t.add(new TextDef("iam.users.msgDisabled", "已禁用（已强制下线）", "Disabled (forced logout)"));
+        t.add(new TextDef("iam.users.msgUnlocked", "{{user}} 已解锁", "{{user}} unlocked"));
+        t.add(new TextDef("iam.users.msgNoLock", "{{user}} 无锁定记录", "{{user}} has no lock record"));
+        t.add(new TextDef("iam.users.msgResetDone", "已重置 {{id}} 的口令（该用户已强制下线）", "Password for {{id}} reset (user forced offline)"));
+        t.add(new TextDef("iam.users.msgProfileSaved", "已保存档案", "Profile saved"));
+        t.add(new TextDef("iam.users.msgOrgsSaved", "已保存组织归属（该用户已强制下线，重登后生效）", "Membership saved (user forced offline; takes effect after re-login)"));
+        t.add(new TextDef("iam.users.msgDeleted", "已删除账号 {{name}}", "Account {{name}} deleted"));
+        t.add(new TextDef("iam.users.confirmDelete", "确认删除账号 {{name}}？该操作不可恢复，其存量令牌将立即失效。",
+                "Delete account {{name}}? This cannot be undone; its existing tokens will be invalidated immediately."));
+        t.add(new TextDef("iam.users.confirmAdDelete", "{{name}} 是 AD 同步用户（无本地凭证），IAM 侧不提供删除。请在企业目录中处理。",
+                "{{name}} is AD-synced (no local credential); IAM does not delete it. Handle it in the corporate directory."));
+        t.add(new TextDef("iam.users.errLoad", "加载用户列表失败", "Failed to load users"));
+        t.add(new TextDef("iam.users.errCreate", "创建失败", "Create failed"));
+        t.add(new TextDef("iam.users.errOp", "操作失败", "Operation failed"));
+        t.add(new TextDef("iam.users.errReset", "重置失败", "Reset failed"));
+        t.add(new TextDef("iam.users.errUnlock", "解锁失败", "Unlock failed"));
+        t.add(new TextDef("iam.users.errSaveProfile", "保存失败", "Save failed"));
+        t.add(new TextDef("iam.users.errSaveOrgs", "保存归属失败", "Failed to save membership"));
+        t.add(new TextDef("iam.users.errDelete", "删除失败", "Delete failed"));
+        t.add(new TextDef("iam.users.phName", "张三", "Zhang San"));
+        t.add(new TextDef("iam.users.phJob", "蚀刻操作员", "Etch operator"));
+
+        // —— OrgPage（iam.orgs.*）——
+        t.add(new TextDef("iam.orgs.title", "组织树", "Org tree"));
+        t.add(new TextDef("iam.orgs.sub", "AD 同步的行政部门只读；制造组织由 IAM 自建", "AD-synced departments are read-only; manufacturing orgs are IAM-managed"));
+        t.add(new TextDef("iam.orgs.count", "{{n}} 节点", "{{n}} nodes"));
+        t.add(new TextDef("iam.orgs.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.orgs.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.orgs.newNode", "新建节点", "New node"));
+        t.add(new TextDef("iam.orgs.emptyTitle", "暂无组织节点", "No org nodes yet"));
+        t.add(new TextDef("iam.orgs.emptyHint", "点击右上「新建节点」建立第一个厂区", "Click “New node” to create the first site"));
+        t.add(new TextDef("iam.orgs.nodeTitle", "节点 · {{name}}", "Node · {{name}}"));
+        t.add(new TextDef("iam.orgs.nodeSub", "{{src}}{{ro}}", "{{src}}{{ro}}"));
+        t.add(new TextDef("iam.orgs.nodeReadOnly", "（只读）", "(read-only)"));
+        t.add(new TextDef("iam.orgs.selectNode", "在左侧选择一个节点", "Select a node on the left"));
+        t.add(new TextDef("iam.orgs.dt.code", "编码", "Code"));
+        t.add(new TextDef("iam.orgs.dt.type", "类型", "Type"));
+        t.add(new TextDef("iam.orgs.dt.source", "来源", "Source"));
+        t.add(new TextDef("iam.orgs.dt.status", "状态", "Status"));
+        t.add(new TextDef("iam.orgs.dt.path", "物化路径", "Materialized path"));
+        t.add(new TextDef("iam.orgs.dt.updated", "最近变更", "Last changed"));
+        t.add(new TextDef("iam.orgs.statusEnabled", "启用", "Enabled"));
+        t.add(new TextDef("iam.orgs.statusDisabled", "停用", "Disabled"));
+        t.add(new TextDef("iam.orgs.f.name", "名称", "Name"));
+        t.add(new TextDef("iam.orgs.f.sort", "排序", "Order"));
+        t.add(new TextDef("iam.orgs.f.status", "状态", "Status"));
+        t.add(new TextDef("iam.orgs.optEnabled", "启用", "Enabled"));
+        t.add(new TextDef("iam.orgs.optDisabled", "停用", "Disabled"));
+        t.add(new TextDef("iam.orgs.save", "保存", "Save"));
+        t.add(new TextDef("iam.orgs.moveTo", "移动到父节点", "Move to parent"));
+        t.add(new TextDef("iam.orgs.noParent", "（无 / 作为根节点）", "(none / as root)"));
+        t.add(new TextDef("iam.orgs.move", "移动", "Move"));
+        t.add(new TextDef("iam.orgs.delete", "删除", "Delete"));
+        t.add(new TextDef("iam.orgs.adReadOnly", "该节点由 AD 同步而来，IAM 侧只读——请在企业目录（AD/HR）中维护，同步器只写自己那一份。",
+                "This node is AD-synced and read-only on IAM — maintain it in the corporate directory (AD/HR); the syncer only writes its own share."));
+        t.add(new TextDef("iam.orgs.membersTitle", "组织成员", "Org members"));
+        t.add(new TextDef("iam.orgs.membersCount", "{{n}} 人", "{{n}} members"));
+        t.add(new TextDef("iam.orgs.memberPH", "输入或选择用户 ID", "Type or pick a user ID"));
+        t.add(new TextDef("iam.orgs.addMember", "挂到该组织", "Add to org"));
+        t.add(new TextDef("iam.orgs.removeMember", "移除", "Remove"));
+        t.add(new TextDef("iam.orgs.noMembers", "暂无成员", "No members yet"));
+        t.add(new TextDef("iam.orgs.memberHint", "成员归属支持多归属（一人可同属多个工序/产线）。归属变更会 bump 用户令牌版本，其会话立即失效。",
+                "Membership supports multiple orgs (one person in several processes/lines). A change bumps the user's token version and invalidates the session immediately."));
+        t.add(new TextDef("iam.orgs.newTitle", "新建组织节点", "New org node"));
+        t.add(new TextDef("iam.orgs.newSub", "IAM 自建（制造维度）；编码建议直接沿用 MES 侧既定编码，不另造第二套",
+                "IAM-managed (manufacturing dimension); reuse the MES-side code directly, do not invent a second one"));
+        t.add(new TextDef("iam.orgs.f.parent", "父节点", "Parent"));
+        t.add(new TextDef("iam.orgs.f.code", "编码", "Code"));
+        t.add(new TextDef("iam.orgs.namePH", "蚀刻 1 线", "Etch line 1"));
+        t.add(new TextDef("iam.orgs.f.type", "类型", "Type"));
+        t.add(new TextDef("iam.orgs.create", "创建", "Create"));
+        t.add(new TextDef("iam.orgs.creating", "创建中…", "Creating…"));
+        t.add(new TextDef("iam.orgs.cancel", "取消", "Cancel"));
+        t.add(new TextDef("iam.orgs.hint", "组织是「按组织批量授权」与数据权限的上游：把树建对 → 挂人 → 在「组织授权」给组织授予 ap 与角色组。",
+                "Orgs are the upstream of org-based batch grants and data scope: build the tree right → attach people → grant ap & role groups in “Org Grants”."));
+        t.add(new TextDef("iam.orgs.msgCreated", "已新建组织 {{name}}", "Org {{name}} created"));
+        t.add(new TextDef("iam.orgs.msgSaved", "已保存组织信息", "Org info saved"));
+        t.add(new TextDef("iam.orgs.msgMoved", "已移动组织（子树路径已重写，相关用户令牌已失效需重登）", "Org moved (subtree paths rewritten; affected users' tokens invalidated, re-login required)"));
+        t.add(new TextDef("iam.orgs.msgDeleted", "已删除组织", "Org deleted"));
+        t.add(new TextDef("iam.orgs.msgMemberAdded", "{{uid}} 已归属该组织", "{{uid}} now belongs to this org"));
+        t.add(new TextDef("iam.orgs.msgMemberMoved", "已把 {{uid}} 挂到该组织", "{{uid}} attached to this org"));
+        t.add(new TextDef("iam.orgs.msgMemberRemoved", "已从该组织移除 {{uid}}", "{{uid}} removed from this org"));
+        t.add(new TextDef("iam.orgs.confirmDelete", "确认删除组织「{{name}}」？须无子节点、无人员归属、无组织授予。",
+                "Delete org “{{name}}”? It must have no children, no members, and no org grants."));
+        t.add(new TextDef("iam.orgs.errLoad", "加载组织失败", "Failed to load orgs"));
+        t.add(new TextDef("iam.orgs.errCreate", "新建失败", "Create failed"));
+        t.add(new TextDef("iam.orgs.errSave", "保存失败", "Save failed"));
+        t.add(new TextDef("iam.orgs.errMove", "移动失败", "Move failed"));
+        t.add(new TextDef("iam.orgs.errDelete", "删除失败", "Delete failed"));
+        t.add(new TextDef("iam.orgs.errMember", "挂人失败", "Failed to add member"));
+        t.add(new TextDef("iam.orgs.errRemove", "移除失败", "Failed to remove"));
+        t.add(new TextDef("iam.orgs.nodeDetail", "节点详情", "Node details"));
+        t.add(new TextDef("iam.orgs.nodeNotSelected", "未选择节点", "No node selected"));
+        t.add(new TextDef("iam.orgs.selectHint", "选择左侧任一节点查看与维护", "Select any node on the left to view & manage"));
+        t.add(new TextDef("iam.orgs.collapse", "折叠", "Collapse"));
+        t.add(new TextDef("iam.orgs.expand", "展开", "Expand"));
+
+        // —— DashboardPage（iam.dashboard.*）——
+        t.add(new TextDef("iam.dashboard.platformTitle", "平台概览", "Platform overview"));
+        t.add(new TextDef("iam.dashboard.loadingPlatform", "正在加载平台态势…", "Loading platform status…"));
+        t.add(new TextDef("iam.dashboard.kpiUser", "用户账号", "User accounts"));
+        t.add(new TextDef("iam.dashboard.kpiUserSub", "{{n}} 已禁用", "{{n}} disabled"));
+        t.add(new TextDef("iam.dashboard.kpiProfile", "用户档案", "Profiles"));
+        t.add(new TextDef("iam.dashboard.kpiProfileSub", "{{n}} AD 同步", "{{n}} AD synced"));
+        t.add(new TextDef("iam.dashboard.kpiOrg", "组织节点", "Org nodes"));
+        t.add(new TextDef("iam.dashboard.kpiOrgSub", "{{n}} IAM 自建", "{{n}} IAM-managed"));
+        t.add(new TextDef("iam.dashboard.kpiApp", "接入应用", "Apps"));
+        t.add(new TextDef("iam.dashboard.kpiAppSub", "启用 / 总数", "enabled / total"));
+        t.add(new TextDef("iam.dashboard.kpiSession", "在线会话", "Sessions"));
+        t.add(new TextDef("iam.dashboard.kpiSessionSub", "活跃刷新令牌", "active refresh tokens"));
+        t.add(new TextDef("iam.dashboard.kpiLock", "锁定账户", "Locked accounts"));
+        t.add(new TextDef("iam.dashboard.kpiLockSub", "暴力破解防护", "brute-force protection"));
+        t.add(new TextDef("iam.dashboard.kpiLoginOk", "登录成功", "Sign-in success"));
+        t.add(new TextDef("iam.dashboard.kpiLoginFail", "登录失败", "Sign-in failure"));
+        t.add(new TextDef("iam.dashboard.kpiLoginFailSub", "累计，需关注", "cumulative, watch"));
+        t.add(new TextDef("iam.dashboard.recentAudit", "最近审计事件", "Recent audit events"));
+        t.add(new TextDef("iam.dashboard.recentAuditSub", "登录、授权、改密等关键动作流水", "Key actions: sign-in, grants, password changes"));
+        t.add(new TextDef("iam.dashboard.viewAll", "查看全部", "View all"));
+        t.add(new TextDef("iam.dashboard.th.time", "时间", "Time"));
+        t.add(new TextDef("iam.dashboard.th.type", "类型", "Type"));
+        t.add(new TextDef("iam.dashboard.th.operator", "操作人", "Operator"));
+        t.add(new TextDef("iam.dashboard.th.target", "对象", "Target"));
+        t.add(new TextDef("iam.dashboard.th.detail", "说明", "Detail"));
+        t.add(new TextDef("iam.dashboard.noAudit", "暂无审计事件", "No audit events yet"));
+        t.add(new TextDef("iam.dashboard.profileTitle", "概览", "Overview"));
+        t.add(new TextDef("iam.dashboard.loadingUser", "正在加载用户信息…", "Loading user info…"));
+        t.add(new TextDef("iam.dashboard.kpiUserId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.dashboard.kpiApps", "可进入应用", "Accessible apps"));
+        t.add(new TextDef("iam.dashboard.kpiRoles", "角色组", "Role groups"));
+        t.add(new TextDef("iam.dashboard.kpiOrgs", "组织归属", "Org membership"));
+        t.add(new TextDef("iam.dashboard.identityTitle", "身份信息", "Identity"));
+        t.add(new TextDef("iam.dashboard.identitySub", "来自用户档案与会话", "From profile & session"));
+        t.add(new TextDef("iam.dashboard.mk.userId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.dashboard.mk.username", "用户名", "Username"));
+        t.add(new TextDef("iam.dashboard.mk.name", "姓名", "Name"));
+        t.add(new TextDef("iam.dashboard.mk.empNo", "工号", "Emp No."));
+        t.add(new TextDef("iam.dashboard.mk.job", "岗位", "Job title"));
+        t.add(new TextDef("iam.dashboard.mk.source", "档案来源", "Profile source"));
+        t.add(new TextDef("iam.dashboard.mk.tenant", "租户", "Tenant"));
+        t.add(new TextDef("iam.dashboard.myOrgsTitle", "我的组织归属", "My org membership"));
+        t.add(new TextDef("iam.dashboard.myOrgsSub", "支持多归属（多能工 / 跨线支援）", "Multi-membership supported (multi-skill / cross-line)"));
+        t.add(new TextDef("iam.dashboard.th.org", "组织", "Org"));
+        t.add(new TextDef("iam.dashboard.th.primary", "主属", "Primary"));
+        t.add(new TextDef("iam.dashboard.yes", "是", "Yes"));
+        t.add(new TextDef("iam.dashboard.noOrgs", "尚未归属任何组织", "Not assigned to any org"));
+        t.add(new TextDef("iam.dashboard.noOrgsHint", "请联系管理员在「组织架构」中把你挂到工序/产线", "Ask an admin to attach you to a process/line in “Organization”"));
+        t.add(new TextDef("iam.dashboard.sessionTitle", "会话与安全", "Session & security"));
+        t.add(new TextDef("iam.dashboard.sessionSub", "令牌签发与验证方式", "Token issuance & verification"));
+        t.add(new TextDef("iam.dashboard.mk.authSrc", "认证源", "Auth source"));
+        t.add(new TextDef("iam.dashboard.v.localCred", "本地凭证（两层 PBKDF2）", "Local credential (two-layer PBKDF2)"));
+        t.add(new TextDef("iam.dashboard.mk.signAlgo", "签名算法", "Signing algo"));
+        t.add(new TextDef("iam.dashboard.mk.verify", "验签方式", "Verification"));
+        t.add(new TextDef("iam.dashboard.v.jwks", "JWKS 公钥，业务侧本地验签", "JWKS public key, verified locally by services"));
+        t.add(new TextDef("iam.dashboard.mk.admission", "准入判定", "Admission rule"));
+        t.add(new TextDef("iam.dashboard.v.appsClaim", "apps claim（个人授予 ∪ 组织授予）", "apps claim (personal ∪ org grants)"));
+        t.add(new TextDef("iam.dashboard.mk.invalid", "失效机制", "Invalidation"));
+        t.add(new TextDef("iam.dashboard.v.version", "版本号校验 + 黑名单（jti）", "Version check + blacklist (jti)"));
+        t.add(new TextDef("iam.dashboard.matrixTitle", "准入与角色矩阵", "Admission & role matrix"));
+        t.add(new TextDef("iam.dashboard.matrixSub", "按接入码分组的准入状态与角色组", "Admission status & role groups by app code"));
+        t.add(new TextDef("iam.dashboard.th.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.dashboard.th.admission", "准入", "Admission"));
+        t.add(new TextDef("iam.dashboard.th.roles", "角色组", "Role groups"));
+        t.add(new TextDef("iam.dashboard.admitted", "已准入", "Admitted"));
+        t.add(new TextDef("iam.dashboard.noRole", "无角色", "No role"));
+        t.add(new TextDef("iam.dashboard.noApp", "暂无准入应用", "No admitted apps"));
+        t.add(new TextDef("iam.dashboard.noAppHint", "请联系管理员在「准入授权」中分配", "Ask an admin to assign one in “Admissions”"));
+        t.add(new TextDef("iam.dashboard.errLoad", "加载概览失败", "Failed to load overview"));
+        t.add(new TextDef("iam.dashboard.kpiCumulative", "累计", "Cumulative"));
+        t.add(new TextDef("iam.dashboard.matrixCount", "{{n}} 个接入码", "{{n}} app codes"));
+
+        // —— SettingsPage（iam.settings.*）——
+        t.add(new TextDef("iam.settings.title", "系统设置", "System settings"));
+        t.add(new TextDef("iam.settings.loading", "正在加载生效配置…", "Loading effective config…"));
+        t.add(new TextDef("iam.settings.authTitle", "认证与口令", "Auth & password"));
+        t.add(new TextDef("iam.settings.authSub", "登录认证源与两层派生参数", "Sign-in source & two-layer derivation params"));
+        t.add(new TextDef("iam.settings.mk.authSrc", "认证源", "Auth source"));
+        t.add(new TextDef("iam.settings.mk.pbkdf2Rounds", "PBKDF2 轮数", "PBKDF2 rounds"));
+        t.add(new TextDef("iam.settings.mk.pepper", "服务端 pepper", "Server pepper"));
+        t.add(new TextDef("iam.settings.configured", "已配置", "Configured"));
+        t.add(new TextDef("iam.settings.pepperMissing", "未配置（不安全）", "Not configured (insecure)"));
+        t.add(new TextDef("iam.settings.mk.bootstrap", "首管理员引导", "First-admin bootstrap"));
+        t.add(new TextDef("iam.settings.enabled", "启用", "Enabled"));
+        t.add(new TextDef("iam.settings.disabled", "停用", "Disabled"));
+        t.add(new TextDef("iam.settings.tokenTitle", "令牌与签名", "Tokens & signing"));
+        t.add(new TextDef("iam.settings.tokenSub", "JWT 签发参数与密钥来源", "JWT issuance params & key source"));
+        t.add(new TextDef("iam.settings.mk.accessTtl", "访问令牌 TTL", "Access token TTL"));
+        t.add(new TextDef("iam.settings.v.minutes", "{{n}} 分钟", "{{n}} min"));
+        t.add(new TextDef("iam.settings.mk.refreshTtl", "刷新令牌 TTL", "Refresh token TTL"));
+        t.add(new TextDef("iam.settings.v.days", "{{n}} 天", "{{n}} d"));
+        t.add(new TextDef("iam.settings.mk.rsaSrc", "RSA 私钥来源", "RSA private key source"));
+        t.add(new TextDef("iam.settings.kms", "KMS 注入", "KMS injected"));
+        t.add(new TextDef("iam.settings.rsaTemp", "启动临时生成", "Generated at startup (temp)"));
+        t.add(new TextDef("iam.settings.mk.jwks", "JWKS 端点", "JWKS endpoint"));
+        t.add(new TextDef("iam.settings.lockTitle", "登录锁定策略", "Lockout policy"));
+        t.add(new TextDef("iam.settings.lockSub", "暴力破解防护（滑动窗口）", "Brute-force protection (sliding window)"));
+        t.add(new TextDef("iam.settings.mk.threshold", "失败阈值", "Failure threshold"));
+        t.add(new TextDef("iam.settings.mk.lockMin", "锁定时长", "Lock duration"));
+        t.add(new TextDef("iam.settings.mk.window", "计数窗口", "Counting window"));
+        t.add(new TextDef("iam.settings.corsTitle", "跨域白名单", "CORS allowlist"));
+        t.add(new TextDef("iam.settings.corsSub", "允许访问本服务的前端源", "Frontend origins allowed to access this service"));
+        t.add(new TextDef("iam.settings.notConfigured", "未配置", "Not configured"));
+        t.add(new TextDef("iam.settings.dirApiTitle", "身份目录 · 只读 API", "Identity directory · read-only API"));
+        t.add(new TextDef("iam.settings.dirApiSub", "供业务 ap 拉取档案与组织（服务身份认证）", "For business aps to pull profiles & orgs (service auth)"));
+        t.add(new TextDef("iam.settings.mk.dirApi", "目录 API", "Directory API"));
+        t.add(new TextDef("iam.settings.dirEnabled", "已启用", "Enabled"));
+        t.add(new TextDef("iam.settings.dirDisabled", "未启用（未配置密钥）", "Disabled (no key configured)"));
+        t.add(new TextDef("iam.settings.mk.authMethod", "认证方式", "Auth method"));
+        t.add(new TextDef("iam.settings.v.dirKey", "X-Directory-Key（方案 A）", "X-Directory-Key (scheme A)"));
+        t.add(new TextDef("iam.settings.mk.dirEp", "目录端点", "Directory endpoint"));
+        t.add(new TextDef("iam.settings.mk.watermark", "水位机制", "Watermark"));
+        t.add(new TextDef("iam.settings.v.watermark", "user / org 单调版本号，业务侧比对后重拉", "Monotonic user/org version numbers; services re-pull after comparing"));
+        t.add(new TextDef("iam.settings.adSyncTitle", "身份目录 · AD 同步", "Identity directory · AD sync"));
+        t.add(new TextDef("iam.settings.adSyncSub", "只读同步人员与行政组织（未配置即跳过）", "Read-only sync of people & admin orgs (skipped if unconfigured)"));
+        t.add(new TextDef("iam.settings.mk.syncSwitch", "同步开关", "Sync switch"));
+        t.add(new TextDef("iam.settings.mk.connCfg", "可连接配置", "Connectivity"));
+        t.add(new TextDef("iam.settings.ready", "已就绪", "Ready"));
+        t.add(new TextDef("iam.settings.syncNotCfg", "未配置 → 同步跳过", "Unconfigured → sync skipped"));
+        t.add(new TextDef("iam.settings.mk.baseDn", "检索基址", "Search base DN"));
+        t.add(new TextDef("iam.settings.mk.interval", "同步间隔", "Sync interval"));
+        t.add(new TextDef("iam.settings.mk.crossSrc", "跨源保护", "Cross-source protection"));
+        t.add(new TextDef("iam.settings.v.crossSrc", "只写 AD_SYNCED，绝不覆盖 IAM 自建节点", "Only writes AD_SYNCED; never overwrites IAM-managed nodes"));
+        t.add(new TextDef("iam.settings.sync", "立即同步", "Sync now"));
+        t.add(new TextDef("iam.settings.syncing", "同步中…", "Syncing…"));
+        t.add(new TextDef("iam.settings.noteTitle", "说明", "Notes"));
+        t.add(new TextDef("iam.settings.noteSub", "为何是只读", "Why read-only"));
+        t.add(new TextDef("iam.settings.note1", "这些参数影响签发与验证的一致性，在线修改会与已签发令牌/业务验证端产生漂移。",
+                "These params affect signing/verification consistency; online edits would drift from issued tokens / verifiers."));
+        t.add(new TextDef("iam.settings.note2", "如需调整，请通过配置中心 / 环境变量发布，并重启生效。",
+                "To change them, publish via config center / env vars and restart."));
+        t.add(new TextDef("iam.settings.note3", "本页用于让管理员核对当前生效值，便于排障与合规审计。",
+                "This page lets admins verify current values for troubleshooting & compliance."));
+        t.add(new TextDef("iam.settings.msgSkipped", "已跳过：{{reason}}", "Skipped: {{reason}}"));
+        t.add(new TextDef("iam.settings.msgDone", "同步完成：组织 {{orgs}}、人员 {{users}}、停用 {{deactivated}}", "Sync done: orgs {{orgs}}, people {{users}}, deactivated {{deactivated}}"));
+        t.add(new TextDef("iam.settings.errLoad", "加载设置失败", "Failed to load settings"));
+        t.add(new TextDef("iam.settings.errSync", "同步失败", "Sync failed"));
+        // W4b 补充：数值单位与开关态（catalog 中无现成 key）
+        t.add(new TextDef("iam.settings.v.times", "{{n}} 次", "{{n}} times"));
+        t.add(new TextDef("iam.settings.v.seconds", "{{n}} 秒", "{{n}} s"));
+        t.add(new TextDef("iam.settings.on", "开启", "On"));
+
+        // —— OrgGrantsPage（iam.orgGrants.*）——
+        t.add(new TextDef("iam.orgGrants.title", "组织授予清单", "Org grant list"));
+        t.add(new TextDef("iam.orgGrants.sub", "组织 → ap → 粗角色组；签发令牌时按用户归属（含祖先链）实时展开",
+                "Org → app → coarse role group; expanded at token issuance by user membership (incl. ancestor chain)"));
+        t.add(new TextDef("iam.orgGrants.count", "{{n}} 条", "{{n}} rows"));
+        t.add(new TextDef("iam.orgGrants.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.orgGrants.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.orgGrants.th.org", "组织", "Org"));
+        t.add(new TextDef("iam.orgGrants.th.code", "编码", "Code"));
+        t.add(new TextDef("iam.orgGrants.th.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.orgGrants.th.roles", "角色组", "Role groups"));
+        t.add(new TextDef("iam.orgGrants.th.children", "覆盖子组织", "Include children"));
+        t.add(new TextDef("iam.orgGrants.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.orgGrants.onlyAdmission", "（仅准入，无角色）", "(admission only, no role)"));
+        t.add(new TextDef("iam.orgGrants.yes", "是", "Yes"));
+        t.add(new TextDef("iam.orgGrants.no", "否", "No"));
+        t.add(new TextDef("iam.orgGrants.revoke", "撤销", "Revoke"));
+        t.add(new TextDef("iam.orgGrants.emptyTitle", "暂无组织授予", "No org grants yet"));
+        t.add(new TextDef("iam.orgGrants.emptyHint", "在下方按组织批量授予准入", "Grant admission by org below"));
+        t.add(new TextDef("iam.orgGrants.grantTitle", "授予组织准入", "Grant org admission"));
+        t.add(new TextDef("iam.orgGrants.grantSub", "先把组织树建对并挂人，再给组织授权——人员进出组织自动继承/失去准入",
+                "Build the org tree and attach people first, then grant — membership changes auto-apply/revoke admission"));
+        t.add(new TextDef("iam.orgGrants.f.org", "组织", "Org"));
+        t.add(new TextDef("iam.orgGrants.selectOrg", "请选择组织", "Select an org"));
+        t.add(new TextDef("iam.orgGrants.f.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.orgGrants.selectApp", "请选择应用", "Select an app"));
+        t.add(new TextDef("iam.orgGrants.f.roles", "角色组（逗号分隔）", "Role groups (comma-separated)"));
+        t.add(new TextDef("iam.orgGrants.includeChildren", "覆盖子组织", "Include child orgs"));
+        t.add(new TextDef("iam.orgGrants.grant", "授予", "Grant"));
+        t.add(new TextDef("iam.orgGrants.granting", "授予中…", "Granting…"));
+        t.add(new TextDef("iam.orgGrants.hint", "勾选「覆盖子组织」时，授予作用于该组织及其全部后代；不勾选则仅作用于本组织直属人员。",
+                "With “include children”, the grant covers the org and all descendants; otherwise only its direct members."));
+        t.add(new TextDef("iam.orgGrants.affected", "当前所选组织（含子组织）共 {{n}} 人，授予后其令牌版本将被 bump、需重新登录。",
+                "The selected org (incl. children) has {{n}} people; after grant their token version is bumped and they must re-login."));
+        t.add(new TextDef("iam.orgGrants.divTitle", "与「准入授权」的分工", "Division of labor with “Admissions”"));
+        t.add(new TextDef("iam.orgGrants.divSub", "个人 vs 组织", "Personal vs org"));
+        t.add(new TextDef("iam.orgGrants.divPersonal", "个人准入（准入授权页）：给某个用户单独开某 ap 的准入与角色组，用于例外与临时授权。",
+                "Personal admission (Admissions page): grant a specific user an app's admission & roles, for exceptions & temporary access."));
+        t.add(new TextDef("iam.orgGrants.divOrg", "组织授予（本页）：给组织整体开准入，组织内人员（含子组织）自动生效——入职即通、转岗即变、离职即断。",
+                "Org grant (this page): grant the whole org; members (incl. children) get it automatically — onboard=granted, transfer=changed, offboard=revoked."));
+        t.add(new TextDef("iam.orgGrants.divUnion", "两者取并集：个人授予只能追加、不能扣减。要收回权限请撤销组织授予或把该用户移出组织。",
+                "The two are unioned: personal grants can only add, never subtract. To revoke, remove the org grant or detach the user."));
+        t.add(new TextDef("iam.orgGrants.divAd", "AD 组织（标记［AD］）由同步器维护，可作为授权目标；但 IAM 侧不能改其名称与层级。",
+                "AD orgs (marked [AD]) are maintained by the syncer and can be grant targets; IAM cannot change their name/hierarchy."));
+        t.add(new TextDef("iam.orgGrants.divIam", "IAM 只管准入，不介入业务系统内部权限", "IAM only manages admission, not business-internal permissions"));
+        t.add(new TextDef("iam.orgGrants.msgGranted", "已授予 {{app}}（受影响用户令牌已失效，需重登生效）", "Granted {{app}} (affected users' tokens invalidated; re-login required)"));
+        t.add(new TextDef("iam.orgGrants.msgRevoked", "已撤销组织授予", "Org grant revoked"));
+        t.add(new TextDef("iam.orgGrants.confirmRevoke", "确认撤销「{{org}}」的 {{app}} 授予？", "Revoke the grant of {{app}} for “{{org}}”?"));
+        t.add(new TextDef("iam.orgGrants.errLoad", "加载组织授权失败", "Failed to load org grants"));
+        t.add(new TextDef("iam.orgGrants.errGrant", "授予失败", "Grant failed"));
+        t.add(new TextDef("iam.orgGrants.errRevoke", "撤销失败", "Revoke failed"));
+        // W4b 补充：组织类型参考行的片段（orgTypeLabel/originLabel 由 format.ts 内部翻译，此处仅包文字）
+        t.add(new TextDef("iam.orgGrants.typeRef", "组织类型参考：", "Org types:"));
+        t.add(new TextDef("iam.orgGrants.localMaintain", "；来源 {{src}} 可本地维护。", "; source {{src}} can be maintained locally."));
+
+        // —— ProfilePage（iam.profile.*）——
+        t.add(new TextDef("iam.profile.infoTitle", "账户信息", "Account info"));
+        t.add(new TextDef("iam.profile.infoSub", "当前登录身份与档案", "Current identity & profile"));
+        t.add(new TextDef("iam.profile.mk.userId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.profile.mk.username", "用户名", "Username"));
+        t.add(new TextDef("iam.profile.mk.name", "姓名", "Name"));
+        t.add(new TextDef("iam.profile.mk.empNo", "工号", "Emp No."));
+        t.add(new TextDef("iam.profile.mk.job", "岗位", "Job title"));
+        t.add(new TextDef("iam.profile.mk.source", "档案来源", "Profile source"));
+        t.add(new TextDef("iam.profile.mk.tenant", "租户", "Tenant"));
+        t.add(new TextDef("iam.profile.mk.apps", "准入应用", "Admitted apps"));
+        t.add(new TextDef("iam.profile.subTitleOrgs", "我的组织归属", "My org membership"));
+        t.add(new TextDef("iam.profile.noOrgs", "尚未归属任何组织——归属由管理员在「组织架构」中维护。", "Not assigned to any org — an admin maintains it in “Organization”."));
+        t.add(new TextDef("iam.profile.secTitle", "安全提示", "Security notes"));
+        t.add(new TextDef("iam.profile.sec1", "改密后全部已签发令牌立即失效，需重新登录。", "After a password change all issued tokens are invalidated; re-login required."));
+        t.add(new TextDef("iam.profile.sec2", "AD / LDAP 账号的口令变更请在目录侧完成。", "For AD / LDAP accounts, change the password on the directory side."));
+        t.add(new TextDef("iam.profile.pwdTitle", "修改口令", "Change password"));
+        t.add(new TextDef("iam.profile.pwdSub", "修改成功后需以新口令重新登录", "After success you must sign in with the new password"));
+        t.add(new TextDef("iam.profile.f.old", "原口令", "Current password"));
+        t.add(new TextDef("iam.profile.f.new", "新口令", "New password"));
+        t.add(new TextDef("iam.profile.f.confirm", "确认新口令", "Confirm new password"));
+        t.add(new TextDef("iam.profile.submit", "提交修改", "Submit change"));
+        t.add(new TextDef("iam.profile.submitting", "提交中…", "Submitting…"));
+        t.add(new TextDef("iam.profile.hint", "口令在浏览器内完成第一层 PBKDF2 派生（与登录一致），仅密文派生值上传；明文口令不离开浏览器。",
+                "The first-layer PBKDF2 derivation runs in the browser (like sign-in); only the derived ciphertext is uploaded; the plain password never leaves the browser."));
+        t.add(new TextDef("iam.profile.errSession", "当前会话缺失用户名，请重新登录", "Session has no username; please sign in again"));
+        t.add(new TextDef("iam.profile.errMismatch", "两次输入的新口令不一致", "The two new passwords do not match"));
+        t.add(new TextDef("iam.profile.errChange", "改密失败", "Password change failed"));
+        // W4b 补充：改密成功后的跳转提示（经路由 state 透传到登录页展示）
+        t.add(new TextDef("iam.profile.pwdUpdatedNotice", "口令已更新，请重新登录", "Password updated, please sign in again"));
+
+        // —— AppMgmtPage（iam.appMgmt.*）——
+        t.add(new TextDef("iam.appMgmt.title", "应用清单", "App list"));
+        t.add(new TextDef("iam.appMgmt.sub", "已注册的业务接入码；接入码即令牌 apps claim 的取值", "Registered business app codes; the code is the value of the token's apps claim"));
+        t.add(new TextDef("iam.appMgmt.count", "{{n}} 条", "{{n}} rows"));
+        t.add(new TextDef("iam.appMgmt.enabled", "{{n}} 启用", "{{n}} enabled"));
+        t.add(new TextDef("iam.appMgmt.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.appMgmt.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.appMgmt.th.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.appMgmt.th.name", "应用名称", "App name"));
+        t.add(new TextDef("iam.appMgmt.th.status", "状态", "Status"));
+        t.add(new TextDef("iam.appMgmt.th.sort", "排序", "Order"));
+        t.add(new TextDef("iam.appMgmt.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.appMgmt.enabled2", "启用", "Enabled"));
+        t.add(new TextDef("iam.appMgmt.disabled2", "停用", "Disabled"));
+        t.add(new TextDef("iam.appMgmt.disable", "停用", "Disable"));
+        t.add(new TextDef("iam.appMgmt.enable", "启用", "Enable"));
+        t.add(new TextDef("iam.appMgmt.emptyTitle", "暂无应用", "No apps yet"));
+        t.add(new TextDef("iam.appMgmt.emptyHint", "在下方「注册应用」中添加第一个业务接入码", "Add the first app code under “Register app”"));
+        t.add(new TextDef("iam.appMgmt.registerTitle", "注册应用", "Register app"));
+        t.add(new TextDef("iam.appMgmt.registerSub", "接入码将写入令牌的 apps claim", "The app code is written into the token's apps claim"));
+        t.add(new TextDef("iam.appMgmt.f.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.appMgmt.f.name", "应用名称", "App name"));
+        t.add(new TextDef("iam.appMgmt.namePH", "MDS 设备数据服务", "MDS device data service"));
+        t.add(new TextDef("iam.appMgmt.f.sort", "排序号", "Sort order"));
+        t.add(new TextDef("iam.appMgmt.register", "注册应用", "Register app"));
+        t.add(new TextDef("iam.appMgmt.registering", "注册中…", "Registering…"));
+        t.add(new TextDef("iam.appMgmt.hint", "接入码全局唯一，注册后即纳入 IAM 的 ap 注册表，用于准入判定。", "The app code is globally unique and enters IAM's ap registry for admission checks."));
+        t.add(new TextDef("iam.appMgmt.guideTitle", "接入指引", "Integration guide"));
+        t.add(new TextDef("iam.appMgmt.guideSub", "业务 ap 如何对接 IAM 令牌", "How a business ap integrates with IAM tokens"));
+        t.add(new TextDef("iam.appMgmt.guide1", "业务 ap 从 /.well-known/jwks.json 拉取公钥，本地验签（RS256），无需每请求回查 IAM。", "The ap fetches the public key from /.well-known/jwks.json and verifies locally (RS256), no per-request IAM call."));
+        t.add(new TextDef("iam.appMgmt.guide2", "准入判定：令牌 apps claim 含本 ap 接入码即放行；否则 403。", "Admission: if the token's apps claim contains this ap's code, allow; otherwise 403."));
+        t.add(new TextDef("iam.appMgmt.guide3", "角色组：令牌 roles claim 携带本 ap 内的粗角色组，业务内部权限据此再细分。", "Role groups: the token's roles claim carries this ap's coarse groups; business-internal rights refine from there."));
+        t.add(new TextDef("iam.appMgmt.msgRegistered", "已注册应用 {{code}}", "App {{code}} registered"));
+        t.add(new TextDef("iam.appMgmt.msgToggled", "{{code}} 已{{state}}", "{{code}} {{state}}"));
+        t.add(new TextDef("iam.appMgmt.stateEnabled", "启用", "enabled"));
+        t.add(new TextDef("iam.appMgmt.stateDisabled", "停用", "disabled"));
+        t.add(new TextDef("iam.appMgmt.confirmDisable", "确认停用 {{code}}？其下所有用户对该应用的准入将立即失效。", "Disable {{code}}? All of its users' admission to this app is revoked immediately."));
+        t.add(new TextDef("iam.appMgmt.errLoad", "加载应用列表失败", "Failed to load apps"));
+        t.add(new TextDef("iam.appMgmt.errRegister", "注册失败", "Register failed"));
+        t.add(new TextDef("iam.appMgmt.errUpdate", "更新失败", "Update failed"));
+
+        // —— SessionsPage（iam.sessions.*）——
+        t.add(new TextDef("iam.sessions.title", "活跃会话", "Active sessions"));
+        t.add(new TextDef("iam.sessions.sub", "以未撤销且未过期的刷新令牌近似表示一个登录会话", "Approximated by un-revoked, unexpired refresh tokens"));
+        t.add(new TextDef("iam.sessions.count", "{{n}} 个", "{{n}}"));
+        t.add(new TextDef("iam.sessions.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.sessions.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.sessions.th.user", "用户", "User"));
+        t.add(new TextDef("iam.sessions.th.userId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.sessions.th.jti", "访问令牌 jti", "Access token jti"));
+        t.add(new TextDef("iam.sessions.th.expire", "到期时间", "Expires"));
+        t.add(new TextDef("iam.sessions.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.sessions.kick", "强制下线", "Force logout"));
+        t.add(new TextDef("iam.sessions.emptyTitle", "当前无活跃会话", "No active sessions"));
+        t.add(new TextDef("iam.sessions.emptyHint", "用户登录后会在此出现", "Appears after users sign in"));
+        t.add(new TextDef("iam.sessions.kickTitle", "按用户 ID 强制下线", "Force logout by user ID"));
+        t.add(new TextDef("iam.sessions.kickSub", "bump 令牌版本，验证端进程内即时校验，无缓存滞后", "Bumps the token version; verified in-process by the verifier with no cache lag"));
+        t.add(new TextDef("iam.sessions.highRisk", "高危操作", "High-risk operation"));
+        t.add(new TextDef("iam.sessions.f.userId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.sessions.userIdPH", "admin（本地账号即用户名）", "admin (local account = username)"));
+        t.add(new TextDef("iam.sessions.process", "踢下线", "Kick"));
+        t.add(new TextDef("iam.sessions.processing", "处理中…", "Processing…"));
+        t.add(new TextDef("iam.sessions.bumpDone", "已 bump 用户 {{uid}}，当前令牌版本号 {{version}}", "Bumped user {{uid}}; current token version {{version}}"));
+        t.add(new TextDef("iam.sessions.note1", "作用对象：该用户已签发的全部访问令牌与刷新令牌。", "Target: all access & refresh tokens the user has issued."));
+        t.add(new TextDef("iam.sessions.note2", "生效方式：验证端比对令牌 ver claim 与库内版本号，不一致即返回 401。", "Effect: the verifier compares the token's ver claim with the stored version; mismatch → 401."));
+        t.add(new TextDef("iam.sessions.note3", "后续影响：用户需重新登录；令牌版本号单调递增，不回滚。", "Aftermath: the user must re-login; the version is monotonic and never rolls back."));
+        t.add(new TextDef("iam.sessions.confirm", "确认强制 {{username}} 下线？其所有已签发令牌将立即失效。", "Force {{username}} offline? All issued tokens are invalidated immediately."));
+        t.add(new TextDef("iam.sessions.msgKicked", "已强制 {{username}} 下线，令牌版本 → {{version}}", "Forced {{username}} offline; token version → {{version}}"));
+        t.add(new TextDef("iam.sessions.errLoad", "加载会话失败", "Failed to load sessions"));
+        t.add(new TextDef("iam.sessions.errOp", "操作失败", "Operation failed"));
+        t.add(new TextDef("iam.sessions.errKick", "强制下线失败", "Force logout failed"));
+
+        // —— AdmissionsPage（iam.admissions.*）——
+        t.add(new TextDef("iam.admissions.title", "按用户授权", "Authorize by user"));
+        t.add(new TextDef("iam.admissions.sub", "输入用户 ID 查看其准入矩阵，逐条授予 / 撤销", "Enter a user ID to see their admission matrix; grant / revoke per row"));
+        t.add(new TextDef("iam.admissions.f.userId", "用户 ID", "User ID"));
+        t.add(new TextDef("iam.admissions.query", "查询", "Query"));
+        t.add(new TextDef("iam.admissions.th.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.admissions.th.appName", "应用名称", "App name"));
+        t.add(new TextDef("iam.admissions.th.admission", "准入", "Admission"));
+        t.add(new TextDef("iam.admissions.th.roles", "角色组（逗号分隔，可编辑）", "Role groups (comma-separated, editable)"));
+        t.add(new TextDef("iam.admissions.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.admissions.admitted", "已准入", "Admitted"));
+        t.add(new TextDef("iam.admissions.notAdmitted", "未准入", "Not admitted"));
+        t.add(new TextDef("iam.admissions.update", "更新", "Update"));
+        t.add(new TextDef("iam.admissions.grant", "授予", "Grant"));
+        t.add(new TextDef("iam.admissions.revoke", "撤销", "Revoke"));
+        t.add(new TextDef("iam.admissions.emptyTitle", "输入用户 ID 后点击「查询」", "Enter a user ID then click “Query”"));
+        t.add(new TextDef("iam.admissions.emptyHint", "将列出全部已注册应用及其准入 / 角色状态", "Lists all registered apps with their admission / role status"));
+        t.add(new TextDef("iam.admissions.impactTitle", "变更影响", "Change impact"));
+        t.add(new TextDef("iam.admissions.impactSub", "准入变更即时生效", "Admission changes take effect immediately"));
+        t.add(new TextDef("iam.admissions.impact1", "授予 / 更新 / 撤销准入都会 bump 该用户的令牌版本，其存量令牌立即失效（需重新登录）。", "Grant / update / revoke all bump the user's token version; existing tokens invalidated (re-login required)."));
+        t.add(new TextDef("iam.admissions.impact2", "禁用某应用后，其下所有已分配用户的准入一并失效（登录时 apps claim 不再包含该接入码）。", "Disabling an app revokes admission for all its assigned users (apps claim drops the code at sign-in)."));
+        t.add(new TextDef("iam.admissions.impact3", "角色组为 ap 内粗粒度分组（如 ADMIN / OPERATOR），业务系统的菜单/按钮权限由业务 ap 自行控制。", "Role groups are coarse ap-internal groups (e.g. ADMIN / OPERATOR); the ap controls its own menu/button rights."));
+        t.add(new TextDef("iam.admissions.msgGranted", "已授予 {{user}} 进入 {{app}}（角色：{{roles}}）", "Granted {{user}} access to {{app}} (roles: {{roles}})"));
+        t.add(new TextDef("iam.admissions.msgRevoked", "已撤销 {{user}} 在 {{app}} 的准入", "Revoked {{user}}'s admission to {{app}}"));
+        t.add(new TextDef("iam.admissions.errLoad", "加载应用失败", "Failed to load apps"));
+        t.add(new TextDef("iam.admissions.errQuery", "查询失败", "Query failed"));
+        t.add(new TextDef("iam.admissions.errGrant", "授予失败", "Grant failed"));
+        t.add(new TextDef("iam.admissions.errRevoke", "撤销失败", "Revoke failed"));
+        t.add(new TextDef("iam.admissions.noRole", "无", "None"));
+
+        // —— LockoutsPage（iam.lockouts.*）——
+        t.add(new TextDef("iam.lockouts.title", "锁定中的账号", "Locked accounts"));
+        t.add(new TextDef("iam.lockouts.sub", "连续登录失败达阈值触发的临时锁定；到期自动解除，也可手动解锁", "Temporary lock from consecutive failures past threshold; auto-released on expiry, or manually unlocked"));
+        t.add(new TextDef("iam.lockouts.count", "{{n}} 个", "{{n}}"));
+        t.add(new TextDef("iam.lockouts.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.lockouts.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.lockouts.th.username", "用户名", "Username"));
+        t.add(new TextDef("iam.lockouts.th.failures", "失败次数", "Failures"));
+        t.add(new TextDef("iam.lockouts.th.first", "首次失败", "First failure"));
+        t.add(new TextDef("iam.lockouts.th.last", "最近失败", "Last failure"));
+        t.add(new TextDef("iam.lockouts.th.until", "锁定至", "Locked until"));
+        t.add(new TextDef("iam.lockouts.th.actions", "操作", "Actions"));
+        t.add(new TextDef("iam.lockouts.unlock", "解锁", "Unlock"));
+        t.add(new TextDef("iam.lockouts.emptyTitle", "当前无锁定账号", "No locked accounts"));
+        t.add(new TextDef("iam.lockouts.emptyHint", "登录失败达阈值后会自动出现在此处", "Appears automatically once failures hit the threshold"));
+        t.add(new TextDef("iam.lockouts.policyTitle", "锁定策略", "Lockout policy"));
+        t.add(new TextDef("iam.lockouts.policySub", "滑动窗口内累计失败触发", "Triggered by cumulative failures within a sliding window"));
+        t.add(new TextDef("iam.lockouts.policy1", "窗口内连续失败达阈值即锁定；窗口过后历史失败清零（滑动窗口）。", "Consecutive failures hit the threshold → lock; after the window, history clears (sliding window)."));
+        t.add(new TextDef("iam.lockouts.policy2", "登录成功会立即清零计数，不会因成功登录而长期锁定。", "A successful sign-in clears the count immediately; success never causes a long lock."));
+        t.add(new TextDef("iam.lockouts.policy3", "锁定期间即使口令正确也会被拒（不区分用户是否存在，防账号枚举）。", "During lock, even the correct password is rejected (user existence is not disclosed, anti-enumeration)."));
+        t.add(new TextDef("iam.lockouts.policy4", "策略参数（阈值 / 锁定时长 / 窗口）见「系统设置」。", "Policy params (threshold / duration / window) are in “System settings”."));
+        t.add(new TextDef("iam.lockouts.msgUnlocked", "已解锁 {{user}}", "Unlocked {{user}}"));
+        t.add(new TextDef("iam.lockouts.msgNoLock", "{{user}} 无锁定记录", "{{user}} has no lock record"));
+        t.add(new TextDef("iam.lockouts.errLoad", "加载锁定列表失败", "Failed to load lockouts"));
+        t.add(new TextDef("iam.lockouts.errUnlock", "解锁失败", "Unlock failed"));
+
+        // —— AuditPage（iam.audit.*）——
+        t.add(new TextDef("iam.audit.title", "审计流水", "Audit trail"));
+        t.add(new TextDef("iam.audit.sub", "登录、登出、改密、应用与准入变更、强制下线等动作的追溯记录", "Trace of sign-in/out, password changes, app & admission changes, forced logout"));
+        t.add(new TextDef("iam.audit.filterType", "全部类型", "All types"));
+        t.add(new TextDef("iam.audit.recent100", "最近 100", "Last 100"));
+        t.add(new TextDef("iam.audit.recent200", "最近 200", "Last 200"));
+        t.add(new TextDef("iam.audit.recent500", "最近 500", "Last 500"));
+        t.add(new TextDef("iam.audit.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.audit.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.audit.th.time", "时间", "Time"));
+        t.add(new TextDef("iam.audit.th.type", "类型", "Type"));
+        t.add(new TextDef("iam.audit.th.result", "结果", "Result"));
+        t.add(new TextDef("iam.audit.th.operator", "操作人", "Operator"));
+        t.add(new TextDef("iam.audit.th.target", "对象", "Target"));
+        t.add(new TextDef("iam.audit.th.detail", "说明", "Detail"));
+        t.add(new TextDef("iam.audit.resultFail", "失败", "Failure"));
+        t.add(new TextDef("iam.audit.resultOk", "成功", "Success"));
+        t.add(new TextDef("iam.audit.emptyTitle", "暂无审计事件", "No audit events yet"));
+        t.add(new TextDef("iam.audit.emptyHint", "关键动作发生后会自动记录", "Key actions are recorded automatically"));
+        t.add(new TextDef("iam.audit.scopeTitle", "记录范围", "Coverage"));
+        t.add(new TextDef("iam.audit.scopeSub", "审计埋点覆盖的关键路径", "Key paths covered by audit instrumentation"));
+        t.add(new TextDef("iam.audit.errLoad", "加载审计日志失败", "Failed to load audit log"));
+
+        // —— RolesPage（iam.rolesView.*）——
+        t.add(new TextDef("iam.rolesView.title", "角色组分布", "Role group distribution"));
+        t.add(new TextDef("iam.rolesView.sub", "按接入码聚合，展示各 app 内实际分配的粗角色组及人数", "Aggregated by app code; shows actual coarse role groups per app and headcount"));
+        t.add(new TextDef("iam.rolesView.countApps", "{{n}} 个接入码", "{{n}} app codes"));
+        t.add(new TextDef("iam.rolesView.countRoles", "{{n}} 个角色组", "{{n}} role groups"));
+        t.add(new TextDef("iam.rolesView.refresh", "刷新", "Refresh"));
+        t.add(new TextDef("iam.rolesView.refreshing", "刷新中", "Refreshing"));
+        t.add(new TextDef("iam.rolesView.th.appCode", "接入码", "App code"));
+        t.add(new TextDef("iam.rolesView.th.appName", "应用名称", "App name"));
+        t.add(new TextDef("iam.rolesView.th.roles", "角色组与人数", "Role groups & headcount"));
+        t.add(new TextDef("iam.rolesView.userCount", "{{n}} 名用户", "{{n}} users"));
+        t.add(new TextDef("iam.rolesView.noRole", "未被分配任何角色组", "No role group assigned"));
+        t.add(new TextDef("iam.rolesView.emptyTitle", "暂无应用", "No apps yet"));
+        t.add(new TextDef("iam.rolesView.emptyHint", "先在「应用注册」登记接入码", "Register an app code in “App registration” first"));
+        t.add(new TextDef("iam.rolesView.aboutTitle", "关于角色组", "About role groups"));
+        t.add(new TextDef("iam.rolesView.aboutSub", "IAM 只管准入，不管业务内部权限", "IAM manages admission only, not business-internal rights"));
+        t.add(new TextDef("iam.rolesView.about1", "角色组是「ap 内的粗粒度分组」，由准入授权时写入，随令牌 roles claim 下发。", "Role groups are coarse ap-internal groups, written at admission time and carried by the token's roles claim."));
+        t.add(new TextDef("iam.rolesView.about2", "本视图不维护独立字典，而是聚合实际在用值，避免「定义与实际脱节」。", "This view keeps no separate dictionary; it aggregates live values to avoid drift between definition and reality."));
+        t.add(new TextDef("iam.rolesView.about3", "业务系统内的菜单 / 按钮 / 数据行权限由各业务 ap 自行控制（IAM 不介入）。", "Menu/button/data-row rights inside a business ap are controlled by that ap (IAM does not intervene)."));
+        t.add(new TextDef("iam.rolesView.errLoad", "加载角色组失败", "Failed to load role groups"));
+
         return t;
     }
 
