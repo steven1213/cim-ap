@@ -449,6 +449,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admin.perms.moduleOwner",
                 "iam:* 属 IAM 控制台内部权限；sys:* 属平台系统域（配置页数据面用它鉴权）",
                 "iam:* belongs to the IAM console; sys:* belongs to the platform system domain"));
+        t.add(new TextDef("iam.admin.perms.ifaceTag", "接口级", "API-level"));
         // —— 角色管理页 ——
         t.add(new TextDef("iam.admin.roles.list", "角色列表", "Roles"));
         t.add(new TextDef("iam.admin.roles.new", "新建角色", "New role"));
@@ -467,6 +468,10 @@ public final class IamConsoleCatalog {
                 "Menu visibility controls the sidebar and routes; independent from permission codes"));
         t.add(new TextDef("iam.admin.roles.grantSave", "保存授权", "Save grants"));
         t.add(new TextDef("iam.admin.roles.groupByModule", "按模块分组", "Grouped by module"));
+        t.add(new TextDef("iam.admin.roles.groupByPage", "按所属页面分组，可整组勾选", "Grouped by linked page; toggle per group"));
+        t.add(new TextDef("iam.admin.roles.tabBasic", "基本信息", "Profile"));
+        t.add(new TextDef("iam.admin.roles.tabPermGrant", "权限授权", "Permissions"));
+        t.add(new TextDef("iam.admin.roles.tabMenuGrant", "菜单授权", "Menus"));
         // —— 多语言页 ——
         t.add(new TextDef("iam.admin.i18n.locales", "语言目录", "Locales"));
         t.add(new TextDef("iam.admin.i18n.messages", "译文", "Texts"));

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
-import type { PageResultDto, SysPermissionDto } from '@/types';
+import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
 import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { useHasAllPermissions } from '@/lib/usePermission';
+import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
 import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
 
@@ -17,6 +18,11 @@ import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/
  * <p><b>为什么不需要手填 module/res/action</b>：平台侧 `SysPermissionService` 在保存时统一调用
  * `applyCode(code)` 拆解三段并落库，保证三段与 `code` 永不漂移——这是「注解里的码」与
  * 「库里的码」能对上的前提。故前端只填 `code` + 名称。</p>
+ *
+ * <p><b>按页面分组</b>：左列以「所属页面」为第一维度（权威源 = 菜单树 MENU/BUTTON 的
+ * `permCode` 关联），让「给某页授权」的心智模型直接落地；未挂页面的接口级码
+ * （平台 `sys:*` 闸门等）按 module 归组排后并打标。菜单树加载失败（如无
+ * `sys:menu:list`）时静默回退为纯 module 分组，不影响权限 CRUD 主功能。</p>
  */
 export default function PermissionsAdminPage() {
   const { t } = useTranslation();
@@ -24,6 +30,7 @@ export default function PermissionsAdminPage() {
   const canRemove = useHasAllPermissions([PERM_DELETE, SYS.PERM_REMOVE]);
 
   const [rows, setRows] = useState<SysPermissionDto[]>([]);
+  const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -51,8 +58,19 @@ export default function PermissionsAdminPage() {
     }
   }
 
+  /** 页面归属目录（可失败：无 sys:menu:list 时回退 module 分组，不拖垮主功能）。 */
+  async function loadMenuTree() {
+    try {
+      const tree = await api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true });
+      setMenuTree(tree ?? []);
+    } catch {
+      setMenuTree([]);
+    }
+  }
+
   useEffect(() => {
     load();
+    loadMenuTree();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canRead]);
 
@@ -69,17 +87,11 @@ export default function PermissionsAdminPage() {
     );
   }, [rows, keyword]);
 
-  /** 按 module 分组（`code` 首段），便于按域查看。 */
-  const grouped = useMemo(() => {
-    const map = new Map<string, SysPermissionDto[]>();
-    for (const r of filtered) {
-      const mod = r.module ?? r.code.split(':')[0] ?? 'other';
-      const list = map.get(mod) ?? [];
-      list.push(r);
-      map.set(mod, list);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filtered]);
+  /** 按所属页面分组（菜单树关联），接口级码按 module 归组排后。 */
+  const grouped = useMemo(
+    () => groupPermsByPage(filtered, buildPermPageMap(menuTree)),
+    [filtered, menuTree],
+  );
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -189,10 +201,15 @@ export default function PermissionsAdminPage() {
           </div>
           {grouped.length ? (
             <div className="tree" style={{ paddingTop: 8 }}>
-              {grouped.map(([mod, list]) => (
-                <div key={mod}>
-                  <div className="side-cap">{mod}</div>
-                  {list.map((r) => (
+              {grouped.map((g) => (
+                <div key={g.key}>
+                  <div className="side-cap" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ textTransform: g.kind === 'page' ? 'none' : undefined }}>
+                      {g.kind === 'page' ? t(g.label) : g.label}
+                    </span>
+                    {g.kind === 'module' && <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>}
+                  </div>
+                  {g.perms.map((r) => (
                     <div
                       key={r.id}
                       className={'tree-row' + (draft?.id === r.id ? ' on' : '')}
