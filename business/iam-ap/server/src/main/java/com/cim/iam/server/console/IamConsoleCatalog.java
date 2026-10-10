@@ -501,7 +501,8 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.shell.theme.dark", "切换到深色主题", "Switch to dark theme"));
         t.add(new TextDef("iam.shell.theme.light", "切换到浅色主题", "Switch to light theme"));
         t.add(new TextDef("iam.shell.language", "语言", "Language"));
-        t.add(new TextDef("iam.shell.adminHint", "具备 IAM 管理面权限", "Has IAM console privileges"));
+        t.add(new TextDef("iam.shell.adminHint", "控制台管理员：持有 iam:console:admin 兜底权限码，可进入全部配置页", "Console admin: holds the iam:console:admin fallback code, can enter all config pages"));
+        t.add(new TextDef("iam.shell.adminBadge", "管理员", "ADMIN"));
         t.add(new TextDef("iam.shell.logout", "退出登录", "Sign out"));
         t.add(new TextDef("iam.shell.navGroupOther", "其他", "Other"));
         t.add(new TextDef("iam.common.notLoggedIn", "未登录", "Not signed in"));

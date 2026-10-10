@@ -174,7 +174,11 @@ export default function Layout() {
           </div>
 
           <div className="topbar-right">
-            {consoleAdmin && <span className="role-chip" title={t('iam.shell.adminHint')}>ADMIN</span>}
+            {consoleAdmin && (
+              <span className="role-chip" title={t('iam.shell.adminHint')}>
+                {t('iam.shell.adminBadge')}
+              </span>
+            )}
 
             <span className="env-chip" title={`构建模式：${import.meta.env.MODE}`}>
               <i className={'led ' + (isProd ? 'ok' : 'warn')} />
