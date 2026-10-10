@@ -30,8 +30,11 @@ docs/business/
 ├── mds-ap/                # 业务 ap：主数据 / 设备主数据
 │   ├── server/README.md    # MDS 业务后端设计（骨架）
 │   └── web/README.md       # MDS 业务前端设计（骨架）
-└── mes-ap/                # 业务 ap：制造执行系统
-    ├── server/README.md    # MES 业务后端设计（骨架）
-    └── web/README.md       # MES 业务前端设计（骨架）
+├── mes-ap/                # 业务 ap：制造执行系统
+│   ├── server/README.md    # MES 业务后端设计（骨架）
+│   └── web/README.md       # MES 业务前端设计（骨架）
+└── rms-ap/                # 业务 ap：配方管理系统（Recipe Management System）
+    ├── server/README.md    # RMS 业务后端设计（骨架）
+    └── web/README.md       # RMS 业务前端设计（骨架）
 
 > 新增业务 ap 时，在 `docs/business/` 下建 `{ap}-ap/{server,web}/README.md` 即可，保持与既有同构。
