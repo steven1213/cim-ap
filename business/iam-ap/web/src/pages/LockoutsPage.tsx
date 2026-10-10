@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { LockRow } from '@/types';
 import { fmtDateTime } from '@/lib/format';
@@ -9,6 +10,7 @@ import { IconAlert, IconCheckCircle, IconKey, IconLock, IconRefresh } from '@/co
 
 /** 登录锁定管理：列出被锁账号并支持手动解锁（解锁按钮按 `iam:user:unlock` 显隐）。 */
 export default function LockoutsPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<LockRow[]>([]);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
@@ -20,7 +22,7 @@ export default function LockoutsPage() {
     try {
       setRows(await api.get<LockRow[]>('/admin/lockouts'));
     } catch (e: any) {
-      setErr(e?.msg || '加载锁定列表失败');
+      setErr(e?.msg || t('iam.lockouts.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -34,10 +36,10 @@ export default function LockoutsPage() {
     setErr('');
     try {
       const cleared = await api.del<boolean>(`/admin/lockouts/${encodeURIComponent(username)}`);
-      setMsg(cleared ? `已解锁 ${username}` : `${username} 无锁定记录`);
+      setMsg(cleared ? t('iam.lockouts.msgUnlocked', { user: username }) : t('iam.lockouts.msgNoLock', { user: username }));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '解锁失败');
+      setErr(e?.msg || t('iam.lockouts.errUnlock'));
     }
   }
 
@@ -57,15 +59,15 @@ export default function LockoutsPage() {
       )}
 
       <Panel
-        title="锁定中的账号"
-        sub="连续登录失败达阈值触发的临时锁定；到期自动解除，也可手动解锁"
+        title={t('iam.lockouts.title')}
+        sub={t('iam.lockouts.sub')}
         flush
         actions={
           <>
-            <span className="tag">{rows.length} 个</span>
+            <span className="tag">{t('iam.lockouts.count', { n: rows.length })}</span>
             <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.lockouts.refreshing') : t('iam.lockouts.refresh')}
             </button>
           </>
         }
@@ -75,14 +77,14 @@ export default function LockoutsPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>用户名</th>
+                  <th>{t('iam.lockouts.th.username')}</th>
                   <th className="num" style={{ width: 110 }}>
-                    失败次数
+                    {t('iam.lockouts.th.failures')}
                   </th>
-                  <th style={{ width: 180 }}>首次失败</th>
-                  <th style={{ width: 180 }}>最近失败</th>
-                  <th style={{ width: 180 }}>锁定至</th>
-                  <th style={{ width: 110 }}>操作</th>
+                  <th style={{ width: 180 }}>{t('iam.lockouts.th.first')}</th>
+                  <th style={{ width: 180 }}>{t('iam.lockouts.th.last')}</th>
+                  <th style={{ width: 180 }}>{t('iam.lockouts.th.until')}</th>
+                  <th style={{ width: 110 }}>{t('iam.lockouts.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +99,7 @@ export default function LockoutsPage() {
                       <Perms code={USER_UNLOCK}>
                         <button className="btn-ghost btn-sm" onClick={() => onUnlock(r.username)}>
                           <IconKey width={13} height={13} />
-                          解锁
+                          {t('iam.lockouts.unlock')}
                         </button>
                       </Perms>
                     </td>
@@ -109,18 +111,18 @@ export default function LockoutsPage() {
         ) : (
           <div className="empty">
             <IconLock width={22} height={22} />
-            <b>当前无锁定账号</b>
-            <span>登录失败达阈值后会自动出现在此处</span>
+            <b>{t('iam.lockouts.emptyTitle')}</b>
+            <span>{t('iam.lockouts.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
-      <Panel title="锁定策略" sub="滑动窗口内累计失败触发">
+      <Panel title={t('iam.lockouts.policyTitle')} sub={t('iam.lockouts.policySub')}>
         <ul className="note-list">
-          <li>窗口内连续失败达阈值即锁定；窗口过后历史失败清零（滑动窗口）。</li>
-          <li>登录成功会立即清零计数，不会因成功登录而长期锁定。</li>
-          <li>锁定期间即使口令正确也会被拒（不区分用户是否存在，防账号枚举）。</li>
-          <li>策略参数（阈值 / 锁定时长 / 窗口）见「系统设置」。</li>
+          <li>{t('iam.lockouts.policy1')}</li>
+          <li>{t('iam.lockouts.policy2')}</li>
+          <li>{t('iam.lockouts.policy3')}</li>
+          <li>{t('iam.lockouts.policy4')}</li>
         </ul>
       </Panel>
     </div>

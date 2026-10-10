@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AppRegistration, AssignmentDto } from '@/types';
 import Panel from '@/components/Panel';
@@ -13,6 +14,7 @@ import { IconAlert, IconCheckCircle, IconInbox, IconLink } from '@/components/Ic
  * 这正是「准入变更即时生效」的落点。写操作按钮按 `iam:admission:grant|revoke` 权限显隐。</p>
  */
 export default function AdmissionsPage() {
+  const { t } = useTranslation();
   const [apps, setApps] = useState<AppRegistration[]>([]);
   const [userId, setUserId] = useState('admin');
   const [assignments, setAssignments] = useState<AssignmentDto[] | null>(null);
@@ -22,7 +24,7 @@ export default function AdmissionsPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.get<AppRegistration[]>('/apps').then(setApps).catch((e: any) => setErr(e?.msg || '加载应用失败'));
+    api.get<AppRegistration[]>('/apps').then(setApps).catch((e: any) => setErr(e?.msg || t('iam.admissions.errLoad')));
     // 默认即以 admin 查询一次，进入页面立即可见准入矩阵（符合常用使用习惯）
     void query();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,7 +47,7 @@ export default function AdmissionsPage() {
       for (const a of list) map[a.appCode] = a.roles.join(', ');
       setEdits(map);
     } catch (e: any) {
-      setErr(e?.msg || '查询失败');
+      setErr(e?.msg || t('iam.admissions.errQuery'));
     }
   }
 
@@ -62,10 +64,10 @@ export default function AdmissionsPage() {
         .map((r) => r.trim())
         .filter(Boolean);
       await api.post(`/apps/${encodeURIComponent(appCode)}/users`, { userId: userId.trim(), roles });
-      flash(`已授予 ${userId} 进入 ${appCode}（角色：${roles.join(', ') || '无'}）`);
+      flash(t('iam.admissions.msgGranted', { user: userId, app: appCode, roles: roles.join(', ') || t('iam.admissions.noRole') }));
       await query();
     } catch (e: any) {
-      setErr(e?.msg || '授予失败');
+      setErr(e?.msg || t('iam.admissions.errGrant'));
     } finally {
       setBusy(false);
     }
@@ -75,10 +77,10 @@ export default function AdmissionsPage() {
     setErr('');
     try {
       await api.del(`/apps/${encodeURIComponent(appCode)}/users/${encodeURIComponent(userId.trim())}`);
-      flash(`已撤销 ${userId} 在 ${appCode} 的准入`);
+      flash(t('iam.admissions.msgRevoked', { user: userId, app: appCode }));
       await query();
     } catch (e: any) {
-      setErr(e?.msg || '撤销失败');
+      setErr(e?.msg || t('iam.admissions.errRevoke'));
     }
   }
 
@@ -97,11 +99,11 @@ export default function AdmissionsPage() {
         </div>
       )}
 
-      <Panel title="按用户授权" sub="输入用户 ID 查看其准入矩阵，逐条授予 / 撤销">
+      <Panel title={t('iam.admissions.title')} sub={t('iam.admissions.sub')}>
         <form className="row" onSubmit={query}>
           <div className="field">
             <label className="field-label" htmlFor="au">
-              用户 ID
+              {t('iam.admissions.f.userId')}
             </label>
             <input
               id="au"
@@ -112,7 +114,7 @@ export default function AdmissionsPage() {
             />
           </div>
           <button type="submit" disabled={!userId.trim()}>
-            查询
+            {t('iam.admissions.query')}
           </button>
         </form>
 
@@ -121,11 +123,11 @@ export default function AdmissionsPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th style={{ width: 150 }}>接入码</th>
-                  <th style={{ width: 170 }}>应用名称</th>
-                  <th style={{ width: 90 }}>准入</th>
-                  <th>角色组（逗号分隔，可编辑）</th>
-                  <th style={{ width: 170 }}>操作</th>
+                  <th style={{ width: 150 }}>{t('iam.admissions.th.appCode')}</th>
+                  <th style={{ width: 170 }}>{t('iam.admissions.th.appName')}</th>
+                  <th style={{ width: 90 }}>{t('iam.admissions.th.admission')}</th>
+                  <th>{t('iam.admissions.th.roles')}</th>
+                  <th style={{ width: 170 }}>{t('iam.admissions.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +141,7 @@ export default function AdmissionsPage() {
                       <td>
                         <span className="status">
                           <i className={'led ' + (admitted ? 'ok' : '')} />
-                          <b>{admitted ? '已准入' : '未准入'}</b>
+                          <b>{admitted ? t('iam.admissions.admitted') : t('iam.admissions.notAdmitted')}</b>
                         </span>
                       </td>
                       <td>
@@ -155,13 +157,13 @@ export default function AdmissionsPage() {
                           <Perms code={ADMISSION_GRANT}>
                             <button className="btn-sm" disabled={busy} onClick={() => grant(a.appCode)}>
                               <IconLink width={13} height={13} />
-                              {admitted ? '更新' : '授予'}
+                              {admitted ? t('iam.admissions.update') : t('iam.admissions.grant')}
                             </button>
                           </Perms>
                           {admitted && (
                             <Perms code={ADMISSION_REVOKE}>
                               <button className="btn-danger btn-sm" onClick={() => revoke(a.appCode)}>
-                                撤销
+                                {t('iam.admissions.revoke')}
                               </button>
                             </Perms>
                           )}
@@ -178,17 +180,17 @@ export default function AdmissionsPage() {
         {!assignments && (
           <div className="empty" style={{ marginTop: 14 }}>
             <IconInbox width={22} height={22} />
-            <b>输入用户 ID 后点击「查询」</b>
-            <span>将列出全部已注册应用及其准入 / 角色状态</span>
+            <b>{t('iam.admissions.emptyTitle')}</b>
+            <span>{t('iam.admissions.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
-      <Panel title="变更影响" sub="准入变更即时生效">
+      <Panel title={t('iam.admissions.impactTitle')} sub={t('iam.admissions.impactSub')}>
         <ul className="note-list">
-          <li>授予 / 更新 / 撤销准入都会 bump 该用户的令牌版本，其存量令牌立即失效（需重新登录）。</li>
-          <li>禁用某应用后，其下所有已分配用户的准入一并失效（登录时 apps claim 不再包含该接入码）。</li>
-          <li>角色组为 ap 内粗粒度分组（如 ADMIN / OPERATOR），业务系统的菜单/按钮权限由业务 ap 自行控制。</li>
+          <li>{t('iam.admissions.impact1')}</li>
+          <li>{t('iam.admissions.impact2')}</li>
+          <li>{t('iam.admissions.impact3')}</li>
         </ul>
       </Panel>
     </div>

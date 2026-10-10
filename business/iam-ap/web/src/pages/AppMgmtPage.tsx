@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AppRegistration, AppStatus } from '@/types';
 import Panel from '@/components/Panel';
@@ -14,6 +15,7 @@ import {
 
 /** 应用注册：登记业务接入码、维护状态（按钮按 `iam:app:*` 权限显隐）。准入分配见「准入授权」。 */
 export default function AppMgmtPage() {
+  const { t } = useTranslation();
   const [apps, setApps] = useState<AppRegistration[]>([]);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -30,7 +32,7 @@ export default function AppMgmtPage() {
     try {
       setApps(await api.get<AppRegistration[]>('/apps'));
     } catch (e: any) {
-      setErr(e?.msg || '加载应用列表失败');
+      setErr(e?.msg || t('iam.appMgmt.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -51,13 +53,13 @@ export default function AppMgmtPage() {
     setBusy(true);
     try {
       await api.post<AppRegistration>('/apps', { appCode: appCode.trim(), appName, sortNo: Number(sortNo) });
-      flash(`已注册应用 ${appCode}`);
+      flash(t('iam.appMgmt.msgRegistered', { code: appCode }));
       setAppCode('');
       setAppName('');
       setSortNo(0);
       await loadApps();
     } catch (e: any) {
-      setErr(e?.msg || '注册失败');
+      setErr(e?.msg || t('iam.appMgmt.errRegister'));
     } finally {
       setBusy(false);
     }
@@ -66,15 +68,15 @@ export default function AppMgmtPage() {
   async function toggleStatus(a: AppRegistration) {
     setErr('');
     const next: AppStatus = a.status === 'ENABLED' ? 'DISABLED' : 'ENABLED';
-    if (next === 'DISABLED' && !window.confirm(`确认停用 ${a.appCode}？其下所有用户对该应用的准入将立即失效。`)) {
+    if (next === 'DISABLED' && !window.confirm(t('iam.appMgmt.confirmDisable', { code: a.appCode }))) {
       return;
     }
     try {
       await api.put(`/apps/${encodeURIComponent(a.appCode)}`, { appName: a.appName, status: next });
-      flash(`${a.appCode} 已${next === 'ENABLED' ? '启用' : '停用'}`);
+      flash(t('iam.appMgmt.msgToggled', { code: a.appCode, state: next === 'ENABLED' ? t('iam.appMgmt.stateEnabled') : t('iam.appMgmt.stateDisabled') }));
       await loadApps();
     } catch (e: any) {
-      setErr(e?.msg || '更新失败');
+      setErr(e?.msg || t('iam.appMgmt.errUpdate'));
     }
   }
 
@@ -96,16 +98,16 @@ export default function AppMgmtPage() {
       )}
 
       <Panel
-        title="应用清单"
-        sub="已注册的业务接入码；接入码即令牌 apps claim 的取值"
+        title={t('iam.appMgmt.title')}
+        sub={t('iam.appMgmt.sub')}
         flush
         actions={
           <>
-            <span className="tag">{apps.length} 条</span>
-            <span className="tag ok">{enabled} 启用</span>
+            <span className="tag">{t('iam.appMgmt.count', { n: apps.length })}</span>
+            <span className="tag ok">{t('iam.appMgmt.enabled', { n: enabled })}</span>
             <button className="btn-ghost btn-sm" onClick={loadApps} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.appMgmt.refreshing') : t('iam.appMgmt.refresh')}
             </button>
           </>
         }
@@ -115,13 +117,13 @@ export default function AppMgmtPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>接入码</th>
-                  <th>应用名称</th>
-                  <th style={{ width: 100 }}>状态</th>
+                  <th>{t('iam.appMgmt.th.appCode')}</th>
+                  <th>{t('iam.appMgmt.th.name')}</th>
+                  <th style={{ width: 100 }}>{t('iam.appMgmt.th.status')}</th>
                   <th className="num" style={{ width: 80 }}>
-                    排序
+                    {t('iam.appMgmt.th.sort')}
                   </th>
-                  <th style={{ width: 120 }}>操作</th>
+                  <th style={{ width: 120 }}>{t('iam.appMgmt.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,7 +134,7 @@ export default function AppMgmtPage() {
                     <td>
                       <span className="status">
                         <i className={'led ' + (a.status === 'ENABLED' ? 'ok' : 'err')} />
-                        <b>{a.status === 'ENABLED' ? '启用' : '停用'}</b>
+                        <b>{a.status === 'ENABLED' ? t('iam.appMgmt.enabled2') : t('iam.appMgmt.disabled2')}</b>
                       </span>
                     </td>
                     <td className="num">{a.sortNo}</td>
@@ -140,7 +142,7 @@ export default function AppMgmtPage() {
                       <Perms code={APP_UPDATE}>
                         <button className="btn-ghost btn-sm" onClick={() => toggleStatus(a)}>
                           <IconPower width={13} height={13} />
-                          {a.status === 'ENABLED' ? '停用' : '启用'}
+                          {a.status === 'ENABLED' ? t('iam.appMgmt.disable') : t('iam.appMgmt.enable')}
                         </button>
                       </Perms>
                     </td>
@@ -152,19 +154,19 @@ export default function AppMgmtPage() {
         ) : (
           <div className="empty">
             <IconApps width={22} height={22} />
-            <b>暂无应用</b>
-            <span>在下方「注册应用」中添加第一个业务接入码</span>
+            <b>{t('iam.appMgmt.emptyTitle')}</b>
+            <span>{t('iam.appMgmt.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
       <Perms code={APP_CREATE}>
-        <Panel title="注册应用" sub="接入码将写入令牌的 apps claim">
+        <Panel title={t('iam.appMgmt.registerTitle')} sub={t('iam.appMgmt.registerSub')}>
           <form onSubmit={onRegister}>
           <div className="form-grid">
             <div className="field">
               <label className="field-label" htmlFor="reg-code">
-                接入码
+                {t('iam.appMgmt.f.appCode')}
               </label>
               <input
                 id="reg-code"
@@ -176,18 +178,18 @@ export default function AppMgmtPage() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="reg-name">
-                应用名称
+                {t('iam.appMgmt.f.name')}
               </label>
               <input
                 id="reg-name"
-                placeholder="MDS 设备数据服务"
+                placeholder={t('iam.appMgmt.namePH')}
                 value={appName}
                 onChange={(e) => setAppName(e.target.value)}
               />
             </div>
             <div className="field">
               <label className="field-label" htmlFor="reg-sort">
-                排序号
+                {t('iam.appMgmt.f.sort')}
               </label>
               <input
                 id="reg-sort"
@@ -198,19 +200,19 @@ export default function AppMgmtPage() {
               />
             </div>
           </div>
-          <p className="hint">接入码全局唯一，注册后即纳入 IAM 的 ap 注册表，用于准入判定。</p>
+          <p className="hint">{t('iam.appMgmt.hint')}</p>
           <button type="submit" className="btn-block" disabled={busy || !appCode.trim() || !appName} style={{ marginTop: 12 }}>
-            注册应用
+            {t('iam.appMgmt.register')}
           </button>
           </form>
         </Panel>
       </Perms>
 
-      <Panel title="接入指引" sub="业务 ap 如何对接 IAM 令牌">
+      <Panel title={t('iam.appMgmt.guideTitle')} sub={t('iam.appMgmt.guideSub')}>
         <ul className="note-list">
-          <li>业务 ap 从 <code>/.well-known/jwks.json</code> 拉取公钥，本地验签（RS256），无需每请求回查 IAM。</li>
-          <li>准入判定：令牌 <code>apps</code> claim 含本 ap 接入码即放行；否则 403。</li>
-          <li>角色组：令牌 <code>roles</code> claim 携带本 ap 内的粗角色组，业务内部权限据此再细分。</li>
+          <li>{t('iam.appMgmt.guide1')}</li>
+          <li>{t('iam.appMgmt.guide2')}</li>
+          <li>{t('iam.appMgmt.guide3')}</li>
         </ul>
       </Panel>
     </div>

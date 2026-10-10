@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
@@ -16,6 +17,7 @@ import { IconAlert, IconTree } from '@/components/Icons';
  * 因此此处主动清空本地会话并跳转登录页，强制以新口令重新登录，避免停留在已失效的会话里。
  */
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const [oldPassword, setOld] = useState('');
   const [newPassword, setNew] = useState('');
   const [confirmPassword, setConfirm] = useState('');
@@ -37,11 +39,11 @@ export default function ProfilePage() {
     e.preventDefault();
     setErr('');
     if (!username) {
-      setErr('当前会话缺失用户名，请重新登录');
+      setErr(t('iam.profile.errSession'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErr('两次输入的新口令不一致');
+      setErr(t('iam.profile.errMismatch'));
       return;
     }
     setBusy(true);
@@ -58,9 +60,9 @@ export default function ProfilePage() {
       await api.post<void>('/me/password', body);
       // 服务端已 bump 令牌版本 → 当前令牌失效，主动清态并重登
       clearSession();
-      navigate('/login', { state: { notice: '口令已更新，请重新登录' } });
+      navigate('/login', { state: { notice: t('iam.profile.pwdUpdatedNotice') } });
     } catch (e: any) {
-      setErr(e?.msg || e?.message || '改密失败');
+      setErr(e?.msg || e?.message || t('iam.profile.errChange'));
     } finally {
       setBusy(false);
     }
@@ -72,28 +74,28 @@ export default function ProfilePage() {
   return (
     <div className="page">
       <div className="grid-2">
-        <Panel title="账户信息" sub="当前登录身份与档案">
+        <Panel title={t('iam.profile.infoTitle')} sub={t('iam.profile.infoSub')}>
           <dl className="meta">
-            <dt className="meta-k">用户 ID</dt>
+            <dt className="meta-k">{t('iam.profile.mk.userId')}</dt>
             <dd className="meta-v mono">{userId ?? '—'}</dd>
-            <dt className="meta-k">用户名</dt>
+            <dt className="meta-k">{t('iam.profile.mk.username')}</dt>
             <dd className="meta-v">{username ?? '—'}</dd>
-            <dt className="meta-k">姓名</dt>
+            <dt className="meta-k">{t('iam.profile.mk.name')}</dt>
             <dd className="meta-v">{displayName ?? '—'}</dd>
-            <dt className="meta-k">工号</dt>
+            <dt className="meta-k">{t('iam.profile.mk.empNo')}</dt>
             <dd className="meta-v mono">{employeeNo ?? '—'}</dd>
-            <dt className="meta-k">岗位</dt>
+            <dt className="meta-k">{t('iam.profile.mk.job')}</dt>
             <dd className="meta-v">{jobTitle ?? '—'}</dd>
-            <dt className="meta-k">档案来源</dt>
+            <dt className="meta-k">{t('iam.profile.mk.source')}</dt>
             <dd className="meta-v">{originLabel(source)}</dd>
-            <dt className="meta-k">租户</dt>
+            <dt className="meta-k">{t('iam.profile.mk.tenant')}</dt>
             <dd className="meta-v mono">{tenantId ?? '—'}</dd>
-            <dt className="meta-k">准入应用</dt>
+            <dt className="meta-k">{t('iam.profile.mk.apps')}</dt>
             <dd className="meta-v mono">{appCount}</dd>
           </dl>
 
           <div className="sub-block">
-            <div className="sub-title">我的组织归属</div>
+            <div className="sub-title">{t('iam.profile.subTitleOrgs')}</div>
             {orgs.length ? (
               <div className="tag-list">
                 {orgs.map((o) => (
@@ -105,25 +107,25 @@ export default function ProfilePage() {
               </div>
             ) : (
               <p className="hint" style={{ marginTop: 4 }}>
-                <IconTree width={13} height={13} /> 尚未归属任何组织——归属由管理员在「组织架构」中维护。
+                <IconTree width={13} height={13} /> {t('iam.profile.noOrgs')}
               </p>
             )}
           </div>
 
           <div className="sub-block">
-            <div className="sub-title">安全提示</div>
+            <div className="sub-title">{t('iam.profile.secTitle')}</div>
             <ul className="note-list">
-              <li>改密后全部已签发令牌立即失效，需重新登录。</li>
-              <li>AD / LDAP 账号的口令变更请在目录侧完成。</li>
+              <li>{t('iam.profile.sec1')}</li>
+              <li>{t('iam.profile.sec2')}</li>
             </ul>
           </div>
         </Panel>
 
-        <Panel title="修改口令" sub="修改成功后需以新口令重新登录">
+        <Panel title={t('iam.profile.pwdTitle')} sub={t('iam.profile.pwdSub')}>
           <form onSubmit={onSubmit}>
             <div className="field">
               <label className="field-label" htmlFor="pw-old">
-                原口令
+                {t('iam.profile.f.old')}
               </label>
               <input
                 id="pw-old"
@@ -135,7 +137,7 @@ export default function ProfilePage() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="pw-new">
-                新口令
+                {t('iam.profile.f.new')}
               </label>
               <input
                 id="pw-new"
@@ -147,7 +149,7 @@ export default function ProfilePage() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="pw-confirm">
-                确认新口令
+                {t('iam.profile.f.confirm')}
               </label>
               <input
                 id="pw-confirm"
@@ -166,11 +168,11 @@ export default function ProfilePage() {
             )}
 
             <button type="submit" className="btn-block" disabled={busy || !canSubmit} style={{ marginTop: 14 }}>
-              {busy ? '提交中…' : '提交修改'}
+              {busy ? t('iam.profile.submitting') : t('iam.profile.submit')}
             </button>
           </form>
           <p className="hint">
-            口令在浏览器内完成第一层 PBKDF2 派生（与登录一致），仅密文派生值上传；明文口令不离开浏览器。
+            {t('iam.profile.hint')}
           </p>
         </Panel>
       </div>

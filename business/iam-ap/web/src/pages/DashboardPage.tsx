@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import * as api from '@/lib/api';
 import type { OverviewDto } from '@/types';
@@ -41,12 +42,13 @@ function AdminOverview() {
   const [ov, setOv] = useState<OverviewDto | null>(null);
   const [err, setErr] = useState('');
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     api
       .get<OverviewDto>('/admin/overview')
       .then(setOv)
-      .catch((e: any) => setErr(e?.msg || '加载概览失败'));
+      .catch((e: any) => setErr(e?.msg || t('iam.dashboard.errLoad')));
   }, []);
 
   if (err) {
@@ -62,10 +64,10 @@ function AdminOverview() {
 
   if (!ov) {
     return (
-      <Panel title="平台概览">
+      <Panel title={t('iam.dashboard.platformTitle')}>
         <div className="empty">
           <IconGauge width={24} height={24} />
-          <b>正在加载平台态势…</b>
+          <b>{t('iam.dashboard.loadingPlatform')}</b>
         </div>
       </Panel>
     );
@@ -76,24 +78,24 @@ function AdminOverview() {
   return (
     <div className="page">
       <div className="kpi-grid">
-        <Kpi icon={<IconUsers width={16} height={16} />} label="用户账号" value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={`${ov.disabledUserCount} 已禁用`} />
-        <Kpi icon={<IconUser width={16} height={16} />} tone="info" label="用户档案" value={ov.profileCount} sub={`${ov.adProfileCount} AD 同步`} />
-        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label="组织节点" value={ov.orgCount} sub={`${ov.orgManagedCount} IAM 自建`} />
-        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label="接入应用" value={`${ov.enabledAppCount} / ${ov.appCount}`} sub="启用 / 总数" />
-        <Kpi icon={<IconMonitor width={16} height={16} />} tone="info" label="在线会话" value={ov.activeSessionCount} sub="活跃刷新令牌" />
-        <Kpi icon={<IconLock width={16} height={16} />} tone={ov.lockedCount > 0 ? 'warn' : 'ok'} label="锁定账户" value={ov.lockedCount} sub="暴力破解防护" />
-        <Kpi icon={<IconShield width={16} height={16} />} tone="ok" label="登录成功" value={ov.loginSuccessCount} sub="累计" />
-        <Kpi icon={<IconAlert width={16} height={16} />} tone={failTone} label="登录失败" value={ov.loginFailureCount} sub="累计，需关注" />
+        <Kpi icon={<IconUsers width={16} height={16} />} label={t('iam.dashboard.kpiUser')} value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={t('iam.dashboard.kpiUserSub', { n: ov.disabledUserCount })} />
+        <Kpi icon={<IconUser width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiProfile')} value={ov.profileCount} sub={t('iam.dashboard.kpiProfileSub', { n: ov.adProfileCount })} />
+        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrg')} value={ov.orgCount} sub={t('iam.dashboard.kpiOrgSub', { n: ov.orgManagedCount })} />
+        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApp')} value={`${ov.enabledAppCount} / ${ov.appCount}`} sub={t('iam.dashboard.kpiAppSub')} />
+        <Kpi icon={<IconMonitor width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiSession')} value={ov.activeSessionCount} sub={t('iam.dashboard.kpiSessionSub')} />
+        <Kpi icon={<IconLock width={16} height={16} />} tone={ov.lockedCount > 0 ? 'warn' : 'ok'} label={t('iam.dashboard.kpiLock')} value={ov.lockedCount} sub={t('iam.dashboard.kpiLockSub')} />
+        <Kpi icon={<IconShield width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiLoginOk')} value={ov.loginSuccessCount} sub={t('iam.dashboard.kpiCumulative')} />
+        <Kpi icon={<IconAlert width={16} height={16} />} tone={failTone} label={t('iam.dashboard.kpiLoginFail')} value={ov.loginFailureCount} sub={t('iam.dashboard.kpiLoginFailSub')} />
       </div>
 
       <Panel
-        title="最近审计事件"
-        sub="登录、授权、改密等关键动作流水"
+        title={t('iam.dashboard.recentAudit')}
+        sub={t('iam.dashboard.recentAuditSub')}
         flush
         actions={
           <button className="btn-ghost btn-sm" onClick={() => navigate('/audit')}>
             <IconList width={13} height={13} />
-            查看全部
+            {t('iam.dashboard.viewAll')}
           </button>
         }
       >
@@ -102,11 +104,11 @@ function AdminOverview() {
             <table className="data">
               <thead>
                 <tr>
-                  <th style={{ width: 150 }}>时间</th>
-                  <th style={{ width: 120 }}>类型</th>
-                  <th style={{ width: 120 }}>操作人</th>
-                  <th style={{ width: 130 }}>对象</th>
-                  <th>说明</th>
+                  <th style={{ width: 150 }}>{t('iam.dashboard.th.time')}</th>
+                  <th style={{ width: 120 }}>{t('iam.dashboard.th.type')}</th>
+                  <th style={{ width: 120 }}>{t('iam.dashboard.th.operator')}</th>
+                  <th style={{ width: 130 }}>{t('iam.dashboard.th.target')}</th>
+                  <th>{t('iam.dashboard.th.detail')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -127,7 +129,7 @@ function AdminOverview() {
         ) : (
           <div className="empty">
             <IconInbox width={22} height={22} />
-            <b>暂无审计事件</b>
+            <b>{t('iam.dashboard.noAudit')}</b>
           </div>
         )}
       </Panel>
@@ -137,13 +139,14 @@ function AdminOverview() {
 
 function PersonalOverview() {
   const user = useAuthStore((s) => s.user);
+  const { t } = useTranslation();
 
   if (!user) {
     return (
-      <Panel title="概览">
+      <Panel title={t('iam.dashboard.profileTitle')}>
         <div className="empty">
           <IconGauge width={24} height={24} />
-          <b>正在加载用户信息…</b>
+          <b>{t('iam.dashboard.loadingUser')}</b>
         </div>
       </Panel>
     );
@@ -157,41 +160,41 @@ function PersonalOverview() {
   return (
     <div className="page">
       <div className="kpi-grid">
-        <Kpi icon={<IconUser width={16} height={16} />} label="用户 ID" value={user.userId} />
-        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label="可进入应用" value={apps.length} />
-        <Kpi icon={<IconShield width={16} height={16} />} tone="info" label="角色组" value={roleCount} />
-        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label="组织归属" value={orgs.length} sub={orgs.filter((o) => o.primary).map((o) => o.name).join('，') || undefined} />
+        <Kpi icon={<IconUser width={16} height={16} />} label={t('iam.dashboard.kpiUserId')} value={user.userId} />
+        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApps')} value={apps.length} />
+        <Kpi icon={<IconShield width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiRoles')} value={roleCount} />
+        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrgs')} value={orgs.length} sub={orgs.filter((o) => o.primary).map((o) => o.name).join(', ') || undefined} />
       </div>
 
       <div className="grid-2">
-        <Panel title="身份信息" sub="来自用户档案与会话">
+        <Panel title={t('iam.dashboard.identityTitle')} sub={t('iam.dashboard.identitySub')}>
           <dl className="meta">
-            <dt className="meta-k">用户 ID</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.userId')}</dt>
             <dd className="meta-v mono">{user.userId}</dd>
-            <dt className="meta-k">用户名</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.username')}</dt>
             <dd className="meta-v">{user.username}</dd>
-            <dt className="meta-k">姓名</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.name')}</dt>
             <dd className="meta-v">{user.displayName ?? '—'}</dd>
-            <dt className="meta-k">工号</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.empNo')}</dt>
             <dd className="meta-v mono">{user.employeeNo ?? '—'}</dd>
-            <dt className="meta-k">岗位</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.job')}</dt>
             <dd className="meta-v">{user.jobTitle ?? '—'}</dd>
-            <dt className="meta-k">档案来源</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.source')}</dt>
             <dd className="meta-v">{originLabel(user.source)}</dd>
-            <dt className="meta-k">租户</dt>
+            <dt className="meta-k">{t('iam.dashboard.mk.tenant')}</dt>
             <dd className="meta-v mono">{user.tenantId ?? '—'}</dd>
           </dl>
         </Panel>
 
-        <Panel title="我的组织归属" sub="支持多归属（多能工 / 跨线支援）">
+        <Panel title={t('iam.dashboard.myOrgsTitle')} sub={t('iam.dashboard.myOrgsSub')}>
           {orgs.length ? (
             <div className="table-wrap">
               <table className="data">
                 <thead>
                   <tr>
-                    <th>组织</th>
-                    <th style={{ width: 84 }}>类型</th>
-                    <th style={{ width: 76 }}>主属</th>
+                    <th>{t('iam.dashboard.th.org')}</th>
+                    <th style={{ width: 84 }}>{t('iam.dashboard.th.type')}</th>
+                    <th style={{ width: 76 }}>{t('iam.dashboard.th.primary')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -203,7 +206,7 @@ function PersonalOverview() {
                       <td>
                         <span className="tag">{orgTypeLabel(o.nodeType)}</span>
                       </td>
-                      <td>{o.primary ? <span className="tag ok">是</span> : <span className="dim">—</span>}</td>
+                      <td>{o.primary ? <span className="tag ok">{t('iam.dashboard.yes')}</span> : <span className="dim">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -212,42 +215,42 @@ function PersonalOverview() {
           ) : (
             <div className="empty">
               <IconTree width={22} height={22} />
-              <b>尚未归属任何组织</b>
-              <span>请联系管理员在「组织架构」中把你挂到工序/产线</span>
+              <b>{t('iam.dashboard.noOrgs')}</b>
+              <span>{t('iam.dashboard.noOrgsHint')}</span>
             </div>
           )}
         </Panel>
       </div>
 
-      <Panel title="会话与安全" sub="令牌签发与验证方式">
-        <dl className="meta">
-          <dt className="meta-k">认证源</dt>
-          <dd className="meta-v">本地凭证（两层 PBKDF2）</dd>
-          <dt className="meta-k">签名算法</dt>
-          <dd className="meta-v mono">RS256 / JWT</dd>
-          <dt className="meta-k">验签方式</dt>
-          <dd className="meta-v">JWKS 公钥，业务侧本地验签</dd>
-          <dt className="meta-k">准入判定</dt>
-          <dd className="meta-v mono">apps claim（个人授予 ∪ 组织授予）</dd>
-          <dt className="meta-k">失效机制</dt>
-          <dd className="meta-v">版本号校验 + 黑名单（jti）</dd>
-        </dl>
-      </Panel>
+        <Panel title={t('iam.dashboard.sessionTitle')} sub={t('iam.dashboard.sessionSub')}>
+          <dl className="meta">
+            <dt className="meta-k">{t('iam.dashboard.mk.authSrc')}</dt>
+            <dd className="meta-v">{t('iam.dashboard.v.localCred')}</dd>
+            <dt className="meta-k">{t('iam.dashboard.mk.signAlgo')}</dt>
+            <dd className="meta-v mono">RS256 / JWT</dd>
+            <dt className="meta-k">{t('iam.dashboard.mk.verify')}</dt>
+            <dd className="meta-v">{t('iam.dashboard.v.jwks')}</dd>
+            <dt className="meta-k">{t('iam.dashboard.mk.admission')}</dt>
+            <dd className="meta-v mono">{t('iam.dashboard.v.appsClaim')}</dd>
+            <dt className="meta-k">{t('iam.dashboard.mk.invalid')}</dt>
+            <dd className="meta-v">{t('iam.dashboard.v.version')}</dd>
+          </dl>
+        </Panel>
 
-      <Panel
-        title="准入与角色矩阵"
-        sub="按接入码分组的准入状态与角色组"
-        flush
-        actions={<span className="tag">{apps.length} 个接入码</span>}
-      >
+        <Panel
+          title={t('iam.dashboard.matrixTitle')}
+          sub={t('iam.dashboard.matrixSub')}
+          flush
+          actions={<span className="tag">{t('iam.dashboard.matrixCount', { n: apps.length })}</span>}
+        >
         {roleEntries.length ? (
           <div className="table-wrap">
             <table className="data">
               <thead>
                 <tr>
-                  <th>接入码</th>
-                  <th>准入</th>
-                  <th>角色组</th>
+                    <th>{t('iam.dashboard.th.appCode')}</th>
+                    <th>{t('iam.dashboard.th.admission')}</th>
+                    <th>{t('iam.dashboard.th.roles')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -257,7 +260,7 @@ function PersonalOverview() {
                     <td>
                       <span className="status">
                         <i className="led ok" />
-                        <b>已准入</b>
+                        <b>{t('iam.dashboard.admitted')}</b>
                       </span>
                     </td>
                     <td>
@@ -270,7 +273,7 @@ function PersonalOverview() {
                           ))}
                         </div>
                       ) : (
-                        <span className="tag">无角色</span>
+                        <span className="tag">{t('iam.dashboard.noRole')}</span>
                       )}
                     </td>
                   </tr>
@@ -280,9 +283,9 @@ function PersonalOverview() {
           </div>
         ) : (
           <div className="empty">
-            <IconInbox width={22} height={22} />
-            <b>暂无准入应用</b>
-            <span>请联系管理员在「准入授权」中分配</span>
+              <IconInbox width={22} height={22} />
+              <b>{t('iam.dashboard.noApp')}</b>
+              <span>{t('iam.dashboard.noAppHint')}</span>
           </div>
         )}
       </Panel>

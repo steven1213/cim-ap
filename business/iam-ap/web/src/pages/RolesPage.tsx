@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AppRoleGroup } from '@/types';
 import Panel from '@/components/Panel';
@@ -6,6 +7,7 @@ import { IconAlert, IconRefresh, IconShield } from '@/components/Icons';
 
 /** 角色组视图（路由级 `RequirePerm`，需 `iam:role:list`）：按接入码聚合实际在用的粗角色组与人数分布。 */
 export default function RolesPage() {
+  const { t } = useTranslation();
   const [groups, setGroups] = useState<AppRoleGroup[]>([]);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +18,7 @@ export default function RolesPage() {
     try {
       setGroups(await api.get<AppRoleGroup[]>('/admin/roles'));
     } catch (e: any) {
-      setErr(e?.msg || '加载角色组失败');
+      setErr(e?.msg || t('iam.rolesView.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -38,16 +40,16 @@ export default function RolesPage() {
       )}
 
       <Panel
-        title="角色组分布"
-        sub="按接入码聚合，展示各 app 内实际分配的粗角色组及人数"
+        title={t('iam.rolesView.title')}
+        sub={t('iam.rolesView.sub')}
         flush
         actions={
           <>
-            <span className="tag">{groups.length} 个接入码</span>
-            <span className="tag pri">{totalRoles} 个角色组</span>
+            <span className="tag">{t('iam.rolesView.countApps', { n: groups.length })}</span>
+            <span className="tag pri">{t('iam.rolesView.countRoles', { n: totalRoles })}</span>
             <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.rolesView.refreshing') : t('iam.rolesView.refresh')}
             </button>
           </>
         }
@@ -57,9 +59,9 @@ export default function RolesPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th style={{ width: 170 }}>接入码</th>
-                  <th style={{ width: 220 }}>应用名称</th>
-                  <th>角色组与人数</th>
+                  <th style={{ width: 170 }}>{t('iam.rolesView.th.appCode')}</th>
+                  <th style={{ width: 220 }}>{t('iam.rolesView.th.appName')}</th>
+                  <th>{t('iam.rolesView.th.roles')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -71,14 +73,14 @@ export default function RolesPage() {
                       {g.roles.length ? (
                         <div className="tag-list">
                           {g.roles.map((r) => (
-                            <span key={r.role} className="tag pri" title={`${r.userCount} 名用户`}>
+                            <span key={r.role} className="tag pri" title={t('iam.rolesView.userCount', { n: r.userCount })}>
                               {r.role}
                               <b className="tag-count">{r.userCount}</b>
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="dim">未被分配任何角色组</span>
+                        <span className="dim">{t('iam.rolesView.noRole')}</span>
                       )}
                     </td>
                   </tr>
@@ -89,17 +91,17 @@ export default function RolesPage() {
         ) : (
           <div className="empty">
             <IconShield width={22} height={22} />
-            <b>暂无应用</b>
-            <span>先在「应用注册」登记接入码</span>
+            <b>{t('iam.rolesView.emptyTitle')}</b>
+            <span>{t('iam.rolesView.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
-      <Panel title="关于角色组" sub="IAM 只管准入，不管业务内部权限">
+      <Panel title={t('iam.rolesView.aboutTitle')} sub={t('iam.rolesView.aboutSub')}>
         <ul className="note-list">
-          <li>角色组是「ap 内的粗粒度分组」，由准入授权时写入，随令牌 roles claim 下发。</li>
-          <li>本视图不维护独立字典，而是聚合实际在用值，避免「定义与实际脱节」。</li>
-          <li>业务系统内的菜单 / 按钮 / 数据行权限由各业务 ap 自行控制（IAM 不介入）。</li>
+          <li>{t('iam.rolesView.about1')}</li>
+          <li>{t('iam.rolesView.about2')}</li>
+          <li>{t('iam.rolesView.about3')}</li>
         </ul>
       </Panel>
     </div>

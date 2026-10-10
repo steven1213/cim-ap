@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode } from '@/types';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
@@ -39,6 +40,7 @@ import {
 type PanelMode = null | 'create' | 'reset' | 'profile' | 'orgs';
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [orgs, setOrgs] = useState<OrgNode[]>([]);
   const [err, setErr] = useState('');
@@ -80,7 +82,7 @@ export default function UsersPage() {
       setRows(us);
       setOrgs(os);
     } catch (e: any) {
-      setErr(e?.msg || '加载用户列表失败');
+      setErr(e?.msg || t('iam.users.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -142,7 +144,7 @@ export default function UsersPage() {
         employeeNo: ne.trim() || null,
         jobTitle: nj.trim() || null,
       });
-      flash(`已创建账号 ${nu}`);
+      flash(t('iam.users.msgCreated', { name: nu }));
       setNu('');
       setNp('');
       setNd('');
@@ -151,7 +153,7 @@ export default function UsersPage() {
       closePanel();
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '创建失败');
+      setErr(e?.msg || t('iam.users.errCreate'));
     } finally {
       setBusy(false);
     }
@@ -161,10 +163,10 @@ export default function UsersPage() {
     setErr('');
     try {
       await api.put(`/admin/users/${encodeURIComponent(r.userId)}/status`, { enabled: !r.enabled });
-      flash(`${r.username} 已${r.enabled ? '禁用（已强制下线）' : '启用'}`);
+      flash(`${r.username} ` + (r.enabled ? t('iam.users.msgDisabled') : t('iam.users.msgEnabled')));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '操作失败');
+      setErr(e?.msg || t('iam.users.errOp'));
     }
   }
 
@@ -172,10 +174,10 @@ export default function UsersPage() {
     setErr('');
     try {
       const cleared = await api.post<boolean>(`/admin/users/${encodeURIComponent(r.userId)}/unlock`);
-      flash(cleared ? `${r.username} 已解锁` : `${r.username} 无锁定记录`);
+      flash(cleared ? t('iam.users.msgUnlocked', { user: r.username }) : t('iam.users.msgNoLock', { user: r.username }));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '解锁失败');
+      setErr(e?.msg || t('iam.users.errUnlock'));
     }
   }
 
@@ -188,12 +190,12 @@ export default function UsersPage() {
       const clientSalt = randomClientSalt();
       const credential = await deriveClientHash(rp, clientSalt);
       await api.put(`/admin/users/${encodeURIComponent(target.userId)}/password`, { credential, clientSalt });
-      flash(`已重置 ${target.userId} 的口令（该用户已强制下线）`);
+      flash(t('iam.users.msgResetDone', { id: target.userId }));
       setRp('');
       closePanel();
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '重置失败');
+      setErr(e?.msg || t('iam.users.errReset'));
     } finally {
       setBusy(false);
     }
@@ -211,11 +213,11 @@ export default function UsersPage() {
         mobile: edMobile.trim() || null,
         jobTitle: edJob.trim() || null,
       });
-      flash('已保存档案');
+      flash(t('iam.users.msgProfileSaved'));
       closePanel();
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '保存失败');
+      setErr(e?.msg || t('iam.users.errSaveProfile'));
     } finally {
       setBusy(false);
     }
@@ -231,11 +233,11 @@ export default function UsersPage() {
         .filter(([, v]) => v)
         .map(([id]) => ({ orgId: id, primary: id === orgPrimary }));
       await api.put(`/admin/users/${encodeURIComponent(target.userId)}/orgs`, { orgs: list });
-      flash('已保存组织归属（该用户已强制下线，重登后生效）');
+      flash(t('iam.users.msgOrgsSaved'));
       closePanel();
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '保存归属失败');
+      setErr(e?.msg || t('iam.users.errSaveOrgs'));
     } finally {
       setBusy(false);
     }
@@ -243,18 +245,18 @@ export default function UsersPage() {
 
   async function onDelete(r: AdminUserRow) {
     if (r.hasCredential) {
-      if (!window.confirm(`确认删除账号 ${r.username}？该操作不可恢复，其存量令牌将立即失效。`)) return;
+      if (!window.confirm(t('iam.users.confirmDelete', { name: r.username }))) return;
     } else {
-      if (!window.confirm(`${r.username} 是 AD 同步用户（无本地凭证），IAM 侧不提供删除。请在企业目录中处理。`)) return;
+      if (!window.confirm(t('iam.users.confirmAdDelete', { name: r.username }))) return;
       return;
     }
     setErr('');
     try {
       await api.del(`/admin/users/${encodeURIComponent(r.userId)}`);
-      flash(`已删除账号 ${r.username}`);
+      flash(t('iam.users.msgDeleted', { name: r.username }));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '删除失败');
+      setErr(e?.msg || t('iam.users.errDelete'));
     }
   }
 
@@ -308,25 +310,25 @@ export default function UsersPage() {
       )}
 
       <Panel
-        title="用户与档案"
-        sub="本地凭证账号 ∪ 用户档案（AD 同步来的员工无本地凭证，改密在目录侧）"
+        title={t('iam.users.title')}
+        sub={t('iam.users.sub')}
         flush
         actions={
           <>
-            <span className="tag">{rows.length} 人</span>
-            <span className="tag ok">{enabled} 启用</span>
-            {adCount > 0 && <span className="tag info">{adCount} AD 同步</span>}
-            {locked > 0 && <span className="tag err">{locked} 锁定</span>}
+            <span className="tag">{t('iam.users.count', { n: rows.length })}</span>
+            <span className="tag ok">{t('iam.users.enabled', { n: enabled })}</span>
+            {adCount > 0 && <span className="tag info">{t('iam.users.adSynced', { n: adCount })}</span>}
+            {locked > 0 && <span className="tag err">{t('iam.users.locked', { n: locked })}</span>}
             <input
               className="select-sm"
               style={{ width: 168 }}
-              placeholder="搜索 姓名/工号/组织"
+              placeholder={t('iam.users.searchPH')}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
             <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.users.refreshing') : t('iam.users.refresh')}
             </button>
             <Perms code={USER_CREATE}>
               <button
@@ -337,7 +339,7 @@ export default function UsersPage() {
                 }}
               >
                 <IconPlus width={13} height={13} />
-                新建账号
+                {t('iam.users.newAccount')}
               </button>
             </Perms>
           </>
@@ -348,13 +350,13 @@ export default function UsersPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>用户</th>
-                  <th style={{ width: 92 }}>工号</th>
-                  <th style={{ width: 92 }}>来源</th>
-                  <th>组织</th>
-                  <th style={{ width: 130 }}>状态</th>
-                  <th style={{ width: 76 }}>准入</th>
-                  <th style={{ width: 320 }}>操作</th>
+                  <th>{t('iam.users.th.user')}</th>
+                  <th style={{ width: 92 }}>{t('iam.users.th.empNo')}</th>
+                  <th style={{ width: 92 }}>{t('iam.users.th.source')}</th>
+                  <th>{t('iam.users.th.org')}</th>
+                  <th style={{ width: 130 }}>{t('iam.users.th.status')}</th>
+                  <th style={{ width: 76 }}>{t('iam.users.th.admission')}</th>
+                  <th style={{ width: 320 }}>{t('iam.users.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -365,7 +367,7 @@ export default function UsersPage() {
                         <span className="mono">{r.username}</span>
                         {r.displayName && <span className="dim">{r.displayName}</span>}
                         {r.jobTitle && <span className="tag">{r.jobTitle}</span>}
-                        {!r.hasCredential && <span className="tag info">仅档案</span>}
+                        {!r.hasCredential && <span className="tag info">{t('iam.users.tagProfileOnly')}</span>}
                       </div>
                     </td>
                     <td className="mono dim">{r.employeeNo ?? '—'}</td>
@@ -382,20 +384,20 @@ export default function UsersPage() {
                           </span>
                         ))}
                         {r.orgNames.length > 3 && <span className="dim">+{r.orgNames.length - 3}</span>}
-                        {!r.orgNames.length && <span className="dim">未归属</span>}
+                        {!r.orgNames.length && <span className="dim">{t('iam.users.noOrg')}</span>}
                       </div>
                     </td>
                     <td>
                       <span className="status">
                         <i className={'led ' + (r.enabled ? 'ok' : 'err')} />
-                        <b>{r.enabled ? '启用' : '禁用'}</b>
+                        <b>{r.enabled ? t('iam.users.statusEnabled') : t('iam.users.statusDisabled')}</b>
                       </span>
                       {r.locked && (
-                        <span className="tag err" style={{ marginLeft: 6 }} title={`锁定至 ${fmtDateTime(r.lockedUntil)}`}>
-                          锁定
+                        <span className="tag err" style={{ marginLeft: 6 }} title={t('iam.lockouts.th.until') + ' ' + fmtDateTime(r.lockedUntil)}>
+                           {t('iam.users.tagLocked')}
                         </span>
                       )}
-                      {r.status === 'INACTIVE' && <span className="tag warn" style={{ marginLeft: 6 }}>档案停用</span>}
+                      {r.status === 'INACTIVE' && <span className="tag warn" style={{ marginLeft: 6 }}>{t('iam.users.tagProfileDisabled')}</span>}
                     </td>
                     <td className="num">{r.apps?.length ?? 0}</td>
                     <td>
@@ -403,19 +405,19 @@ export default function UsersPage() {
                         <Perms code={USER_UPDATE}>
                           <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
                             <IconEdit width={13} height={13} />
-                            档案
+                            {t('iam.users.btnProfile')}
                           </button>
                         </Perms>
                         <Perms code={USER_ORGS}>
                           <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
                             <IconTree width={13} height={13} />
-                            归属
+                            {t('iam.users.btnOrgs')}
                           </button>
                         </Perms>
                         <Perms code={USER_STATUS}>
                           <button className="btn-ghost btn-sm" onClick={() => onToggleStatus(r)}>
                             {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
-                            {r.enabled ? '禁用' : '启用'}
+                            {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
                           </button>
                         </Perms>
                         {r.hasCredential && (
@@ -429,7 +431,7 @@ export default function UsersPage() {
                               }}
                             >
                               <IconKey width={13} height={13} />
-                              重置
+                              {t('iam.users.btnReset')}
                             </button>
                           </Perms>
                         )}
@@ -437,7 +439,7 @@ export default function UsersPage() {
                           <Perms code={USER_UNLOCK}>
                             <button className="btn-ghost btn-sm" onClick={() => onUnlock(r)}>
                               <IconKey width={13} height={13} />
-                              解锁
+                              {t('iam.users.btnUnlock')}
                             </button>
                           </Perms>
                         )}
@@ -456,76 +458,73 @@ export default function UsersPage() {
         ) : (
           <div className="empty">
             <IconUsers width={22} height={22} />
-            <b>{rows.length ? '无匹配用户' : '暂无用户'}</b>
-            <span>{rows.length ? '换个关键词试试' : '点击右上「新建账号」创建第一个账号'}</span>
+            <b>{rows.length ? t('iam.users.emptyMatch') : t('iam.users.emptyNone')}</b>
+            <span>{rows.length ? t('iam.users.emptyHintMatch') : t('iam.users.emptyHintNone')}</span>
           </div>
         )}
       </Panel>
 
       {panel === 'create' && (
-        <Panel title="新建账号" sub="口令在浏览器内完成第一层 PBKDF2 派生后上传；档案字段可留空后续补充">
+        <Panel title={t('iam.users.createTitle')} sub={t('iam.users.createSub')}>
           <form onSubmit={onCreate}>
             <div className="row">
               <div className="field">
                 <label className="field-label" htmlFor="nu">
-                  用户名
+                  {t('iam.users.f.username')}
                 </label>
                 <input id="nu" className="mono" placeholder="operator01" value={nu} onChange={(e) => setNu(e.target.value)} />
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="np">
-                  初始口令
+                  {t('iam.users.f.password')}
                 </label>
                 <input id="np" type="password" value={np} onChange={(e) => setNp(e.target.value)} autoComplete="new-password" />
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="nd">
-                  姓名
+                  {t('iam.users.f.name')}
                 </label>
-                <input id="nd" placeholder="张三" value={nd} onChange={(e) => setNd(e.target.value)} />
+                <input id="nd" placeholder={t('iam.users.phName')} value={nd} onChange={(e) => setNd(e.target.value)} />
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="ne">
-                  工号
+                  {t('iam.users.f.empNo')}
                 </label>
                 <input id="ne" className="mono" placeholder="1001" value={ne} onChange={(e) => setNe(e.target.value)} />
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="nj">
-                  岗位
+                  {t('iam.users.f.job')}
                 </label>
-                <input id="nj" placeholder="蚀刻操作员" value={nj} onChange={(e) => setNj(e.target.value)} />
+                <input id="nj" placeholder={t('iam.users.phJob')} value={nj} onChange={(e) => setNj(e.target.value)} />
               </div>
               <button type="submit" disabled={busy || !nu.trim() || !np}>
-                {busy ? '创建中…' : '创建'}
+                {busy ? t('iam.users.creating') : t('iam.users.createSubmit')}
               </button>
               <button type="button" className="btn-ghost" onClick={closePanel}>
-                取消
+                {t('iam.users.cancel')}
               </button>
             </div>
           </form>
-          <p className="hint">
-            新建账号默认无任何准入。建议：在「组织架构」把该用户挂到工序 → 由「组织授权」自动获得准入；
-            或到「准入授权」单独授予。
-          </p>
+          <p className="hint">{t('iam.users.createHint')}</p>
         </Panel>
       )}
 
       {panel === 'reset' && target && (
-        <Panel title={`重置口令 · ${target.userId}`} sub="重置成功后该用户所有会话立即失效，需以新口令重登">
+        <Panel title={t('iam.users.resetTitle', { id: target.userId })} sub={t('iam.users.resetSub')}>
           <form onSubmit={onReset}>
             <div className="row">
               <div className="field">
                 <label className="field-label" htmlFor="rp">
-                  新口令
+                  {t('iam.users.resetNew')}
                 </label>
                 <input id="rp" type="password" value={rp} onChange={(e) => setRp(e.target.value)} autoComplete="new-password" />
               </div>
               <button type="submit" disabled={busy || !rp}>
-                {busy ? '提交中…' : '确认重置'}
+                {busy ? t('iam.users.submitting') : t('iam.users.resetSubmit')}
               </button>
               <button type="button" className="btn-ghost" onClick={closePanel}>
-                取消
+                {t('iam.users.cancel')}
               </button>
             </div>
           </form>
@@ -534,18 +533,18 @@ export default function UsersPage() {
 
       {panel === 'profile' && target && (
         <Panel
-          title={`档案 · ${target.userId}`}
+          title={t('iam.users.profileTitle', { id: target.userId })}
           sub={
             target.source === 'AD_SYNCED'
-              ? 'AD 同步档案：姓名/邮箱/手机只读，仅岗位可在 IAM 侧维护'
-              : 'IAM 自建档案：可自由维护'
+              ? t('iam.users.profileSubAd')
+              : t('iam.users.profileSubIam')
           }
         >
           <form onSubmit={onSaveProfile}>
             <div className="row">
               <div className="field">
                 <label className="field-label" htmlFor="pdn">
-                  姓名
+                  {t('iam.users.f.name')}
                 </label>
                 <input
                   id="pdn"
@@ -556,7 +555,7 @@ export default function UsersPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="pem">
-                  邮箱
+                  {t('iam.users.f.email')}
                 </label>
                 <input
                   id="pem"
@@ -568,7 +567,7 @@ export default function UsersPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="pmb">
-                  手机
+                  {t('iam.users.f.mobile')}
                 </label>
                 <input
                   id="pmb"
@@ -579,29 +578,28 @@ export default function UsersPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="pjt">
-                  岗位
+                  {t('iam.users.f.job')}
                 </label>
-                <input id="pjt" value={edJob} onChange={(e) => setEdJob(e.target.value)} placeholder="蚀刻操作员" />
+                <input id="pjt" value={edJob} onChange={(e) => setEdJob(e.target.value)} placeholder={t('iam.users.phJob')} />
               </div>
               <button type="submit" disabled={busy}>
-                {busy ? '保存中…' : '保存'}
+                {busy ? t('iam.users.saving') : t('iam.users.save')}
               </button>
               <button type="button" className="btn-ghost" onClick={closePanel}>
-                取消
+                {t('iam.users.cancel')}
               </button>
             </div>
           </form>
           <p className="hint">
-            工号 <span className="mono">{target.employeeNo ?? '—'}</span>、来源 {originLabel(target.source)}。
-            岗位由 IAM 维护（AD 常无此维度），可用于按岗位批量授权。
+            {t('iam.users.profileHint', { no: target.employeeNo ?? '—', src: originLabel(target.source) })}
           </p>
         </Panel>
       )}
 
       {panel === 'orgs' && target && (
         <Panel
-          title={`组织归属 · ${target.userId}`}
-          sub="支持多归属（多能工 / 跨线支援）；保存后该用户会话失效，重登即按新归属获得准入"
+          title={t('iam.users.orgsTitle', { id: target.userId })}
+          sub={t('iam.users.orgsSub')}
         >
           <form onSubmit={onSaveOrgs}>
             <div className="org-pick">
@@ -619,15 +617,15 @@ export default function UsersPage() {
                   <span>{o.label}</span>
                 </label>
               ))}
-              {!orgOptions.length && <span className="dim">尚未建立组织，请先到「组织架构」创建</span>}
+              {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
             </div>
             <div className="row" style={{ marginTop: 12 }}>
               <div className="field">
                 <label className="field-label" htmlFor="prm">
-                  主属组织
+                  {t('iam.users.primaryOrg')}
                 </label>
                 <select id="prm" value={orgPrimary} onChange={(e) => setOrgPrimary(e.target.value)}>
-                  <option value="">（不指定）</option>
+                  <option value="">{t('iam.users.primaryNone')}</option>
                   {orgOptions
                     .filter((o) => orgSel[o.id])
                     .map((o) => (
@@ -638,33 +636,23 @@ export default function UsersPage() {
                 </select>
               </div>
               <button type="submit" disabled={busy}>
-                {busy ? '保存中…' : '保存归属'}
+                {busy ? t('iam.users.saving') : t('iam.users.saveOrgs')}
               </button>
               <button type="button" className="btn-ghost" onClick={closePanel}>
-                取消
+                {t('iam.users.cancel')}
               </button>
             </div>
           </form>
-          <p className="hint">
-            主属组织用于展示与默认数据权限范围。归属变更会 bump 该用户令牌版本 → 旧令牌 401 → 重登即带新准入。
-          </p>
+          <p className="hint">{t('iam.users.orgsHint')}</p>
         </Panel>
       )}
 
-      <Panel title="使用说明" sub="身份生命周期">
+      <Panel title={t('iam.users.usageTitle')} sub={t('iam.users.usageSub')}>
         <ul className="note-list">
-          <li>
-            <b>入职</b>：建账号（或由 AD 同步自动建档案）→ 在「组织架构」挂到工序 → 组织授权自动生效；例外再走「准入授权」。
-          </li>
-          <li>
-            <b>转岗</b>：调整组织归属即可——组织授权随归属自动增减（个人授予需手动处理）。
-          </li>
-          <li>
-            <b>停用/离职</b>：禁用账号或把档案置为停用，会自动 bump 令牌版本 → 所有存量令牌立即失效。
-          </li>
-          <li>
-            <b>口令遗忘</b>：重置口令（自动强制下线）；AD 账号请在企业目录侧改密，IAM 不代管。
-          </li>
+          <li>{t('iam.users.usageOnboard')}</li>
+          <li>{t('iam.users.usageTransfer')}</li>
+          <li>{t('iam.users.usageOffboard')}</li>
+          <li>{t('iam.users.usagePwd')}</li>
         </ul>
       </Panel>
     </div>

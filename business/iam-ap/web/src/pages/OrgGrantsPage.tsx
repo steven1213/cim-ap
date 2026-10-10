@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AppRegistration, OrgGrantRow, OrgNode } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
@@ -23,6 +24,7 @@ import {
  * 个人授予与组织授予取<b>并集</b>（个人只能追加、不能扣减）。写操作按 `iam:grant:*` 显隐。</p>
  */
 export default function OrgGrantsPage() {
+  const { t } = useTranslation();
   const [grants, setGrants] = useState<OrgGrantRow[]>([]);
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [apps, setApps] = useState<AppRegistration[]>([]);
@@ -64,7 +66,7 @@ export default function OrgGrantsPage() {
       setNodes(o);
       setApps(a);
     } catch (e: any) {
-      setErr(e?.msg || '加载组织授权失败');
+      setErr(e?.msg || t('iam.orgGrants.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -104,25 +106,25 @@ export default function OrgGrantsPage() {
           .filter(Boolean),
         includeChildren,
       });
-      flash(`已授予 ${appCode}（受影响用户令牌已失效，需重登生效）`);
+      flash(t('iam.orgGrants.msgGranted', { app: appCode }));
       setRoles('');
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '授予失败');
+      setErr(e?.msg || t('iam.orgGrants.errGrant'));
     } finally {
       setBusy(false);
     }
   }
 
   async function onRevoke(g: OrgGrantRow) {
-    if (!window.confirm(`确认撤销「${g.orgName ?? g.orgId}」的 ${g.appCode} 授予？`)) return;
+    if (!window.confirm(t('iam.orgGrants.confirmRevoke', { org: g.orgName ?? g.orgId, app: g.appCode }))) return;
     setErr('');
     try {
       await api.del(`/admin/org-grants/${encodeURIComponent(g.orgId)}/${encodeURIComponent(g.appCode)}`);
-      flash('已撤销组织授予');
+      flash(t('iam.orgGrants.msgRevoked'));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '撤销失败');
+      setErr(e?.msg || t('iam.orgGrants.errRevoke'));
     }
   }
 
@@ -142,15 +144,15 @@ export default function OrgGrantsPage() {
       )}
 
       <Panel
-        title="组织授予清单"
-        sub="组织 → ap → 粗角色组；签发令牌时按用户归属（含祖先链）实时展开"
+        title={t('iam.orgGrants.title')}
+        sub={t('iam.orgGrants.sub')}
         flush
         actions={
           <>
-            <span className="tag">{grants.length} 条</span>
+            <span className="tag">{t('iam.orgGrants.count', { n: grants.length })}</span>
             <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.orgGrants.refreshing') : t('iam.orgGrants.refresh')}
             </button>
           </>
         }
@@ -160,12 +162,12 @@ export default function OrgGrantsPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>组织</th>
-                  <th>编码</th>
-                  <th>接入码</th>
-                  <th>角色组</th>
-                  <th style={{ width: 120 }}>覆盖子组织</th>
-                  <th style={{ width: 110 }}>操作</th>
+                  <th>{t('iam.orgGrants.th.org')}</th>
+                  <th>{t('iam.orgGrants.th.code')}</th>
+                  <th>{t('iam.orgGrants.th.appCode')}</th>
+                  <th>{t('iam.orgGrants.th.roles')}</th>
+                  <th style={{ width: 120 }}>{t('iam.orgGrants.th.children')}</th>
+                  <th style={{ width: 110 }}>{t('iam.orgGrants.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,17 +187,17 @@ export default function OrgGrantsPage() {
                             </span>
                           ))
                         ) : (
-                          <span className="dim">（仅准入，无角色）</span>
+                          <span className="dim">{t('iam.orgGrants.onlyAdmission')}</span>
                         )}
                       </div>
                     </td>
-                    <td>{g.includeChildren ? <span className="tag ok">是</span> : <span className="tag">否</span>}</td>
+                    <td>{g.includeChildren ? <span className="tag ok">{t('iam.orgGrants.yes')}</span> : <span className="tag">{t('iam.orgGrants.no')}</span>}</td>
                     <td>
                       <div className="cell-actions">
                         <Perms code={GRANT_REVOKE}>
                           <button className="btn-danger btn-sm" onClick={() => onRevoke(g)}>
                             <IconTrash width={13} height={13} />
-                            撤销
+                            {t('iam.orgGrants.revoke')}
                           </button>
                         </Perms>
                       </div>
@@ -208,22 +210,22 @@ export default function OrgGrantsPage() {
         ) : (
           <div className="empty">
             <IconOrgGrant width={22} height={22} />
-            <b>暂无组织授予</b>
-            <span>在下方按组织批量授予准入</span>
+            <b>{t('iam.orgGrants.emptyTitle')}</b>
+            <span>{t('iam.orgGrants.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
       <Perms code={GRANT_GRANT}>
-        <Panel title="授予组织准入" sub="先把组织树建对并挂人，再给组织授权——人员进出组织自动继承/失去准入">
+        <Panel title={t('iam.orgGrants.grantTitle')} sub={t('iam.orgGrants.grantSub')}>
           <form onSubmit={onGrant}>
           <div className="row">
             <div className="field">
               <label className="field-label" htmlFor="go">
-                组织
+                {t('iam.orgGrants.f.org')}
               </label>
               <select id="go" value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-                <option value="">请选择组织</option>
+                <option value="">{t('iam.orgGrants.selectOrg')}</option>
                 {orgOptions.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
@@ -234,10 +236,10 @@ export default function OrgGrantsPage() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="ga">
-                接入码
+                {t('iam.orgGrants.f.appCode')}
               </label>
               <select id="ga" value={appCode} onChange={(e) => setAppCode(e.target.value)}>
-                <option value="">请选择应用</option>
+                <option value="">{t('iam.orgGrants.selectApp')}</option>
                 {apps.map((a) => (
                   <option key={a.appCode} value={a.appCode}>
                     {a.appCode}
@@ -248,7 +250,7 @@ export default function OrgGrantsPage() {
             </div>
             <div className="field">
               <label className="field-label" htmlFor="gr">
-                角色组（逗号分隔）
+                {t('iam.orgGrants.f.roles')}
               </label>
               <input
                 id="gr"
@@ -264,53 +266,46 @@ export default function OrgGrantsPage() {
                 checked={includeChildren}
                 onChange={(e) => setIncludeChildren(e.target.checked)}
               />
-              <span>覆盖子组织</span>
+              <span>{t('iam.orgGrants.includeChildren')}</span>
             </label>
             <button type="submit" disabled={busy || !orgId || !appCode}>
               <IconPlus width={13} height={13} />
-              {busy ? '授予中…' : '授予'}
+              {busy ? t('iam.orgGrants.granting') : t('iam.orgGrants.grant')}
             </button>
           </div>
         </form>
         <p className="hint">
-          勾选「覆盖子组织」时，授予作用于该组织<b>及其全部后代</b>；不勾选则仅作用于本组织直属人员。
+          {t('iam.orgGrants.hint')}
           {affected != null && (
             <>
               {' '}
-              当前所选组织（含子组织）共 <b>{affected}</b> 人，授予后其令牌版本将被 bump、需重新登录。
+              {t('iam.orgGrants.affected', { n: affected })}
             </>
           )}
         </p>
         </Panel>
       </Perms>
 
-      <Panel title="与「准入授权」的分工" sub="个人 vs 组织">
+      <Panel title={t('iam.orgGrants.divTitle')} sub={t('iam.orgGrants.divSub')}>
         <ul className="note-list">
+          <li>{t('iam.orgGrants.divPersonal')}</li>
+          <li>{t('iam.orgGrants.divOrg')}</li>
+          <li>{t('iam.orgGrants.divUnion')}</li>
+          <li>{t('iam.orgGrants.divAd')}</li>
           <li>
-            <b>个人准入（准入授权页）</b>：给某个用户单独开某 ap 的准入与角色组，用于例外与临时授权。
-          </li>
-          <li>
-            <b>组织授予（本页）</b>：给组织整体开准入，组织内人员（含子组织）自动生效——<b>入职即通、转岗即变、离职即断</b>。
-          </li>
-          <li>
-            <b>两者取并集</b>：个人授予只能追加、不能扣减。要收回权限请撤销组织授予或把该用户移出组织。
-          </li>
-          <li>
-            <b>AD 组织</b>（标记［AD］）由同步器维护，可作为授权目标；但 IAM 侧不能改其名称与层级。
-          </li>
-          <li>
-            组织类型参考：<span className="mono">{orgTypeLabel('AREA')}</span> →
+            {t('iam.orgGrants.typeRef')}
+            <span className="mono">{orgTypeLabel('AREA')}</span> →
             <span className="mono">{orgTypeLabel('WORKSHOP')}</span> →
             <span className="mono">{orgTypeLabel('LINE')}</span> →
             <span className="mono">{orgTypeLabel('PROCESS')}</span> →
-            <span className="mono">{orgTypeLabel('TEAM')}</span>；来源
-            <span className="mono"> {originLabel('IAM_MANAGED')}</span> 可本地维护。
+            <span className="mono">{orgTypeLabel('TEAM')}</span>
+            {t('iam.orgGrants.localMaintain', { src: originLabel('IAM_MANAGED') })}
           </li>
         </ul>
         <div className="tag-list" style={{ marginTop: 8 }}>
           <span className="tag info">
             <IconShield width={12} height={12} />
-            IAM 只管准入，不介入业务系统内部权限
+            {t('iam.orgGrants.divIam')}
           </span>
         </div>
       </Panel>

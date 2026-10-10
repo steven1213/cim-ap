@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { KickResult, SessionRow, TokenVersionBump } from '@/types';
 import { fmtDateTime } from '@/lib/format';
@@ -15,6 +16,7 @@ import {
 
 /** 在线会话：活跃会话列表 + 强制下线（bump 令牌版本）。下线按钮按 `iam:session:kick` 显隐。 */
 export default function SessionsPage() {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
@@ -30,7 +32,7 @@ export default function SessionsPage() {
     try {
       setRows(await api.get<SessionRow[]>('/admin/sessions'));
     } catch (e: any) {
-      setErr(e?.msg || '加载会话失败');
+      setErr(e?.msg || t('iam.sessions.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -46,14 +48,14 @@ export default function SessionsPage() {
   }
 
   async function kick(userId: string, username: string) {
-    if (!window.confirm(`确认强制 ${username} 下线？其所有已签发令牌将立即失效。`)) return;
+    if (!window.confirm(t('iam.sessions.confirm', { username }))) return;
     setErr('');
     try {
       const r = await api.del<KickResult>(`/admin/sessions/${encodeURIComponent(userId)}`);
-      flash(`已强制 ${username} 下线，令牌版本 → ${r.version}`);
+      flash(t('iam.sessions.msgKicked', { username, version: r.version }));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '强制下线失败');
+      setErr(e?.msg || t('iam.sessions.errKick'));
     }
   }
 
@@ -67,7 +69,7 @@ export default function SessionsPage() {
       setBump(r);
       await load();
     } catch (e: any) {
-      setErr(e?.msg || e?.message || '操作失败');
+      setErr(e?.msg || e?.message || t('iam.sessions.errOp'));
     } finally {
       setBusy(false);
     }
@@ -89,15 +91,15 @@ export default function SessionsPage() {
       )}
 
       <Panel
-        title="活跃会话"
-        sub="以未撤销且未过期的刷新令牌近似表示一个登录会话"
+        title={t('iam.sessions.title')}
+        sub={t('iam.sessions.sub')}
         flush
         actions={
           <>
-            <span className="tag">{rows.length} 个</span>
+            <span className="tag">{t('iam.sessions.count', { n: rows.length })}</span>
             <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
               <IconRefresh width={13} height={13} />
-              {loading ? '刷新中' : '刷新'}
+              {loading ? t('iam.sessions.refreshing') : t('iam.sessions.refresh')}
             </button>
           </>
         }
@@ -107,11 +109,11 @@ export default function SessionsPage() {
             <table className="data">
               <thead>
                 <tr>
-                  <th>用户</th>
-                  <th style={{ width: 180 }}>用户 ID</th>
-                  <th style={{ width: 260 }}>访问令牌 jti</th>
-                  <th style={{ width: 190 }}>到期时间</th>
-                  <th style={{ width: 130 }}>操作</th>
+                  <th>{t('iam.sessions.th.user')}</th>
+                  <th style={{ width: 180 }}>{t('iam.sessions.th.userId')}</th>
+                  <th style={{ width: 260 }}>{t('iam.sessions.th.jti')}</th>
+                  <th style={{ width: 190 }}>{t('iam.sessions.th.expire')}</th>
+                  <th style={{ width: 130 }}>{t('iam.sessions.th.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -125,7 +127,7 @@ export default function SessionsPage() {
                       <Perms code={SESSION_KICK}>
                         <button className="btn-danger btn-sm" onClick={() => kick(r.userId, r.username)}>
                           <IconKick width={13} height={13} />
-                          强制下线
+                          {t('iam.sessions.kick')}
                         </button>
                       </Perms>
                     </td>
@@ -137,38 +139,38 @@ export default function SessionsPage() {
         ) : (
           <div className="empty">
             <IconMonitor width={22} height={22} />
-            <b>当前无活跃会话</b>
-            <span>用户登录后会在此出现</span>
+            <b>{t('iam.sessions.emptyTitle')}</b>
+            <span>{t('iam.sessions.emptyHint')}</span>
           </div>
         )}
       </Panel>
 
       <Perms code={SESSION_KICK}>
         <Panel
-          title="按用户 ID 强制下线"
-          sub="bump 令牌版本，验证端进程内即时校验，无缓存滞后"
+          title={t('iam.sessions.kickTitle')}
+          sub={t('iam.sessions.kickSub')}
           actions={
             <span className="tag warn">
               <IconKick width={12} height={12} />
-              高危操作
+              {t('iam.sessions.highRisk')}
             </span>
           }
         >
           <form className="row" onSubmit={onManualBump}>
             <div className="field">
               <label className="field-label" htmlFor="kick-uid">
-                用户 ID
+                {t('iam.sessions.f.userId')}
               </label>
               <input
                 id="kick-uid"
                 className="mono"
-                placeholder="admin（本地账号即用户名）"
+                placeholder={t('iam.sessions.userIdPH')}
                 value={uid}
                 onChange={(e) => setUid(e.target.value)}
               />
             </div>
             <button className="btn-danger" type="submit" disabled={busy || !uid}>
-              {busy ? '处理中…' : '踢下线'}
+              {busy ? t('iam.sessions.processing') : t('iam.sessions.process')}
             </button>
           </form>
 
@@ -177,15 +179,15 @@ export default function SessionsPage() {
           <div className="alert ok" style={{ marginTop: 12 }}>
             <IconCheckCircle width={15} height={15} />
             <span>
-              已 bump 用户 <b>{bump.uid}</b>，当前令牌版本号 <b>{bump.version}</b>
+              {t('iam.sessions.bumpDone', { uid: bump.uid, version: bump.version })}
             </span>
           </div>
         )}
 
         <ul className="note-list" style={{ marginTop: 12 }}>
-          <li>作用对象：该用户已签发的全部访问令牌与刷新令牌。</li>
-          <li>生效方式：验证端比对令牌 <code>ver</code> claim 与库内版本号，不一致即返回 401。</li>
-          <li>后续影响：用户需重新登录；令牌版本号单调递增，不回滚。</li>
+          <li>{t('iam.sessions.note1')}</li>
+          <li>{t('iam.sessions.note2')}</li>
+          <li>{t('iam.sessions.note3')}</li>
         </ul>
         </Panel>
       </Perms>

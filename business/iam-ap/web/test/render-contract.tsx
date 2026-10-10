@@ -24,6 +24,8 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import { useAuthStore } from '@/store/authStore';
+import { MemoryRouter } from 'react-router-dom';
+import * as PC from '@/lib/permCodes';
 import {
   I18N_LIST,
   MENU_CREATE,
@@ -40,6 +42,21 @@ import MenusAdminPage from '@/pages/MenusAdminPage';
 import PermissionsAdminPage from '@/pages/PermissionsAdminPage';
 import RolesAdminPage from '@/pages/RolesAdminPage';
 import I18nAdminPage from '@/pages/I18nAdminPage';
+// W4b 存量业务页（迁移后须无任何渲染中文）
+import UsersPage from '@/pages/UsersPage';
+import OrgPage from '@/pages/OrgPage';
+import DashboardPage from '@/pages/DashboardPage';
+import SettingsPage from '@/pages/SettingsPage';
+import OrgGrantsPage from '@/pages/OrgGrantsPage';
+import ProfilePage from '@/pages/ProfilePage';
+import AppMgmtPage from '@/pages/AppMgmtPage';
+import SessionsPage from '@/pages/SessionsPage';
+import AdmissionsPage from '@/pages/AdmissionsPage';
+import LockoutsPage from '@/pages/LockoutsPage';
+import AuditPage from '@/pages/AuditPage';
+import RolesViewPage from '@/pages/RolesPage';
+
+const ALL_PERMS: string[] = Object.values(PC).filter((v): v is string => typeof v === 'string');
 
 // ---------------------------------------------------------------- 运行环境
 
@@ -107,6 +124,13 @@ function hasNot(html: string, needle: string): void {
 function expectNoticeOnly(html: string, noticeKey: string, bodyMarker: string): void {
   has(html, missing(noticeKey));
   hasNot(html, missing(bodyMarker));
+}
+
+/** W4b 验收：渲染结果不得含任何 CJK 字符（无资源时 t() 回落为 `⟪key⟫`、format 枚举回落为 ASCII 键）。 */
+const CJK = /[一-鿿]/;
+function assertNoChinese(html: string, page: string): void {
+  const hit = html.match(CJK);
+  assert.ok(!hit, `${page} 渲染结果含中文残留：${hit?.[0] ?? ''}`);
 }
 
 /**
@@ -272,6 +296,35 @@ async function main(): Promise<void> {
     hasNot(html, missing('iam.admin.i18n.newLocale'));
     hasNot(html, missing('iam.admin.i18n.newMessage'));
   });
+
+  // ------------------------------------------------------------ W4b：存量页无中文残留
+  console.log('\n[渲染契约] W4b 存量业务页（切 en-US 无中文残留）');
+
+  const stockPages: Array<[string, ComponentType]> = [
+    ['UsersPage', UsersPage],
+    ['OrgPage', OrgPage],
+    ['DashboardPage', DashboardPage],
+    ['SettingsPage', SettingsPage],
+    ['OrgGrantsPage', OrgGrantsPage],
+    ['ProfilePage', ProfilePage],
+    ['AppMgmtPage', AppMgmtPage],
+    ['SessionsPage', SessionsPage],
+    ['AdmissionsPage', AdmissionsPage],
+    ['LockoutsPage', LockoutsPage],
+    ['AuditPage', AuditPage],
+    ['RolesPage', RolesViewPage],
+  ];
+  for (const [name, Page] of stockPages) {
+    check(`${name} 渲染输出不含中文`, () => {
+      // 用全部权限渲染以覆盖按钮/抽屉等分支，确保「任何可见分支都没有中文」。
+      // 部分页用 useNavigate，需包在 Router 上下文里（SSR 才能渲染）。
+      withPermissions(ALL_PERMS);
+      const html = renderToStaticMarkup(
+        createElement(MemoryRouter, null, createElement(Page)),
+      );
+      assertNoChinese(html, name);
+    });
+  }
 
   // ------------------------------------------------------------ 汇总
 

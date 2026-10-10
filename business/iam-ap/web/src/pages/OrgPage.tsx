@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
 import { fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
@@ -52,6 +53,7 @@ function buildTree(nodes: OrgNode[]): TreeNode[] {
 const CREATE_TYPES: OrgNodeType[] = ['AREA', 'WORKSHOP', 'LINE', 'PROCESS', 'TEAM'];
 
 export default function OrgPage() {
+  const { t } = useTranslation();
   const [nodes, setNodes] = useState<OrgNode[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [err, setErr] = useState('');
@@ -95,7 +97,7 @@ export default function OrgPage() {
       setUsers(us);
       setExpanded((prev) => (prev.size ? prev : new Set(orgs.map((o) => o.id))));
     } catch (e: any) {
-      setErr(e?.msg || '加载组织失败');
+      setErr(e?.msg || t('iam.orgs.errLoad'));
     } finally {
       setLoading(false);
     }
@@ -153,13 +155,13 @@ export default function OrgPage() {
         nodeType,
         sortNo: Number(sortNo) || 0,
       });
-      flash(`已新建组织 ${name}`);
+      flash(t('iam.orgs.msgCreated', { name }));
       setCode('');
       setName('');
       setShowCreate(false);
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '新建失败');
+      setErr(e?.msg || t('iam.orgs.errCreate'));
     } finally {
       setBusy(false);
     }
@@ -176,10 +178,10 @@ export default function OrgPage() {
         sortNo: Number(editSort) || 0,
         status: editStatus,
       });
-      flash('已保存组织信息');
+      flash(t('iam.orgs.msgSaved'));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '保存失败');
+      setErr(e?.msg || t('iam.orgs.errSave'));
     } finally {
       setBusy(false);
     }
@@ -190,24 +192,24 @@ export default function OrgPage() {
     setErr('');
     try {
       await api.put(`/admin/orgs/${encodeURIComponent(selected)}/move`, { newParentId: moveTo || null });
-      flash('已移动组织（子树路径已重写，相关用户令牌已失效需重登）');
+      flash(t('iam.orgs.msgMoved'));
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '移动失败');
+      setErr(e?.msg || t('iam.orgs.errMove'));
     }
   }
 
   async function onDelete() {
     if (!selectedNode) return;
-    if (!window.confirm(`确认删除组织「${selectedNode.name}」？须无子节点、无人员归属、无组织授予。`)) return;
+    if (!window.confirm(t('iam.orgs.confirmDelete', { name: selectedNode.name }))) return;
     setErr('');
     try {
       await api.del(`/admin/orgs/${encodeURIComponent(selectedNode.id)}`);
-      flash('已删除组织');
+      flash(t('iam.orgs.msgDeleted'));
       setSelected(null);
       await load();
     } catch (e: any) {
-      setErr(e?.msg || '删除失败');
+      setErr(e?.msg || t('iam.orgs.errDelete'));
     }
   }
 
@@ -220,17 +222,17 @@ export default function OrgPage() {
         `/admin/users/${encodeURIComponent(uid)}/orgs`,
       );
       if (cur.some((o) => o.orgId === selected)) {
-        flash(`${uid} 已归属该组织`);
+        flash(t('iam.orgs.msgMemberAdded', { uid }));
         return;
       }
       const next = [...cur.map((o) => ({ orgId: o.orgId, primary: o.primary })),
         { orgId: selected, primary: cur.length === 0 }];
       await api.put(`/admin/users/${encodeURIComponent(uid)}/orgs`, { orgs: next });
-      flash(`已把 ${uid} 挂到该组织`);
+      flash(t('iam.orgs.msgMemberMoved', { uid }));
       setAddUser('');
       await loadMembers(selected);
     } catch (e: any) {
-      setErr(e?.msg || '挂人失败');
+      setErr(e?.msg || t('iam.orgs.errMember'));
     }
   }
 
@@ -243,42 +245,42 @@ export default function OrgPage() {
       );
       const next = cur.filter((o) => o.orgId !== selected).map((o) => ({ orgId: o.orgId, primary: o.primary }));
       await api.put(`/admin/users/${encodeURIComponent(uid)}/orgs`, { orgs: next });
-      flash(`已从该组织移除 ${uid}`);
+      flash(t('iam.orgs.msgMemberRemoved', { uid }));
       await loadMembers(selected);
     } catch (e: any) {
-      setErr(e?.msg || '移除失败');
+      setErr(e?.msg || t('iam.orgs.errRemove'));
     }
   }
 
   function renderTree(list: TreeNode[], depth: number) {
-    return list.map((t) => {
-      const hasChildren = t.children.length > 0;
-      const open = expanded.has(t.node.id);
+    return list.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const open = expanded.has(node.node.id);
       return (
-        <div key={t.node.id}>
+        <div key={node.node.id}>
           <div
-            className={'tree-row' + (selected === t.node.id ? ' on' : '')}
+            className={'tree-row' + (selected === node.node.id ? ' on' : '')}
             style={{ paddingLeft: 8 + depth * 17 }}
-            onClick={() => setSelected(t.node.id)}
+            onClick={() => setSelected(node.node.id)}
           >
             <button
               type="button"
               className={'tree-toggle' + (hasChildren ? '' : ' hollow') + (open ? ' open' : '')}
               onClick={(e) => {
                 e.stopPropagation();
-                if (hasChildren) toggle(t.node.id);
+                if (hasChildren) toggle(node.node.id);
               }}
-              aria-label={open ? '折叠' : '展开'}
+              aria-label={open ? t('iam.orgs.collapse') : t('iam.orgs.expand')}
             >
               <IconChevron width={13} height={13} />
             </button>
-            <span className="tree-name">{t.node.name}</span>
-            <span className="mono dim tree-code">{t.node.code}</span>
-            <span className="tag">{orgTypeLabel(t.node.nodeType)}</span>
-            {t.node.source === 'AD_SYNCED' && <span className="tag info">AD</span>}
-            {t.node.status === 'DISABLED' && <span className="tag err">停用</span>}
+            <span className="tree-name">{node.node.name}</span>
+            <span className="mono dim tree-code">{node.node.code}</span>
+            <span className="tag">{orgTypeLabel(node.node.nodeType)}</span>
+            {node.node.source === 'AD_SYNCED' && <span className="tag info">AD</span>}
+            {node.node.status === 'DISABLED' && <span className="tag err">{t('iam.orgs.statusDisabled')}</span>}
           </div>
-          {hasChildren && open && renderTree(t.children, depth + 1)}
+          {hasChildren && open && renderTree(node.children, depth + 1)}
         </div>
       );
     });
@@ -308,66 +310,66 @@ export default function OrgPage() {
       )}
 
       <div className="split">
-        <Panel
-          title="组织树"
-          sub="AD 同步的行政部门只读；制造组织由 IAM 自建"
-          flush
-          actions={
-            <>
-              <span className="tag">{nodes.length} 节点</span>
-              <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-                <IconRefresh width={13} height={13} />
-                {loading ? '刷新中' : '刷新'}
+      <Panel
+        title={t('iam.orgs.title')}
+        sub={t('iam.orgs.sub')}
+        flush
+        actions={
+          <>
+            <span className="tag">{t('iam.orgs.count', { n: nodes.length })}</span>
+            <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
+              <IconRefresh width={13} height={13} />
+              {loading ? t('iam.orgs.refreshing') : t('iam.orgs.refresh')}
+            </button>
+            <Perms code={ORG_CREATE}>
+              <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
+                <IconPlus width={13} height={13} />
+                {t('iam.orgs.newNode')}
               </button>
-              <Perms code={ORG_CREATE}>
-                <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
-                  <IconPlus width={13} height={13} />
-                  新建节点
-                </button>
-              </Perms>
-            </>
-          }
-        >
+            </Perms>
+          </>
+        }
+      >
           {tree.length ? (
             <div className="tree">{renderTree(tree, 0)}</div>
           ) : (
             <div className="empty">
               <IconTree width={22} height={22} />
-              <b>暂无组织节点</b>
-              <span>点击右上「新建节点」建立第一个厂区</span>
+              <b>{t('iam.orgs.emptyTitle')}</b>
+              <span>{t('iam.orgs.emptyHint')}</span>
             </div>
           )}
         </Panel>
 
         <Panel
-          title={selectedNode ? `节点 · ${selectedNode.name}` : '节点详情'}
-          sub={selectedNode ? `${originLabel(selectedNode.source)}${managed ? '' : '（只读）'}` : '在左侧选择一个节点'}
+          title={selectedNode ? t('iam.orgs.nodeTitle', { name: selectedNode.name }) : t('iam.orgs.nodeDetail')}
+          sub={selectedNode ? t('iam.orgs.nodeSub', { src: originLabel(selectedNode.source), ro: managed ? t('iam.orgs.nodeReadOnly') : '' }) : t('iam.orgs.selectNode')}
         >
           {!selectedNode ? (
             <div className="empty">
               <IconInbox width={22} height={22} />
-              <b>未选择节点</b>
-              <span>选择左侧任一节点查看与维护</span>
+              <b>{t('iam.orgs.nodeNotSelected')}</b>
+              <span>{t('iam.orgs.selectHint')}</span>
             </div>
           ) : (
             <>
               <dl className="kv">
-                <dt>编码</dt>
+                <dt>{t('iam.orgs.dt.code')}</dt>
                 <dd className="mono">{selectedNode.code}</dd>
-                <dt>类型</dt>
+                <dt>{t('iam.orgs.dt.type')}</dt>
                 <dd>{orgTypeLabel(selectedNode.nodeType)}</dd>
-                <dt>来源</dt>
+                <dt>{t('iam.orgs.dt.source')}</dt>
                 <dd>{originLabel(selectedNode.source)}</dd>
-                <dt>状态</dt>
+                <dt>{t('iam.orgs.dt.status')}</dt>
                 <dd>
                   <span className="status">
                     <i className={'led ' + (selectedNode.status === 'ENABLED' ? 'ok' : 'err')} />
-                    <b>{selectedNode.status === 'ENABLED' ? '启用' : '停用'}</b>
+                    <b>{selectedNode.status === 'ENABLED' ? t('iam.orgs.statusEnabled') : t('iam.orgs.statusDisabled')}</b>
                   </span>
                 </dd>
-                <dt>物化路径</dt>
+                <dt>{t('iam.orgs.dt.path')}</dt>
                 <dd className="mono dim">{selectedNode.path}</dd>
-                <dt>最近变更</dt>
+                <dt>{t('iam.orgs.dt.updated')}</dt>
                 <dd>{fmtRelative(selectedNode.updatedAt)}</dd>
               </dl>
 
@@ -377,13 +379,13 @@ export default function OrgPage() {
                     <div className="row">
                       <div className="field">
                         <label className="field-label" htmlFor="on">
-                          名称
+                          {t('iam.orgs.f.name')}
                         </label>
                         <input id="on" value={editName} onChange={(e) => setEditName(e.target.value)} />
                       </div>
                       <div className="field">
                         <label className="field-label" htmlFor="os">
-                          排序
+                          {t('iam.orgs.f.sort')}
                         </label>
                         <input
                           id="os"
@@ -395,21 +397,21 @@ export default function OrgPage() {
                       </div>
                       <div className="field">
                         <label className="field-label" htmlFor="ost">
-                          状态
+                          {t('iam.orgs.f.status')}
                         </label>
                         <select
                           id="ost"
                           value={editStatus}
                           onChange={(e) => setEditStatus(e.target.value as 'ENABLED' | 'DISABLED')}
                         >
-                          <option value="ENABLED">启用</option>
-                          <option value="DISABLED">停用</option>
+                          <option value="ENABLED">{t('iam.orgs.optEnabled')}</option>
+                          <option value="DISABLED">{t('iam.orgs.optDisabled')}</option>
                         </select>
                       </div>
                       <Perms code={ORG_UPDATE}>
                         <button type="submit" className="btn-sm" disabled={busy}>
                           <IconEdit width={13} height={13} />
-                          保存
+                          {t('iam.orgs.save')}
                         </button>
                       </Perms>
                     </div>
@@ -417,11 +419,11 @@ export default function OrgPage() {
 
                   <div className="row" style={{ marginTop: 12 }}>
                     <div className="field">
-                      <label className="field-label" htmlFor="mv">
-                        移动到父节点
-                      </label>
-                      <select id="mv" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
-                        <option value="">（无 / 作为根节点）</option>
+                        <label className="field-label" htmlFor="mv">
+                          {t('iam.orgs.moveTo')}
+                        </label>
+                        <select id="mv" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+                          <option value="">{t('iam.orgs.noParent')}</option>
                         {flatOptions
                           .filter((o) => o.id !== selectedNode.id)
                           .map((o) => (
@@ -432,35 +434,35 @@ export default function OrgPage() {
                       </select>
                     </div>
                     <Perms code={ORG_MOVE}>
-                      <button type="button" className="btn-ghost btn-sm" onClick={onMove}>
-                        移动
-                      </button>
+                        <button type="button" className="btn-ghost btn-sm" onClick={onMove}>
+                          {t('iam.orgs.move')}
+                        </button>
                     </Perms>
                     <Perms code={ORG_DELETE}>
                       <button type="button" className="btn-danger btn-sm" onClick={onDelete}>
-                        <IconTrash width={13} height={13} />
-                        删除
-                      </button>
+                          <IconTrash width={13} height={13} />
+                          {t('iam.orgs.delete')}
+                        </button>
                     </Perms>
                   </div>
                 </>
               ) : (
                 <p className="hint" style={{ marginTop: 12 }}>
-                  该节点由 AD 同步而来，IAM 侧只读——请在企业目录（AD/HR）中维护，同步器只写自己那一份。
+                  {t('iam.orgs.adReadOnly')}
                 </p>
               )}
 
               <div className="sub-block">
                 <div className="sub-head">
-                  <b>组织成员</b>
-                  <span className="tag">{members.length} 人</span>
+                  <b>{t('iam.orgs.membersTitle')}</b>
+                  <span className="tag">{t('iam.orgs.membersCount', { n: members.length })}</span>
                 </div>
                 <div className="row">
                   <div className="field">
                     <input
                       className="mono"
                       list="all-users"
-                      placeholder="输入或选择用户 ID"
+                      placeholder={t('iam.orgs.memberPH')}
                       value={addUser}
                       onChange={(e) => setAddUser(e.target.value)}
                     />
@@ -475,7 +477,7 @@ export default function OrgPage() {
                   <Perms code={ORG_MEMBER}>
                     <button type="button" className="btn-sm" onClick={onAddMember} disabled={!addUser.trim()}>
                       <IconPlus width={13} height={13} />
-                      挂到该组织
+                      {t('iam.orgs.addMember')}
                     </button>
                   </Perms>
                 </div>
@@ -484,17 +486,15 @@ export default function OrgPage() {
                     <span key={m} className="role-chip">
                       <span className="mono">{m}</span>
                       <Perms code={ORG_MEMBER}>
-                        <button type="button" className="chip-x" onClick={() => onRemoveMember(m)} aria-label="移除">
+                        <button type="button" className="chip-x" onClick={() => onRemoveMember(m)} aria-label={t('iam.orgs.removeMember')}>
                           ×
                         </button>
                       </Perms>
                     </span>
                   ))}
-                  {!members.length && <span className="dim">暂无成员</span>}
+                  {!members.length && <span className="dim">{t('iam.orgs.noMembers')}</span>}
                 </div>
-                <p className="hint">
-                  成员归属支持<b>多归属</b>（一人可同属多个工序/产线）。归属变更会 bump 用户令牌版本，其会话立即失效。
-                </p>
+                <p className="hint">{t('iam.orgs.memberHint')}</p>
               </div>
             </>
           )}
@@ -502,15 +502,15 @@ export default function OrgPage() {
       </div>
 
       {showCreate && (
-        <Panel title="新建组织节点" sub="IAM 自建（制造维度）；编码建议直接沿用 MES 侧既定编码，不另造第二套">
+        <Panel title={t('iam.orgs.newTitle')} sub={t('iam.orgs.newSub')}>
           <form onSubmit={onCreate}>
             <div className="row">
               <div className="field">
                 <label className="field-label" htmlFor="pp">
-                  父节点
+                  {t('iam.orgs.f.parent')}
                 </label>
                 <select id="pp" value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                  <option value="">（无 / 作为根节点）</option>
+                  <option value="">{t('iam.orgs.noParent')}</option>
                   {flatOptions.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.label}
@@ -520,7 +520,7 @@ export default function OrgPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="cc">
-                  编码
+                  {t('iam.orgs.f.code')}
                 </label>
                 <input
                   id="cc"
@@ -532,13 +532,13 @@ export default function OrgPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="nn">
-                  名称
+                  {t('iam.orgs.f.name')}
                 </label>
-                <input id="nn" placeholder="蚀刻 1 线" value={name} onChange={(e) => setName(e.target.value)} />
+                <input id="nn" placeholder={t('iam.orgs.namePH')} value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="nt">
-                  类型
+                  {t('iam.orgs.f.type')}
                 </label>
                 <select id="nt" value={nodeType} onChange={(e) => setNodeType(e.target.value as OrgNodeType)}>
                   {CREATE_TYPES.map((t) => (
@@ -550,7 +550,7 @@ export default function OrgPage() {
               </div>
               <div className="field">
                 <label className="field-label" htmlFor="sn">
-                  排序
+                  {t('iam.orgs.f.sort')}
                 </label>
                 <input
                   id="sn"
@@ -560,16 +560,14 @@ export default function OrgPage() {
                   onChange={(e) => setSortNo(Number(e.target.value))}
                 />
               </div>
-              <Perms code={ORG_CREATE}>
-                <button type="submit" disabled={busy || !code.trim() || !name.trim()}>
-                  {busy ? '创建中…' : '创建'}
-                </button>
-              </Perms>
+                <Perms code={ORG_CREATE}>
+                  <button type="submit" disabled={busy || !code.trim() || !name.trim()}>
+                    {busy ? t('iam.orgs.creating') : t('iam.orgs.create')}
+                  </button>
+                </Perms>
             </div>
           </form>
-          <p className="hint">
-            组织是「按组织批量授权」与数据权限的上游：把树建对 → 挂人 → 在「组织授权」给组织授予 ap 与角色组。
-          </p>
+          <p className="hint">{t('iam.orgs.hint')}</p>
         </Panel>
       )}
     </div>

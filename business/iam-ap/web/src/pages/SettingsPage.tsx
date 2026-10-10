@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { SettingsDto, SyncResult } from '@/types';
 import Panel from '@/components/Panel';
@@ -8,13 +9,14 @@ import { IconAlert, IconSliders, IconSync } from '@/components/Icons';
 
 /** 系统设置：只读展示当前生效的运行时策略参数（目录同步按钮按 `iam:sync:run` 显隐）。 */
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const [s, setS] = useState<SettingsDto | null>(null);
   const [err, setErr] = useState('');
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
   useEffect(() => {
-    api.get<SettingsDto>('/admin/settings').then(setS).catch((e: any) => setErr(e?.msg || '加载设置失败'));
+    api.get<SettingsDto>('/admin/settings').then(setS).catch((e: any) => setErr(e?.msg || t('iam.settings.errLoad')));
   }, []);
 
   async function onSync() {
@@ -23,14 +25,14 @@ export default function SettingsPage() {
     try {
       const r = await api.post<SyncResult>('/admin/sync/ad');
       if (r.skipped) {
-        setSyncMsg(`已跳过：${r.reason}`);
+        setSyncMsg(t('iam.settings.msgSkipped', { reason: r.reason }));
       } else if (r.reason) {
         setSyncMsg(r.reason);
       } else {
-        setSyncMsg(`同步完成：组织 ${r.orgCount}、人员 ${r.userCount}、停用 ${r.deactivated}`);
+        setSyncMsg(t('iam.settings.msgDone', { orgs: r.orgCount, users: r.userCount, deactivated: r.deactivated }));
       }
     } catch (e: any) {
-      setErr(e?.msg || '同步失败');
+      setErr(e?.msg || t('iam.settings.errSync'));
     } finally {
       setSyncBusy(false);
     }
@@ -49,10 +51,10 @@ export default function SettingsPage() {
 
   if (!s) {
     return (
-      <Panel title="系统设置">
+      <Panel title={t('iam.settings.title')}>
         <div className="empty">
           <IconSliders width={22} height={22} />
-          <b>正在加载生效配置…</b>
+          <b>{t('iam.settings.loading')}</b>
         </div>
       </Panel>
     );
@@ -61,61 +63,61 @@ export default function SettingsPage() {
   return (
     <div className="page">
       <div className="grid-2">
-        <Panel title="认证与口令" sub="登录认证源与两层派生参数">
+        <Panel title={t('iam.settings.authTitle')} sub={t('iam.settings.authSub')}>
           <dl className="meta">
-            <dt className="meta-k">认证源</dt>
+            <dt className="meta-k">{t('iam.settings.mk.authSrc')}</dt>
             <dd className="meta-v mono">{s.authSource}</dd>
-            <dt className="meta-k">PBKDF2 轮数</dt>
+            <dt className="meta-k">{t('iam.settings.mk.pbkdf2Rounds')}</dt>
             <dd className="meta-v mono">{s.passwordRounds.toLocaleString()}</dd>
-            <dt className="meta-k">服务端 pepper</dt>
+            <dt className="meta-k">{t('iam.settings.mk.pepper')}</dt>
             <dd className="meta-v">
               {s.pepperConfigured ? (
-                <span className="tag ok">已配置</span>
+                <span className="tag ok">{t('iam.settings.configured')}</span>
               ) : (
-                <span className="tag err">未配置（不安全）</span>
+                <span className="tag err">{t('iam.settings.pepperMissing')}</span>
               )}
             </dd>
-            <dt className="meta-k">首管理员引导</dt>
+            <dt className="meta-k">{t('iam.settings.mk.bootstrap')}</dt>
             <dd className="meta-v">
-              {s.bootstrapEnabled ? <span className="tag ok">启用</span> : <span className="tag">停用</span>}
+              {s.bootstrapEnabled ? <span className="tag ok">{t('iam.settings.enabled')}</span> : <span className="tag">{t('iam.settings.disabled')}</span>}
               <span className="mono"> · {s.bootstrapAdminUsername}</span>
             </dd>
           </dl>
         </Panel>
 
-        <Panel title="令牌与签名" sub="JWT 签发参数与密钥来源">
+        <Panel title={t('iam.settings.tokenTitle')} sub={t('iam.settings.tokenSub')}>
           <dl className="meta">
-            <dt className="meta-k">访问令牌 TTL</dt>
-            <dd className="meta-v mono">{s.accessTokenTtlMinutes} 分钟</dd>
-            <dt className="meta-k">刷新令牌 TTL</dt>
-            <dd className="meta-v mono">{Math.round(s.refreshTokenTtlMinutes / 1440)} 天</dd>
+            <dt className="meta-k">{t('iam.settings.mk.accessTtl')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.minutes', { n: s.accessTokenTtlMinutes })}</dd>
+            <dt className="meta-k">{t('iam.settings.mk.refreshTtl')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.days', { n: Math.round(s.refreshTokenTtlMinutes / 1440) })}</dd>
             <dt className="meta-k">issuer / kid</dt>
             <dd className="meta-v mono">
               {s.jwtIssuer} / {s.jwtKid}
             </dd>
-            <dt className="meta-k">RSA 私钥来源</dt>
+            <dt className="meta-k">{t('iam.settings.mk.rsaSrc')}</dt>
             <dd className="meta-v">
-              {s.rsaKeyInjected ? <span className="tag ok">KMS 注入</span> : <span className="tag warn">启动临时生成</span>}
+              {s.rsaKeyInjected ? <span className="tag ok">{t('iam.settings.kms')}</span> : <span className="tag warn">{t('iam.settings.rsaTemp')}</span>}
             </dd>
-            <dt className="meta-k">JWKS 端点</dt>
+            <dt className="meta-k">{t('iam.settings.mk.jwks')}</dt>
             <dd className="meta-v mono">{s.jwksPath}</dd>
           </dl>
         </Panel>
       </div>
 
       <div className="grid-2">
-        <Panel title="登录锁定策略" sub="暴力破解防护（滑动窗口）">
+        <Panel title={t('iam.settings.lockTitle')} sub={t('iam.settings.lockSub')}>
           <dl className="meta">
-            <dt className="meta-k">失败阈值</dt>
-            <dd className="meta-v mono">{s.lockoutMaxAttempts} 次</dd>
-            <dt className="meta-k">锁定时长</dt>
-            <dd className="meta-v mono">{s.lockoutLockMinutes} 分钟</dd>
-            <dt className="meta-k">计数窗口</dt>
-            <dd className="meta-v mono">{s.lockoutWindowMinutes} 分钟</dd>
+            <dt className="meta-k">{t('iam.settings.mk.threshold')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.times', { n: s.lockoutMaxAttempts })}</dd>
+            <dt className="meta-k">{t('iam.settings.mk.lockMin')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.minutes', { n: s.lockoutLockMinutes })}</dd>
+            <dt className="meta-k">{t('iam.settings.mk.window')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.minutes', { n: s.lockoutWindowMinutes })}</dd>
           </dl>
         </Panel>
 
-        <Panel title="跨域白名单" sub="允许访问本服务的前端源">
+        <Panel title={t('iam.settings.corsTitle')} sub={t('iam.settings.corsSub')}>
           {s.webAllowedOrigins?.length ? (
             <div className="tag-list">
               {s.webAllowedOrigins.map((o) => (
@@ -125,57 +127,57 @@ export default function SettingsPage() {
               ))}
             </div>
           ) : (
-            <span className="dim">未配置</span>
+            <span className="dim">{t('iam.settings.notConfigured')}</span>
           )}
         </Panel>
       </div>
 
       <div className="grid-2">
-        <Panel title="身份目录 · 只读 API" sub="供业务 ap 拉取档案与组织（服务身份认证）">
+        <Panel title={t('iam.settings.dirApiTitle')} sub={t('iam.settings.dirApiSub')}>
           <dl className="meta">
-            <dt className="meta-k">目录 API</dt>
+            <dt className="meta-k">{t('iam.settings.mk.dirApi')}</dt>
             <dd className="meta-v">
               {s.directoryApiEnabled ? (
-                <span className="tag ok">已启用</span>
+                <span className="tag ok">{t('iam.settings.dirEnabled')}</span>
               ) : (
-                <span className="tag err">未启用（未配置密钥）</span>
+                <span className="tag err">{t('iam.settings.dirDisabled')}</span>
               )}
             </dd>
-            <dt className="meta-k">认证方式</dt>
-            <dd className="meta-v mono">X-Directory-Key（方案 A）</dd>
-            <dt className="meta-k">目录端点</dt>
+            <dt className="meta-k">{t('iam.settings.mk.authMethod')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.dirKey')}</dd>
+            <dt className="meta-k">{t('iam.settings.mk.dirEp')}</dt>
             <dd className="meta-v mono">/api/v1/directory/*</dd>
-            <dt className="meta-k">水位机制</dt>
-            <dd className="meta-v">user / org 单调版本号，业务侧比对后重拉</dd>
+            <dt className="meta-k">{t('iam.settings.mk.watermark')}</dt>
+            <dd className="meta-v">{t('iam.settings.v.watermark')}</dd>
           </dl>
         </Panel>
 
-        <Panel title="身份目录 · AD 同步" sub="只读同步人员与行政组织（未配置即跳过）">
+        <Panel title={t('iam.settings.adSyncTitle')} sub={t('iam.settings.adSyncSub')}>
           <dl className="meta">
-            <dt className="meta-k">同步开关</dt>
+            <dt className="meta-k">{t('iam.settings.mk.syncSwitch')}</dt>
             <dd className="meta-v">
-              {s.adSyncEnabled ? <span className="tag ok">开启</span> : <span className="tag">关闭</span>}
+              {s.adSyncEnabled ? <span className="tag ok">{t('iam.settings.on')}</span> : <span className="tag">{t('iam.common.close')}</span>}
             </dd>
-            <dt className="meta-k">可连接配置</dt>
+            <dt className="meta-k">{t('iam.settings.mk.connCfg')}</dt>
             <dd className="meta-v">
               {s.adSyncConfigured ? (
-                <span className="tag ok">已就绪</span>
+                <span className="tag ok">{t('iam.settings.ready')}</span>
               ) : (
-                <span className="tag warn">未配置 → 同步跳过</span>
+                <span className="tag warn">{t('iam.settings.syncNotCfg')}</span>
               )}
             </dd>
-            <dt className="meta-k">检索基址</dt>
+            <dt className="meta-k">{t('iam.settings.mk.baseDn')}</dt>
             <dd className="meta-v mono">{s.adBaseDn || '—'}</dd>
-            <dt className="meta-k">同步间隔</dt>
-            <dd className="meta-v mono">{Math.round(s.adSyncIntervalMs / 1000)} 秒</dd>
-            <dt className="meta-k">跨源保护</dt>
-            <dd className="meta-v">只写 AD_SYNCED，绝不覆盖 IAM 自建节点</dd>
+            <dt className="meta-k">{t('iam.settings.mk.interval')}</dt>
+            <dd className="meta-v mono">{t('iam.settings.v.seconds', { n: Math.round(s.adSyncIntervalMs / 1000) })}</dd>
+            <dt className="meta-k">{t('iam.settings.mk.crossSrc')}</dt>
+            <dd className="meta-v">{t('iam.settings.v.crossSrc')}</dd>
           </dl>
           <div className="row" style={{ marginTop: 12 }}>
             <Perms code={SYNC_RUN}>
               <button type="button" className="btn-sm" onClick={onSync} disabled={syncBusy}>
                 <IconSync width={13} height={13} />
-                {syncBusy ? '同步中…' : '立即同步'}
+                {syncBusy ? t('iam.settings.syncing') : t('iam.settings.sync')}
               </button>
             </Perms>
             {syncMsg && <span className="hint" style={{ margin: 0 }}>{syncMsg}</span>}
@@ -183,11 +185,11 @@ export default function SettingsPage() {
         </Panel>
       </div>
 
-      <Panel title="说明" sub="为何是只读">
+      <Panel title={t('iam.settings.noteTitle')} sub={t('iam.settings.noteSub')}>
         <ul className="note-list">
-          <li>这些参数影响<b>签发与验证的一致性</b>，在线修改会与已签发令牌/业务验证端产生漂移。</li>
-          <li>如需调整，请通过配置中心 / 环境变量发布，并重启生效。</li>
-          <li>本页用于让管理员核对当前生效值，便于排障与合规审计。</li>
+          <li><b>{t('iam.settings.note1')}</b></li>
+          <li>{t('iam.settings.note2')}</li>
+          <li>{t('iam.settings.note3')}</li>
         </ul>
       </Panel>
     </div>
