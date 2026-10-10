@@ -645,12 +645,13 @@ button.side-cap.page-cap {
   transform: rotate(90deg);
 }
 
-/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；顶部留白给右上角关闭徽标探出 */
+/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；
+   顶部留白给右上角关闭徽标探出，页签贴底（浏览器页签式） */
 .tabbar-scroll {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -661,24 +662,25 @@ button.side-cap.page-cap {
   display: none;
 }
 
-/* 页签 chip：紧凑等宽（120px），圆点 + 标题（截断，悬浮 title 显全称）；
-   相对定位承载右上角关闭徽标 */
+/* 页签 chip：紧凑等宽（100px）、贴底、顶部两角圆弧（浏览器页签式）；
+   文字居中；相对定位承载右上角关闭徽标 */
 .tab-item {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 10px;
-  width: 120px;
-  flex: 0 0 120px;
-  border-radius: 7px;
+  height: 30px;
+  padding: 0 8px;
+  width: 100px;
+  flex: 0 0 100px;
+  border-radius: 9px 9px 0 0;
   border: 1px solid transparent;
+  border-bottom: 0;
   font-size: var(--fs-xs);
   color: var(--text-2);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  justify-content: center;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .tab-item:hover {
@@ -692,27 +694,12 @@ button.side-cap.page-cap {
   font-weight: 600;
 }
 
-/* 状态圆点：激活=主题色实心，未激活=灰点 */
-.tab-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--line-strong);
-  flex: 0 0 6px;
-  transition: background 0.12s ease;
-}
-.tab-item:hover .tab-dot {
-  background: var(--muted);
-}
-.tab-item.active .tab-dot {
-  background: var(--primary);
-}
-
 .tab-label {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
 }
 
 /* 关闭徽标：骑在右上角的小圆钮（Chrome 页签风格）；悬停所在签时浮现。
@@ -782,6 +769,41 @@ button.side-cap.page-cap {
 .tab-menu button:hover {
   background: var(--panel-3);
   color: var(--text);
+}
+
+/* 页签右键菜单：跟随鼠标的固定定位浮层（关闭标签页 / 关闭其它 / 关闭右侧） */
+.tab-ctx {
+  position: fixed;
+  z-index: 80;
+  min-width: 152px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(13, 22, 38, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.tab-ctx button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tab-ctx button:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.tab-ctx button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* ---------- 页面容器 ---------- */

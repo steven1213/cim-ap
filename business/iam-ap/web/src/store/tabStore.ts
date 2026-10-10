@@ -35,6 +35,11 @@ interface TabState {
   close: (path: string) => string | null;
   /** 关闭其他：保留固定签与指定签，激活指定签。 */
   closeOthers: (path: string) => void;
+  /**
+   * 关闭右侧：保留指定签及其左侧（含固定签）。
+   * 若激活签被关掉，激活指定签并返回其路径（调用方负责导航）；否则返回 null。
+   */
+  closeRight: (path: string) => string | null;
   /** 关闭全部：重置为只剩固定签，返回固定签路径（调用方负责导航）。 */
   closeAll: () => string;
   /** 登出清空：重置为初始态。 */
@@ -90,6 +95,19 @@ export const useTabStore = create<TabState>()((set, get) => ({
   closeAll: () => {
     set({ tabs: homeTab(), activePath: HOME_PATH });
     return HOME_PATH;
+  },
+
+  closeRight: (path) => {
+    const { tabs, activePath } = get();
+    const idx = tabs.findIndex((x) => x.path === path);
+    if (idx < 0) return null;
+    const next = tabs.slice(0, idx + 1);
+    if (next.some((x) => x.path === activePath)) {
+      set({ tabs: next });
+      return null;
+    }
+    set({ tabs: next, activePath: path });
+    return path;
   },
 
   clear: () => set({ tabs: homeTab(), activePath: HOME_PATH }),

@@ -2,10 +2,12 @@
 //
 // <p><b>交互契约</b>：
 // <ul>
-//   <li>「概览」为固定签（pinned），无关闭钮，关闭全部/其他后仍保留；</li>
-//   <li>页签溢出时两侧出现滚动箭头（按容器 60% 步进平滑滚动），激活签变化时自动滚入可视区；</li>
-//   <li>右侧「更多」下拉：关闭其他 / 关闭全部；关闭激活签时由 {@link useTabStore}
-//       决定相邻签并导航过去（优先右邻）。</li>
+//   <li>「概览」为固定签（pinned），无关闭徽标，右键菜单的「关闭标签页」对其禁用；</li>
+//   <li>每个签支持<b>右键菜单</b>：关闭标签页 / 关闭其它标签页 / 关闭右侧标签页
+//       （对齐 Ant Design Pro / vue-element-admin 的 tags-view 惯例）；</li>
+//   <li>右侧「更多」下拉保留全局入口：关闭其他 / 关闭全部；</li>
+//   <li>页签溢出时两侧出现滚动箭头，激活签变化时自动滚入可视区；</li>
+//   <li>关闭激活签时由 {@link useTabStore} 决定相邻签并导航过去（优先右邻）。</li>
 // </ul></p>
 //
 // <p>标题解析优先取菜单库的 `i18nCode`（随授权即时更新），回退到开签时快照——
@@ -17,6 +19,13 @@ import { useMenuStore } from '@/store/menuStore';
 import { HOME_PATH, useTabStore } from '@/store/tabStore';
 import { IconChevron, IconX } from '@/components/Icons';
 
+/** 右键菜单状态：屏幕坐标 + 目标签路径。 */
+interface CtxMenu {
+  x: number;
+  y: number;
+  path: string;
+}
+
 export default function TabBar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -25,12 +34,15 @@ export default function TabBar() {
   const setActive = useTabStore((s) => s.setActive);
   const close = useTabStore((s) => s.close);
   const closeOthers = useTabStore((s) => s.closeOthers);
+  const closeRight = useTabStore((s) => s.closeRight);
   const closeAll = useTabStore((s) => s.closeAll);
   const flat = useMenuStore((s) => s.flat);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [ctx, setCtx] = useState<CtxMenu | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
@@ -77,7 +89,7 @@ export default function TabBar() {
     }
   }, [activePath, tabs]);
 
-  // 下拉菜单：点击外部 / Escape 关闭
+  // 右侧「更多」下拉：点击外部 / Escape 关闭
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -94,6 +106,23 @@ export default function TabBar() {
     };
   }, [menuOpen]);
 
+  // 右键菜单：点击外部 / Escape 关闭
+  useEffect(() => {
+    if (!ctx) return;
+    const onDown = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtx(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCtx(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [ctx]);
+
   function scrollByDir(dir: -1 | 1) {
     const el = scrollerRef.current;
     if (!el) return;
@@ -106,9 +135,40 @@ export default function TabBar() {
     navigate(path);
   }
 
-  function onClose(e: React.MouseEvent, path: string) {
+  function onCloseBtn(e: React.MouseEvent, path: string) {
     e.stopPropagation();
     const next = close(path);
+    if (next) navigate(next);
+  }
+
+  /** 页签右键菜单（对齐参考实现：关闭标签页 / 关闭其它 / 关闭右侧）。 */
+  function onTabCtx(e: React.MouseEvent, path: string) {
+    e.preventDefault();
+    // 简单钳位，避免菜单溢出视口右/下缘
+    setCtx({
+      x: Math.min(e.clientX, window.innerWidth - 170),
+      y: Math.min(e.clientY, window.innerHeight - 130),
+      path,
+    });
+  }
+
+  function ctxCloseThis() {
+    if (!ctx) return;
+    const next = close(ctx.path);
+    setCtx(null);
+    if (next) navigate(next);
+  }
+
+  function ctxCloseOthers() {
+    if (!ctx) return;
+    closeOthers(ctx.path);
+    setCtx(null);
+  }
+
+  function ctxCloseRight() {
+    if (!ctx) return;
+    const next = closeRight(ctx.path);
+    setCtx(null);
     if (next) navigate(next);
   }
 
@@ -142,8 +202,8 @@ export default function TabBar() {
               className={'tab-item' + (active ? ' active' : '') + (pinned ? ' pinned' : '')}
               title={title}
               onClick={() => onTab(tab.path)}
+              onContextMenu={(e) => onTabCtx(e, tab.path)}
             >
-              <span className="tab-dot" aria-hidden="true" />
               <span className="tab-label">{title}</span>
               {!pinned && (
                 <button
@@ -151,7 +211,7 @@ export default function TabBar() {
                   className="tab-x"
                   aria-label={t('iam.shell.tabs.close')}
                   title={t('iam.shell.tabs.close')}
-                  onClick={(e) => onClose(e, tab.path)}
+                  onClick={(e) => onCloseBtn(e, tab.path)}
                 >
                   <IconX width={8} height={8} />
                 </button>
@@ -213,6 +273,30 @@ export default function TabBar() {
           </div>
         )}
       </div>
+
+      {ctx && (
+        <div className="tab-ctx" role="menu" ref={ctxRef} style={{ left: ctx.x, top: ctx.y }}>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={ctx.path === HOME_PATH}
+            onClick={ctxCloseThis}
+          >
+            {t('iam.shell.tabs.closeThis')}
+          </button>
+          <button type="button" role="menuitem" onClick={ctxCloseOthers}>
+            {t('iam.shell.tabs.closeOthers')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={tabs.findIndex((x) => x.path === ctx.path) >= tabs.length - 1}
+            onClick={ctxCloseRight}
+          >
+            {t('iam.shell.tabs.closeRight')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

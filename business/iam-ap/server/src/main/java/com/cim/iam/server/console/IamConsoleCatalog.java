@@ -535,6 +535,8 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.shell.tabs.more", "页签操作", "Tab actions"));
         t.add(new TextDef("iam.shell.tabs.closeOthers", "关闭其他", "Close others"));
         t.add(new TextDef("iam.shell.tabs.closeAll", "关闭全部", "Close all"));
+        t.add(new TextDef("iam.shell.tabs.closeThis", "关闭标签页", "Close tab"));
+        t.add(new TextDef("iam.shell.tabs.closeRight", "关闭右侧标签页", "Close tabs to the right"));
         t.add(new TextDef("iam.common.notLoggedIn", "未登录", "Not signed in"));
         t.add(new TextDef("iam.common.loading", "加载中…", "Loading…"));
         t.add(new TextDef("iam.common.retry", "重试", "Retry"));

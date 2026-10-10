@@ -149,9 +149,6 @@ export default function Layout() {
     navigate('/login');
   }
 
-  const entry = flat.find((m) => m.path === pathname);
-  const title = entry ? t(entry.i18nCode ?? '') : t('iam.shell.consoleTitle');
-  const sub = entry ? t(`${entry.i18nCode ?? ''}.desc`, { defaultValue: '' }) : '';
   const crumbPath = pathname === '/' ? 'overview' : pathname.replace(/^\//, '');
   const initial = (user?.username || '?').charAt(0).toUpperCase();
   const isProd = import.meta.env.MODE === 'production';
@@ -231,10 +228,9 @@ export default function Layout() {
             <IconSidebar width={18} height={18} />
           </button>
 
+          {/* 当前页名由页签栏承载，header 只留路径小字作方位提示 */}
           <div className="crumb">
-            <h1>{title}</h1>
             <span className="path">IAM / {crumbPath}</span>
-            {sub && <p>{sub}</p>}
           </div>
 
           <div className="topbar-right">
