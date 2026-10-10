@@ -10,6 +10,8 @@ import { I18N_LIST, I18N_CREATE, I18N_DELETE, I18N_LOCALE } from '@/lib/permCode
 import {
   IconAlert,
   IconCheckCircle,
+  IconChevron,
+  IconEdit,
   IconInbox,
   IconPlus,
   IconRefresh,
@@ -17,8 +19,15 @@ import {
   IconTrash,
 } from '@/components/Icons';
 
+/** 译文表客户端分页大小（服务端已按 locale/module/keyword 过滤，前端只做翻页）。 */
+const PAGE_SIZE = 50;
+
 /**
  * 多语言（`/i18n`）：语言目录与译文维护。
+ *
+ * <p><b>布局（主从式）</b>：左列语言目录（点选即过滤右侧译文，行内编辑/删除），
+ * 右列译文表（module/keyword 过滤 + 客户端分页）+ 缺失键（默认收起，点开处理）。
+ * 与菜单/权限/角色三页保持同一 master-detail 心智模型。</p>
  *
  * <p><b>数据面在 IAM 自己</b>（不像菜单/权限/角色那样复用平台端点）：管理端点
  * `GET/POST/DELETE /api/v1/admin/i18n/**` 由 `I18nAdminController` 提供，权限码是
@@ -46,6 +55,8 @@ export default function I18nAdminPage() {
   const [filterLocale, setFilterLocale] = useState('');
   const [filterModule, setFilterModule] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [missOpen, setMissOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -69,6 +80,7 @@ export default function I18nAdminPage() {
       setLocales(ls ?? []);
       setMessages(ms ?? []);
       setMissing(miss ?? {});
+      setPage(1); // 过滤条件变化后回到第一页
     } catch (e: any) {
       setErr(e?.msg || t('iam.common.loadFailed'));
     } finally {
@@ -93,6 +105,14 @@ export default function I18nAdminPage() {
   }, [messages]);
 
   const missingKeys = useMemo(() => Object.keys(missing).sort(), [missing]);
+
+  /** 客户端分页（数据已由服务端过滤）。 */
+  const pages = Math.max(1, Math.ceil(messages.length / PAGE_SIZE));
+  const safePage = Math.min(page, pages);
+  const paged = useMemo(
+    () => messages.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [messages, safePage],
+  );
 
   async function onSaveLocale(e: FormEvent) {
     e.preventDefault();
@@ -217,7 +237,9 @@ export default function I18nAdminPage() {
         </div>
       )}
 
+      <div className="split">
       <Panel
+        className="scroll-y"
         title={t('iam.admin.i18n.locales')}
         sub={`${locales.length}`}
         flush
@@ -249,72 +271,77 @@ export default function I18nAdminPage() {
           </>
         }
       >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('iam.field.code')}</th>
-                <th>{t('iam.field.name')}</th>
-                <th style={{ width: 110 }}>{t('iam.i18n.default')}</th>
-                <th className="num" style={{ width: 80 }}>
-                  {t('iam.field.sortNo')}
-                </th>
-                <th style={{ width: 100 }}>{t('iam.common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {locales.map((l) => (
-                <tr key={l.id}>
-                  <td className="mono">{l.code}</td>
-                  <td>{l.name ?? '—'}</td>
-                  <td>
-                    {l.isDefault ? (
-                      <span className="tag pri">{t('iam.i18n.default')}</span>
-                    ) : (
-                      <span className="dim">—</span>
-                    )}
-                  </td>
-                  <td className="num">{l.sortNo}</td>
-                  <td>
-                    <div className="cell-actions">
-                      <Perms code={I18N_LOCALE}>
-                        <button
-                          className="btn-ghost btn-sm"
-                          onClick={() =>
-                            setLocaleDraft({
-                              id: l.id,
-                              code: l.code,
-                              name: l.name ?? '',
-                              isDefault: l.isDefault,
-                              sortNo: l.sortNo,
-                              status: l.status,
-                            })
-                          }
-                        >
-                          {t('iam.common.edit')}
-                        </button>
-                      </Perms>
-                      {!l.isDefault && (
-                        <Perms code={I18N_LOCALE}>
-                          <button
-                            className="icon-btn danger"
-                            title={t('iam.common.delete')}
-                            onClick={() => onDeleteLocale(l.id, l.code)}
-                          >
-                            <IconTrash width={13} height={13} />
-                          </button>
-                        </Perms>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {locales.length ? (
+          <div className="tree">
+            <div
+              className={'tree-row' + (!filterLocale ? ' on' : '')}
+              onClick={() => setFilterLocale('')}
+            >
+              <span className="tree-name">{t('iam.admin.i18n.allLocales')}</span>
+              <span className="tree-code dim">{messages.length}</span>
+            </div>
+            {locales.map((l) => (
+              <div
+                key={l.id}
+                className={'tree-row' + (filterLocale === l.code ? ' on' : '')}
+                onClick={() => setFilterLocale(filterLocale === l.code ? '' : l.code)}
+                title={t('iam.admin.i18n.clickToFilter')}
+              >
+                <span className="tree-name mono">{l.code}</span>
+                {l.isDefault && (
+                  <span className="tag pri">{t('iam.i18n.default')}</span>
+                )}
+                {l.status === 'DISABLED' && (
+                  <span className="tag err">{t('iam.common.disabled')}</span>
+                )}
+                <span className="tree-code dim">{l.name ?? ''}</span>
+                <span className="cell-actions" style={{ marginLeft: 'auto' }}>
+                  <Perms code={I18N_LOCALE}>
+                    <button
+                      className="icon-btn"
+                      title={t('iam.common.edit')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocaleDraft({
+                          id: l.id,
+                          code: l.code,
+                          name: l.name ?? '',
+                          isDefault: l.isDefault,
+                          sortNo: l.sortNo,
+                          status: l.status,
+                        });
+                      }}
+                    >
+                      <IconEdit width={13} height={13} />
+                    </button>
+                  </Perms>
+                  {!l.isDefault && (
+                    <Perms code={I18N_LOCALE}>
+                      <button
+                        className="icon-btn danger"
+                        title={t('iam.common.delete')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteLocale(l.id, l.code);
+                        }}
+                      >
+                        <IconTrash width={13} height={13} />
+                      </button>
+                    </Perms>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty">
+            <IconInbox width={22} height={22} />
+            <b>{t('iam.common.none')}</b>
+          </div>
+        )}
 
         {localeDraft && (
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 12, borderTop: '1px dashed var(--line)' }}>
             <form onSubmit={onSaveLocale}>
               <div className="form-grid">
                 <div className="field">
@@ -381,6 +408,7 @@ export default function I18nAdminPage() {
         )}
       </Panel>
 
+      <div>
       <Panel
         title={t('iam.admin.i18n.messages')}
         sub={`${messages.length}`}
@@ -419,60 +447,54 @@ export default function I18nAdminPage() {
           </>
         }
       >
-        <div style={{ padding: '10px 12px 0' }}>
-          <div className="grid-3">
-            <div className="field">
-              <label className="field-label" htmlFor="f-locale">
-                {t('iam.admin.i18n.filterLocale')}
-              </label>
-              <select
-                id="f-locale"
-                value={filterLocale}
-                onChange={(e) => setFilterLocale(e.target.value)}
-              >
-                <option value="">{t('iam.common.all')}</option>
-                {locales.map((l) => (
-                  <option key={l.id} value={l.code}>
-                    {l.code}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="f-module">
-                {t('iam.admin.i18n.filterModule')}
-              </label>
-              <select
-                id="f-module"
-                value={filterModule}
-                onChange={(e) => setFilterModule(e.target.value)}
-              >
-                <option value="">{t('iam.common.all')}</option>
-                {modules.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="f-kw">
-                {t('iam.admin.i18n.keyword')}
-              </label>
-              <input
-                id="f-kw"
-                className="mono"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') loadAll();
-                }}
-              />
-            </div>
-          </div>
+        <div
+          style={{
+            padding: '10px 12px 4px',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          {filterLocale && (
+            <button
+              type="button"
+              className="tag pri"
+              title={t('iam.admin.i18n.clickToFilter')}
+              onClick={() => setFilterLocale('')}
+            >
+              {filterLocale}
+              <span className="chip-x">✕</span>
+            </button>
+          )}
+          <select
+            id="f-module"
+            style={{ width: 170 }}
+            value={filterModule}
+            onChange={(e) => setFilterModule(e.target.value)}
+          >
+            <option value="">{t('iam.admin.i18n.filterModule') + ' · ' + t('iam.common.all')}</option>
+            {modules.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <input
+            id="f-kw"
+            className="mono"
+            style={{ flex: '1 1 170px' }}
+            placeholder={t('iam.admin.i18n.keyword')}
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') loadAll();
+            }}
+          />
         </div>
 
         {messages.length ? (
+          <>
           <div className="table-wrap">
             <table className="data">
               <thead>
@@ -486,7 +508,7 @@ export default function I18nAdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {messages.map((m) => (
+                {paged.map((m) => (
                   <tr key={m.id}>
                     <td className="mono">{m.localeCode}</td>
                     <td className="mono">{m.code}</td>
@@ -530,6 +552,28 @@ export default function I18nAdminPage() {
               </tbody>
             </table>
           </div>
+          {pages > 1 && (
+            <div className="pager">
+              <span>{t('iam.common.pagerInfo', { page: safePage, pages })}</span>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                disabled={safePage <= 1}
+                onClick={() => setPage(safePage - 1)}
+              >
+                {t('iam.common.prevPage')}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                disabled={safePage >= pages}
+                onClick={() => setPage(safePage + 1)}
+              >
+                {t('iam.common.nextPage')}
+              </button>
+            </div>
+          )}
+          </>
         ) : (
           <div className="empty">
             <IconInbox width={22} height={22} />
@@ -628,53 +672,67 @@ export default function I18nAdminPage() {
 
       <Panel
         title={t('iam.i18n.missing')}
-        sub={t('iam.admin.i18n.missingHint')}
+        sub={missOpen ? t('iam.admin.i18n.missingHint') : undefined}
         actions={
           <>
             <span className={'tag' + (missingKeys.length ? ' warn' : '')}>
               {t('iam.admin.i18n.missingCount', { n: missingKeys.length })}
             </span>
-            {canRemove && missingKeys.length > 0 && (
+            {canRemove && missOpen && missingKeys.length > 0 && (
               <button className="btn-ghost btn-sm" onClick={onClearMissing} disabled={busy}>
                 <IconTrash width={13} height={13} />
                 {t('iam.admin.i18n.clearMissing')}
               </button>
             )}
+            <button
+              type="button"
+              className="icon-btn"
+              title={missOpen ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
+              aria-expanded={missOpen}
+              onClick={() => setMissOpen((v) => !v)}
+            >
+              <span className={'tree-toggle' + (missOpen ? ' open' : '')} style={{ width: 14, height: 14 }}>
+                <IconChevron width={12} height={12} />
+              </span>
+            </button>
           </>
         }
       >
-        {missingKeys.length ? (
-          <div className="tag-list">
-            {missingKeys.map((k) => (
-              <span className="tag warn mono" key={k} title={missing[k]}>
-                {k}
-                <button
-                  className="chip-x"
-                  title={t('iam.common.add')}
-                  onClick={() => {
-                    setMsgDraft({
-                      id: '',
-                      localeCode: filterLocale || currentLang(),
-                      code: k,
-                      content: '',
-                      module: '',
-                      scope: 'USER',
-                    });
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                >
-                  +
-                </button>
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="empty">
-            <IconCheckCircle width={22} height={22} />
-            <b>{t('iam.common.none')}</b>
-          </div>
-        )}
+        {missOpen ? (
+          missingKeys.length ? (
+            <div className="tag-list">
+              {missingKeys.map((k) => (
+                <span className="tag warn mono" key={k} title={missing[k]}>
+                  {k}
+                  <button
+                    className="chip-x"
+                    title={t('iam.common.add')}
+                    onClick={() => {
+                      setMsgDraft({
+                        id: '',
+                        localeCode: filterLocale || currentLang(),
+                        code: k,
+                        content: '',
+                        module: '',
+                        scope: 'USER',
+                      });
+                    }}
+                  >
+                    +
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">
+              <IconCheckCircle width={22} height={22} />
+              <b>{t('iam.common.none')}</b>
+            </div>
+          )
+        ) : null}
       </Panel>
+      </div>
+      </div>
     </div>
   );
 }
