@@ -39,7 +39,7 @@ class BootstrapAssemblyTest {
 
     @Test
     void assemblesStarterAndSystemDomainOverRealDatasource() {
-        // ① 域模块的实体/仓储被扫描到（靠 cim-system 自带的 @EntityScan/@EnableJpaRepositories）
+        // ① 域模块的实体/仓储被扫描到（靠 cim-system 自带的 @EntityScan/@EnableJpaRepositories("com.cim.system")）
         assertThat(context.getBean(SysUserRepository.class))
                 .as("cim-system 的仓储应已注册（未被扫描则会启动失败）")
                 .isNotNull();

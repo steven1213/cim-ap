@@ -13,10 +13,15 @@ import org.hibernate.Session;
  *
  * <p>过滤器启用是基于「会话」的，同一事务内幂等；多次调用仅刷新参数。</p>
  *
- * <p>租户化实体须**直接**标注（Hibernate 不解析元注解形式）：
- * {@code @FilterDef(name="cimTenantFilter", parameters=@ParamDef(name="tenantId", type=String.class))}
- * 与 {@code @Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")}，同名 {@code FilterDef}
- * 在多实体上重复声明是幂等的。</p>
+ * <p><b>{@code @FilterDef} 的声明位置（ADR-12 —— 勿在实体上重复声明）</b>：Hibernate 要求
+ * {@code @FilterDef} 的名字<b>在每个持久化单元内唯一</b>，同一个名字被声明两次会直接抛
+ * {@code AnnotationException: Multiple '@FilterDef' annotations define a filter named 'cimTenantFilter'}
+ * （Hibernate 6.2+ 起为硬错误，无开关可关，见 HHH-16581 / HHH-16803；「同名同参即幂等」是
+ * 6.1 及更早的旧行为，<b>不成立</b>）。故平台的唯一声明点是
+ * {@code com.cim.system}'s {@code package-info}；租户化实体只标
+ * {@code @Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")}（须<b>直接</b>标注，
+ * Hibernate 不解析元注解，且显式 {@code condition} 使启动期不依赖 {@code @FilterDef} 是否在同一
+ * 扫描包内）。</p>
  *
  * <p>本类以 {@code @Bean} 形式在 {@code JpaAutoConfiguration} 中声明（见该类的
  * {@code tenantFilterApplier()}），以便脱离包扫描也可注入。</p>
