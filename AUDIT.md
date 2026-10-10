@@ -117,6 +117,27 @@
 - **验证**：iam-ap **48/48 绿**（新增 `IdentityDirectoryTest`×7：① 组织授予经祖先链展开到成员；② 跨源保护使 AD 节点只读；③ 组织变更 bump 令牌版本 + 水位；④ 未配置 AD 时同步跳过；⑤ 目录 API 强制服务密钥；⑥ 批量用户与组织/档案管理端点；⑦ 组织授予变更使存量令牌失效）。web `tsc -p tsconfig.json` EXIT=0；`vite build` 128 模块、CSS 22.60 kB、JS 309.01 kB，EXIT=0。
 - **视觉回归**：独立验证实例（后端 :8082 + 临时 vite :5172）种子化数据（3 应用 / 组织树 8 节点 / 5 账号含档案 / 多归属 / 3 条组织授予 / AD 同步返回 `skipped:true`），以 CDP 实拍**浅/深双主题共 11 页 + 登录页**；并量化检测**全部 11 页零横向溢出**（`scrollWidth === clientWidth`，越界元素计数 0）。**额外**对组织树做层级几何核验：`padding-left` 依次 8 / 25 / 42 / 59px（每级 +17px），`薄膜车间` 与 `蚀刻车间` **同为 25px（证实同级）**、`B厂` 回到 8px —— 量化纠正了此前对低分辨率截图的误读（曾误判 `薄膜车间` 缩进多一级）。
 
+## 2026-10-09（续）IAM 控制台配置化（W4b：存量页面正文文案 i18n 迁移）
+
+### 13.1 后端（server）
+- **范围**：`business/iam-ap/server`
+  - `IamConsoleCatalog.texts()` 补 12 个存量页命名空间双语 `TextDef`：`iam.users.*` / `iam.orgs.*` / `iam.dashboard.*` / `iam.settings.*` / `iam.orgGrants.*` / `iam.profile.*` / `iam.appMgmt.*` / `iam.sessions.*` / `iam.admissions.*` / `iam.lockouts.*` / `iam.audit.*` / `iam.rolesView.*`（注：`RolesPage` 用 `rolesView` 命名空间，区别于配置页 `rolesAdmin`）。
+  - 枚举/相对时间标签全部落到 `TextDef`：`iam.audit.type.*`（24 个审计类型）、`iam.org.type.*`（6 种组织类型）、`iam.source.*`（AD_SYNCED/IAM_MANAGED）、`iam.common.{justNow,minutesAgo,hoursAgo,daysAgo,dash}`（含 `{{n}}` 插值）。
+  - 新增 `ConsoleTextCatalogTest`（3 方法）：① 每个 `TextDef` 的 zh/en 均非空 + code 唯一；② `en` 文本不得含 CJK（否则 en-US 包混入中文）；③ W4b 12 个命名空间齐备（缺任一→对应页切 en-US 回落 `humanize(key)`）。
+- **验证**：随 iam-ap 回归 **71/71** 绿（68 + 本测试 3 方法）。
+
+### 13.2 前端（web）
+- **范围**：`business/iam-ap/web`
+  - `lib/format.ts`：移除 `AUDIT_LABELS`/`ORG_TYPE_LABELS` 常量对象，`auditLabel`/`orgTypeLabel`/`originLabel`/`fmtDateTime`/`fmtRelative` 全部改走 `i18next.t` 内部翻译（页面**不得**二次包裹其返回值，否则双重 key）；`AuditPage` 同步改引 `AUDIT_TYPES` 字符串数组（因 `format.ts` 不再导出 `AUDIT_LABELS`）。
+  - 17 个存量页（UsersPage/OrgPage/DashboardPage/SettingsPage/OrgGrantsPage/ProfilePage/AppMgmtPage/SessionsPage/AdmissionsPage/LockoutsPage/AuditPage/RolesPage 等）UI 中文改 `t('iam.<page>.*')`；动态串用 `{{var}}` 插值；`window.confirm`/`flash` 提示一并包裹；少量子代理补的 key 统一落在 W4b 段（`iam.admissions.noRole`/`iam.audit.scopeSub`/`iam.settings.v.*`/`iam.orgGrants.{typeRef,localMaintain}`/`iam.profile.pwdUpdatedNotice`）。
+  - `test/render-contract.tsx`：扩至 12 存量页，配 `MemoryRouter` 上下文 + `ALL_PERMS` 闸门（`getServerSnapshot` 改写）包裹，断言 `assertNoChinese`（正则 `/[一-鿿]/`）零残留；`run.mjs` 仍是 esbuild SSR 运行器。
+- **验证**：`tsc -p tsconfig.json` EXIT=0；`vite build` 161 模块、JS 414.14 kB EXIT=0；**渲染契约 33/33**（4 配置页 + 12 存量页切 en-US 无中文残留、零裸 key）。
+- **关键设计决策**：
+  1. **翻译内聚于 `format.ts`**：枚举标签由 `format.ts` 内部 `i18n.t` 完成，调用方只消费返回值，避免「`{auditLabel(t)}` 外包 `t`」双重 key 缺陷（曾导致 `AuditPage` 编译报错，已修）。
+  2. **目录单一事实源**：`TextDef` 是 zh/en 成对种子，前端 `t()` 运行时从平台 `/api/i18n/messages` 拉取；en 含 CJK 由 `ConsoleTextCatalogTest.englishTextContainsNoCjk` 兜底，从数据源根绝「en-US 包混中文」。
+  3. **SSR 契约测试上下文修复**：`DashboardPage`/`ProfilePage` 用 `useNavigate` 需 `MemoryRouter` 包裹，否则 `renderToStaticMarkup` 抛 `useNavigate() may be used only in the context of a <Router>`；`useLayoutEffect` SSR 警告无害。
+  4. **注释可保留中文**：仅渲染文本须 `t()`，代码注释不进 UI，不强制 i18n。
+
 ## 2026-10-09（续）IAM 控制台配置化（W4：菜单/权限/角色/多语言自助闭环）
 
 ### 11. 后端（server）
@@ -153,7 +174,7 @@
 - 验证产物（`.verify/` 脚本与截图、`vite.smoke.config.ts`）**未入库**，已清理。
 
 ### 14. 风险 / 待办
-- **W4b 存量页面 i18n 迁移**：4 个配置页已 i18n，但 17 个存量页面（OrgPage/UsersPage/Dashboard/Settings 等）约 537 行硬编码中文，**未纳入本次**，列为后续 wave；届时需逐页配 `t()` + `TextDef`，使切 `en-US` 无中文残留。
+- ~~**W4b 存量页面 i18n 迁移**：4 个配置页已 i18n，但 17 个存量页面（OrgPage/UsersPage/Dashboard/Settings 等）约 537 行硬编码中文，**未纳入本次**，列为后续 wave。~~ **已于 2026-10-10 完成**，见下方「2026-10-10 W4b」章节。
 - ~~平台 `cim-system` 迁移版本号 V1→V1000（ADR-10）等早年会话产物的未提交改动仍在工作区。~~ **已于 2026-10-10 收口**：`cim-i18n-starter`(ca95b8d) + `cim-system`(6a46448) + `cim-jpa-starter`/`cim-bootstrap`(ffea12a) 三笔 commit 入库，构建验证全绿；工作区已无 platform 底座未提交改动。（注：`cim-mq-starter`/`cim-cache-starter`/MDS 文档此前已随各自 commit 入库，本行原"未提交"表述系当时误判。）
 
 ## 2026-10-09 全量回归记录
@@ -196,6 +217,27 @@
 ### 19. 风险 / 待办
 - **遗留（文档）**：`docs/business/mds-ap/server/*` 约 30+ 篇设计稿仍写「`@FilterDef` 放实体包 `package-info.java`」，与 ADR-12（唯一声明点 = `com.cim.system`）相悖；落地 mds-ap 前须按新口径改写，否则启动即 `AnnotationException: Multiple '@FilterDef'`。
 - **验证范围**：本次仅对 platform 受影响模块做 `mvn install`（未跑全仓 13 模块整回归），但 cim-i18n-starter 为新建模块、cim-system 等此前已整仓回归；IAM 侧未触碰，不受影响。
+
+## 2026-10-10 W4b 存量页面 i18n 迁移 + SysPermissionSeeder 运行顺序修复
+
+### 20. W4b 后端：文案目录双语种子 + 数据质量门禁
+- **范围**：`business/iam-ap/server`
+  - `IamConsoleCatalog.texts()` 补 12 个存量页命名空间双语 `TextDef`：`iam.users/orgs/dashboard/settings/orgGrants/profile/appMgmt/sessions/admissions/lockouts/audit/rolesView.*`（注意：`RolesPage` 用 `rolesView`，区别于配置页 `rolesAdmin`）；枚举/相对时间标签全落 `TextDef`：`iam.audit.type.*`（24 审计类型）、`iam.org.type.*`、`iam.source.*`、`iam.common.{justNow,minutesAgo,hoursAgo,daysAgo,dash}`（`{{n}}` 插值）。
+  - 新增 `ConsoleTextCatalogTest`×3：① zh/en 成对非空 + code 唯一；② en 文本不得含 CJK；③ W4b 12 命名空间齐备（缺任一 → 对应页切 en-US 回落 `humanize(key)`）。
+- **验证**：随 iam-ap 回归 **71/71 绿**（68 + 本测试 3）。测试开发期曾抓到 1 处目录缺陷：`iam.dashboard.th.type` 被定义两次（审计表与组织表各一），去重修复——门禁测试立功。
+
+### 21. W4b 前端：17 存量页 UI 文案迁移
+- **范围**：`business/iam-ap/web`
+  - `lib/format.ts`：删除 `AUDIT_LABELS`/`ORG_TYPE_LABELS` 常量，`auditLabel`/`orgTypeLabel`/`originLabel`/`fmtDateTime`/`fmtRelative` 改走 `i18next.t` **内聚翻译**（调用方不得二次包裹，否则双重 key）；`AuditPage` 同步改引 `AUDIT_TYPES` 数组。
+  - 12 个页面文件（UsersPage/OrgPage/DashboardPage/SettingsPage/OrgGrantsPage/ProfilePage/AppMgmtPage/SessionsPage/AdmissionsPage/LockoutsPage/AuditPage/RolesPage）：UI 中文改 `t('iam.<page>.*')`、动态串 `{{var}}` 插值、`window.confirm`/`flash` 一并包裹；代码注释不渲染、保留中文不强制。
+  - `test/render-contract.tsx`：扩至 12 存量页 + `assertNoChinese`（`/[一-鿿]/`），配 `MemoryRouter`（`useNavigate` SSR 需要）+ `ALL_PERMS` 闸门。
+- **验证**：`tsc` EXIT=0；`vite build` 161 模块 / JS 414.14 kB EXIT=0；**渲染契约 33/33**（4 配置页 + 12 存量页切 en-US 零中文残留、零裸 key）。
+
+### 22. fix(platform)：SysPermissionSeeder 显式 @Order（顺带修复一处既有红测）
+- **动因（W4b 验证期发现）**：iam-ap 全量回归 71 测中有 1 失败 —— `ConsolePermissionI18nTest` 断言 `IAM_OPERATOR` 应持有 `sys:menu:list/sys:permission:list/sys:role:list`，实测缺失。**git stash 对照实验证实该失败在 W4 提交态（改动 stash 后）即复现，属既有缺陷、非 W4b 引入**（W4 当时「68/68 绿」的记录与实际不符，应为验证遗漏）。
+- **根因**：`seedGrants` 对库里查不到的权限码**静默跳过**且事后不补授（角色「尚无任何授权」才写授权）；`IAM_OPERATOR` 的 `sys:*` 码依赖平台 `SysPermissionSeeder` 先落库。而该 seeder **无 `@Order`**（缺省 = `LOWEST_PRECEDENCE`），与 `IamConsoleSeedRunner`（同为 `LOWEST_PRECEDENCE`）**排序不确定**——实际按 bean 名字母序 `iamConsoleSeedRunner` 先跑 → 授予时 `sys:*` 尚不存在 → 角色永久缺失平台码。生产影响：操作员角色看不到菜单/权限/角色页面。
+- **修复**：`SysPermissionSeeder` 加 `@Order(Ordered.LOWEST_PRECEDENCE - 1000)`——仍属「启动晚期」但在一切缺省顺序的 ap 种子**之前**；javadoc 写明理由，防止将来被「顺手去掉」。
+- **验证**：`mvn install -pl cim-system -am -o` 全绿（含 cim-auth-starter 27 测 + cim-system 16 测）后重装本地仓库，iam-ap 全量 **71/71 绿**，`ConsolePermissionI18nTest` 恢复通过。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
