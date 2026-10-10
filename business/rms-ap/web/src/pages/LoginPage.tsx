@@ -6,14 +6,16 @@ import { useAuthStore } from '@/store/authStore';
 /**
  * 统一登录入口。
  *
- * <p><b>生产路径</b>：跳转至 IAM 统一认证中心（{@code VITE_IAM_BASE}，缺省 http://localhost:8081），
- * 携带 `app=rms-ap` 与回跳地址；IAM 完成认证后重定向回 `{origin}/sso?token=...&refreshToken=...`，
+ * <p><b>生产路径</b>：跳转至 IAM 统一登录页（{@code VITE_IAM_WEB_BASE}，缺省 http://localhost:5171，
+ * 即 IAM 前端开发服务器；生产填 IAM 前端域名）。注意此处指向 IAM <b>前端</b>（承载 {@code /login} 页面），
+ * 不是 IAM 后端（8081 只有 {@code /api/v1/login} 接口，无 GET 页面）。
+ * 跳转携带 `app=rms-ap` 与回跳地址；IAM 完成认证后重定向回 `{origin}/sso?token=...&refreshToken=...`，
  * 由 {@link SsoCallback} 接管写库。</p>
  *
  * <p><b>开发回退</b>：仅 DEV 模式提供「粘贴令牌」入口，便于未拉起 IAM 时本地预览 UI；
  * 该入口不出现在生产构建。</p>
  */
-const IAM_BASE = import.meta.env.VITE_IAM_BASE || 'http://localhost:8081';
+const IAM_BASE = import.meta.env.VITE_IAM_WEB_BASE || import.meta.env.VITE_IAM_BASE || 'http://localhost:5171';
 
 export default function LoginPage() {
   const { t } = useTranslation();

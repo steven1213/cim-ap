@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -33,13 +34,37 @@ function RoutePage({ menu }: { menu: SysMenuDto }) {
  * 前端不再维护路由清单（原 `lib/menu.tsx` 已删除）。未授权/未知地址落到 404，
  * 已登录但无权限落到 403。</p>
  */
-export default function App() {
+/**
+ * 登录入口分流：未登录 → IAM 登录页；已登录且有 SSO 回跳（接入 ap 的 /sso）则直接带 token 跳回，
+ * 避免已登录用户被挡在 IAM 主页、丢失回跳上下文。
+ */
+function LoginEntry() {
   const token = useAuthStore((s) => s.token);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const [params] = useSearchParams();
+  const redirect = params.get('redirect');
+
+  useEffect(() => {
+    if (token && redirect) {
+      const sep = redirect.includes('?') ? '&' : '?';
+      window.location.assign(
+        `${redirect}${sep}token=${encodeURIComponent(token)}&refreshToken=${encodeURIComponent(refreshToken || token)}`,
+      );
+    }
+  }, [token, redirect, refreshToken]);
+
+  if (token) {
+    return redirect ? null : <Navigate to="/" replace />;
+  }
+  return <LoginPage />;
+}
+
+export default function App() {
   const menus = useMenuStore((s) => s.flat);
 
   return (
     <Routes>
-      <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={<LoginEntry />} />
       <Route
         element={
           <ProtectedRoute>

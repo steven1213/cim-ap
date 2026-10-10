@@ -42,6 +42,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const notice = (location.state as { notice?: string } | null)?.notice;
+  // SSO 回跳地址：RMS 等接入 ap 通过 /login?redirect=<ap>/sso 传入，
+  // 登录成功后携带 token 跳回该地址（由接入 ap 的 /sso 回调落地）。
+  const ssoRedirect = new URLSearchParams(location.search).get('redirect');
   const setSession = useAuthStore((s) => s.setSession);
   const loadMe = useAuthStore((s) => s.loadMe);
 
@@ -77,6 +80,14 @@ export default function LoginPage() {
       setPassword('');
       setSession(res.token, res.refreshToken);
       await loadMe();
+      // 接入 ap 发起的 SSO：携带 token 回跳其 /sso 回调（跨域，必须整页跳转）。
+      if (ssoRedirect) {
+        const sep = ssoRedirect.includes('?') ? '&' : '?';
+        window.location.assign(
+          `${ssoRedirect}${sep}token=${encodeURIComponent(res.token)}&refreshToken=${encodeURIComponent(res.refreshToken)}`,
+        );
+        return;
+      }
       navigate('/');
     } catch (err: any) {
       setError(err?.msg || err?.message || t('iam.login.failed'));
