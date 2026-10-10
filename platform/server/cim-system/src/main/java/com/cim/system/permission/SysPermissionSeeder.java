@@ -5,6 +5,8 @@ import com.cim.system.support.PermissionCodes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,8 +23,16 @@ import java.util.Map;
  *
  * <p>由 {@code CimSystemConfiguration} 在 {@code cim.system.seed-permissions=true}（默认）时装配；
  * 幂等（按 {@code code} 跳过已存在行），不覆盖管理端的改名/停用。</p>
+ *
+ * <p><b>⚠️ {@code @Order(LOWEST_PRECEDENCE - 1000)} 是刻意的</b>：各业务 ap 的种子
+ * （如 iam-ap 的 {@code IamConsoleSeedRunner}，{@code LOWEST_PRECEDENCE}）依赖
+ * 「平台权限码已落库」来做角色授权——{@code seedGrants} 对库里查不到的权限码是
+ * <b>静默跳过</b>且事后不补授。若本种子与 ap 种子同为缺省顺序（同为
+ * {@code LOWEST_PRECEDENCE}，排序不确定），ap 种子先跑会导致其角色永久缺失平台码
+ * （如 {@code sys:menu:list}），故本种子必须显式先于一切缺省顺序的 ApplicationRunner。</p>
  */
 @Slf4j
+@Order(Ordered.LOWEST_PRECEDENCE - 1000)
 public class SysPermissionSeeder implements ApplicationRunner {
 
     private final SysPermissionRepository permissionRepository;
