@@ -676,7 +676,7 @@ button.side-cap.page-cap {
   padding: 0 10px;
   width: 100px;
   flex: 0 0 100px;
-  border-radius: 999px;
+  border-radius: 8px; /* 与选中态色染签同形（999px 全圆胶囊会与 8px 指示器不一致） */
   font-size: var(--fs-xs);
   color: var(--text-2);
   cursor: pointer;
