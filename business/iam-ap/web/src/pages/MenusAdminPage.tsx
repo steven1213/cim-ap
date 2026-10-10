@@ -43,6 +43,21 @@ export default function MenusAdminPage() {
 
   const flat = useMemo(() => flatten(tree), [tree]);
   const saveCodes = draft?.id ? [MENU_UPDATE, SYS.MENU_SAVE] : [MENU_CREATE, SYS.MENU_SAVE];
+  /** 全部有子节点的 id（供一键展开/收起）。 */
+  const allParentIds = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: MenuTreeNode[]) => {
+      for (const n of nodes) {
+        if (n.children?.length) {
+          ids.push(n.menu.id);
+          walk(n.children);
+        }
+      }
+    };
+    walk(tree);
+    return ids;
+  }, [tree]);
+  const allExpanded = allParentIds.length > 0 && allParentIds.every((id) => expanded.has(id));
 
   async function load() {
     if (!canRead) return;
@@ -189,6 +204,13 @@ export default function MenusAdminPage() {
           flush
           actions={
             <>
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() => setExpanded(allExpanded ? new Set() : new Set(allParentIds))}
+                disabled={!allParentIds.length}
+              >
+                {allExpanded ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
+              </button>
               <Perms codes={[MENU_CREATE, SYS.MENU_SAVE]}>
                 <button
                   className="icon-btn"

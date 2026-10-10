@@ -6,11 +6,12 @@ import { useMenuStore } from '@/store/menuStore';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { hasPermission, CONSOLE_ADMIN } from '@/lib/permissions';
 import { resolveIcon } from '@/lib/iconRegistry';
-import { IconLogout, IconMoon, IconShield, IconSidebar, IconSun } from '@/components/Icons';
+import { IconLogout, IconMoon, IconShield, IconSidebar, IconSun, IconChevron } from '@/components/Icons';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import type { MenuTreeNode, SysMenuDto } from '@/types';
 
 const SIDEBAR_KEY = 'iam-sidebar-collapsed';
+const SIDEBAR_GROUPS_KEY = 'iam-sidebar-groups';
 
 /** 侧栏分组（目录节点升格为分组标题；顶级菜单自成一档且不显示标题）。 */
 interface NavGroup {
@@ -43,6 +44,15 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => readTheme());
+  /** 收起的分组 key 集合（持久化；侧栏整体收起为图标态时不生效）。 */
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_GROUPS_KEY);
+      return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
 
   const consoleAdmin = hasPermission(permissions, CONSOLE_ADMIN);
 
@@ -78,6 +88,20 @@ export default function Layout() {
     return result;
   }, [menuTree, t]);
 
+  // 路由所在分组自动展开（折叠分组后点侧栏入口仍要能看到当前位置）
+  useEffect(() => {
+    const active = groups.find((g) => g.items.some((m) => m.path === pathname));
+    if (!active) return;
+    setHiddenGroups((prev) => {
+      if (!prev.has(active.key)) return prev;
+      const next = new Set(prev);
+      next.delete(active.key);
+      localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]));
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, groups]);
+
   function toggleSidebar() {
     if (window.matchMedia('(max-width: 900px)').matches) {
       setMobileOpen((v) => !v);
@@ -94,6 +118,17 @@ export default function Layout() {
     const next: Theme = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
     persistTheme(next);
+  }
+
+  /** 收起/展开一个导航分组（持久化；图标态下不折叠）。 */
+  function toggleGroup(key: string) {
+    setHiddenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]));
+      return next;
+    });
   }
 
   async function onLogout() {
@@ -121,33 +156,50 @@ export default function Layout() {
         </div>
 
         <nav className="side-nav">
-          {groups.map((g, gi) => (
-            <div className="side-group" key={g.key || `g${gi}`}>
-              {g.cap && <span className="side-cap">{g.cap}</span>}
-              {g.items.map((m) => {
-                const Icon = resolveIcon(m.icon);
-                return (
-                  <NavLink
-                    key={m.id}
-                    to={m.path as string}
-                    end={m.path === '/'}
-                    title={t(m.i18nCode ?? '')}
-                    className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
+          {groups.map((g, gi) => {
+            const hide = !collapsed && !mobileOpen && hiddenGroups.has(g.key);
+            return (
+              <div className="side-group" key={g.key || `g${gi}`}>
+                {g.cap ? (
+                  <button
+                    type="button"
+                    className="side-cap nav-tog"
+                    title={t('iam.shell.toggleGroup')}
+                    aria-expanded={!hide}
+                    onClick={() => toggleGroup(g.key)}
                   >
-                    <span className="side-ico">
-                      <Icon width={18} height={18} />
+                    <span className="nav-tog-text">{g.cap}</span>
+                    <span className={'tree-toggle' + (hide ? '' : ' open')}>
+                      <IconChevron width={11} height={11} />
                     </span>
-                    <span className="side-text">
-                      <span className="side-label">{t(m.i18nCode ?? '')}</span>
-                      <span className="side-desc">
-                        {t(`${m.i18nCode ?? ''}.desc`, { defaultValue: '' })}
-                      </span>
-                    </span>
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
+                  </button>
+                ) : null}
+                {!hide &&
+                  g.items.map((m) => {
+                    const Icon = resolveIcon(m.icon);
+                    return (
+                      <NavLink
+                        key={m.id}
+                        to={m.path as string}
+                        end={m.path === '/'}
+                        title={t(m.i18nCode ?? '')}
+                        className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
+                      >
+                        <span className="side-ico">
+                          <Icon width={18} height={18} />
+                        </span>
+                        <span className="side-text">
+                          <span className="side-label">{t(m.i18nCode ?? '')}</span>
+                          <span className="side-desc">
+                            {t(`${m.i18nCode ?? ''}.desc`, { defaultValue: '' })}
+                          </span>
+                        </span>
+                      </NavLink>
+                    );
+                  })}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-foot">

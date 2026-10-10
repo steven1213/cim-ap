@@ -255,6 +255,42 @@ code,
   padding-top: 12px;
 }
 
+/* 可点击折叠的分组头（侧栏分组 + 管理页列表分组，chevron 旋转指示状态） */
+button.side-cap {
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+button.side-cap:hover {
+  filter: brightness(1.35);
+}
+button.side-cap .nav-tog-text,
+button.side-cap .cap-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.side-cap .tree-toggle {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+/* 页面名分组（权限/角色授权）：不做大写变形，字号微升保证可读 */
+button.side-cap.page-cap {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
 .side-link {
   position: relative;
   display: flex;
@@ -852,6 +888,21 @@ code,
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* ---------- 分页条（大表客户端分页） ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.pager .tag-count {
+  margin-right: 2px;
 }
 
 /* ---------- 面板内标签页（角色管理：基本信息/权限授权/菜单授权） ---------- */

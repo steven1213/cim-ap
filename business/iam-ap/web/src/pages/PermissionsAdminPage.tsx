@@ -7,7 +7,7 @@ import Perms from '@/components/Perms';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
+import { IconAlert, IconCheckCircle, IconChevron, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
 
 /**
  * 权限管理（`/permissions`）：权限点 CRUD（`module:res:action`）。
@@ -32,6 +32,8 @@ export default function PermissionsAdminPage() {
   const [rows, setRows] = useState<SysPermissionDto[]>([]);
   const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [keyword, setKeyword] = useState('');
+  /** 折叠的分组 key（页面/模块组），点击组头切换。 */
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -201,38 +203,58 @@ export default function PermissionsAdminPage() {
           </div>
           {grouped.length ? (
             <div className="tree" style={{ paddingTop: 8 }}>
-              {grouped.map((g) => (
-                <div key={g.key}>
-                  <div className="side-cap" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ textTransform: g.kind === 'page' ? 'none' : undefined }}>
-                      {g.kind === 'page' ? t(g.label) : g.label}
-                    </span>
-                    {g.kind === 'module' && <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>}
-                  </div>
-                  {g.perms.map((r) => (
-                    <div
-                      key={r.id}
-                      className={'tree-row' + (draft?.id === r.id ? ' on' : '')}
-                      onClick={() => {
-                        setErr('');
-                        setDraft({
-                          id: r.id,
-                          code: r.code,
-                          name: r.name ?? '',
-                          status: r.status,
-                          origin: r,
-                        });
-                      }}
+              {grouped.map((g) => {
+                const closed = closedGroups.has(g.key);
+                return (
+                  <div key={g.key}>
+                    <button
+                      type="button"
+                      className={'side-cap' + (g.kind === 'page' ? ' page-cap' : '')}
+                      aria-expanded={!closed}
+                      onClick={() =>
+                        setClosedGroups((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(g.key)) next.delete(g.key);
+                          else next.add(g.key);
+                          return next;
+                        })
+                      }
                     >
-                      <span className="tree-name">{r.name ?? r.code}</span>
-                      {r.status === 'DISABLED' && (
-                        <span className="tag err">{t('iam.common.disabled')}</span>
+                      <span className={'tree-toggle' + (closed ? '' : ' open')}>
+                        <IconChevron width={11} height={11} />
+                      </span>
+                      <span className="cap-text">{g.kind === 'page' ? t(g.label) : g.label}</span>
+                      {g.kind === 'module' && (
+                        <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
                       )}
-                      <span className="tree-code dim">{r.code}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                      <span className="tag-count">{g.perms.length}</span>
+                    </button>
+                    {!closed &&
+                      g.perms.map((r) => (
+                        <div
+                          key={r.id}
+                          className={'tree-row' + (draft?.id === r.id ? ' on' : '')}
+                          onClick={() => {
+                            setErr('');
+                            setDraft({
+                              id: r.id,
+                              code: r.code,
+                              name: r.name ?? '',
+                              status: r.status,
+                              origin: r,
+                            });
+                          }}
+                        >
+                          <span className="tree-name">{r.name ?? r.code}</span>
+                          {r.status === 'DISABLED' && (
+                            <span className="tag err">{t('iam.common.disabled')}</span>
+                          )}
+                          <span className="tree-code dim">{r.code}</span>
+                        </div>
+                      ))}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="empty">

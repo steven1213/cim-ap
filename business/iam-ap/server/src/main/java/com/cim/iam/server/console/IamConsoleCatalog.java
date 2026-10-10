@@ -403,6 +403,12 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.common.reset", "重置", "Reset"));
         t.add(new TextDef("iam.common.selectAll", "全选", "Select all"));
         t.add(new TextDef("iam.common.clearAll", "清空", "Clear"));
+        t.add(new TextDef("iam.common.expandAll", "全部展开", "Expand all"));
+        t.add(new TextDef("iam.common.collapseAll", "全部收起", "Collapse all"));
+        t.add(new TextDef("iam.common.prevPage", "上一页", "Previous"));
+        t.add(new TextDef("iam.common.nextPage", "下一页", "Next"));
+        t.add(new TextDef("iam.common.pagerInfo", "第 {{page}} / {{pages}} 页",
+                "Page {{page}} of {{pages}}"));
         t.add(new TextDef("iam.common.all", "全部", "All"));
         t.add(new TextDef("iam.common.enabled", "启用", "Enabled"));
         t.add(new TextDef("iam.common.disabled", "停用", "Disabled"));
@@ -474,6 +480,9 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admin.roles.tabMenuGrant", "菜单授权", "Menus"));
         // —— 多语言页 ——
         t.add(new TextDef("iam.admin.i18n.locales", "语言目录", "Locales"));
+        t.add(new TextDef("iam.admin.i18n.allLocales", "全部语言", "All locales"));
+        t.add(new TextDef("iam.admin.i18n.clickToFilter", "点击筛选该语言的译文",
+                "Click to filter messages by this locale"));
         t.add(new TextDef("iam.admin.i18n.messages", "译文", "Texts"));
         t.add(new TextDef("iam.admin.i18n.newLocale", "新增语言", "Add locale"));
         t.add(new TextDef("iam.admin.i18n.newMessage", "新增译文", "Add text"));
@@ -502,6 +511,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.shell.crypto", "RS256 / JWKS 本地验签", "RS256 / local JWKS verification"));
         t.add(new TextDef("iam.shell.consoleTitle", "IAM 控制台", "IAM Console"));
         t.add(new TextDef("iam.shell.toggleNav", "收起 / 展开菜单", "Collapse / expand menu"));
+        t.add(new TextDef("iam.shell.toggleGroup", "展开或收起该分组", "Expand or collapse this group"));
         t.add(new TextDef("iam.shell.toggleTheme", "切换主题", "Toggle theme"));
         t.add(new TextDef("iam.shell.theme.dark", "切换到深色主题", "Switch to dark theme"));
         t.add(new TextDef("iam.shell.theme.light", "切换到浅色主题", "Switch to light theme"));
