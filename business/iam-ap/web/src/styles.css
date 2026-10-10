@@ -605,6 +605,173 @@ button.side-cap.page-cap {
   background: var(--line-strong);
 }
 
+/* ---------- 页签栏（tags-view） ---------- */
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  flex: 0 0 38px;
+  padding: 0 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 左右滚动箭头：不溢出时禁用淡出；箭头本体用 chevron 旋转 */
+.tab-nav {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+.tab-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.tab-nav:not(:disabled):hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.rot-l {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+.rot-d {
+  display: inline-flex;
+  transform: rotate(90deg);
+}
+
+/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之） */
+.tabbar-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 0 2px;
+}
+.tabbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 页签 chip：圆点 + 标题 + 悬停出现的关闭钮 */
+.tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.tab-item:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.tab-item.active {
+  background: var(--primary-soft);
+  border-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary-d);
+  font-weight: 600;
+}
+
+/* 状态圆点：激活=主题色实心，未激活=灰点 */
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  flex: 0 0 6px;
+  transition: background 0.12s ease;
+}
+.tab-item:hover .tab-dot {
+  background: var(--muted);
+}
+.tab-item.active .tab-dot {
+  background: var(--primary);
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* 关闭钮：默认隐身（占位防跳动），悬停签/激活签时可见 */
+.tab-x {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.tab-item:hover .tab-x,
+.tab-item.active .tab-x {
+  opacity: 0.7;
+}
+.tab-x:hover {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+/* 右侧「页签操作」下拉 */
+.tabbar-actions {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.tab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  min-width: 128px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(13, 22, 38, 0.14);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.tab-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tab-menu button:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+
 /* ---------- 页面容器 ---------- */
 .page {
   display: flex;

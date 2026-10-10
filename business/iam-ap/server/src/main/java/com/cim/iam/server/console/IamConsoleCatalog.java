@@ -528,6 +528,13 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.shell.adminBadge", "管理员", "ADMIN"));
         t.add(new TextDef("iam.shell.logout", "退出登录", "Sign out"));
         t.add(new TextDef("iam.shell.navGroupOther", "其他", "Other"));
+        t.add(new TextDef("iam.shell.tabs.label", "页签栏", "Tab bar"));
+        t.add(new TextDef("iam.shell.tabs.scrollLeft", "向左滚动页签", "Scroll tabs left"));
+        t.add(new TextDef("iam.shell.tabs.scrollRight", "向右滚动页签", "Scroll tabs right"));
+        t.add(new TextDef("iam.shell.tabs.close", "关闭该页签", "Close this tab"));
+        t.add(new TextDef("iam.shell.tabs.more", "页签操作", "Tab actions"));
+        t.add(new TextDef("iam.shell.tabs.closeOthers", "关闭其他", "Close others"));
+        t.add(new TextDef("iam.shell.tabs.closeAll", "关闭全部", "Close all"));
         t.add(new TextDef("iam.common.notLoggedIn", "未登录", "Not signed in"));
         t.add(new TextDef("iam.common.loading", "加载中…", "Loading…"));
         t.add(new TextDef("iam.common.retry", "重试", "Retry"));

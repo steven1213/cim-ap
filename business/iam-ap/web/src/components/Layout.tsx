@@ -3,11 +3,13 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
+import { useTabStore } from '@/store/tabStore';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { hasPermission, CONSOLE_ADMIN } from '@/lib/permissions';
 import { resolveIcon } from '@/lib/iconRegistry';
 import { IconLogout, IconMoon, IconShield, IconSidebar, IconSun, IconChevron } from '@/components/Icons';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import TabBar from '@/components/TabBar';
 import type { MenuTreeNode, SysMenuDto } from '@/types';
 
 const SIDEBAR_KEY = 'iam-sidebar-collapsed';
@@ -38,6 +40,8 @@ export default function Layout() {
   const menuTree = useMenuStore((s) => s.tree);
   const flat = useMenuStore((s) => s.flat);
   const clearMenus = useMenuStore((s) => s.clear);
+  const openTab = useTabStore((s) => s.open);
+  const clearTabs = useTabStore((s) => s.clear);
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -64,6 +68,13 @@ export default function Layout() {
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  // 路由切换 → 打开/激活对应页签（仅可路由的菜单项；404 等未知路径不开签）
+  useEffect(() => {
+    if (flat.length === 0) return;
+    const m = flat.find((x) => x.path === pathname);
+    if (m?.path) openTab({ path: m.path, i18nCode: m.i18nCode ?? '' });
+  }, [pathname, flat, openTab]);
 
   // 后端树 → 侧栏分组：DIR 节点成为分组（cap），其子 MENU 为条目；
   // 顶级 MENU（如概览 / 我的）自成一档，不显示分组标题。
@@ -134,6 +145,7 @@ export default function Layout() {
   async function onLogout() {
     await logout();
     clearMenus(); // 下一个登录者不应看到上一个人的菜单残留
+    clearTabs(); // 页签同理
     navigate('/login');
   }
 
@@ -262,6 +274,8 @@ export default function Layout() {
             </button>
           </div>
         </header>
+
+        <TabBar />
 
         <main className="content">
           <Outlet />
