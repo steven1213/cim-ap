@@ -554,7 +554,9 @@ button.side-cap.page-cap {
   width: 100%;
   max-width: none;
   margin: 0 auto;
-  padding: 12px 14px 20px;
+  /* ⚠️ 顶部不得加 padding：sticky 约束矩形按滚动容器 padding 内缩，
+     会把吸顶左列钉在裁切线之下（与右列顶部错位）。初始间距由 .page 自己给 */
+  padding: 0 14px 20px;
   /* flex 纵向链：.page 撑满可视高度，.split 再撑满 .page——页面不再在 footer 前留大白条 */
   display: flex;
   flex-direction: column;
@@ -622,7 +624,7 @@ button.side-cap.page-cap {
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -743,6 +745,8 @@ button.side-cap.page-cap {
   flex-direction: column;
   gap: 14px;
   flex: 1 0 auto; /* 撑满 .content 可视高度（内容超出时正常滚动） */
+  /* 初始顶部间距（.content 不能给 padding-top，会破坏 sticky 对齐，见 .content 注释） */
+  padding-top: 12px;
 }
 
 .grid-2 {
@@ -791,8 +795,8 @@ button.side-cap.page-cap {
 /* 分栏左列（树/清单）限高内部滚动：内容过长时自身滚动 + 吸顶，右侧编辑不随树高被顶走 */
 .panel.scroll-y {
   position: sticky;
-  top: 12px; /* 滚动容器已是 .content（topbar 在其外），吸顶只留内容边距 */
-  max-height: calc(100vh - var(--header-h) - 70px); /* topbar56 已扣；12 顶距 + footer 38 + 内容底 padding 20 */
+  top: 0; /* 必须=0：否则页面滚动后左列钉在 12px、右列被滚动口裁到 0，左右顶部错 12px */
+  max-height: calc(100vh - var(--header-h) - 114px); /* topbar56 + tabbar 38 + footer ~40 + 内容底距 20 */
 }
 .panel.scroll-y .panel-body {
   flex: 1 1 auto;
