@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -24,6 +24,7 @@ function BootGate({ children }: { children: ReactNode }) {
   const loadMe = useAuthStore((s) => s.loadMe);
   const loadPermissions = useAuthStore((s) => s.loadPermissions);
   const [ready, setReady] = useState(false);
+  const [bootFailed, setBootFailed] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -31,13 +32,25 @@ function BootGate({ children }: { children: ReactNode }) {
       return;
     }
     let alive = true;
-    Promise.all([loadMe(), loadPermissions()]).finally(() => {
-      if (alive) setReady(true);
-    });
+    Promise.all([loadMe(), loadPermissions()])
+      .then(() => {
+        if (alive) setReady(true);
+      })
+      .catch((err) => {
+        // 401 已由 api.ts 拦截清态跳登录；此处处理 403（无本 ap 准入）
+        // 或其它 boot 失败，避免无权限令牌卡死 Loading。
+        console.error('[BootGate] boot failed', err);
+        useAuthStore.getState().clear();
+        if (alive) setBootFailed(true);
+      });
     return () => {
       alive = false;
     };
   }, [token, loadMe, loadPermissions]);
+
+  if (bootFailed) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!ready) {
     return (
