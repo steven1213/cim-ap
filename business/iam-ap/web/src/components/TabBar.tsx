@@ -12,7 +12,7 @@
 // <p>标题解析优先取菜单库的 `i18nCode`（随授权即时更新），回退到开签时快照——
 // 只存码不存译文，切语言即时生效。</p>
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMenuStore } from '@/store/menuStore';
 import { HOME_PATH, useTabStore } from '@/store/tabStore';
@@ -28,6 +28,7 @@ interface CtxMenu {
 export default function TabBar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const tabs = useTabStore((s) => s.tabs);
   const activePath = useTabStore((s) => s.activePath);
   const setActive = useTabStore((s) => s.setActive);
@@ -71,8 +72,14 @@ export default function TabBar() {
     };
   }, [updateArrows, tabs]);
 
-  // 激活签变化（含切语言导致宽度变化后）自动滚入可视区
-  useEffect(() => {
+  /**
+   * 把激活签滚入可视区（贴左/右缘留 24px 余量）。
+   *
+   * <p>触发时机不能只看 `activePath`/`tabs`——「激活签未变但滚动位置被
+   * 挪走」（如用箭头翻页后再点同一菜单，`location.key` 仍会变）时也必须
+   * 拉回，否则激活签滞留在可视区外。</p>
+   */
+  const ensureActiveVisible = useCallback(() => {
     const el = scrollerRef.current;
     if (!el) return;
     const active = el.querySelector<HTMLElement>('[data-active="true"]');
@@ -84,7 +91,12 @@ export default function TabBar() {
     } else if (r > el.scrollLeft + el.clientWidth - 8) {
       el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
     }
-  }, [activePath, tabs]);
+  }, []);
+
+  // 激活签变化、页签增删、以及任意路由跳转（含重复点击同一菜单）后滚入可视区
+  useEffect(() => {
+    ensureActiveVisible();
+  }, [ensureActiveVisible, activePath, tabs, location.key]);
 
   // 右键菜单：点击外部 / Escape 关闭
   useEffect(() => {
