@@ -114,18 +114,19 @@ export default function TabBar() {
 
   return (
     <div className="tabbar" role="tablist" aria-label={t('iam.shell.tabs.label')}>
-      <button
-        type="button"
-        className="icon-btn tab-nav"
-        disabled={!canLeft}
-        aria-label={t('iam.shell.tabs.scrollLeft')}
-        title={t('iam.shell.tabs.scrollLeft')}
-        onClick={() => scrollByDir(-1)}
-      >
-        <span className="rot-l">
-          <IconChevron width={14} height={14} />
-        </span>
-      </button>
+      {canLeft && (
+        <button
+          type="button"
+          className="icon-btn tab-nav"
+          aria-label={t('iam.shell.tabs.scrollLeft')}
+          title={t('iam.shell.tabs.scrollLeft')}
+          onClick={() => scrollByDir(-1)}
+        >
+          <span className="rot-l">
+            <IconChevron width={14} height={14} />
+          </span>
+        </button>
+      )}
 
       <div className="tabbar-scroll" ref={scrollerRef}>
         {tabs.map((tab) => {
@@ -160,16 +161,17 @@ export default function TabBar() {
         })}
       </div>
 
-      <button
-        type="button"
-        className="icon-btn tab-nav"
-        disabled={!canRight}
-        aria-label={t('iam.shell.tabs.scrollRight')}
-        title={t('iam.shell.tabs.scrollRight')}
-        onClick={() => scrollByDir(1)}
-      >
-        <IconChevron width={14} height={14} />
-      </button>
+      {canRight && (
+        <button
+          type="button"
+          className="icon-btn tab-nav"
+          aria-label={t('iam.shell.tabs.scrollRight')}
+          title={t('iam.shell.tabs.scrollRight')}
+          onClick={() => scrollByDir(1)}
+        >
+          <IconChevron width={14} height={14} />
+        </button>
+      )}
 
       <div className="tabbar-actions" ref={menuRef}>
         <button
