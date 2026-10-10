@@ -26,7 +26,7 @@ interface CtxMenu {
 }
 
 export default function TabBar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const tabs = useTabStore((s) => s.tabs);
@@ -45,6 +45,8 @@ export default function TabBar() {
   const [ctx, setCtx] = useState<CtxMenu | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  /** 滑动胶囊指示器：激活签在滚动内容坐标系里的位置与宽度（content 坐标，随滚动自然移动）。 */
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
 
   /** 标题：菜单库优先（码最新），回退开签快照；两者皆空显示路径。 */
   function titleOf(path: string, i18nCode: string): string {
@@ -75,29 +77,35 @@ export default function TabBar() {
   }, [updateArrows, tabs]);
 
   /**
-   * 把激活签滚入可视区（贴左/右缘留 24px 余量）。
+   * 同步激活签：滚入可视区（贴缘留 24px）+ 更新滑动胶囊指示器几何。
    *
-   * <p>双 rAF 延后一帧再量几何，等 flex/字体布局稳定。触发时机覆盖：
-   * 激活签变化、页签增删、任意路由跳转（`location.key`）、以及侧栏/页签
-   * 点击发出的滚动票证（`scrollTicket`）——最后者是「点击已激活路由菜单」
-   * 等激活签与路由都没变场景下的兜底。</p>
+   * <p>双 rAF 延后一帧再量几何，等 flex/字体布局稳定。测量用
+   * `getBoundingClientRect` 差值 + `scrollLeft`（`offsetLeft` 相对
+   * offsetParent，受祖先定位影响会算偏）。触发时机覆盖：激活签变化、
+   * 页签增删、任意路由跳转（`location.key`）、切语言（标签宽度变化）、
+   * 以及侧栏/页签点击发出的滚动票证（`scrollTicket`）——票证是
+   * 「点击已激活路由菜单」等一切状态都没变场景下的兜底。</p>
    */
-  const ensureActiveVisible = useCallback(() => {
+  const syncTabs = useCallback(() => {
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           const el = scrollerRef.current;
           if (!el) return;
+          const track = el.querySelector<HTMLElement>('.tab-track');
           const active = el.querySelector<HTMLElement>('[data-active="true"]');
-          if (!active) return;
-          // 相对滚动容器精确测量：offsetLeft 相对 offsetParent（受祖先定位影响），
-          // rect 差值 + scrollLeft 才是签在滚动内容里的真实位置
-          const l =
-            active.getBoundingClientRect().left -
-            el.getBoundingClientRect().left +
-            el.scrollLeft;
-          const r = l + active.offsetWidth;
-          if (l < el.scrollLeft + 8) {
-            el.scrollTo({ left: Math.max(0, l - 24), behavior: 'smooth' });
+          if (!track || !active) {
+            setIndicator((s) => ({ ...s, ready: false }));
+            return;
+          }
+          // 指示器与签同以 track 为参照（同一滚动内容系，rect 差值免滚动、免 padding 干扰）
+          const left = active.getBoundingClientRect().left - track.getBoundingClientRect().left;
+          const width = active.offsetWidth;
+          setIndicator({ left, width, ready: true });
+          // 滚动判定仍以 scroller 为参照：签的视口位置决定是否需要滚入
+          const contentLeft = left + (track.getBoundingClientRect().left - el.getBoundingClientRect().left) + el.scrollLeft;
+          const r = contentLeft + width;
+          if (contentLeft < el.scrollLeft + 8) {
+            el.scrollTo({ left: Math.max(0, contentLeft - 24), behavior: 'smooth' });
           } else if (r > el.scrollLeft + el.clientWidth - 8) {
             el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
           }
@@ -106,8 +114,8 @@ export default function TabBar() {
   }, []);
 
   useEffect(() => {
-    ensureActiveVisible();
-  }, [ensureActiveVisible, activePath, tabs, location.key, scrollTicket]);
+    syncTabs();
+  }, [syncTabs, activePath, tabs, location.key, scrollTicket, i18n.language]);
 
   // 右键菜单：点击外部 / Escape 关闭
   useEffect(() => {
@@ -202,36 +210,47 @@ export default function TabBar() {
       )}
 
       <div className="tabbar-scroll" ref={scrollerRef}>
-        {tabs.map((tab) => {
-          const active = tab.path === activePath;
-          const pinned = tab.path === HOME_PATH;
-          const title = titleOf(tab.path, tab.i18nCode);
-          return (
-            <div
-              key={tab.path}
-              role="tab"
-              aria-selected={active}
-              data-active={active}
-              className={'tab-item' + (active ? ' active' : '') + (pinned ? ' pinned' : '')}
-              title={title}
-              onClick={() => onTab(tab.path)}
-              onContextMenu={(e) => onTabCtx(e, tab.path)}
-            >
-              <span className="tab-label">{title}</span>
-              {!pinned && (
-                <button
-                  type="button"
-                  className="tab-x"
-                  aria-label={t('iam.shell.tabs.close')}
-                  title={t('iam.shell.tabs.close')}
-                  onClick={(e) => onCloseBtn(e, tab.path)}
-                >
-                  <IconX width={8} height={8} />
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <div className="tab-track">
+          {/* 滑动胶囊指示器：位于签层之下，随激活签平滑滑动（content 坐标，随滚动平移） */}
+          <span
+            className={'tab-indicator' + (indicator.ready ? ' on' : '')}
+            style={{
+              width: indicator.width,
+              transform: `translateX(${indicator.left}px)`,
+            }}
+            aria-hidden="true"
+          />
+          {tabs.map((tab) => {
+            const active = tab.path === activePath;
+            const pinned = tab.path === HOME_PATH;
+            const title = titleOf(tab.path, tab.i18nCode);
+            return (
+              <div
+                key={tab.path}
+                role="tab"
+                aria-selected={active}
+                data-active={active}
+                className={'tab-item' + (active ? ' active' : '') + (pinned ? ' pinned' : '')}
+                title={title}
+                onClick={() => onTab(tab.path)}
+                onContextMenu={(e) => onTabCtx(e, tab.path)}
+              >
+                <span className="tab-label">{title}</span>
+                {!pinned && (
+                  <button
+                    type="button"
+                    className="tab-x"
+                    aria-label={t('iam.shell.tabs.close')}
+                    title={t('iam.shell.tabs.close')}
+                    onClick={(e) => onCloseBtn(e, tab.path)}
+                  >
+                    <IconX width={8} height={8} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {canRight && (
