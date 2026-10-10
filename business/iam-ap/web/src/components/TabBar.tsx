@@ -153,7 +153,7 @@ export default function TabBar() {
                   title={t('iam.shell.tabs.close')}
                   onClick={(e) => onClose(e, tab.path)}
                 >
-                  <IconX width={10} height={10} />
+                  <IconX width={8} height={8} />
                 </button>
               )}
             </div>

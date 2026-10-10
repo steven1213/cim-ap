@@ -645,7 +645,7 @@ button.side-cap.page-cap {
   transform: rotate(90deg);
 }
 
-/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之） */
+/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；顶部留白给右上角关闭徽标探出 */
 .tabbar-scroll {
   flex: 1 1 auto;
   min-width: 0;
@@ -655,21 +655,23 @@ button.side-cap.page-cap {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  padding: 0 2px;
+  padding: 6px 8px 0 4px;
 }
 .tabbar-scroll::-webkit-scrollbar {
   display: none;
 }
 
-/* 页签 chip：等宽（160px），圆点 + 标题（截断，悬浮 title 显全称）+ 悬停出现的关闭钮 */
+/* 页签 chip：紧凑等宽（120px），圆点 + 标题（截断，悬浮 title 显全称）；
+   相对定位承载右上角关闭徽标 */
 .tab-item {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   height: 26px;
   padding: 0 10px;
-  width: 160px;
-  flex: 0 0 160px;
+  width: 120px;
+  flex: 0 0 120px;
   border-radius: 7px;
   border: 1px solid transparent;
   font-size: var(--fs-xs);
@@ -713,25 +715,34 @@ button.side-cap.page-cap {
   text-overflow: ellipsis;
 }
 
-/* 关闭钮：占位防跳动，仅悬停所在签时浮现 */
+/* 关闭徽标：骑在右上角的小圆钮（Chrome 页签风格）；悬停所在签时浮现。
+   必须完整重置全局 button 的蓝底白字，否则图标被色块吞掉 */
 .tab-x {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 2;
   width: 15px;
   height: 15px;
-  flex: 0 0 15px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  color: inherit;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-2);
+  box-shadow: 0 1px 3px rgba(13, 22, 38, 0.15);
   opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
 .tab-item:hover .tab-x {
-  opacity: 0.7;
+  opacity: 1;
 }
-.tab-x:hover {
-  opacity: 1 !important;
-  background: color-mix(in srgb, var(--text) 12%, transparent);
+/* 三段类名压过全局 button:hover:not(:disabled) 的 (0,2,1) */
+.tab-item .tab-x:hover {
+  background: var(--panel-3);
+  color: var(--text);
 }
 
 /* 右侧「页签操作」下拉 */
