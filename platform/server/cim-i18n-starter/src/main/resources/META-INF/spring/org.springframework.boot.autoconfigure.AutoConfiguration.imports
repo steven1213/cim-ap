@@ -1,0 +1,2 @@
+com.cim.i18n.config.I18nAutoConfiguration
+com.cim.i18n.config.I18nFlywayConfiguration
