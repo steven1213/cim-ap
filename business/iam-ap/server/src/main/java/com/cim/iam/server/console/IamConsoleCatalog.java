@@ -417,6 +417,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.common.confirmDelete", "确认删除？此操作不可撤销。",
                 "Delete? This cannot be undone."));
         t.add(new TextDef("iam.common.saved", "已保存", "Saved"));
+        t.add(new TextDef("iam.common.saveFailed", "保存失败", "Save failed"));
         t.add(new TextDef("iam.common.deleted", "已删除", "Deleted"));
         t.add(new TextDef("iam.common.required", "必填", "Required"));
         t.add(new TextDef("iam.common.loadFailed", "加载失败", "Failed to load"));
@@ -478,6 +479,11 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admin.roles.tabBasic", "基本信息", "Profile"));
         t.add(new TextDef("iam.admin.roles.tabPermGrant", "权限授权", "Permissions"));
         t.add(new TextDef("iam.admin.roles.tabMenuGrant", "菜单授权", "Menus"));
+        t.add(new TextDef("iam.admin.roles.tabGrant", "授权", "Grants"));
+        t.add(new TextDef("iam.admin.roles.grantNote",
+                "勾选菜单＝侧栏可见；入口码/按钮码＝接口权限。一次保存同时写两张授权表；两者仍相互独立，可只勾其一",
+                "Checking a menu controls sidebar visibility; entry/button codes control API access. One save writes both grant tables; they stay independent"));
+        t.add(new TextDef("iam.admin.roles.entryTip", "入口码：进入该页所需的接口权限", "Entry code: API permission required to open this page"));
         // —— 多语言页 ——
         t.add(new TextDef("iam.admin.i18n.locales", "语言目录", "Locales"));
         t.add(new TextDef("iam.admin.i18n.allLocales", "全部语言", "All locales"));

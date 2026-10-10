@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '@/types';
@@ -17,15 +17,17 @@ import {
 import { IconAlert, IconCheckCircle, IconChevron, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
 
 /**
- * 角色管理（`/roles-admin`）：角色 CRUD + **两张独立授权表**（`sys_role_perm` / `sys_role_menu`）。
+ * 角色管理（`/roles-admin`）：角色 CRUD + 授权。
  *
- * <p><b>为什么不合并成一个「授权」按钮</b>：平台设计刻意让「能调用接口」与「看得见菜单」解耦
- * （README §21.1）。合并会让两者重新耦合，正是要避免的退化——例如「有菜单但无权限码」是合法态：
- * 路由可达、点进去接口 403。本页右侧用**三个标签页**分别承载（基本信息 / 权限授权 / 菜单授权），
- * 各自独立保存（覆盖式写入，幂等）——解耦语义不变，纵向堆叠三个长面板的布局问题消除。</p>
+ * <p><b>授权交互为单棵菜单树（一次保存），存储仍是两张独立授权表</b>：
+ * `sys_role_perm`（接口权限）与 `sys_role_menu`（侧栏可见）。树上勾选菜单＝写菜单表，
+ * 勾选入口码/按钮码＝写权限表，一个「保存授权」顺序写两张表。平台刻意让
+ * 「能调用接口」与「看得见菜单」解耦（README §21.1）——解耦语义完整保留：
+ * 可以只勾菜单不勾码（路由可达、接口 403），反之亦然；只是不再要求管理员分两批操作。</p>
  *
- * <p><b>权限授权按页面分组</b>：与权限管理页一致，以菜单树 MENU/BUTTON 的 `permCode`
- * 关联为权威源按「所属页面」分组（组头带勾选计数 + 组级全选/清空），接口级码排后并打标。</p>
+ * <p><b>树结构</b>：DIR 可折叠；MENU 行＝菜单可见 checkbox + 入口码 checkbox + 「全选」
+ * 快捷（菜单+入口+全部按钮）；其下平铺该页按钮码。未挂页面的接口级码（平台 `sys:*`
+ * 闸门等）按 module 分组排在树后，与权限管理页同口径。</p>
  *
  * <p>数据面在平台 `/sys/**`，需同时具备控制台码与平台码（双闸门，见 `lib/permCodes.ts` 的 `SYS`）。</p>
  */
@@ -37,7 +39,7 @@ export default function RolesAdminPage() {
   const [roles, setRoles] = useState<SysRoleDto[]>([]);
   const [selected, setSelected] = useState<SysRoleDto | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [tab, setTab] = useState<'basic' | 'perms' | 'menus'>('basic');
+  const [tab, setTab] = useState<'basic' | 'grant'>('basic');
 
   const [allPerms, setAllPerms] = useState<SysPermissionDto[]>([]);
   const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
@@ -46,9 +48,10 @@ export default function RolesAdminPage() {
 
   const [grantedPerms, setGrantedPerms] = useState<Set<string>>(new Set());
   const [grantedMenus, setGrantedMenus] = useState<Set<string>>(new Set());
-  /** 权限授权区：码/名检索（本地过滤）与折叠的分组 key。 */
+  /** 授权区：码/名检索（本地过滤）、折叠的目录节点与接口级分组。 */
   const [permKw, setPermKw] = useState('');
   const [closedPermGroups, setClosedPermGroups] = useState<Set<string>>(new Set());
+  const [closedDirs, setClosedDirs] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -187,37 +190,38 @@ export default function RolesAdminPage() {
     }
   }
 
-  async function savePerms() {
+  /**
+   * 一次保存两张授权表（顺序执行、各自幂等覆盖写）。
+   *
+   * <p>两张表分属两个平台端点、无跨表事务——任一失败时把失败的那张表名列进错误提示，
+   * 成功的那张不回滚（覆盖写可重试，重按一次保存即可补齐）。</p>
+   */
+  async function saveGrant() {
     if (!selected) return;
     setErr('');
     setBusy(true);
+    const failed: string[] = [];
     try {
       await api.rootPut<void>(
         `/sys/roles/${encodeURIComponent(selected.id)}/permissions`,
         Array.from(grantedPerms),
       );
-      flash(t('iam.common.saved'));
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.common.loadFailed'));
-    } finally {
-      setBusy(false);
+    } catch {
+      failed.push(t('iam.admin.roles.tabPermGrant'));
     }
-  }
-
-  async function saveMenus() {
-    if (!selected) return;
-    setErr('');
-    setBusy(true);
     try {
       await api.rootPut<void>(
         `/sys/roles/${encodeURIComponent(selected.id)}/menus`,
         Array.from(grantedMenus),
       );
+    } catch {
+      failed.push(t('iam.admin.roles.tabMenuGrant'));
+    }
+    setBusy(false);
+    if (failed.length) {
+      setErr(`${t('iam.common.saveFailed')}：${failed.join(' / ')}`);
+    } else {
       flash(t('iam.common.saved'));
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.common.loadFailed'));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -235,12 +239,182 @@ export default function RolesAdminPage() {
   /** 组级全选/清空：组内已全选则清空，否则全选。 */
   function toggleGroup(g: { perms: SysPermissionDto[] }) {
     const next = new Set(grantedPerms);
-    const allOn = g.perms.every((p) => next.has(p.id));
+    const allOn = g.perms.length > 0 && g.perms.every((p) => next.has(p.id));
     for (const p of g.perms) {
       if (allOn) next.delete(p.id);
       else next.add(p.id);
     }
     setGrantedPerms(next);
+  }
+
+  /** 授权树用：permCode → 权限行 ID（授权接口按权限 ID 读写；树上只有码）。 */
+  const permIdByCode = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of allPerms) m.set(p.code, p.id);
+    return m;
+  }, [allPerms]);
+
+  /** 检索过滤：命中菜单名/i18n/码或任一后代即保留分支；检索时目录强制展开。 */
+  const filteredTree = useMemo(() => {
+    const kw = permKw.trim().toLowerCase();
+    if (!kw) return menuTree;
+    const hit = (n: MenuTreeNode): boolean =>
+      (n.menu.permCode ?? '').toLowerCase().includes(kw) ||
+      (n.menu.i18nCode ?? '').toLowerCase().includes(kw) ||
+      t(n.menu.i18nCode ?? n.menu.id).toLowerCase().includes(kw) ||
+      (n.children ?? []).some(hit);
+    const prune = (nodes: MenuTreeNode[]): MenuTreeNode[] =>
+      nodes.filter(hit).map((n) => ({ menu: n.menu, children: prune(n.children ?? []) }));
+    return prune(menuTree);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuTree, permKw]);
+
+  /** MENU 行快捷「全选」：菜单可见 + 入口码 + 全部按钮码，整页一键开/关。 */
+  function toggleMenuPage(node: MenuTreeNode) {
+    const btns = (node.children ?? []).filter(
+      (c) => c.menu.type === 'BUTTON' && c.menu.permCode && permIdByCode.has(c.menu.permCode),
+    );
+    const entryId = node.menu.permCode ? permIdByCode.get(node.menu.permCode) : undefined;
+    const allOn =
+      grantedMenus.has(node.menu.id) &&
+      (!node.menu.permCode || (entryId !== undefined && grantedPerms.has(entryId))) &&
+      btns.every((b) => grantedPerms.has(permIdByCode.get(b.menu.permCode!)!));
+    const menus = new Set(grantedMenus);
+    const perms = new Set(grantedPerms);
+    if (allOn) menus.delete(node.menu.id);
+    else menus.add(node.menu.id);
+    if (entryId !== undefined) {
+      if (allOn) perms.delete(entryId);
+      else perms.add(entryId);
+    }
+    for (const b of btns) {
+      const id = permIdByCode.get(b.menu.permCode!)!;
+      if (allOn) perms.delete(id);
+      else perms.add(id);
+    }
+    setGrantedMenus(menus);
+    setGrantedPerms(perms);
+  }
+
+  /** 接口级码组（未挂任何页面的码，如平台 sys:* 闸门），排在授权树之后。 */
+  const ifaceGroups = useMemo(
+    () => permGroups.filter((g) => g.kind === 'module'),
+    [permGroups],
+  );
+
+  /**
+   * 授权树：DIR 折叠行 → MENU 行（菜单可见 + 入口码 + 页面全选）→ 按钮码平铺。
+   *
+   * <p>按钮码以菜单树 BUTTON 节点的 `permCode` 为准，经 {@link permIdByCode} 换算成
+   * 权限 ID 写入 `sys_role_perm`；码未在权限表注册时按钮行禁用（显示码但勾不了）。</p>
+   */
+  function renderGrantTree(nodes: MenuTreeNode[], depth: number): ReactNode[] {
+    const kw = permKw.trim().length > 0;
+    const superRole = draft?.isSuper ?? false;
+    const rows: ReactNode[] = [];
+    for (const n of nodes) {
+      const m = n.menu;
+      if (m.type === 'BUTTON') continue; // 按钮码渲染在其 MENU 父行之下
+      if (m.type === 'DIR') {
+        const open = kw || !closedDirs.has(m.id);
+        rows.push(
+          <div className="tree-row" key={m.id} style={{ paddingLeft: 12 + depth * 16 }}>
+            <button
+              type="button"
+              className={'tree-toggle' + (open ? ' open' : '')}
+              aria-expanded={open}
+              title={t('iam.shell.toggleGroup')}
+              onClick={() =>
+                setClosedDirs((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(m.id)) next.delete(m.id);
+                  else next.add(m.id);
+                  return next;
+                })
+              }
+            >
+              <IconChevron width={11} height={11} />
+            </button>
+            <span className="tree-name">{t(m.i18nCode ?? m.id)}</span>
+          </div>,
+        );
+        if (open) rows.push(...renderGrantTree(n.children ?? [], depth + 1));
+        continue;
+      }
+      // MENU：菜单可见 + 入口码 + 页面级全选
+      const btns = (n.children ?? []).filter(
+        (c) => c.menu.type === 'BUTTON' && c.menu.permCode,
+      );
+      const entryId = m.permCode ? permIdByCode.get(m.permCode) : undefined;
+      rows.push(
+        <div className="tree-row" key={m.id} style={{ paddingLeft: 12 + depth * 16 }}>
+          <input
+            type="checkbox"
+            checked={grantedMenus.has(m.id)}
+            disabled={superRole}
+            onChange={() => {
+              const next = new Set(grantedMenus);
+              if (next.has(m.id)) next.delete(m.id);
+              else next.add(m.id);
+              setGrantedMenus(next);
+            }}
+          />
+          <span className="tree-name">{t(m.i18nCode ?? m.id)}</span>
+          {entryId !== undefined && (
+            <label className="check" title={t('iam.admin.roles.entryTip')}>
+              <input
+                type="checkbox"
+                checked={grantedPerms.has(entryId)}
+                disabled={superRole}
+                onChange={() => {
+                  const next = new Set(grantedPerms);
+                  if (next.has(entryId)) next.delete(entryId);
+                  else next.add(entryId);
+                  setGrantedPerms(next);
+                }}
+              />
+              <span className="mono dim">{m.permCode}</span>
+            </label>
+          )}
+          {!superRole && (
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              style={{ marginLeft: 'auto', padding: '1px 8px' }}
+              onClick={() => toggleMenuPage(n)}
+            >
+              {t('iam.common.selectAll')}
+            </button>
+          )}
+        </div>,
+      );
+      for (const b of btns) {
+        const pid = permIdByCode.get(b.menu.permCode!);
+        rows.push(
+          <label
+            className="tree-row"
+            key={b.menu.id}
+            style={{ paddingLeft: 12 + (depth + 1) * 16 }}
+          >
+            <input
+              type="checkbox"
+              checked={pid !== undefined && grantedPerms.has(pid)}
+              disabled={superRole || pid === undefined}
+              onChange={() => {
+                if (pid === undefined) return;
+                const next = new Set(grantedPerms);
+                if (next.has(pid)) next.delete(pid);
+                else next.add(pid);
+                setGrantedPerms(next);
+              }}
+            />
+            <span className="tree-name">{t(b.menu.i18nCode ?? '')}</span>
+            <span className="tree-code dim">{b.menu.permCode}</span>
+          </label>,
+        );
+      }
+    }
+    return rows;
   }
 
   if (!canRead) {
@@ -346,28 +520,16 @@ export default function RolesAdminPage() {
                   {t('iam.admin.roles.tabBasic')}
                 </button>
                 {draft.id && (
-                  <>
-                    <button
-                      type="button"
-                      className={'tab' + (tab === 'perms' ? ' on' : '')}
-                      onClick={() => setTab('perms')}
-                    >
-                      {t('iam.admin.roles.tabPermGrant')}
-                      <span className="tag-count">
-                        {grantedPerms.size}/{allPerms.length}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={'tab' + (tab === 'menus' ? ' on' : '')}
-                      onClick={() => setTab('menus')}
-                    >
-                      {t('iam.admin.roles.tabMenuGrant')}
-                      <span className="tag-count">
-                        {grantedMenus.size}/{allMenus.length}
-                      </span>
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className={'tab' + (tab === 'grant' ? ' on' : '')}
+                    onClick={() => setTab('grant')}
+                  >
+                    {t('iam.admin.roles.tabGrant')}
+                    <span className="tag-count">
+                      {grantedPerms.size}/{allPerms.length} · {grantedMenus.size}/{allMenus.length}
+                    </span>
+                  </button>
                 )}
               </div>
 
@@ -466,20 +628,20 @@ export default function RolesAdminPage() {
               </Panel>
               )}
 
-              {tab === 'perms' && draft.id && (
+              {tab === 'grant' && draft.id && (
               <Panel
-                    title={t('iam.admin.roles.permGrant')}
-                    sub={`${grantedPerms.size} / ${allPerms.length}`}
+                    title={t('iam.admin.roles.tabGrant')}
+                    sub={`${grantedPerms.size} / ${allPerms.length} · ${grantedMenus.size} / ${allMenus.length}`}
                     actions={
                       <Perms codes={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
-                        <button className="btn-ghost btn-sm" onClick={savePerms} disabled={busy}>
+                        <button className="btn-ghost btn-sm" onClick={saveGrant} disabled={busy}>
                           <IconSave width={13} height={13} />
                           {t('iam.admin.roles.grantSave')}
                         </button>
                       </Perms>
                     }
                   >
-                    <p className="hint">{t('iam.admin.roles.permNote')}</p>
+                    <p className="hint">{t('iam.admin.roles.grantNote')}</p>
                     {catalogErr && <div className="alert warn">{catalogErr}</div>}
                     {!draft.isSuper && (
                       <div className="sub-head">
@@ -509,7 +671,17 @@ export default function RolesAdminPage() {
                         </span>
                       </div>
                     )}
-                    {permGroups.map((g) => {
+                    {menuTree.length ? (
+                      <div className="tree" style={{ paddingTop: 4 }}>
+                        {renderGrantTree(filteredTree, 0)}
+                      </div>
+                    ) : (
+                      <div className="empty">
+                        <IconAlert width={22} height={22} />
+                        <b>{catalogErr || t('iam.common.none')}</b>
+                      </div>
+                    )}
+                    {ifaceGroups.map((g) => {
                       const kw = permKw.trim().length > 0;
                       const closed = !kw && closedPermGroups.has(g.key);
                       const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
@@ -533,12 +705,8 @@ export default function RolesAdminPage() {
                               <span className={'tree-toggle' + (closed ? '' : ' open')}>
                                 <IconChevron width={11} height={11} />
                               </span>
-                              <span className="cap-text">
-                                {g.kind === 'page' ? t(g.label) : g.label}
-                              </span>
-                              {g.kind === 'module' && (
-                                <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
-                              )}
+                              <span className="cap-text">{g.label}</span>
+                              <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
                               <span className="tag-count">
                                 {g.perms.filter((p) => grantedPerms.has(p.id)).length}/{g.perms.length}
                               </span>
@@ -577,57 +745,6 @@ export default function RolesAdminPage() {
                         </div>
                       );
                     })}
-                  </Panel>
-              )}
-
-              {tab === 'menus' && draft.id && (
-              <Panel
-                    title={t('iam.admin.roles.menuGrant')}
-                    sub={`${grantedMenus.size} / ${allMenus.length}`}
-                    flush
-                    actions={
-                      <Perms codes={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
-                        <button className="btn-ghost btn-sm" onClick={saveMenus} disabled={busy}>
-                          <IconSave width={13} height={13} />
-                          {t('iam.admin.roles.grantSave')}
-                        </button>
-                      </Perms>
-                    }
-                  >
-                    <div style={{ padding: '10px 12px 0' }}>
-                      <p className="hint">{t('iam.admin.roles.menuNote')}</p>
-                    </div>
-                    {allMenus.length ? (
-                      <div className="tree" style={{ paddingTop: 4 }}>
-                        {allMenus.map(({ menu, depth }) => (
-                          <label
-                            className="tree-row"
-                            key={menu.id}
-                            style={{ paddingLeft: 12 + depth * 16, cursor: 'pointer' }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={grantedMenus.has(menu.id)}
-                              disabled={draft.isSuper}
-                              onChange={(e) => {
-                                const next = new Set(grantedMenus);
-                                if (e.target.checked) next.add(menu.id);
-                                else next.delete(menu.id);
-                                setGrantedMenus(next);
-                              }}
-                            />
-                            <span className="tree-name">{t(menu.i18nCode ?? menu.id)}</span>
-                            {menu.type !== 'MENU' && <span className="tag">{menu.type}</span>}
-                            <span className="tree-code dim">{menu.i18nCode ?? menu.permCode ?? menu.id}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="empty">
-                        <IconAlert width={22} height={22} />
-                        <b>{catalogErr || t('iam.common.none')}</b>
-                      </div>
-                    )}
                   </Panel>
               )}
             </>
