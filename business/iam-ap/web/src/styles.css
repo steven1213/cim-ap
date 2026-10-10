@@ -247,30 +247,39 @@ code,
   color: rgba(142, 155, 177, 0.6);
 }
 
-/* 菜单分组：组间留出分隔间距，组标题在非首组时上方补白 */
+/* 菜单分组：组间细分隔线，成组感更清晰 */
 .side-group + .side-group {
   margin-top: 6px;
+  border-top: 1px solid var(--sidebar-line);
 }
 .side-group + .side-group > .side-cap {
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
-/* 可点击折叠的分组头（侧栏分组 + 管理页列表分组，chevron 旋转指示状态） */
+/* 可点击折叠的侧栏分组头：静默灰、chevron 右置，悬停才浮出底色 */
 button.side-cap {
   width: calc(100% - 8px);
   margin: 0 4px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   text-align: left;
   background: none;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  color: var(--muted);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 button.side-cap:hover {
-  filter: brightness(1.35);
+  background: var(--sidebar-hover);
+  color: #dfe6f3;
 }
 button.side-cap .nav-tog-text,
 button.side-cap .cap-text {
@@ -281,14 +290,15 @@ button.side-cap .cap-text {
 }
 button.side-cap .tree-toggle {
   flex: 0 0 auto;
-  opacity: 0.75;
+  margin-left: auto;
+  opacity: 0.6;
 }
-/* 页面名分组（权限/角色授权）：不做大写变形，字号微升保证可读 */
+/* 页面名分组（权限/角色授权）：正文色、略大，与组内行协调 */
 button.side-cap.page-cap {
-  text-transform: none;
-  letter-spacing: 0.02em;
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 8px;
+  color: var(--text);
 }
 
 .side-link {
