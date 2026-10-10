@@ -589,7 +589,7 @@ button.side-cap.page-cap {
   height: 38px;
   flex: 0 0 38px;
   padding: 0 8px;
-  background: var(--panel-2); /* 比 --panel 深半档：胶囊指示器的浮起对比更明显 */
+  background: var(--panel); /* 与内容区同色：扁平，仅靠底部分隔线分界，色染签才有干净落点 */
   border-bottom: 1px solid var(--line);
 }
 
@@ -641,20 +641,18 @@ button.side-cap.page-cap {
   min-width: 100%;
 }
 
-/* 滑动胶囊指示器：激活态的「浮起白卡」——柔光分层投影 + 主题色微光，
-   从上一个签平滑滑来（ease-out-quint），是整个页签栏的高级感来源 */
+/* 滑动色染签：激活态 = 主题色淡染圆角矩形 + 内描边发丝线。
+   无外投影、无描边框——扁平克制，高级感来自色彩而非阴影堆砌；
+   从上一个签平滑滑来（ease-out-quint） */
 .tab-indicator {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
   width: 0;
-  border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow:
-    0 1px 2px rgba(13, 22, 38, 0.1),
-    0 4px 16px color-mix(in srgb, var(--primary) 16%, transparent);
+  border-radius: 8px;
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
   opacity: 0;
   pointer-events: none;
 }
