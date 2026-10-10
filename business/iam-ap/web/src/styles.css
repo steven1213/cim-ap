@@ -854,6 +854,37 @@ code,
   color: var(--muted);
 }
 
+/* ---------- 面板内标签页（角色管理：基本信息/权限授权/菜单授权） ---------- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line-strong);
+  margin-bottom: 12px;
+}
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 14px 7px;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.on {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+.tab .tag-count {
+  margin-left: 4px;
+}
+
 /* ---------- 键值矩阵 ---------- */
 .meta {
   display: grid;

@@ -5,6 +5,7 @@ import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRole
 import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { useHasAllPermissions } from '@/lib/usePermission';
+import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import {
   ROLE_ADMIN_LIST,
   ROLE_ADMIN_CREATE,
@@ -20,7 +21,11 @@ import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconSave, IconTrash 
  *
  * <p><b>为什么不合并成一个「授权」按钮</b>：平台设计刻意让「能调用接口」与「看得见菜单」解耦
  * （README §21.1）。合并会让两者重新耦合，正是要避免的退化——例如「有菜单但无权限码」是合法态：
- * 路由可达、点进去接口 403。本页因此并列两块，各自独立保存（覆盖式写入，幂等）。</p>
+ * 路由可达、点进去接口 403。本页右侧用**三个标签页**分别承载（基本信息 / 权限授权 / 菜单授权），
+ * 各自独立保存（覆盖式写入，幂等）——解耦语义不变，纵向堆叠三个长面板的布局问题消除。</p>
+ *
+ * <p><b>权限授权按页面分组</b>：与权限管理页一致，以菜单树 MENU/BUTTON 的 `permCode`
+ * 关联为权威源按「所属页面」分组（组头带勾选计数 + 组级全选/清空），接口级码排后并打标。</p>
  *
  * <p>数据面在平台 `/sys/**`，需同时具备控制台码与平台码（双闸门，见 `lib/permCodes.ts` 的 `SYS`）。</p>
  */
@@ -32,8 +37,10 @@ export default function RolesAdminPage() {
   const [roles, setRoles] = useState<SysRoleDto[]>([]);
   const [selected, setSelected] = useState<SysRoleDto | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [tab, setTab] = useState<'basic' | 'perms' | 'menus'>('basic');
 
   const [allPerms, setAllPerms] = useState<SysPermissionDto[]>([]);
+  const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [allMenus, setAllMenus] = useState<{ menu: SysMenuDto; depth: number }[]>([]);
   const [catalogErr, setCatalogErr] = useState('');
 
@@ -74,7 +81,7 @@ export default function RolesAdminPage() {
   async function loadCatalogs() {
     setCatalogErr('');
     try {
-      const [permPage, menuTree] = await Promise.all([
+      const [permPage, tree] = await Promise.all([
         api.rootGet<PageResultDto<SysPermissionDto>>('/sys/permissions/page', {
           page: 1,
           size: 500,
@@ -83,9 +90,11 @@ export default function RolesAdminPage() {
         api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }),
       ]);
       setAllPerms(permPage?.records ?? []);
-      setAllMenus(flatten(menuTree ?? []));
+      setMenuTree(tree ?? []);
+      setAllMenus(flatten(tree ?? []));
     } catch (e: any) {
       setAllPerms([]);
+      setMenuTree([]);
       setAllMenus([]);
       setCatalogErr(e?.msg || t('iam.common.noPlatformPerm'));
     }
@@ -100,6 +109,7 @@ export default function RolesAdminPage() {
   async function selectRole(role: SysRoleDto) {
     setErr('');
     setSelected(role);
+    setTab('basic');
     setDraft({
       id: role.id,
       code: role.code,
@@ -208,17 +218,22 @@ export default function RolesAdminPage() {
     }
   }
 
-  /** 权限码按 module 分组。 */
-  const permGroups = useMemo(() => {
-    const map = new Map<string, SysPermissionDto[]>();
-    for (const p of allPerms) {
-      const mod = p.module ?? p.code.split(':')[0] ?? 'other';
-      const list = map.get(mod) ?? [];
-      list.push(p);
-      map.set(mod, list);
+  /** 权限码按「所属页面」分组（菜单树关联）；接口级码按 module 排后。 */
+  const permGroups = useMemo(
+    () => groupPermsByPage(allPerms, buildPermPageMap(menuTree)),
+    [allPerms, menuTree],
+  );
+
+  /** 组级全选/清空：组内已全选则清空，否则全选。 */
+  function toggleGroup(g: { perms: SysPermissionDto[] }) {
+    const next = new Set(grantedPerms);
+    const allOn = g.perms.every((p) => next.has(p.id));
+    for (const p of g.perms) {
+      if (allOn) next.delete(p.id);
+      else next.add(p.id);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [allPerms]);
+    setGrantedPerms(next);
+  }
 
   if (!canRead) {
     return (
@@ -314,6 +329,41 @@ export default function RolesAdminPage() {
         <div>
           {draft ? (
             <>
+              <div className="tabs">
+                <button
+                  type="button"
+                  className={'tab' + (tab === 'basic' ? ' on' : '')}
+                  onClick={() => setTab('basic')}
+                >
+                  {t('iam.admin.roles.tabBasic')}
+                </button>
+                {draft.id && (
+                  <>
+                    <button
+                      type="button"
+                      className={'tab' + (tab === 'perms' ? ' on' : '')}
+                      onClick={() => setTab('perms')}
+                    >
+                      {t('iam.admin.roles.tabPermGrant')}
+                      <span className="tag-count">
+                        {grantedPerms.size}/{allPerms.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={'tab' + (tab === 'menus' ? ' on' : '')}
+                      onClick={() => setTab('menus')}
+                    >
+                      {t('iam.admin.roles.tabMenuGrant')}
+                      <span className="tag-count">
+                        {grantedMenus.size}/{allMenus.length}
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {tab === 'basic' && (
               <Panel
                 title={draft.id ? t('iam.common.edit') : t('iam.admin.roles.new')}
                 sub={draft.id ?? t('iam.admin.roles.new')}
@@ -406,10 +456,10 @@ export default function RolesAdminPage() {
                   </div>
                 </form>
               </Panel>
+              )}
 
-              {draft.id && (
-                <>
-                  <Panel
+              {tab === 'perms' && draft.id && (
+              <Panel
                     title={t('iam.admin.roles.permGrant')}
                     sub={`${grantedPerms.size} / ${allPerms.length}`}
                     actions={
@@ -425,7 +475,7 @@ export default function RolesAdminPage() {
                     {catalogErr && <div className="alert warn">{catalogErr}</div>}
                     {!draft.isSuper && (
                       <div className="sub-head">
-                        <span className="hint">{t('iam.admin.roles.groupByModule')}</span>
+                        <span className="hint">{t('iam.admin.roles.groupByPage')}</span>
                         <span style={{ display: 'flex', gap: 6 }}>
                           <button
                             type="button"
@@ -444,16 +494,33 @@ export default function RolesAdminPage() {
                         </span>
                       </div>
                     )}
-                    {permGroups.map(([mod, list]) => (
-                      <div className="sub-block" key={mod}>
-                        <div className="side-cap">
-                          {mod}
-                          <span className="tag-count">
-                            {list.filter((p) => grantedPerms.has(p.id)).length}/{list.length}
+                    {permGroups.map((g) => (
+                      <div className="sub-block" key={g.key}>
+                        <div className="side-cap" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ textTransform: g.kind === 'page' ? 'none' : undefined }}>
+                            {g.kind === 'page' ? t(g.label) : g.label}
                           </span>
+                          {g.kind === 'module' && (
+                            <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
+                          )}
+                          <span className="tag-count">
+                            {g.perms.filter((p) => grantedPerms.has(p.id)).length}/{g.perms.length}
+                          </span>
+                          {!draft.isSuper && (
+                            <button
+                              type="button"
+                              className="btn-ghost btn-sm"
+                              style={{ marginLeft: 'auto', padding: '1px 8px' }}
+                              onClick={() => toggleGroup(g)}
+                            >
+                              {g.perms.every((p) => grantedPerms.has(p.id))
+                                ? t('iam.common.clearAll')
+                                : t('iam.common.selectAll')}
+                            </button>
+                          )}
                         </div>
                         <div className="grid-3">
-                          {list.map((p) => (
+                          {g.perms.map((p) => (
                             <label className="check" key={p.id}>
                               <input
                                 type="checkbox"
@@ -473,8 +540,10 @@ export default function RolesAdminPage() {
                       </div>
                     ))}
                   </Panel>
+              )}
 
-                  <Panel
+              {tab === 'menus' && draft.id && (
+              <Panel
                     title={t('iam.admin.roles.menuGrant')}
                     sub={`${grantedMenus.size} / ${allMenus.length}`}
                     flush
@@ -522,7 +591,6 @@ export default function RolesAdminPage() {
                       </div>
                     )}
                   </Panel>
-                </>
               )}
             </>
           ) : (
