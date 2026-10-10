@@ -732,6 +732,75 @@ button.side-cap.page-cap {
   white-space: nowrap;
 }
 
+/* ---------- 权限点树（权限管理/角色授权共用；与菜单树同构 DIR→MENU→BUTTON） ---------- */
+.ptree {
+  padding: 4px 0 8px;
+}
+.ptree-node {
+  min-width: 0;
+}
+/* 层级引导线：子级缩进 + 左边线，从属关系一眼可读 */
+.ptree-kids {
+  margin-left: 13px;
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+/* 五列网格：折叠钮 / 复选框 / 名称 / 权限码 / 动作——码列同列对齐，名称吃剩余空间 */
+.ptree-row {
+  display: grid;
+  grid-template-columns: 18px 16px minmax(0, 1fr) minmax(110px, 250px) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 10px 2px 4px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+}
+.ptree-row > * {
+  min-width: 0;
+}
+.ptree-row:hover {
+  background: var(--panel-2);
+}
+.ptree-row.on {
+  background: var(--panel-3);
+}
+.ptree-row.clickable {
+  cursor: pointer;
+}
+.ptree-row.is-off .ptree-name,
+.ptree-row.is-off .tree-code {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.ptree-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ptree-row.is-leaf .ptree-name {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.ptree-count {
+  font-size: var(--fs-micro);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ptree-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ptree-entry {
+  min-width: 0;
+}
+.ptree .clickable {
+  cursor: pointer;
+}
+
 /* 键值对（详情面板） */
 .kv {
   display: grid;
@@ -1579,8 +1648,9 @@ button:disabled {
   user-select: none;
   white-space: nowrap;
 }
-/* 复选框需清掉全局 input 的样式并自绘，否则原生控件不受 padding/背景影响 */
-.check input[type='checkbox'] {
+/* 复选框需清掉全局 input 的样式并自绘，否则原生控件不受 padding/背景影响（权限点树同款） */
+.check input[type='checkbox'],
+.ptree input[type='checkbox'] {
   appearance: none;
   -webkit-appearance: none;
   position: relative;

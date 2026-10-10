@@ -484,6 +484,8 @@ public final class IamConsoleCatalog {
                 "勾选菜单＝侧栏可见；入口码/按钮码＝接口权限。一次保存同时写两张授权表；两者仍相互独立，可只勾其一",
                 "Checking a menu controls sidebar visibility; entry/button codes control API access. One save writes both grant tables; they stay independent"));
         t.add(new TextDef("iam.admin.roles.entryTip", "入口码：进入该页所需的接口权限", "Entry code: API permission required to open this page"));
+        t.add(new TextDef("iam.admin.roles.menuTip", "菜单可见：勾选后该菜单出现在侧栏", "Menu visibility: check to show this menu in the sidebar"));
+        t.add(new TextDef("iam.admin.perms.unregistered", "未注册：菜单树挂了此码但权限表无对应行", "Unregistered: attached to the menu tree but missing from the permission table"));
         // —— 多语言页 ——
         t.add(new TextDef("iam.admin.i18n.locales", "语言目录", "Locales"));
         t.add(new TextDef("iam.admin.i18n.allLocales", "全部语言", "All locales"));
