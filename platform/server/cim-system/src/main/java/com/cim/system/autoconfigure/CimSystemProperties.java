@@ -18,6 +18,15 @@ public class CimSystemProperties {
     /** 总开关；关闭后本模块不注册任何 Bean（切面/加载器一并退出）。 */
     private boolean enabled = true;
 
+    /**
+     * 是否在启动时种子平台权限目录（{@link com.cim.system.support.PermissionCodes} → {@code sys_permission}）。
+     *
+     * <p>默认 {@code true}。必须种子：超管短路展开为「库内全部启用权限码」，
+     * 目录为空会让超管的 authorities 缺 {@code sys:*}，从而被本模块自己的
+     * {@code @PreAuthorize("hasAuthority('sys:menu:list')")} 拒绝（精确串匹配）。</p>
+     */
+    private boolean seedPermissions = true;
+
     /** RBAC 解析策略。 */
     private Rbac rbac = new Rbac();
 

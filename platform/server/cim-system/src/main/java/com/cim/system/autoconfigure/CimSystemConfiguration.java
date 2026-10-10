@@ -3,6 +3,8 @@ package com.cim.system.autoconfigure;
 import com.cim.auth.rbac.LocalAuthorityLoader;
 import com.cim.system.log.OperationLogAspect;
 import com.cim.system.log.OperationLogService;
+import com.cim.system.permission.SysPermissionRepository;
+import com.cim.system.permission.SysPermissionSeeder;
 import com.cim.system.rbac.DbLocalAuthorityLoader;
 import com.cim.system.rbac.LocalUserResolver;
 import com.cim.system.rbac.SysRbacService;
@@ -23,16 +25,19 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * design.md §2 中「域模块 vs starter」的分界，也是 IAM（另一层，见 §8）不会被误当作
  * "同类选项"的原因。</p>
  *
- * <p><b>扫描根</b>：平台包约定为 {@code com.cim.*}，故此处直接声明
- * {@code @EntityScan/@EnableJpaRepositories basePackages = "com.cim"}——一次性覆盖平台全部模块，
- * 宿主 ap 无需再配。若宿主的实体/仓储不在此包下，请自行补充扫描根（两者不冲突；
- * 但同类型注解重复声明会导致注册器重复，届时以宿主声明为准即可）。</p>
+ * <p><b>扫描根 = 本模块自己的包（{@code com.cim.system}），不是 {@code com.cim}</b>：
+ * Spring Data 的仓储注册器<b>不做重名去重</b>——若两个 {@code @EnableJpaRepositories} 的包范围<b>重叠</b>
+ * （例如本模块声明 {@code com.cim}，而 {@code cim-i18n-starter} 声明 {@code com.cim.i18n}），
+ * 同一个仓储 bean 会被注册两次，Spring Boot 2.1+ 默认禁止 bean 覆盖 → 启动即
+ * {@code BeanDefinitionOverrideException}。<b>故各单元只声明自己的包</b>：
+ * 本模块 {@code com.cim.system}、i18n {@code com.cim.i18n}、宿主 ap 自己的包——
+ * 三者互不重叠，「加依赖即可用」依然成立（宿主只需补自己的包）。</p>
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(CimSystemProperties.class)
 @ConditionalOnProperty(prefix = "cim.system", name = "enabled", havingValue = "true", matchIfMissing = true)
-@EntityScan(basePackages = "com.cim")
-@EnableJpaRepositories(basePackages = "com.cim")
+@EntityScan(basePackages = "com.cim.system")
+@EnableJpaRepositories(basePackages = "com.cim.system")
 public class CimSystemConfiguration {
 
     /**
@@ -61,5 +66,16 @@ public class CimSystemConfiguration {
     @ConditionalOnMissingBean
     public OperationLogAspect operationLogAspect(OperationLogService operationLogService) {
         return new OperationLogAspect(operationLogService);
+    }
+
+    /**
+     * 平台权限目录种子（幂等）。见 {@link SysPermissionSeeder} 说明——
+     * 目录为空会导致超管被 {@code hasAuthority('sys:*')} 拒绝。
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "cim.system", name = "seed-permissions",
+            havingValue = "true", matchIfMissing = true)
+    public SysPermissionSeeder sysPermissionSeeder(SysPermissionRepository permissionRepository) {
+        return new SysPermissionSeeder(permissionRepository);
     }
 }

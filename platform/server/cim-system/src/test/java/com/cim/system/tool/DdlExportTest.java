@@ -35,7 +35,11 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 模块 DDL 生成工具（<b>非业务测试</b>）：把实体元数据导出为各数据库方言的建表脚本，
- * 落到 {@code src/main/resources/db/migration/system/{vendor}/V1__init_system_tables.sql}。
+ * 落到 {@code src/main/resources/db/migration/system/{vendor}/V1000__init_system_tables.sql}。
+ *
+ * <p><b>版本段</b>：本模块走保留版本段 {@code V1000–V1999}（见 {@code cim-jpa-starter} 的
+ * {@code db/migration/README.md}「版本空间分配」）——宿主 ap 用 {@code V1–V999}，
+ * 平台模块各占一个 1000 的整数倍段，避免多模块/宿主同库时 Flyway 版本重号。</p>
  *
  * <p><b>为什么用生成而不是手写</b>：本模块 19 张表（含 7 张 {@code *Hist} 历史表与 3 张关联表）
  * × 4 种方言，手写必然与实体漂移；而「主/历成对」正是平台 §6.2 的 CI 守卫项。
@@ -87,7 +91,7 @@ class DdlExportTest {
 
     private void exportDialect(String vendor, String dialectClass) {
         File target = new File("src/main/resources/db/migration/system/" + vendor
-                + "/V1__init_system_tables.sql");
+                + "/V1000__init_system_tables.sql");
         File parent = target.getParentFile();
         if (!parent.exists() && !parent.mkdirs()) {
             throw new IllegalStateException("cannot create dir: " + parent);

@@ -4,11 +4,15 @@
 
 ```
 db/migration/system/
-├── mysql/V1__init_system_tables.sql
-├── postgresql/V1__init_system_tables.sql
-├── oracle/V1__init_system_tables.sql
-└── dm/V1__init_system_tables.sql        # 由 DdlExportTest 生成；缺 DmDialect 时回退 Oracle 方言
+├── mysql/V1000__init_system_tables.sql
+├── postgresql/V1000__init_system_tables.sql
+├── oracle/V1000__init_system_tables.sql
+└── dm/V1000__init_system_tables.sql        # 由 DdlExportTest 生成；缺 DmDialect 时回退 Oracle 方言
 ```
+
+> **版本段 `V1000–V1999`**：本模块属平台模块，按 `cim-jpa-starter` 的
+> `db/migration/README.md`「版本空间分配」占用 1000 段，与宿主 ap（`V1–V999`）及
+> 其它模块互不重号——否则「宿主 + 本模块同库」会因版本重号启动失败。
 
 ## 如何被加载
 
@@ -49,6 +53,7 @@ Hibernate 6.x 未内置 `DmDialect`，故导出工具**回退到 Oracle 方言**
 ## 规范
 
 1. **主 / 历成对**：对 `{X}` 的 `ALTER` 必须同步其历史表 `{X}Hist`（§6.2 守卫）。
-2. 命名 `V{版本}__{描述}.sql`，版本单调递增；本模块后续脚本从 `V2` 起。
+2. 命名 `V{版本}__{描述}.sql`，版本在**本模块版本段（V1000–V1999）内**单调递增；
+   本模块后续脚本从 `V1001` 起。
 3. 日志表（`sys_operation_log` / `sys_login_log`）是流水表，**无**历史表——
    这是设计使然（`BaseEventData` 自身即流水），不是遗漏。
