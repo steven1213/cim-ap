@@ -206,7 +206,7 @@ export default function PermissionsAdminPage() {
               {grouped.map((g) => {
                 const closed = closedGroups.has(g.key);
                 return (
-                  <div key={g.key}>
+                  <div className="tree-group" key={g.key}>
                     <button
                       type="button"
                       className={'side-cap' + (g.kind === 'page' ? ' page-cap' : '')}

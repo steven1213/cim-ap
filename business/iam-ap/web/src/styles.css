@@ -165,7 +165,8 @@ code,
 /* ---------- 外壳 ---------- */
 .shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh; /* 定高：内容区自身滚动，footer 常驻可见（与 header 一致） */
+  overflow: hidden;
   background: var(--bg);
 }
 
@@ -574,6 +575,8 @@ button.side-cap.page-cap {
 /* ---------- 内容 / 页脚 ---------- */
 .content {
   flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   width: 100%;
   max-width: none;
   margin: 0 auto;
@@ -581,6 +584,7 @@ button.side-cap.page-cap {
 }
 
 .footer {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -621,7 +625,26 @@ button.side-cap.page-cap {
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+  /* 至少撑满可视内容区：右侧空态/短表单不再缩成一小条 */
+  min-height: calc(100vh - var(--header-h) - 136px);
+}
+/* 分栏面板：面板体弹性填充，超高时面板内滚动（主从式管理页标准形态） */
+.split > .panel {
+  min-height: 0;
+}
+.split .panel-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.split .panel-body > * {
+  flex-shrink: 0; /* 防长表格/表单被 flex 压缩 */
+}
+.split .panel-body > .empty:only-child {
+  margin: auto; /* 空态在面板体内垂直水平居中 */
 }
 @media (max-width: 1000px) {
   .split {
@@ -632,7 +655,7 @@ button.side-cap.page-cap {
 /* 分栏左列（树/清单）限高内部滚动：内容过长时自身滚动 + 吸顶，右侧编辑不随树高被顶走 */
 .panel.scroll-y {
   position: sticky;
-  top: calc(var(--header-h) + 12px);
+  top: 12px; /* 滚动容器已是 .content（topbar 在其外），吸顶只留内容边距 */
   max-height: calc(100vh - var(--header-h) - 82px); /* 12 顶距 + footer ≈38 + 内容底 padding 20 + 余量 */
 }
 .panel.scroll-y .panel-body {
@@ -644,6 +667,14 @@ button.side-cap.page-cap {
   .panel.scroll-y {
     position: static;
   }
+}
+
+/* 分组清单的层级感：组头（side-cap）与其成员行缩进区分（权限点清单/角色授权组） */
+.tree-group > .tree-row {
+  margin-left: 22px;
+}
+.tree-group > .grid-3 {
+  padding-left: 18px;
 }
 
 /* ---------- 组织树 ---------- */

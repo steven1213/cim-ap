@@ -514,7 +514,7 @@ export default function RolesAdminPage() {
                       const closed = !kw && closedPermGroups.has(g.key);
                       const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
                       return (
-                        <div className="sub-block" key={g.key}>
+                        <div className="sub-block tree-group" key={g.key}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <button
                               type="button"
