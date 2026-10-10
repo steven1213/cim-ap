@@ -149,7 +149,6 @@ export default function Layout() {
     navigate('/login');
   }
 
-  const crumbPath = pathname === '/' ? 'overview' : pathname.replace(/^\//, '');
   const initial = (user?.username || '?').charAt(0).toUpperCase();
   const isProd = import.meta.env.MODE === 'production';
 
@@ -228,10 +227,7 @@ export default function Layout() {
             <IconSidebar width={18} height={18} />
           </button>
 
-          {/* 当前页名由页签栏承载，header 只留路径小字作方位提示 */}
-          <div className="crumb">
-            <span className="path">IAM / {crumbPath}</span>
-          </div>
+          {/* 当前页名已由页签栏承载，header 不再重复显示菜单/路径 */}
 
           <div className="topbar-right">
             {consoleAdmin && (

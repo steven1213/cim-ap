@@ -426,41 +426,15 @@ button.side-cap.page-cap {
   align-items: center;
   gap: 14px;
   height: var(--header-h);
+  flex-shrink: 0; /* flex 列布局内禁止被挤压：短视口页面不得压缩 header */
   padding: 0 18px;
   background: color-mix(in srgb, var(--panel) 88%, transparent);
   backdrop-filter: saturate(180%) blur(10px);
   border-bottom: 1px solid var(--line);
 }
 
-.crumb {
-  min-width: 0;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-.crumb h1 {
-  font-size: var(--fs-md);
-  font-weight: 650;
-  white-space: nowrap;
-}
-.crumb .path {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-.crumb p {
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .topbar-right {
+  margin-left: auto; /* crumb 已移除，右侧控件组自行靠右 */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -640,10 +614,6 @@ button.side-cap.page-cap {
   display: inline-flex;
   transform: rotate(180deg);
 }
-.rot-d {
-  display: inline-flex;
-  transform: rotate(90deg);
-}
 
 /* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；
    顶部留白给右上角关闭徽标探出，页签贴底（浏览器页签式） */
@@ -732,46 +702,7 @@ button.side-cap.page-cap {
   color: var(--text);
 }
 
-/* 右侧「页签操作」下拉 */
-.tabbar-actions {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-}
-.tab-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 60;
-  min-width: 128px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(13, 22, 38, 0.14);
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-}
-.tab-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 10px;
-  border: 0;
-  background: none;
-  border-radius: 6px;
-  font-size: var(--fs-xs);
-  font-family: inherit;
-  color: var(--text-2);
-  cursor: pointer;
-}
-.tab-menu button:hover {
-  background: var(--panel-3);
-  color: var(--text);
-}
-
-/* 页签右键菜单：跟随鼠标的固定定位浮层（关闭标签页 / 关闭其它 / 关闭右侧） */
+/* 页签右键菜单：跟随鼠标的固定定位浮层（关闭标签页 / 关闭其它 / 关闭右侧 / 关闭全部） */
 .tab-ctx {
   position: fixed;
   z-index: 80;

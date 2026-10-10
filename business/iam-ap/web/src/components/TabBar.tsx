@@ -3,9 +3,8 @@
 // <p><b>交互契约</b>：
 // <ul>
 //   <li>「概览」为固定签（pinned），无关闭徽标，右键菜单的「关闭标签页」对其禁用；</li>
-//   <li>每个签支持<b>右键菜单</b>：关闭标签页 / 关闭其它标签页 / 关闭右侧标签页
-//       （对齐 Ant Design Pro / vue-element-admin 的 tags-view 惯例）；</li>
-//   <li>右侧「更多」下拉保留全局入口：关闭其他 / 关闭全部；</li>
+//   <li>每个签支持<b>右键菜单</b>：关闭标签页 / 关闭其它标签页 / 关闭右侧标签页 /
+//       关闭全部标签页（对齐 Ant Design Pro / vue-element-admin 的 tags-view 惯例）；</li>
 //   <li>页签溢出时两侧出现滚动箭头，激活签变化时自动滚入可视区；</li>
 //   <li>关闭激活签时由 {@link useTabStore} 决定相邻签并导航过去（优先右邻）。</li>
 // </ul></p>
@@ -39,9 +38,7 @@ export default function TabBar() {
   const flat = useMenuStore((s) => s.flat);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [ctx, setCtx] = useState<CtxMenu | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -88,23 +85,6 @@ export default function TabBar() {
       el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
     }
   }, [activePath, tabs]);
-
-  // 右侧「更多」下拉：点击外部 / Escape 关闭
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
 
   // 右键菜单：点击外部 / Escape 关闭
   useEffect(() => {
@@ -172,6 +152,13 @@ export default function TabBar() {
     if (next) navigate(next);
   }
 
+  function ctxCloseAll() {
+    if (!ctx) return;
+    const home = closeAll();
+    setCtx(null);
+    if (activePath !== home) navigate(home);
+  }
+
   return (
     <div className="tabbar" role="tablist" aria-label={t('iam.shell.tabs.label')}>
       {canLeft && (
@@ -233,47 +220,6 @@ export default function TabBar() {
         </button>
       )}
 
-      <div className="tabbar-actions" ref={menuRef}>
-        <button
-          type="button"
-          className={'icon-btn' + (menuOpen ? ' on' : '')}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label={t('iam.shell.tabs.more')}
-          title={t('iam.shell.tabs.more')}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <span className="rot-d">
-            <IconChevron width={14} height={14} />
-          </span>
-        </button>
-        {menuOpen && (
-          <div className="tab-menu" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                closeOthers(activePath);
-                setMenuOpen(false);
-              }}
-            >
-              {t('iam.shell.tabs.closeOthers')}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                const home = closeAll();
-                setMenuOpen(false);
-                if (activePath !== home) navigate(home);
-              }}
-            >
-              {t('iam.shell.tabs.closeAll')}
-            </button>
-          </div>
-        )}
-      </div>
-
       {ctx && (
         <div className="tab-ctx" role="menu" ref={ctxRef} style={{ left: ctx.x, top: ctx.y }}>
           <button
@@ -294,6 +240,9 @@ export default function TabBar() {
             onClick={ctxCloseRight}
           >
             {t('iam.shell.tabs.closeRight')}
+          </button>
+          <button type="button" role="menuitem" onClick={ctxCloseAll}>
+            {t('iam.shell.tabs.closeAll')}
           </button>
         </div>
       )}
