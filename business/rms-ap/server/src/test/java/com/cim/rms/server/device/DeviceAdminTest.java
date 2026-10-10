@@ -92,7 +92,7 @@ class DeviceAdminTest {
     @Order(2)
     void duplicateCodeRejectedWithChineseMessage() throws Exception {
         // 中文文案断言走服务层（响应侧经 i18n，只回业务码与通用文案——iam 同款口径）
-        assertThatThrownBy(() -> deviceAdminService.createType("ETFD-300", "重复机型", null))
+        assertThatThrownBy(() -> deviceAdminService.createType("ETFD-300", "重复机型", null, null, null))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("机型编码已存在");
         // HTTP 层：业务异常统一 400 + 业务码 2000（PARAM_INVALID）

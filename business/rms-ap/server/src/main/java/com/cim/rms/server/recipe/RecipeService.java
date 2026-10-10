@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
@@ -40,10 +42,10 @@ public class RecipeService {
     // ---------- 查询（FR-F2） ----------
 
     /** 通配符查询（FR-F2）：{@code *} 任意串、{@code ?} 单字符，其余转义。 */
-    public List<Recipe> list(String keyword, String deviceTypeId, String areaId, Boolean golden) {
+    public List<RecipeSummary> list(String keyword, String deviceTypeId, String areaId, Boolean golden) {
         String like = Wildcards.toLikePattern(keyword);
         return recipeRepository.search(like, blankToNull(deviceTypeId), blankToNull(areaId), golden,
-                Sort.by(Sort.Order.asc("code")));
+                Sort.by(Sort.Order.asc("code"))).stream().map(this::toSummary).toList();
     }
 
     public Recipe require(String id) {
@@ -54,10 +56,10 @@ public class RecipeService {
         return r;
     }
 
-    /** 详情（主档 + 全部版本，版本号倒序）。 */
+    /** 详情（主档摘要 + 全部版本，版本号倒序）。 */
     public RecipeDetail detail(String id) {
         Recipe r = require(id);
-        return new RecipeDetail(r, versionsOf(id));
+        return new RecipeDetail(toSummary(r), versionsOf(id));
     }
 
     public List<RecipeVersion> versionsOf(String recipeId) {
@@ -68,8 +70,9 @@ public class RecipeService {
     // ---------- 建档（FR-F1，Req 1/2） ----------
 
     @Transactional
-    public Recipe create(String code, String name, String deviceTypeId, String areaId,
-                         boolean golden, String description) {
+    public RecipeSummary create(String code, String name, String deviceTypeId, String areaId,
+                               boolean golden, String description,
+                               String bodyFormat, String bodyBase64, String expectedBodyHash) {
         if (recipeRepository.findByCodeAndDeletedFalse(code).isPresent()) {
             throw new BizException(BizCode.PARAM_INVALID, "配方编码已存在: " + code);
         }
@@ -83,16 +86,20 @@ public class RecipeService {
         r.setGolden(golden);
         r.setDescription(description);
         Recipe saved = recipeRepository.save(r);
-        // 初始版本 v1（DRAFT、无 Body；Body 由 newVersion/上传补齐）
-        newVersionInternal(saved, null, null, null, "初始版本", null);
+        // 初始版本 v1：若建档时即带 Body 则一并写入（Body 变更即新版本，Req 42）
+        if (bodyBase64 != null && !bodyBase64.isBlank()) {
+            newVersionInternal(saved, BodyFormat.valueOf(bodyFormat), bodyBase64, null, "初始版本", expectedBodyHash);
+        } else {
+            newVersionInternal(saved, null, null, null, "初始版本", null);
+        }
         log.info("[recipe] 新建配方 code={} name={} golden={}", code, name, golden);
-        return saved;
+        return toSummary(saved);
     }
 
     /** 主档元数据维护（不触碰版本）。 */
     @Transactional
-    public Recipe update(String id, String name, String deviceTypeId, String areaId,
-                         Boolean golden, String description) {
+    public RecipeSummary update(String id, String name, String deviceTypeId, String areaId,
+                               Boolean golden, String description) {
         Recipe r = require(id);
         if (name != null && !name.isBlank()) {
             r.setName(name);
@@ -109,7 +116,7 @@ public class RecipeService {
         if (description != null) {
             r.setDescription(description);
         }
-        return recipeRepository.save(r);
+        return toSummary(recipeRepository.save(r));
     }
 
     // ---------- 版本（FR-L1/L3，Req 13/42） ----------
@@ -152,7 +159,7 @@ public class RecipeService {
     // ---------- 复制/另存为（FR-F4，Req 6） ----------
 
     @Transactional
-    public Recipe copyAs(String recipeId, String newCode, String newName) {
+    public RecipeSummary copyAs(String recipeId, String newCode, String newName) {
         Recipe src = require(recipeId);
         if (recipeRepository.findByCodeAndDeletedFalse(newCode).isPresent()) {
             throw new BizException(BizCode.PARAM_INVALID, "配方编码已存在: " + newCode);
@@ -185,7 +192,7 @@ public class RecipeService {
         versionRepository.save(v1);
         log.info("[recipe] 另存为 {} <- {} v{}", newCode, src.getCode(),
                 latest.map(RecipeVersion::getVersionNo).orElse(0));
-        return savedCopy;
+        return toSummary(savedCopy);
     }
 
     // ---------- 删除（FR-F3，Req 5） ----------
@@ -262,8 +269,43 @@ public class RecipeService {
         return s == null || s.isBlank() ? null : s;
     }
 
-    /** 详情聚合（主档 + 版本列表）。 */
-    public record RecipeDetail(Recipe recipe, List<RecipeVersion> versions) {
+    /** 审计时间格式化（LocalDateTime → 字符串，前端直接展示）。 */
+    private static String fmt(LocalDateTime t) {
+        return t == null ? null : t.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
+    /** 实体 → 列表/详情摘要（含版本数、生效版本号等派生字段，前端契约稳定）。 */
+    public RecipeSummary toSummary(Recipe r) {
+        int versionCount = (int) versionRepository.countByRecipeIdAndDeletedFalse(r.getId());
+        Integer activeVersionNo = null;
+        if (r.getActiveVersionId() != null) {
+            activeVersionNo = versionRepository.findById(r.getActiveVersionId())
+                    .map(RecipeVersion::getVersionNo).orElse(null);
+        }
+        return new RecipeSummary(
+                r.getId(), r.getCode(), r.getName(), r.getDeviceTypeId(), r.getAreaId(),
+                r.isGolden(), r.getActiveVersionId(), activeVersionNo, versionCount,
+                r.getDescription(), fmt(r.getCreateTime()), fmt(r.getEventTime()));
+    }
+
+    /** 详情聚合（主档摘要 + 版本列表）。 */
+    public record RecipeDetail(RecipeSummary recipe, List<RecipeVersion> versions) {
+    }
+
+    /** 配方列表/详情摘要（前端展示契约）。 */
+    public record RecipeSummary(
+            String id,
+            String code,
+            String name,
+            String deviceTypeId,
+            String areaId,
+            boolean golden,
+            String activeVersionId,
+            Integer activeVersionNo,
+            int versionCount,
+            String remark,
+            String createTime,
+            String updateTime) {
     }
 
     // 占位：保留 UTF-8 语义引用，防误改（Body 归档内容按平台约定一律 UTF-8）

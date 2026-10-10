@@ -46,4 +46,8 @@ public class Device extends BaseDefData {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
     private DeviceStatus status = DeviceStatus.ENABLED;
+
+    /** 设备 IP（SECS-II / HSMS 通信地址，可空）。 */
+    @Column(name = "ip", length = 64)
+    private String ip;
 }

@@ -30,7 +30,7 @@ public class RecipeController {
 
     /** 通配符查询（FR-F2）：{@code *}/{@code ?} 语义。 */
     @GetMapping
-    public Result<List<Recipe>> list(
+    public Result<List<RecipeService.RecipeSummary>> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String deviceTypeId,
             @RequestParam(required = false) String areaId,
@@ -44,13 +44,14 @@ public class RecipeController {
     }
 
     @PostMapping
-    public Result<Recipe> create(@RequestBody CreateReq req) {
+    public Result<RecipeService.RecipeSummary> create(@RequestBody CreateReq req) {
         return Result.ok(service.create(req.code(), req.name(), req.deviceTypeId(), req.areaId(),
-                Boolean.TRUE.equals(req.golden()), req.description()));
+                Boolean.TRUE.equals(req.golden()), req.description(),
+                req.bodyFormat(), req.bodyBase64(), req.expectedBodyHash()));
     }
 
     @PutMapping("/{id}")
-    public Result<Recipe> update(@PathVariable String id, @RequestBody UpdateReq req) {
+    public Result<RecipeService.RecipeSummary> update(@PathVariable String id, @RequestBody UpdateReq req) {
         return Result.ok(service.update(id, req.name(), req.deviceTypeId(), req.areaId(),
                 req.golden(), req.description()));
     }
@@ -63,7 +64,7 @@ public class RecipeController {
 
     /** 另存为（FR-F4，Req 6）。 */
     @PostMapping("/{id}/copy")
-    public Result<Recipe> copy(@PathVariable String id, @RequestBody CopyReq req) {
+    public Result<RecipeService.RecipeSummary> copy(@PathVariable String id, @RequestBody CopyReq req) {
         return Result.ok(service.copyAs(id, req.newCode(), req.newName()));
     }
 
@@ -89,7 +90,8 @@ public class RecipeController {
     // ---------- 请求体 ----------
 
     public record CreateReq(String code, String name, String deviceTypeId, String areaId,
-                            Boolean golden, String description) {
+                            Boolean golden, String description,
+                            String bodyFormat, String bodyBase64, String expectedBodyHash) {
     }
 
     public record UpdateReq(String name, String deviceTypeId, String areaId,

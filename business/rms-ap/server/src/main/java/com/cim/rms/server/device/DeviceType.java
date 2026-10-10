@@ -30,4 +30,12 @@ public class DeviceType extends BaseDefData {
     /** 机型名称。 */
     @Column(name = "name", length = 128, nullable = false)
     private String name;
+
+    /** 制造商（如 Applied Materials / Lam Research）。 */
+    @Column(name = "manufacturer", length = 128)
+    private String manufacturer;
+
+    /** 型号（如 Producer GT）。 */
+    @Column(name = "model", length = 128)
+    private String model;
 }

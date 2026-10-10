@@ -13,4 +13,6 @@ public interface RecipeVersionRepository extends JpaRepository<RecipeVersion, St
     Optional<RecipeVersion> findByRecipeIdAndVersionNoAndDeletedFalse(String recipeId, int versionNo);
 
     Optional<RecipeVersion> findFirstByRecipeIdAndDeletedFalseOrderByVersionNoDesc(String recipeId);
+
+    long countByRecipeIdAndDeletedFalse(String recipeId);
 }

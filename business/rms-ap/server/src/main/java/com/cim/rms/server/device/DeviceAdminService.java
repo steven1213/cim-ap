@@ -9,7 +9,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * 设备管理（Req 46/47/48）：设备类型 / 设备区域 / 设备台账 的基础维护。
@@ -28,12 +31,14 @@ public class DeviceAdminService {
 
     // ---------- 设备类型（Req 46） ----------
 
-    public List<DeviceType> listTypes() {
-        return typeRepository.findByDeletedFalseOrderByCode();
+    public List<DeviceTypeSummary> listTypes() {
+        return typeRepository.findByDeletedFalseOrderByCode().stream()
+                .map(this::toTypeSummary).toList();
     }
 
     @Transactional
-    public DeviceType createType(String code, String name, String description) {
+    public DeviceTypeSummary createType(String code, String name, String description,
+                                       String manufacturer, String model) {
         if (typeRepository.findByCodeAndDeletedFalse(code).isPresent()) {
             throw new BizException(BizCode.PARAM_INVALID, "机型编码已存在: " + code);
         }
@@ -41,11 +46,14 @@ public class DeviceAdminService {
         t.setCode(code);
         t.setName(name);
         t.setDescription(description);
-        return typeRepository.save(t);
+        t.setManufacturer(blankToNull(manufacturer));
+        t.setModel(blankToNull(model));
+        return toTypeSummary(typeRepository.save(t));
     }
 
     @Transactional
-    public DeviceType updateType(String id, String name, String description) {
+    public DeviceTypeSummary updateType(String id, String name, String description,
+                                       String manufacturer, String model) {
         DeviceType t = requireType(id);
         if (name != null && !name.isBlank()) {
             t.setName(name);
@@ -53,7 +61,13 @@ public class DeviceAdminService {
         if (description != null) {
             t.setDescription(description);
         }
-        return typeRepository.save(t);
+        if (manufacturer != null) {
+            t.setManufacturer(manufacturer.isBlank() ? null : manufacturer);
+        }
+        if (model != null) {
+            t.setModel(model.isBlank() ? null : model);
+        }
+        return toTypeSummary(typeRepository.save(t));
     }
 
     @Transactional
@@ -68,12 +82,13 @@ public class DeviceAdminService {
 
     // ---------- 设备区域（Req 47） ----------
 
-    public List<DeviceArea> listAreas() {
-        return areaRepository.findByDeletedFalseOrderBySortNoAscCode();
+    public List<DeviceAreaSummary> listAreas() {
+        return areaRepository.findByDeletedFalseOrderBySortNoAscCode().stream()
+                .map(this::toAreaSummary).toList();
     }
 
     @Transactional
-    public DeviceArea createArea(String code, String name, String parentId, int sortNo, String description) {
+    public DeviceAreaSummary createArea(String code, String name, String parentId, Integer sortNo, String description) {
         if (areaRepository.findByCodeAndDeletedFalse(code).isPresent()) {
             throw new BizException(BizCode.PARAM_INVALID, "区域编码已存在: " + code);
         }
@@ -81,16 +96,23 @@ public class DeviceAdminService {
         a.setCode(code);
         a.setName(name);
         a.setParentId(parentId == null || parentId.isBlank() ? null : requireArea(parentId).getId());
-        a.setSortNo(sortNo);
+        a.setSortNo(sortNo == null ? 0 : sortNo);
         a.setDescription(description);
-        return areaRepository.save(a);
+        return toAreaSummary(areaRepository.save(a));
     }
 
     @Transactional
-    public DeviceArea updateArea(String id, String name, Integer sortNo, String description) {
+    public DeviceAreaSummary updateArea(String id, String name, String parentId, Integer sortNo, String description) {
         DeviceArea a = requireArea(id);
         if (name != null && !name.isBlank()) {
             a.setName(name);
+        }
+        // 改父：防止自指成环（子树成环检测 W3+）
+        if (parentId != null) {
+            if (parentId.equals(a.getId())) {
+                throw new BizException(BizCode.PARAM_INVALID, "区域父级不能是自身: " + a.getCode());
+            }
+            a.setParentId(parentId.isBlank() ? null : requireArea(parentId).getId());
         }
         if (sortNo != null) {
             a.setSortNo(sortNo);
@@ -98,7 +120,7 @@ public class DeviceAdminService {
         if (description != null) {
             a.setDescription(description);
         }
-        return areaRepository.save(a);
+        return toAreaSummary(areaRepository.save(a));
     }
 
     @Transactional
@@ -119,14 +141,20 @@ public class DeviceAdminService {
 
     // ---------- 设备台账（Req 48） ----------
 
-    public List<Device> listDevices(String keyword, String deviceTypeId, String areaId, DeviceStatus status) {
+    public List<DeviceSummary> listDevices(String keyword, String deviceTypeId, String areaId, DeviceStatus status) {
         String like = Wildcards.toLikePattern(keyword);
-        return deviceRepository.search(like, blankToNull(deviceTypeId), blankToNull(areaId), status,
+        List<Device> devices = deviceRepository.search(like, blankToNull(deviceTypeId), blankToNull(areaId), status,
                 Sort.by(Sort.Order.asc("code")));
+        Map<String, String> typeNames = typeRepository.findByDeletedFalseOrderByCode().stream()
+                .collect(java.util.stream.Collectors.toMap(DeviceType::getId, DeviceType::getName, (a, b) -> a));
+        Map<String, String> areaNames = areaRepository.findByDeletedFalseOrderBySortNoAscCode().stream()
+                .collect(java.util.stream.Collectors.toMap(DeviceArea::getId, DeviceArea::getName, (a, b) -> a));
+        return devices.stream().map(d -> toDeviceSummary(d, typeNames, areaNames)).toList();
     }
 
     @Transactional
-    public Device createDevice(String code, String name, String deviceTypeId, String areaId, String description) {
+    public DeviceSummary createDevice(String code, String name, String deviceTypeId, String areaId,
+                                     String ip, String description) {
         if (deviceRepository.findByCodeAndDeletedFalse(code).isPresent()) {
             throw new BizException(BizCode.PARAM_INVALID, "设备编码已存在: " + code);
         }
@@ -135,12 +163,14 @@ public class DeviceAdminService {
         d.setName(name);
         d.setDeviceTypeId(requireType(deviceTypeId).getId());
         d.setAreaId(areaId == null || areaId.isBlank() ? null : requireArea(areaId).getId());
+        d.setIp(blankToNull(ip));
         d.setDescription(description);
-        return deviceRepository.save(d);
+        return toDeviceSummary(deviceRepository.save(d));
     }
 
     @Transactional
-    public Device updateDevice(String id, String name, String areaId, DeviceStatus status, String description) {
+    public DeviceSummary updateDevice(String id, String name, String areaId, DeviceStatus status,
+                                    String ip, String description) {
         Device d = requireDevice(id);
         if (name != null && !name.isBlank()) {
             d.setName(name);
@@ -151,10 +181,13 @@ public class DeviceAdminService {
         if (status != null) {
             d.setStatus(status);
         }
+        if (ip != null) {
+            d.setIp(ip.isBlank() ? null : ip);
+        }
         if (description != null) {
             d.setDescription(description);
         }
-        return deviceRepository.save(d);
+        return toDeviceSummary(deviceRepository.save(d));
     }
 
     @Transactional
@@ -189,6 +222,57 @@ public class DeviceAdminService {
             throw new BizException(BizCode.DATA_NOT_FOUND, "设备不存在: " + id);
         }
         return d;
+    }
+
+    // ---------- 摘要映射（前端契约稳定：派生联表名，备注走 description） ----------
+
+    private DeviceTypeSummary toTypeSummary(DeviceType t) {
+        return new DeviceTypeSummary(t.getId(), t.getCode(), t.getName(),
+                t.getManufacturer(), t.getModel(), t.getDescription());
+    }
+
+    private DeviceAreaSummary toAreaSummary(DeviceArea a) {
+        String parentName = a.getParentId() == null ? null
+                : areaRepository.findById(a.getParentId()).map(DeviceArea::getName).orElse(null);
+        return new DeviceAreaSummary(a.getId(), a.getCode(), a.getName(),
+                a.getParentId(), parentName, a.getDescription());
+    }
+
+    private DeviceSummary toDeviceSummary(Device d) {
+        Map<String, String> typeNames = new HashMap<>();
+        if (d.getDeviceTypeId() != null) {
+            typeRepository.findById(d.getDeviceTypeId()).ifPresent(t -> typeNames.put(t.getId(), t.getName()));
+        }
+        Map<String, String> areaNames = new HashMap<>();
+        if (d.getAreaId() != null) {
+            areaRepository.findById(d.getAreaId()).ifPresent(a -> areaNames.put(a.getId(), a.getName()));
+        }
+        return toDeviceSummary(d, typeNames, areaNames);
+    }
+
+    private DeviceSummary toDeviceSummary(Device d, Map<String, String> typeNames, Map<String, String> areaNames) {
+        return new DeviceSummary(d.getId(), d.getCode(), d.getName(),
+                d.getDeviceTypeId(), typeNames.get(d.getDeviceTypeId()),
+                d.getAreaId(), areaNames.get(d.getAreaId()),
+                d.getIp(), d.getStatus() == null ? DeviceStatus.ENABLED : d.getStatus(),
+                d.getDescription());
+    }
+
+    /** 设备类型摘要（含制造商/型号；备注走 description）。 */
+    public record DeviceTypeSummary(String id, String code, String name,
+                                   String manufacturer, String model, String remark) {
+    }
+
+    /** 设备区域摘要（含父区域名）。 */
+    public record DeviceAreaSummary(String id, String code, String name,
+                                   String parentId, String parentName, String remark) {
+    }
+
+    /** 设备台账摘要（含机型名/区域名/IP/状态）。 */
+    public record DeviceSummary(String id, String code, String name,
+                               String deviceTypeId, String deviceTypeName,
+                               String areaId, String areaName, String ip,
+                               DeviceStatus status, String remark) {
     }
 
     private static String blankToNull(String s) {
