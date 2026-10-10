@@ -143,6 +143,28 @@ OBSOLETE（失效；仅可查/可复制为 DRAFT）
 - **FR-H2（Req 18）**：Validate Log 汇总统计（按设备/配方/时间段/结果/差异类型聚合）。
 - **FR-H3（Req 19）**：配方对象历史查询——时间范围、最大返回笔数可设；操作/状态/参数三级历史；复用平台 `{X}`↔`{X}Hist` 同构约定。
 
+### 4.8 配方-机台资格矩阵（业界核心，原始协议未显式提出——行业补充）
+
+> 业界（Applied E3 RMS 等）把「哪个配方允许跑在哪台机台」作为 RMS 的**核心管控点**：它区别于 Req 11 的「用户↔设备」授权（人视角），是**配方↔设备**的运行资格（物视角）。缺失此能力的 RMS 只能做档案库，管不住生产行为。
+
+- **FR-Q1**：资格矩阵维护——配方（UID/版本策略）×设备（含机型/区域分组）的授权运行关系，逐条含生效期与审批依据。
+- **FR-Q2**：**默认拒绝**——未登记资格的配方在机台运行时，IF-M1 校验/IF-E3 在线比对链路直接返回 `NOT_QUALIFIED` 并可选报警。【决策点 D8】
+- **FR-Q3**：资格与配方版本联动——新版本生效后默认继承原版本资格（需审批的机型可配置为重新认定）；资格吊销即时生效并通知 EAP。
+- **FR-Q4**：资格矩阵变更全量审计（谁/何时/哪台机/哪个配方的资格被授予或吊销）。
+
+### 4.9 配方安全与 IP 保护（行业补充）
+
+> 配方即工厂核心 IP（工艺窗口泄露 = 竞争力损失），业界对 Body 的访问控制远严于普通数据。
+
+- **FR-SEC1**：Body **静态加密存储**（按机型/分组可配开关），密钥管理走平台 KMS/配置中心，库内不落明文。【决策点 D9】
+- **FR-SEC2**：Body **明文查看受控**——默认仅展示参数快照（结构化），查看/下载原始 Body 需专门权限（`rms:body:view`/`rms:body:export`）+ 导出审批，全量留痕。
+- **FR-SEC3**：防篡改证据链——Body 存档 HASH + 关键操作历史不可变（复用 `{X}Hist`），支持审计期完整性校验。
+
+### 4.10 报表与看板（行业补充）
+
+- **FR-RPT1**：配方 KPI 看板——配方使用率、版本变更频率、比对通过率、漂移检出数、Hold/豁免存量，按机型/区域/时间聚合（概览页直接呈现）。
+- **FR-RPT2**：明细报表可导出（资格矩阵现状、Bypass 清单、签核时效统计）。
+
 ---
 
 ## 5. 系统间接口设计（业界惯例对齐）
@@ -156,9 +178,12 @@ MES ──(Run货校验/指派)──┐
                         ▲
                         │ (上传/下载/在线比对/选配方事件)
 IAM ◄──(登录/准入/JWKS)── EAP ──(HSMS/E37: S7系列·S2F41·S5·S1)── 设备
+                        │
+                        └──(只读开放API·预留)── FDC/SPC/报表平台（消费配方元数据与Spec基线）
 ```
 
 - 业界惯例：**RMS 不与设备直连**，SECS-II 事务（S7F1–F6、S2F41 等）全部由 EAP 终结；RMS↔EAP 走**异步消息 + 命令回执**，RMS↔MES 走**服务调用或事件**，RMS↔Alarm/签核走**事件/回调**。
+- **FDC/SPC 联动（行业补充，本版只预留）**：业界 RMS 常向 FDC 提供参数 Spec 基线供建模。本版仅提供**版本化只读 REST 开放 API**（配方元数据/参数快照/资格矩阵查询，服务令牌接入），不做双向集成；FDC 深度联动留待后续版本。
 - 传输与可靠性统一基于 **cim-mq-starter**：关键链路走 outbox 事务发件箱（平台 §12）、消费幂等（§16，`eventId` 去重）、同 key 有序（`sendOrdered`，按 `TOOL_ID`/`aggregateId` 分区保序）、重试/死信（§13）。
 
 ### 5.2 接口通用规范（IF-COM，所有接口必须遵守）
@@ -247,7 +272,7 @@ SECS 来源：S2F41 `PP-SELECT` 选配方事件、GEM Process Program 事件（S
 | `verifyRequired` | bool | 是 | 是否强制比对通过 |
 | `requestor` | string | 是 | 用户/系统 |
 
-应答 `RecipeCheckResult`：`checkResult`（`QUALIFIED`/`HOLD`/`NOT_FOUND`/`VERSION_MISMATCH`）、`activeVersion`、`diffHint`（失败摘要）、`resultAt`。
+应答 `RecipeCheckResult`：`checkResult`（`QUALIFIED`/`NOT_QUALIFIED`（资格矩阵拦截，FR-Q2）/`HOLD`/`NOT_FOUND`/`VERSION_MISMATCH`）、`activeVersion`、`diffHint`（失败摘要）、`resultAt`。
 **IF-M2 配方指派审计**：MES 侧 LOT↔Recipe 绑定变更以事件同步 RMS 留痕（不反向主数据管理）。
 
 ### 5.5 RMS → 报警系统（Req 21/45）
@@ -285,6 +310,8 @@ SECS 来源：S2F41 `PP-SELECT` 选配方事件、GEM Process Program 事件（S
 - **NFR-4（容量）**：Body 存档不动域库主表（对象存储或大对象表），参数快照结构化入 PG；历史表分区策略设计阶段定。
 - **NFR-5（安全/审计）**：口令/令牌体系全复用 IAM；敏感操作（Bypass/Hold/预设放行/设备授权）双留痕（业务表 + 审计历史）。
 - **NFR-6（多租户）**：全业务实体挂 `cimTenantFilter`（`@Filter` 只标注，`@FilterDef` 用平台唯一声明点，ADR-12）。
+- **NFR-7（备份与 DR，行业补充）**：RMS 属生产关键系统——Body 存档与库数据异地/离线备份，目标 **RPO ≤ 15min / RTO ≤ 1h**；每季度恢复演练；Body 为不可变存档（append-only），天然利于增量备份。
+- **NFR-8（跨厂区预留，行业补充）**：业界成熟 RMS 均有 Multi-Fab 演进路径——数据模型自始携带厂区/站点维度（复用租户体系或独立 site 字段），本版不做跨站同步，但**实体设计禁止写死单厂假设**。
 
 ---
 
@@ -323,6 +350,8 @@ SECS 来源：S2F41 `PP-SELECT` 选配方事件、GEM Process Program 事件（S
 | D5 | MES↔RMS 同步调用 or 纯事件 | 校验类同步 REST（P95 预算内）、审计类事件 |
 | D6 | 设备间复制跨机型策略 | 默认拒绝，显式确认 + 记录强审计 |
 | D7 | RMS 是否维护「机台 PPID ↔ RMS UID」映射 | 是（RMS 维护映射表，EAP 只认机台 PPID） |
+| D8 | 资格矩阵默认策略（FR-Q2） | 未登记资格的配方在机台运行默认拒绝（NOT_QUALIFIED）；已有产线数据迁移期可配白名单过渡 |
+| D9 | Body 静态加密策略（FR-SEC1） | 按机型分组开关；密钥走平台 KMS；优先对高敏机型启用 |
 
 ---
 
@@ -349,6 +378,7 @@ SECS 来源：S2F41 `PP-SELECT` 选配方事件、GEM Process Program 事件（S
 | 43/44/45 | FR-D2~D4、IF-E5 |
 | 46/47/48 | FR-D1 |
 | 49–53 | NFR-1/NFR-2、§8 |
+| （行业补充，超出原始协议） | FR-Q1~Q4（资格矩阵）、FR-SEC1~3（IP 保护）、FR-RPT1~2（报表）、NFR-7（备份 DR）、NFR-8（跨厂区预留）、FDC 开放 API 预留 |
 
 ---
 
