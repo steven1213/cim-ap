@@ -554,7 +554,13 @@ export default function I18nAdminPage() {
           </div>
           {pages > 1 && (
             <div className="pager">
-              <span>{t('iam.common.pagerInfo', { page: safePage, pages })}</span>
+              <span>
+                {t('iam.common.pagerInfo', {
+                  page: safePage,
+                  pages,
+                  total: messages.length,
+                })}
+              </span>
               <button
                 type="button"
                 className="btn-ghost btn-sm"

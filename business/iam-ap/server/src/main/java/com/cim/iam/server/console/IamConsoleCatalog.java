@@ -407,8 +407,8 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.common.collapseAll", "全部收起", "Collapse all"));
         t.add(new TextDef("iam.common.prevPage", "上一页", "Previous"));
         t.add(new TextDef("iam.common.nextPage", "下一页", "Next"));
-        t.add(new TextDef("iam.common.pagerInfo", "第 {{page}} / {{pages}} 页",
-                "Page {{page}} of {{pages}}"));
+        t.add(new TextDef("iam.common.pagerInfo", "第 {{page}} / {{pages}} 页 · 共 {{total}} 条",
+                "Page {{page}} of {{pages}} · {{total}} in total"));
         t.add(new TextDef("iam.common.all", "全部", "All"));
         t.add(new TextDef("iam.common.enabled", "启用", "Enabled"));
         t.add(new TextDef("iam.common.disabled", "停用", "Disabled"));
