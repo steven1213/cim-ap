@@ -250,6 +250,7 @@ export default function RolesAdminPage() {
 
       <div className="split">
         <Panel
+          className="scroll-y"
           title={t('iam.admin.roles.list')}
           sub={`${roles.length}`}
           flush

@@ -154,6 +154,7 @@ export default function PermissionsAdminPage() {
 
       <div className="split">
         <Panel
+          className="scroll-y"
           title={t('iam.admin.perms.count')}
           sub={`${filtered.length} / ${rows.length}`}
           flush

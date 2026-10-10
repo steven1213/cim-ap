@@ -183,6 +183,7 @@ export default function MenusAdminPage() {
 
       <div className="split">
         <Panel
+          className="scroll-y"
           title={t('iam.admin.menus.tree')}
           sub={t('iam.admin.menus.nodeCount', { n: flat.length })}
           flush

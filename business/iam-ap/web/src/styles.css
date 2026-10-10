@@ -583,6 +583,23 @@ code,
   }
 }
 
+/* 分栏左列（树/清单）限高内部滚动：内容过长时自身滚动 + 吸顶，右侧编辑不随树高被顶走 */
+.panel.scroll-y {
+  position: sticky;
+  top: calc(var(--header-h) + 12px);
+  max-height: calc(100vh - var(--header-h) - 82px); /* 12 顶距 + footer ≈38 + 内容底 padding 20 + 余量 */
+}
+.panel.scroll-y .panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (max-width: 1000px) {
+  .panel.scroll-y {
+    position: static;
+  }
+}
+
 /* ---------- 组织树 ---------- */
 .tree {
   padding: 6px 0 10px;

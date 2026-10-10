@@ -311,6 +311,7 @@ export default function OrgPage() {
 
       <div className="split">
       <Panel
+        className="scroll-y"
         title={t('iam.orgs.title')}
         sub={t('iam.orgs.sub')}
         flush
