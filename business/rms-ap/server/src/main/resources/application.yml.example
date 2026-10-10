@@ -1,0 +1,40 @@
+# RMS-AP 生产配置模板（复制为 application-local.yml 或经环境变量覆盖）
+# 本文件入库；application-local.yml 等真实配置不入库（.gitignore）。
+
+server:
+  port: 8084
+
+spring:
+  application:
+    name: rms-ap
+  datasource:
+    url: jdbc:mysql://localhost:3306/rms_ap?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: rms
+    password: change-me
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+cim:
+  auth:
+    enabled: true
+    # IAM 的 JWKS 公钥端点（生产换成 IAM 集群地址）
+    jwks-uri: http://iam-ap:8081/.well-known/jwks.json
+    jwks-cache-minutes: 60
+    admission:
+      app-code: rms-ap
+      enabled: true
+
+  jpa:
+    id:
+      mode: SNOWFLAKE
+      worker-id: 1          # 多实例部署时每实例唯一（可用环境变量注入）
+      datacenter-id: 1
+    naming:
+      lowercase-snake: true
+    flyway:
+      enabled: true
