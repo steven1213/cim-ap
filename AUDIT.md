@@ -154,7 +154,7 @@
 
 ### 14. 风险 / 待办
 - **W4b 存量页面 i18n 迁移**：4 个配置页已 i18n，但 17 个存量页面（OrgPage/UsersPage/Dashboard/Settings 等）约 537 行硬编码中文，**未纳入本次**，列为后续 wave；届时需逐页配 `t()` + `TextDef`，使切 `en-US` 无中文残留。
-- 平台 `cim-system` 迁移版本号 V1→V1000（ADR-10）、`cim-mq-starter`/`cim-cache-starter`/MDS 文档等早年会话产物的未提交改动仍在工作区（见 PROCESS 表与通用风险），本次按用户决策**仅提交 W4**，其余保留待后续独立 wave 收口。
+- ~~平台 `cim-system` 迁移版本号 V1→V1000（ADR-10）等早年会话产物的未提交改动仍在工作区。~~ **已于 2026-10-10 收口**：`cim-i18n-starter`(ca95b8d) + `cim-system`(6a46448) + `cim-jpa-starter`/`cim-bootstrap`(ffea12a) 三笔 commit 入库，构建验证全绿；工作区已无 platform 底座未提交改动。（注：`cim-mq-starter`/`cim-cache-starter`/MDS 文档此前已随各自 commit 入库，本行原"未提交"表述系当时误判。）
 
 ## 2026-10-09 全量回归记录
 - **范围**：整仓（platform 13 模块 + iam-ap/server）。
@@ -163,6 +163,39 @@
   - platform：`BUILD SUCCESS`，13/13 模块全绿（含 `cim-mq-starter` / `cim-cache-starter` / `cim-system` / `cim-bootstrap` 等全部子模块）。
   - iam-ap：回归当时 `29/29` 测试全绿，`BUILD SUCCESS`（其后管理面 +4 → 29/29，改密 clientHash +2 → 31/31，改密强制作废旧会话 +3 → 36/36，管理控制台 +5 → 41/41，身份目录 Wave 0 +7 → **当前 48/48**）。
 - **结论**：前期会话落地的 mq / cache / platform 三项经整仓回归确认无编译/测试漂移，原「待回归」标记全部解除。
+
+## 2026-10-10 platform 底座收口（cim-i18n-starter / cim-system / cim-jpa-starter / cim-bootstrap）
+
+> 把此前漏提交（PROCESS 表标记"已提交"实际未入库）的 platform 底座落地，按模块拆三笔 commit 收口；构建验证全绿后再入库。
+
+### 15. 平台多语言基础设施（cim-i18n-starter，全新模块）
+- **范围**：`platform/server/cim-i18n-starter/**`（33 文件，含 `META-INF/spring/...AutoConfiguration.imports` 自动装配）。
+- **内容**：Spring `MessageSource` 由 DB 驱动（`DatabaseMessageSource` + `DbMessageResolver` 顶替默认）；`I18nService#frontendBundle` 按「内置默认 → 内置目标 → DB 默认 → DB 目标」**整包合并兜底**（修复未翻译语言拿到空包 → 界面空白/裸 key）；`I18nSeedLoader` 幂等种子（不覆盖在线维护）；`I18nController`/`LocaleResolverCim`；迁移 `db/migration/i18n/{vendor}/V2000__init_i18n_tables.sql`（ADR-10 版本段 V2000–V2999）；内置 `builtin_zh-CN/en-US.properties`；`I18nIntegrationTest` 绿。
+- **关键约束**：⚠️ ADR-12 本模块**不声明** `@FilterDef`（唯一声明点在 `com.cim.system`），否则与系统域模块同名重复声明在 Hibernate 6.2+ 为硬错误（HHH-16581/16803）。
+- **验证**：随平台受影响模块 `mvn install` 全绿（SUCCESS）。
+
+### 16. cim-system 域模块（扫描根 / Flyway / @FilterDef / 种子器）
+- **范围**：`platform/server/cim-system/**`（12 文件，含 V1→V1000 迁移重命名 `git rename`）。
+- **内容**：
+  - 扫描根由 `com.cim` 收窄为 `com.cim.system`（ADR-11：避免与 `cim-i18n`(`com.cim.i18n`) 重叠 → Spring Data 仓储注册器不重名去重 → `BeanDefinitionOverrideException`）。
+  - `@FilterDef(cimTenantFilter)` **唯一声明点**落在 `com.cim.system.package-info`（ADR-12）。
+  - Flyway 迁移 `V1__init_system_tables` → `V1000__init_system_tables`（ADR-10 版本段 V1000–V1999，5 种库产品 dm/h2/mysql/oracle/postgresql）。
+  - 新增 `SysPermissionSeeder`（幂等写入 21 条平台权限码，是超管展开为「全库启用码」的基础；前端精确匹配、勿把 `SUPER_ADMIN` 当 `*`）。
+  - `CimSystemConfiguration`/`CimSystemProperties` 声明 `EntityScan`/`EnableJpaRepositories` 仅本模块包。
+- **验证**：`mvn install` 中 cim-system SUCCESS；`BootstrapAssemblyTest` 实测 `[cim-system] 权限目录种子：写入 21 条平台权限`、`Flyway 迁至 v1000`。
+
+### 17. cim-jpa-starter + cim-bootstrap 装配层
+- **范围**：`platform/server/cim-jpa-starter/**`（`TenantFilterApplier` + `db/migration/README.md` 版本段分配表）+ `platform/server/cim-bootstrap/**`（`CimApApplication` + `BootstrapAssemblyTest`）。
+- **内容**：cim-jpa-starter 对齐 ADR-12（`TenantFilterApplier` 注释）/ ADR-10（`db/migration/README.md` 新增版本段分配表）；cim-bootstrap 启动类收敛为唯一启动入口，`BootstrapAssemblyTest` 5/5 绿。
+- **验证**：平台受影响模块 `mvn install` 全绿（cim-jpa-starter/cim-bootstrap 均 SUCCESS）。
+
+### 18. 文档与验证
+- `docs/platform/server/design.md`：补 ADR-10（Flyway 版本段分配）、ADR-11（扫描根互不重叠）、ADR-12（`@FilterDef` 唯一声明点）落地口径与教训；cim-i18n-starter 目录结构、四级兜底链、`frontendBundle` 整包合并说明。
+- `PROCESS.md` 里程碑「platform 底座(server)」行：范围补 `cim-i18n-starter`，验证列更新为 2026-10-10 平台模块 `mvn install` 全绿，提交列补三笔 commit 哈希。
+
+### 19. 风险 / 待办
+- **遗留（文档）**：`docs/business/mds-ap/server/*` 约 30+ 篇设计稿仍写「`@FilterDef` 放实体包 `package-info.java`」，与 ADR-12（唯一声明点 = `com.cim.system`）相悖；落地 mds-ap 前须按新口径改写，否则启动即 `AnnotationException: Multiple '@FilterDef'`。
+- **验证范围**：本次仅对 platform 受影响模块做 `mvn install`（未跑全仓 13 模块整回归），但 cim-i18n-starter 为新建模块、cim-system 等此前已整仓回归；IAM 侧未触碰，不受影响。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**

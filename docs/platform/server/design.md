@@ -247,7 +247,7 @@ com.cim.jpa
 - **主键**：`IdGenerator`（[README §3](README.md#3-多数据库支持oraclemysqlpostgresql)）在 `@PrePersist` 注入 `String id`；时钟回拨降级 UUIDv7。
 - **回调桥接（实现要点）**：基类族的 `@PrePersist`/`@PreUpdate` 定义在 `cim-core`（零 Spring），通过 `EntityLifecycleCallbacks` **静态持有者**把控制权交给 `cim-jpa-starter` 的 `SpringEntityLifecycleCallback`（启动时由 `LifecycleCallbackRegistrar` 注册）。这样既保持核心零 Spring 依赖，又能让 JPA 回调访问 Spring 管理的 `IdGenerator`/`CurrentUserPort`/`TenantPort`。
 - **历史（落地要点）**：由服务基类 `AbstractJpaService` 在写操作后调用 `HistoryRecorder` 触发（即 README §21.3 所述「经 DataAp 触发历史」）——`update` 先用 `ChangeDetector` 对「库中旧值 vs 入参新值」做字段级 diff，**未变更则不落历史**；`HistoryMapper` 按约定（`{X}Hist` / `{X}StateLog`，同包同构）解析并拷贝业务字段。落库目标由 `@History` 策略决定（`SNAPSHOT`→`{X}Hist`，`STATE_LOG`→`{X}StateLog`，`NONE`→跳过）。**取舍**：经 `AbstractJpaService` 的写入自动落历史；绕过服务直接 `repository.save()` 则不落（历史以服务为统一入口，代码生成器产出的服务天然继承基类）。关键数据同事务、高频数据走发件箱异步（[README §12](README.md#12-事务与一致性跨库--发件箱)）。
-- **租户（T2.6 落地）**：基于 `TenantContext` 开启 Hibernate Filter 自动追加 `tenant_id` 条件，业务零感知。落地为 `TenantFilterApplier`（框架 Bean），由 `AbstractJpaService` 在每个读写方法入口按 `TenantContext.get()` 启用名为 `cimTenantFilter` 的过滤器并注入参数；上下文为空（超管跨租户）时不启用（风险 R6）。**约定**：`@FilterDef`（`cimTenantFilter`，参数 `tenantId`）全局唯一，放在实体包的 `package-info.java`；各租户化实体仅标注 `@Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")`。注：Hibernate **不解析元注解**，故 `@FilterDef`/`@Filter`/`@SQLRestriction` 须直接标注（不能封装成 `@CimTenantFilter` 之类的元注解）。
+- **租户（T2.6 落地）**：基于 `TenantContext` 开启 Hibernate Filter 自动追加 `tenant_id` 条件，业务零感知。落地为 `TenantFilterApplier`（框架 Bean），由 `AbstractJpaService` 在每个读写方法入口按 `TenantContext.get()` 启用名为 `cimTenantFilter` 的过滤器并注入参数；上下文为空（超管跨租户）时不启用（风险 R6）。**约定（ADR-12，勿违反）**：`@FilterDef(name="cimTenantFilter", parameters=@ParamDef(name="tenantId", type=String.class))` 的<b>唯一声明点</b>是 **`cim-system` 的 `com.cim.system.package-info`**（平台必备的系统域模块，且已由 `CimSystemConfiguration` 声明 `@EntityScan("com.cim.system")`）；**其他任何模块/starter/业务 ap 都不得再声明**，各租户化实体仅标注 `@Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")`。原因：Hibernate 要求 `@FilterDef` 名<b>在每个持久化单元内唯一</b>，同名重复声明自 6.2 起为**硬错误**（`AnnotationException: Multiple '@FilterDef' annotations define a filter named '…'`，HHH-16581 / HHH-16803，无开关可关）——「同名同参即幂等」是 6.1 及更早的旧行为，**已不成立**。注：Hibernate **不解析元注解**，故 `@FilterDef`/`@Filter`/`@SQLRestriction` 须直接标注（不能封装成 `@CimTenantFilter` 之类的元注解）。
 - **软删唯一约束（T2.5 落地）**：逻辑删除以 `deleted` 布尔列表示；**唯一约束须含 `deleted` 列**（如 `(biz_key, tenant_id, deleted)`），使「一删一活可并存」（同键仅允许一条有效 + 一条已删）。查询侧以 `@SQLRestriction("deleted = false")` 直接标注实体（同上，不可用元注解），使逻辑删除行对业务查询不可见；`AbstractJpaService.remove` 置 `deleted=true` 完成软删。
 - **三层版本语义（T2.7 落地）**：① `@Version`（行级乐观锁，Hibernate 自动 +1，不进历史，落在 `BaseDefData`/`BaseStateData`）；② `revision`（业务版本，由发布/归档等业务动作驱动，落在 `BaseRevisionData`）；③ 历史表（`{X}Hist`/`{X}StateLog`，独立变更流水）。三者相互独立、各自演进，已由 H2 用例验证。
 - **迁移（T1.5 落地）**：`db/migration/{mysql,oracle,postgresql,dm,h2}` + `common` 多目录（达梦 DM 见 `dm/` 目录，与 Oracle 兼容可复用其脚本）；`CimFlywayAutoConfiguration` 在 `cim.jpa.flyway.enabled=true` 时按当前库产品名选择 `common` + `{vendor}` 目录；生产配合 `ddl-auto=validate`、**主/历 DDL 成对**（见 §6.2）。
@@ -428,15 +428,20 @@ com.cim.mq
 
 ```
 com.cim.i18n
-├── config/{CimI18nProperties, I18nAutoConfiguration}
-├── model/{SysLocale, SysI18n}        # locale/i18n 两表（scope: SYSTEM/USER）
-├── source/{DatabaseMessageSource, I18nCache}   # DB 驱动 + Redis 缓存
-├── seed/{I18nSeedLoader}             # 启动种子写入系统级文案
-└── web/{LocaleResolverCim, LocaleHeaderFilter}
+├── config/{I18nAutoConfiguration, I18nFlywayConfiguration, I18nProperties}
+├── model/{SysLocale, SysI18n, SysLocaleRepository, SysI18nRepository}   # locale/i18n 两表（scope: SYSTEM/USER）
+├── source/{I18nCache, I18nResolver, DatabaseMessageSource, DbMessageResolver, BuiltinI18n, MissingI18nReporter}
+├── service/{I18nService}             # 语言/译文读写 + 启动种子 + seedMessages（供宿主种自己的 UI 文案）
+├── seed/{I18nSeedLoader}             # 启动种子写入内置文案（幂等，不覆盖）
+└── web/{I18nController, LocaleResolverCim}
 ```
 
 - 全量文案入库（热更新，免发版）；`SYSTEM` 系统级种子写入、`USER` 用户级后台维护。
-- Spring `MessageSource` 由 DB 版实现，`@Valid`/异常消息零改造命中 DB（[README §7](README.md#7-国际化全量数据库驱动--系统级--用户级)）。
+- Spring `MessageSource` 由 DB 版实现（`DatabaseMessageSource` 顶替、`DbMessageResolver` 顶替默认 `MessageResolver`），`@Valid`/异常消息零改造命中 DB（[README §7](README.md#7-国际化全量数据库驱动--系统级--用户级)）。
+- **四级兜底链**（`I18nResolver`，单键解析）：L1 目标语言 DB → L2 默认兜底语言 DB（`zh-CN`）→ L3 内置 properties → L4 `humanize(code)` + 上报缺失工单（**绝不返回裸 key**）。
+- ⚠️ **前端整包必须合并兜底**（2026-10-09 修复）：`GET /api/i18n/messages?lang=` 走 `I18nService#frontendBundle`，按「内置(默认) → 内置(目标) → DB(默认) → DB(目标)」**整包合并**；`I18nService#bundle` 只回该语言的**原始行**（管理端看真值/缺失用，**勿用于前端**）。若整包不合并，未翻译完整或未收录的语言（如 `fr-FR`）前端会拿到空包 → 界面空白/裸 key，与「翻译后展示 + 中文兜底」相悖。
+- 迁移 `db/migration/i18n/{vendor}/V2000__init_i18n_tables.sql`（ADR-10 版本段）；`@FilterDef` **不在本模块声明**（ADR-12，唯一声明点在 `com.cim.system`）。
+- 配置键 `cim.i18n.*`：`enabled`、`default-locale`（默认 `zh-CN`）、`seed-enabled`、`builtin-prefix`、`missing-report-enabled`。
 
 ### 2.8 cim-obs-starter（可观测）
 
@@ -508,11 +513,17 @@ com.cim.system
   用**组件扫描**生效（宿主 `@SpringBootApplication(scanBasePackages="com.cim")` 即覆盖），
   **不写** `META-INF/spring/...AutoConfiguration.imports`。判据是「加依赖得到一整套后台管理域」
   还是「加依赖得到可插拔横切能力」。
-- **模块自带 schema 与扫描根**：`@EntityScan/@EnableJpaRepositories(basePackages="com.cim")`
-  由 `CimSystemConfiguration` 声明（宿主无需再配）；迁移脚本随模块发布在
-  `db/migration/system/{mysql,postgresql,oracle,dm,h2}`，由 `CimSystemFlywayConfiguration`
+- **模块自带 schema 与扫描根**：`@EntityScan/@EnableJpaRepositories(basePackages="com.cim.system")`
+  由 `CimSystemConfiguration` 声明（**只声明本模块自己的包**，见下「扫描根不得重叠」）；迁移脚本随模块发布在
+  `db/migration/system/{mysql,postgresql,oracle,dm,h2}`（版本段 `V1000–V1999`，ADR-10），
+  由 `CimSystemFlywayConfiguration`
   追加为 Flyway location（**追加**语义依赖 cim-jpa 侧 customizer 的 `@Order(HIGHEST_PRECEDENCE)`）。
   DDL 由 `tool/DdlExportTest` 从实体元数据导出，杜绝主/历表漂移（见 `db/migration/system/README.md`）。
+- ⚠️ **实体/仓储扫描根不得重叠（ADR-11）**：Spring Data 的仓储注册器**不做重名去重**——两个
+  `@EnableJpaRepositories` 包范围重叠（如一个 `com.cim`、另一个 `com.cim.i18n`）会把同一仓储
+  bean 注册两次，Spring Boot 2.1+ 默认禁止 bean 覆盖 → 启动即 `BeanDefinitionOverrideException`。
+  **故 `cim-system` 只声明 `com.cim.system`、`cim-i18n-starter` 只声明 `com.cim.i18n`、
+  宿主 ap 声明自己的包**（三者互不重叠）；宿主「加依赖即可用」= 模块带自己的根 + 宿主补自己的根。
 - **变更即时生效（T6.5 验收）**：`DbLocalAuthorityLoader` **每请求从库解析、不缓存**，
   故授权变更与用户停用在**同一枚令牌的下一次请求**即生效（无需等令牌过期/重签）。
   这正是 T6.5「变更即时生效」的即时性来源；若将来改为按令牌版本缓存权限，须同时接入
@@ -794,11 +805,36 @@ public interface TenantPort { String tenantId(); }
 | ADR-7 | **platform 侧认证只做「验签 + 准入 + 业务鉴权」** | IAM 只管准入，业务内部权限各 ap 自管 | §2.4、§8   |
 | ADR-8 | 主/历 DDL 成对 + CI 守卫                 | 根治 schema drift        | §6.2、§7   |
 | ADR-9 | 编译期保留方法参数名（`-parameters`）           | Spring MVC 解析 `@PathVariable`/`@RequestParam` 必需；缺失在运行期才暴露为 500 | §2.2、父 POM |
+| ADR-10 | **Flyway 迁移版本段分配**（宿主 `V1–V999`；平台模块各占 1000 整数倍段：`cim-system` 1000、`cim-i18n` 2000） | 多模块 + 宿主同库时 Flyway 合并 locations 为同一版本序列，重号即 `Found more than one migration with version X` | §2.3、§2.7、§2.10、`db/migration/README.md` |
+| ADR-11 | **各单元实体/仓储扫描根互不重叠**（模块只声明自己的包，宿主声明自己的包） | Spring Data 仓储注册器不做重名去重，包范围重叠 → 同一仓储 bean 注册两次 → `BeanDefinitionOverrideException` | §2.10、§2.7 |
+| ADR-12 | **`@FilterDef(cimTenantFilter)` 每个持久化单元只声明一次**，唯一位置 = `cim-system` 的 `com.cim.system.package-info`；模块/starter/业务 ap 只标 `@Filter` 引用 | Hibernate 6.2+ 要求 filter 名在持久化单元内唯一，同名重复声明为硬错误（HHH-16581/HHH-16803），且 starter 内加 `@EntityScan` 会顶掉宿主自身实体扫描（Spring 仅在 `EntityScanPackages` 为空时才回退到宿主包），故声明点必须放在「必备域模块」而非 starter | §2.3、§2.10、`cim-jpa-starter` `TenantFilterApplier` |
 
 > **ADR-9 落地**：父 POM `maven-compiler-plugin` 显式 `<parameters>true</parameters>`
 > （等价 `spring-boot-starter-parent` 的 `maven.compiler.parameters=true`）。本项目父 POM 非
 > Boot parent，故必须自行声明。**注意**：新增该配置后需 **clean 重建**——Maven 增量编译只看源文件
 > 时间戳，不会因 POM 变更重编，否则旧字节码仍缺参数名（表现为接口 500）。
+>
+> **ADR-10 落地**（2026-10-09）：`cim-system` 迁移 `V1__init_system_tables` → `V1000__…`、
+> `cim-i18n-starter` `V1__init_i18n_tables` → `V2000__…`（含 `DdlExportTest` 输出名与各 README）。
+> 新增平台模块须在 `cim-jpa-starter/src/main/resources/db/migration/README.md` 的分配表登记版本段。
+>
+> **ADR-11 落地**（2026-10-09）：`CimSystemConfiguration` 的扫描根由 `com.cim` 收窄为
+> `com.cim.system`。教训来自 IAM 同时引入 `cim-system` + `cim-i18n-starter` 时启动即抛
+> `BeanDefinitionOverrideException: … 'sysLocaleRepository' … already bound`——正是
+> `com.cim`（cim-system）与 `com.cim.i18n`（i18n）重叠所致。宿主 ap 同理只声明自己的包，
+> 并用 `scanBasePackages` 把**域模块**（非 starter）纳入组件扫描——starter 走自动装配，不扫也能用。
+> ⚠️ 配套陷阱：Spring 仅在 `EntityScanPackages` **为空**时才回退到宿主自身包，所以
+> **starter 绝不能声明 `@EntityScan`**（会把宿主的实体扫描整体顶掉）；需要「保证某包一定被扫」
+> 时应放进必备的域模块，见 ADR-12。
+>
+> **ADR-12 落地**（2026-10-09）：移除 `cim-i18n-starter` 的 `com.cim.i18n.package-info` 中的
+> `@FilterDef`（此前与 `com.cim.system` 的声明同名同参，被文档误认为"幂等"）。
+> 暴露路径：IAM 同时引入 `cim-system` + `cim-i18n-starter` 后启动即抛
+> `AnnotationException: Multiple '@FilterDef' annotations define a filter named 'cimTenantFilter'`；
+> `cim-bootstrap` 未引 i18n，故该缺陷此前被掩盖。已同步修正 `TenantFilterApplier` 与两处
+> `package-info` 的 javadoc。**遗留**：`docs/business/mds-ap/server/*` 中约 30+ 篇设计稿仍写
+> "「`@FilterDef` 放实体包 `package-info.java`」"，落地 mds-ap 前须按本节口径改写为"每 PU 唯一、
+> 由 cim-system 声明"。
 
 ---
 
