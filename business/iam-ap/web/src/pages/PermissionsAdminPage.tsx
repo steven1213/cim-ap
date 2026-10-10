@@ -8,7 +8,7 @@ import PermTree from '@/components/PermTree';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconChevron, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
+import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
 
 /**
  * 权限管理（`/permissions`）：权限点 CRUD（`module:res:action`）。
@@ -33,8 +33,6 @@ export default function PermissionsAdminPage() {
   const [rows, setRows] = useState<SysPermissionDto[]>([]);
   const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [keyword, setKeyword] = useState('');
-  /** 折叠的接口级分组 key，点击组头切换。 */
-  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -242,58 +240,14 @@ export default function PermissionsAdminPage() {
                     origin: p,
                   });
                 }}
+                groups={moduleGroups.map((g) => ({
+                  key: g.key,
+                  label: g.label,
+                  iface: true,
+                  perms: g.perms,
+                }))}
                 kw={keyword}
               />
-              {moduleGroups.map((g) => {
-                const closed = closedGroups.has(g.key);
-                return (
-                  <div className="tree-group" key={g.key}>
-                    <button
-                      type="button"
-                      className="side-cap"
-                      aria-expanded={!closed}
-                      onClick={() =>
-                        setClosedGroups((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(g.key)) next.delete(g.key);
-                          else next.add(g.key);
-                          return next;
-                        })
-                      }
-                    >
-                      <span className={'tree-toggle' + (closed ? '' : ' open')}>
-                        <IconChevron width={11} height={11} />
-                      </span>
-                      <span className="cap-text">{g.label}</span>
-                      <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
-                      <span className="tag-count">{g.perms.length}</span>
-                    </button>
-                    {!closed &&
-                      g.perms.map((r) => (
-                        <div
-                          key={r.id}
-                          className={'tree-row' + (draft?.id === r.id ? ' on' : '')}
-                          onClick={() => {
-                            setErr('');
-                            setDraft({
-                              id: r.id,
-                              code: r.code,
-                              name: r.name ?? '',
-                              status: r.status,
-                              origin: r,
-                            });
-                          }}
-                        >
-                          <span className="tree-name">{r.name ?? r.code}</span>
-                          {r.status === 'DISABLED' && (
-                            <span className="tag err">{t('iam.common.disabled')}</span>
-                          )}
-                          <span className="tree-code dim">{r.code}</span>
-                        </div>
-                      ))}
-                  </div>
-                );
-              })}
             </>
           ) : (
             <div className="empty">

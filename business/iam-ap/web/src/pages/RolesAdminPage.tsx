@@ -15,7 +15,7 @@ import {
   ROLE_ADMIN_GRANT,
   SYS,
 } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconChevron, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
+import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
 
 /**
  * 角色管理（`/roles-admin`）：角色 CRUD + 授权。
@@ -50,9 +50,8 @@ export default function RolesAdminPage() {
 
   const [grantedPerms, setGrantedPerms] = useState<Set<string>>(new Set());
   const [grantedMenus, setGrantedMenus] = useState<Set<string>>(new Set());
-  /** 授权区：码/名检索（本地过滤）、折叠的接口级分组。 */
+  /** 授权区：码/名检索（本地过滤）。 */
   const [permKw, setPermKw] = useState('');
-  const [closedPermGroups, setClosedPermGroups] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -337,6 +336,20 @@ export default function RolesAdminPage() {
           {t('iam.common.selectAll')}
         </button>
       )}
+      groups={ifaceGroups.map((g) => ({ key: g.key, label: g.label, iface: true, perms: g.perms }))}
+      groupAction={(g) => {
+        const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
+        return (
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            style={{ padding: '1px 8px' }}
+            onClick={() => toggleGroup(g)}
+          >
+            {allOn ? t('iam.common.clearAll') : t('iam.common.selectAll')}
+          </button>
+        );
+      }}
       kw={permKw}
     />
   );
@@ -603,70 +616,6 @@ export default function RolesAdminPage() {
                         <b>{catalogErr || t('iam.common.none')}</b>
                       </div>
                     )}
-                    {ifaceGroups.map((g) => {
-                      const kw = permKw.trim().length > 0;
-                      const closed = !kw && closedPermGroups.has(g.key);
-                      const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
-                      return (
-                        <div className="sub-block tree-group" key={g.key}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <button
-                              type="button"
-                              className="side-cap page-cap"
-                              style={{ flex: 1, minWidth: 0 }}
-                              aria-expanded={!closed}
-                              onClick={() =>
-                                setClosedPermGroups((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(g.key)) next.delete(g.key);
-                                  else next.add(g.key);
-                                  return next;
-                                })
-                              }
-                            >
-                              <span className={'tree-toggle' + (closed ? '' : ' open')}>
-                                <IconChevron width={11} height={11} />
-                              </span>
-                              <span className="cap-text">{g.label}</span>
-                              <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>
-                              <span className="tag-count">
-                                {g.perms.filter((p) => grantedPerms.has(p.id)).length}/{g.perms.length}
-                              </span>
-                            </button>
-                            {!draft.isSuper && (
-                              <button
-                                type="button"
-                                className="btn-ghost btn-sm"
-                                style={{ padding: '1px 8px' }}
-                                onClick={() => toggleGroup(g)}
-                              >
-                                {allOn ? t('iam.common.clearAll') : t('iam.common.selectAll')}
-                              </button>
-                            )}
-                          </div>
-                          {!closed && (
-                            <div className="grid-3">
-                              {g.perms.map((p) => (
-                                <label className="check" key={p.id}>
-                                  <input
-                                    type="checkbox"
-                                    checked={grantedPerms.has(p.id)}
-                                    disabled={draft.isSuper}
-                                    onChange={(e) => {
-                                      const next = new Set(grantedPerms);
-                                      if (e.target.checked) next.add(p.id);
-                                      else next.delete(p.id);
-                                      setGrantedPerms(next);
-                                    }}
-                                  />
-                                  <span className="mono">{p.code}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
                   </Panel>
               )}
             </>

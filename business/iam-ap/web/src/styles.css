@@ -581,6 +581,9 @@ button.side-cap.page-cap {
   max-width: none;
   margin: 0 auto;
   padding: 12px 14px 20px;
+  /* flex 纵向链：.page 撑满可视高度，.split 再撑满 .page——页面不再在 footer 前留大白条 */
+  display: flex;
+  flex-direction: column;
 }
 
 .footer {
@@ -607,6 +610,7 @@ button.side-cap.page-cap {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  flex: 1 0 auto; /* 撑满 .content 可视高度（内容超出时正常滚动） */
 }
 
 .grid-2 {
@@ -626,8 +630,8 @@ button.side-cap.page-cap {
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 14px;
   align-items: stretch;
-  /* 至少撑满可视内容区：右侧空态/短表单不再缩成一小条 */
-  min-height: calc(100vh - var(--header-h) - 136px);
+  /* flex-grow 撑满 .page 剩余高度（替代旧 min-height 魔法常数，不再产生 footer 前留白） */
+  flex: 1 1 auto;
 }
 /* 分栏面板：面板体弹性填充，超高时面板内滚动（主从式管理页标准形态） */
 .split > .panel {
@@ -656,7 +660,7 @@ button.side-cap.page-cap {
 .panel.scroll-y {
   position: sticky;
   top: 12px; /* 滚动容器已是 .content（topbar 在其外），吸顶只留内容边距 */
-  max-height: calc(100vh - var(--header-h) - 82px); /* 12 顶距 + footer ≈38 + 内容底 padding 20 + 余量 */
+  max-height: calc(100vh - var(--header-h) - 70px); /* topbar56 已扣；12 顶距 + footer 38 + 内容底 padding 20 */
 }
 .panel.scroll-y .panel-body {
   flex: 1 1 auto;
@@ -780,6 +784,10 @@ button.side-cap.page-cap {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ptree-name .tag {
+  margin-left: 6px;
+  vertical-align: 1px;
 }
 .ptree-row.is-leaf .ptree-name {
   font-weight: 500;
