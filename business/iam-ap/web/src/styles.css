@@ -745,10 +745,12 @@ button.side-cap.page-cap {
   padding-left: 7px;
   border-left: 1px solid var(--line);
 }
-/* 五列网格：折叠钮 / 复选框 / 名称 / 权限码 / 动作——码列同列对齐，名称吃剩余空间 */
+/* 五列网格：折叠钮 / 复选框 / 名称 / 权限码 / 动作——码列同列对齐，名称吃剩余空间。
+   ⚠️ 名称与码都走 fr：若码列用 minmax(固定,固定) 这类非 fr 轨道，track 最大化阶段
+   会先于 fr 抢占空闲空间，窄容器（权限管理左列 ≈250px）下名称列被挤成 0。 */
 .ptree-row {
   display: grid;
-  grid-template-columns: 18px 16px minmax(0, 1fr) minmax(110px, 250px) auto;
+  grid-template-columns: 18px 16px minmax(64px, 1.5fr) minmax(70px, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-height: 30px;
