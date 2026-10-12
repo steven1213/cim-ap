@@ -47,13 +47,13 @@ export default function LoginPage() {
     // 仅当显式 VITE_SSO_AUTO_REDIRECT=false（如 IAM 不可达的纯本地预览）才停留在当前页。
     if (AUTO_REDIRECT) {
       const redirect = encodeURIComponent(window.location.origin + '/sso');
-      window.location.href = `${IAM_BASE}/login?app=rms-ap&redirect=${redirect}`;
+      window.location.href = `${IAM_BASE}/login?app=RMS&redirect=${redirect}`;
     }
   }, [navigate, error]);
 
   function goSso() {
     const redirect = encodeURIComponent(window.location.origin + '/sso');
-    window.location.href = `${IAM_BASE}/login?app=rms-ap&redirect=${redirect}`;
+    window.location.href = `${IAM_BASE}/login?app=RMS&redirect=${redirect}`;
   }
 
   function applyDevToken() {

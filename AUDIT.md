@@ -239,6 +239,25 @@
 - **修复**：`SysPermissionSeeder` 加 `@Order(Ordered.LOWEST_PRECEDENCE - 1000)`——仍属「启动晚期」但在一切缺省顺序的 ap 种子**之前**；javadoc 写明理由，防止将来被「顺手去掉」。
 - **验证**：`mvn install -pl cim-system -am -o` 全绿（含 cim-auth-starter 27 测 + cim-system 16 测）后重装本地仓库，iam-ap 全量 **71/71 绿**，`ConsolePermissionI18nTest` 恢复通过。
 
+## 2026-10-12（续）统一登录到 8081 后端单一登录页（方案 C 收口）
+
+### 23. feat(auth)：IAM 控制台与 RMS 共用 8081 后端单一登录页
+- **范围**：
+  - `business/iam-ap/server`：`sso/SsoLoginPageController` 重写登录页 HTML —— 双栏版式（左品牌/主视觉、右表单，与 5171 控制台登录页同源设计令牌）、内联 IAM 设计令牌（浅/深随系统）、通过公开端点 `GET /api/i18n/messages?lang=` 运行时拉取 `iam.login.*` 文案（含 zh/en 切换），拉取失败回退内置中英词典；保留 salt→PBKDF2-HMAC-SHA256 第一层派生→`POST /api/v1/login`→整页回跳 `redirect?token=&refreshToken=` 契约。
+  - `business/iam-ap/web`：`App.tsx` 的 `/login` 改为整页中继到 IAM 后端（8081）`/login?app=IAM&redirect=<origin>/sso-callback`（已登录且有外部回跳参数则直接带 token 弹回）；新增 `/sso-callback` 路由由 `pages/SsoCallback.tsx` 收口（写入 authStore 跳首页）；删除旧 `pages/LoginPage.tsx`（控制台内不再渲染登录表单）。
+  - `business/rms-ap/web`：`pages/LoginPage.tsx` 中继目标统一指向 8081 后端登录页（`VITE_IAM_LOGIN_BASE`/`VITE_IAM_BASE` 可覆盖），`RMS` app 码 + 回跳 `<origin>/sso`，`/sso` 由既有 `SsoCallback` 收口。
+- **验证（已跑通）**：
+  - iam-ap 后端：`71/71` 测试全绿（含 `IamApIntegrationTest` 等），`mvni.sh -o test` BUILD SUCCESS。
+  - iam-ap web：`tsc -p tsconfig.json` EXIT=0 + `vite build` 165 模块 / JS 428.12 kB / gzip 123.31 kB，built in 3.31s。
+  - rms-ap web：`tsc` EXIT=0 + `vite build` 146 模块 / JS 330.94 kB / gzip 103.42 kB，built in 3.33s。
+- **关键设计决策 / 核查**：
+  - **文案契约已闭环**：登录页拉取的 `GET /api/i18n/messages` 属 `cim-i18n-starter` 的 `I18nController`（无 `@PreAuthorize`，而安全链 `authorizeHttpRequests(a -> a.anyRequest().permitAll())` 放行所有请求、细粒度由方法级 `@PreAuthorize` 控制）→ 该端点对匿名请求公开；返回 `Result<I18nBundle>`，`I18nBundle.messages` 即 `Map<String,String>`，与登录页 JS 读取的 `j.data.messages` 一致。故「登录页文案随控制台 i18n 实时同步」非仅文档宣称、而是真实生效（FALLBACK 仅作 i18n 服务不可达时的兜底）。`iam.login.*` 键由 `IamConsoleCatalog.texts()` 在启动种子写入 `sys_i18n`，经 `frontendBundle` 合并兜底后出现在 bundle 中。
+  - **消除「两套登录」**：既有实现为 8081 后端直出页（方案 C）与 5171 控制台 React 登录页并存；本次把控制台 `/login` 也改为中继到 8081 同一页，所有客户端（IAM 控制台、RMS、未来 MDS/MES）落点同一登录页，视觉/文案单一真相源。
+  - **循环跳转根除**：`rms-ap` `BootGate` 在 boot 失败（典型 403 无本 ap 准入）时清态并带 `?error=admission` 回 `/login`；登录页见 `error` 即停自动中继，避免 IAM 侧会话仍在导致两端登录页无限往返（同见 `99d2631` 的循环保护）。
+- **风险 / 待办**：
+  - 本轮以编译/测试/构建绿为验收，**IAM(8081)+RMS(8084) 实际联调跑通 SSO 登录→回跳→准入**为 W3 收口项（见 2026-10-12 日log 待办）。
+  - 登录页 `crypto.subtle` 要求安全上下文：localhost 视为安全上下文可用，生产须 HTTPS。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
