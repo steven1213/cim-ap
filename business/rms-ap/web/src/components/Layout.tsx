@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
-import { hasPermission, RMS_ADMIN } from '@/lib/permissions';
+import { hasPermission } from '@/lib/permissions';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import {
   IconGauge,
@@ -82,7 +82,9 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
   const [theme, setTheme] = useState<Theme>(() => readTheme());
 
-  const admin = hasPermission(permissions, RMS_ADMIN) || permissions.includes('SUPER_ADMIN');
+  // 超管判定：后端 DbLocalAuthorityLoader 在解析超管角色时会把 SUPER_ADMIN 展开进 authorities
+  // （与 cim-system 的精确字符串匹配约定一致，见 lib/permissions.ts 注释），故以 SUPER_ADMIN 为准。
+  const admin = permissions.includes('SUPER_ADMIN');
   const isProd = import.meta.env.MODE === 'production';
 
   useEffect(() => {

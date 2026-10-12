@@ -38,3 +38,9 @@ cim:
       lowercase-snake: true
     flyway:
       enabled: true
+
+  # 业务内部 RBAC（域模块 cim-system）：权限源由「令牌 roles」转「本 ap 库内 sys_* 授权表」。
+  # enabled / seed-permissions 默认即 true，此处显式声明以消歧义（见 design.md §2.10）。
+  system:
+    enabled: true
+    seed-permissions: true

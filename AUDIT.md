@@ -255,8 +255,31 @@
   - **消除「两套登录」**：既有实现为 8081 后端直出页（方案 C）与 5171 控制台 React 登录页并存；本次把控制台 `/login` 也改为中继到 8081 同一页，所有客户端（IAM 控制台、RMS、未来 MDS/MES）落点同一登录页，视觉/文案单一真相源。
   - **循环跳转根除**：`rms-ap` `BootGate` 在 boot 失败（典型 403 无本 ap 准入）时清态并带 `?error=admission` 回 `/login`；登录页见 `error` 即停自动中继，避免 IAM 侧会话仍在导致两端登录页无限往返（同见 `99d2631` 的循环保护）。
 - **风险 / 待办**：
-  - 本轮以编译/测试/构建绿为验收，**IAM(8081)+RMS(8084) 实际联调跑通 SSO 登录→回跳→准入**为 W3 收口项（见 2026-10-12 日log 待办）。
+  - IAM(8081)+RMS(8084) 实际联调 SSO 登录→回跳→准入已于本会话前序完成（10/10 通过）；**RMS 真实 RBAC 替换临时 Loader 见 §24**（E2E 8/8）。
   - 登录页 `crypto.subtle` 要求安全上下文：localhost 视为安全上下文可用，生产须 HTTPS。
+
+## 2026-10-12（续2）RMS 接入 cim-system 真实 RBAC（替换临时 RmsAuthorityLoader）
+
+### 24. feat(rms)：RMS 业务权限由「令牌 roles 短路」转「本 ap 库内 sys_* RBAC」
+- **范围**：
+  - `business/rms-ap/server/pom.xml`：新增 `cim-system` 依赖（与 iam-ap 同款）。
+  - `RmsApApplication`：`scanBasePackages={"com.cim.rms.server","com.cim.system"}`；保留本包 `@EntityScan`/`@EnableJpaRepositories`，cim-system 自带扫描根 `com.cim.system`（互不重叠，符合 ADR-11）。
+  - `security/RmsAuthorityLoader.java`：**删除**（W2 临时占位）；由 `cim-system` 的 `DbLocalAuthorityLoader` 经 `@ConditionalOnMissingBean` 自动顶替默认 `ClaimLocalAuthorityLoader`。
+  - 新增 `console/` 包（镜像 iam-ap `IamConsoleCatalog`/`IamConsoleSeedService`/`IamConsoleSeedRunner`/`IamConsoleProperties`）：`RmsConsoleCatalog`（18 个 `rms:*` 权限码 + 3 角色 RMS_ADMIN/RMS_OPERATOR/RMS_VIEWER + 角色→权限授予）、`RmsConsoleSeedService`（幂等：权限→角色→授权→管理员档案 `externalId=username="admin"`）、`RmsConsoleSeedRunner`（`@Order(LOWEST_PRECEDENCE)`，晚于平台 SysPermissionSeeder）、`RmsConsoleProperties`（`cim.rms.console.*`）。
+  - `security/MeController`：注释更新（权限源改为 DbLocalAuthorityLoader 查库）。
+  - `application.yml.example`：补 `cim.system.enabled/seed-permissions: true`（默认即 true，显式消歧义；`application.yml` 本身被 .gitignore，仅模板入库）。
+  - 前端：`lib/permCodes.ts` 澄清 RMS_ADMIN 是角色码非权限码；`lib/permissions.ts` 导出 `SUPER_ADMIN` 信号；`components/Layout.tsx` 的 `admin` 判定由失效的 `rms:admin` 占位改为 `permissions.includes('SUPER_ADMIN')`（真实 RBAC 下超管角色会被展开为含 SUPER_ADMIN）。
+- **验证（已跑通）**：
+  - rms-ap 后端：`15/15` 测试全绿（含 cim-system 装配、Flyway V1/V2+V1000(system)+V2000(i18n) 迁移、种子器），`mvnrms.sh -o test` BUILD SUCCESS。
+  - rms-ap web：`tsc -p` + `vite build` 145 模块 / JS 330.92 kB / gzip 103.40 kB。
+  - 实时 E2E（IAM 8081 + RMS 8084 双后端，复刻浏览器第一层 PBKDF2 登录）：`e2e-rbac.mjs` **8/8 通过** —— 登录拿令牌→解码 JWT 确认 `roles` 含 `rms-ap:ADMIN`、**`authorities` claim 不含任何 `rms:*`（证明非 IAM 注入）**；`GET /api/v1/rms/permissions`（Bearer）返回 18 个 `rms:*`（全部来自本 ap `sys_role_perm` 库内解析）+ 21 个平台 `sys:*` + `SUPER_ADMIN`（共 40，即 DbLocalAuthorityLoader 超管短路「库内全部启用权限码」语义，完全符合 SysPermissionSeeder 设计）；无令牌→200 空集（MeController 无方法级鉴权，与 /me 同源）。
+- **关键设计决策 / 核查**：
+  - **真实 RBAC 已生效的铁证**：令牌 `authorities` 仅含 `iam-ap:ADMIN`/`rms-ap:ADMIN`（IAM 签发时 roles 与 authorities 同为 `appCode:ROLE` 限定形态），但 RMS `/permissions` 返回 18 个 `rms:*`。二者矛盾只能解释为 RMS 在本地查 `sys_user→sys_role→sys_role_perm` 解析出权限，而非读令牌——正是「业务权限各 ap 自管」落地的接缝。
+  - **管理员对齐**：`RmsConsoleSeedService.seedAdminProfile` 建档 `sys_user(externalId=username="admin")`，与 IAM bootstrap 首管理员同名；`DbLocalAuthorityLoader`→`LocalUserResolver` 按 `username="admin"` 命中（令牌 `uname=admin`），故登录即获 RMS_ADMIN 超管角色。
+  - **权限码单一真相源**：`RmsConsoleCatalog` 复用 `RmsPermissions` 常量，前后端 `permCodes.ts` 镜像，避免「按钮可见但接口 403」。
+- **风险 / 待办**：
+  - 当前仅种子管理员（RMS_ADMIN 超管）；RMS_OPERATOR/RMS_VIEWER 角色已定义并授予对应 `rms:*`，但尚无「在 IAM 侧为非管理员用户授予 rms-ap 准入 + 在 RMS 侧将其 `sys_user` 关联到 RMS_OPERATOR/VIEWER」的运行时开通链路（属 W3 多角色开通，待 IAM 用户/组织授权与 RMS 用户建档打通后联调）。
+  - 菜单树（`sys_menu`）未种子：RMS 前端菜单为硬编码 + permCodes 门禁，本轮未引入后端菜单树；若后续采用后端驱动菜单，须补 `sys_menu` 种子与 `sys_role_menu` 授权。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**

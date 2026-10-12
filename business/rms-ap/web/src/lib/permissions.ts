@@ -9,8 +9,8 @@
 // **展开为全部启用权限码**，而不是靠某个通配符——所以这里绝不能把 `SUPER_ADMIN` 当成 `*` 放通，
 // 否则会出现「前端显示按钮、后端拒绝」的假阳性。
 
-/** RMS 管理员兜底权限码（定义见 `lib/permCodes.ts`，此处转出便于统一引用）。 */
-export { RMS_ADMIN } from '@/lib/permCodes';
+/** 超管信号权限码（由后端 DbLocalAuthorityLoader 在解析超管角色时展开进 authorities）。 */
+export const SUPER_ADMIN = 'SUPER_ADMIN';
 
 /**
  * 是否具备某权限码。

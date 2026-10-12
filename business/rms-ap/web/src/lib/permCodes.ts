@@ -1,7 +1,8 @@
 // RMS 权限码常量（前端侧镜像，与 server `security/RmsPermissions` 一一对应）。
 // 新增权限码时**两侧都要加**，避免「按钮可见但接口 403」。
-
-export const RMS_ADMIN = 'rms:admin'; // 占位：W2 阶段超管/管理员的短路标识
+// 注：RMS 管理员是一个角色（后端角色码 RMS_ADMIN），不是权限码；其权限由后端
+// cim-system 的 DbLocalAuthorityLoader 按 sys_role_perm 展开为下列 rms:* 码，
+// 超管另追加 SUPER_ADMIN（见 lib/permissions.ts）。
 
 // ---- 配方 ----
 export const RECIPE_VIEW = 'rms:recipe:view';

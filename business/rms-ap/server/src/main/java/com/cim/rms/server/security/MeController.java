@@ -17,7 +17,8 @@ import java.util.Set;
  *
  * <p>前端 {@code authStore} 启动后拉取：{@code /me} 拿用户档案（写入 UI），
  * {@code /permissions} 拿本 ap 权限码集（用于 {@code <Perms>} 门禁）。
- * 权限码严格来自 {@link CimUserPrincipal#authoritiesSet()}（即 {@code RmsAuthorityLoader} 解析后的结果），
+ * 权限码严格来自 {@link CimUserPrincipal#authoritiesSet()}（即本 ap 的
+ * {@code LocalAuthorityLoader}——接入 cim-system 后为 {@code DbLocalAuthorityLoader} 查库解析的结果），
  * 与后端 {@code @PreAuthorize} 同源，避免「有按钮却 403」。</p>
  */
 @RestController
