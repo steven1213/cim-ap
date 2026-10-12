@@ -48,8 +48,11 @@ function BootGate({ children }: { children: ReactNode }) {
     };
   }, [token, loadMe, loadPermissions]);
 
+  // 引导失败（典型：令牌 apps claim 不含本 ap 接入码 → 后端 403）。
+  // 必须带 error=admission 落回 /login：否则 /login 会自动中继回 IAM，
+  // 而 IAM 侧会话仍在、会拿同一枚令牌再次弹回 /sso，形成两端登录页无限往返。
   if (bootFailed) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login?error=admission" replace />;
   }
 
   if (!ready) {

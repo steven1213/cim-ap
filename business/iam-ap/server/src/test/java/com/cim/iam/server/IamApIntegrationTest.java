@@ -126,7 +126,6 @@ class IamApIntegrationTest {
                 .claim("apps", java.util.List.of("iam-ap"))
                 .claim("roles", java.util.List.of("iam-ap:ADMIN"))
                 .claim("authorities", java.util.List.of("iam-ap:ADMIN"))
-                .claim("ver", 1L)
                 .issuedAt(new java.util.Date())
                 .expiration(new java.util.Date(System.currentTimeMillis() + 3_600_000L))
                 .signWith(rsaKeyService.getPrivateKey(), io.jsonwebtoken.Jwts.SIG.RS256)

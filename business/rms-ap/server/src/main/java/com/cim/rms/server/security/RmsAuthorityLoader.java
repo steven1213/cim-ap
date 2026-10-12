@@ -6,7 +6,6 @@ import com.cim.auth.token.TokenClaims;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.stereotype.Component;
-import java.util.Set;
 
 /**
  * RMS 业务权限加载器（{@code LocalAuthorityLoader} SPI 实现）。
@@ -33,8 +32,10 @@ public class RmsAuthorityLoader implements LocalAuthorityLoader {
         Set<String> roles = claims.roles() == null ? Set.of() : claims.roles();
 
         boolean superAdmin = authorities.contains("SUPER_ADMIN") || authorities.contains("ROLE_SUPER");
-        boolean rmsAdmin = containsAny(roles, "RMS_ADMIN", "rms_admin", "RMS:ADMIN")
-                || containsAny(authorities, "rms:admin", "rms:console:admin");
+        // 令牌角色以 appCode:ROLE 形式签发（如 rms-ap:ADMIN），故这里必须识别「带接入码前缀」的形态，
+        // 否则 IAM 侧授予的 rms-ap 管理员角色组在这里落空 → 退回只读集、页面上看不到任何操作按钮。
+        boolean rmsAdmin = containsAny(roles, "RMS_ADMIN", "rms_admin", "RMS:ADMIN", "rms-ap:ADMIN")
+                || containsAny(authorities, "rms:admin", "rms:console:admin", "rms-ap:ADMIN");
 
         if (superAdmin || rmsAdmin) {
             return RmsPermissions.full();

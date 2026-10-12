@@ -122,6 +122,14 @@ cim:
         admin-password: ${IAM_BOOTSTRAP_ADMIN_PASSWORD}
         # 引导完成后可置 false 关闭（或用后即改口令）
         enabled: true
+        # 启动时自动登记的业务接入码并授予首管理员准入（开发/演示用）。
+        # code 必须与业务 ap 侧 cim.auth.admission.app-code 完全一致，
+        # 否则该 ap 收到的令牌 apps claim 不含本码 → 准入 403（表现为登录后来回弹跳）。
+        apps:
+          - code: rms-ap
+            name: 配方管理系统
+            roles:
+              - ADMIN
 
     # 身份目录（Wave 0：组织架构 + 用户档案 + 同步到业务系统，见 identity-directory.md）
     directory:

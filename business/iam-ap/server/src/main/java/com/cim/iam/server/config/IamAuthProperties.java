@@ -3,6 +3,9 @@ package com.cim.iam.server.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * IAM 登录认证配置（{@code cim.iam.auth.*}）。
  *
@@ -170,6 +173,8 @@ public class IamAuthProperties {
         private boolean enabled = true;
         private String adminUsername = "admin";
         private String adminPassword = "";
+        /** 启动时自动登记并授予首管理员准入的业务接入码（开发/演示用，见 BootstrapAdminRunner）。 */
+        private List<BootstrapApp> apps = new ArrayList<>();
 
         public boolean isEnabled() {
             return enabled;
@@ -193,6 +198,50 @@ public class IamAuthProperties {
 
         public void setAdminPassword(String adminPassword) {
             this.adminPassword = adminPassword;
+        }
+
+        public List<BootstrapApp> getApps() {
+            return apps;
+        }
+
+        public void setApps(List<BootstrapApp> apps) {
+            this.apps = apps;
+        }
+    }
+
+    /**
+     * 引导期登记的业务接入码（{@code cim.iam.auth.bootstrap.apps[i]}）。
+     *
+     * <p>{@code code} 即令牌 {@code apps} claim 的取值，必须与业务 ap 侧
+     * {@code cim.auth.admission.app-code} 完全一致，否则该 ap 会 403。</p>
+     */
+    public static class BootstrapApp {
+        private String code = "";
+        private String name = "";
+        private List<String> roles = new ArrayList<>();
+
+        public String getCode() {
+            return code;
+        }
+
+        public void setCode(String code) {
+            this.code = code;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public List<String> getRoles() {
+            return roles;
+        }
+
+        public void setRoles(List<String> roles) {
+            this.roles = roles;
         }
     }
 }
