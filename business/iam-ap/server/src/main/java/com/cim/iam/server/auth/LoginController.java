@@ -1,6 +1,8 @@
 package com.cim.iam.server.auth;
 
+import com.cim.iam.server.sso.SsoSessionService;
 import com.cim.spring.support.web.Result;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +35,7 @@ public class LoginController {
 
     private final LoginService loginService;
     private final LocalCredentialService credentialService;
+    private final SsoSessionService ssoSessionService;
 
     public record LoginRequest(String username, String credential, String clientSalt) {
     }
@@ -47,9 +50,12 @@ public class LoginController {
     }
 
     @PostMapping("/login")
-    public Result<LoginService.LoginResult> login(@RequestBody LoginRequest req) {
-        return Result.ok(loginService.login(
-                new LoginCredentials(req.username(), req.credential(), req.clientSalt())));
+    public Result<LoginService.LoginResult> login(@RequestBody LoginRequest req, HttpServletResponse response) {
+        LoginService.LoginResult result = loginService.login(
+                new LoginCredentials(req.username(), req.credential(), req.clientSalt()));
+        // 种下 SSO 会话 Cookie：使已接入 ap（如 RMS）中继回 8081 /login 时可直接签发令牌、免重复登录。
+        ssoSessionService.attach(response, ssoSessionService.createFromAccessToken(result.token()));
+        return Result.ok(result);
     }
 
     @PostMapping("/token/refresh")
@@ -59,11 +65,14 @@ public class LoginController {
 
     @PostMapping("/logout")
     public Result<Void> logout(@RequestHeader(value = "Authorization", required = false) String authorization,
-                               @RequestBody(required = false) LogoutRequest req) {
+                               @RequestBody(required = false) LogoutRequest req,
+                               HttpServletResponse response) {
         String accessToken = (authorization != null && authorization.startsWith("Bearer "))
                 ? authorization.substring(7).trim() : null;
         String refreshToken = req != null ? req.refreshToken() : null;
         loginService.logout(accessToken, refreshToken);
+        // 清除 SSO 会话 Cookie：从 IAM 登出即结束单点登录（其它 ap 后续中继将重新要求登录）。
+        ssoSessionService.clear(response);
         return Result.ok();
     }
 

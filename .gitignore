@@ -33,3 +33,6 @@ server/**/target/
 *.log
 business/approval-ap/server/data/
 business/approval-ap/web/_*
+
+# vite 缓存
+.vite/

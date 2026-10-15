@@ -86,10 +86,14 @@ cim:
       seed-admin-profile: true
       admin-display-name: IAM 管理员
 
-    # 管理面前端（business/iam-ap/web）跨域白名单；生产按部署域名收紧
+    # 前端跨域白名单：须列全「IAM 控制台」+「所有接入 ap 的控制台」。
+    # 业务 ap（如 RMS）要在浏览器里直调 IAM 的 POST /api/v1/logout 做 RP-initiated logout
+    # （带 SSO 会话 Cookie，credentials:'include'）；漏配 → 浏览器拦掉 → 登出后令牌仍有效。
+    # 生产按部署域名收紧。
     web:
       allowed-origins:
         - https://iam.example.com
+        - https://rms.example.com
 
     jwt:
       kid: iam-rsa-1
@@ -100,6 +104,20 @@ cim:
       # 建议以环境变量注入，例如：
       # private-key-pem: ${IAM_JWT_PRIVATE_KEY_PEM}
       # public-key-pem: ${IAM_JWT_PUBLIC_KEY_PEM}
+
+    # 单点登录（SSO）会话：让「在 IAM 登录一次，访问 RMS 等其它已接入 ap 直接进入」成为可能。
+    # 机制：登录成功时由 IAM 后端（8081）种下一枚同站共享的 SSO 会话 Cookie；
+    # 任一 ap 中继回 8081 /login 时若此 Cookie 仍有效，后端直接为该 ap 签发令牌并回跳，免重复登录。
+    # ⚠️ localhost 开发（http）下 secure 必须 false，否则 Cookie 不被发送；生产 HTTPS 务必置 true。
+    # ⚠️ 跨子域部署（如 iam.example.com / rms.example.com）须设 cookie-domain: .example.com 才能共享。
+    sso:
+      cookie-name: iam_sso
+      cookie-ttl-minutes: 480        # SSO 会话窗口（默认 8h）
+      cookie-domain: ""              # 留空=host-only（localhost 开发足够）；生产跨子域设为 .example.com
+      cookie-secure: false           # 生产置 true
+      allowed-redirect-hosts:        # 回跳地址白名单（防开放重定向）
+        - localhost
+        - 127.0.0.1
 
     # 登录认证（M-login：认证源 / 两层派生 / AD-LDAP）
     auth:

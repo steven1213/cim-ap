@@ -1,8 +1,24 @@
 package com.cim.iam.server.sso;
 
+import com.cim.iam.server.auth.RefreshTokenService;
+import com.cim.iam.server.config.SsoProperties;
+import com.cim.iam.server.sso.SsoSessionService;
+import com.cim.iam.server.token.TokenIssueRequest;
+import com.cim.iam.server.token.TokenIssuerService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /**
  * SSO 轻量登录页（方案 C：登录页从 IAM 控制台 SPA 剥离，由 IAM 后端直接 serve）。
@@ -28,7 +44,13 @@ import org.springframework.web.bind.annotation.RestController;
  * 页面同源（8081）调用上述接口，不涉及跨域。{@code crypto.subtle} 要求安全上下文——localhost 视为安全上下文，生产须 HTTPS。</p>
  */
 @RestController
+@RequiredArgsConstructor
 public class SsoLoginPageController {
+
+    private final TokenIssuerService tokenIssuerService;
+    private final RefreshTokenService refreshTokenService;
+    private final SsoSessionService ssoSessionService;
+    private final SsoProperties ssoProperties;
 
     private static final String LOGIN_HTML = """
             <!doctype html>
@@ -286,8 +308,63 @@ public class SsoLoginPageController {
             </html>
             """;
 
-    @GetMapping(value = "/login", produces = MediaType.TEXT_HTML_VALUE)
-    public String loginPage() {
-        return LOGIN_HTML;
+    /**
+     * 统一登录页。
+     *
+     * <p><b>SSO 会话感知（方案 C 单点登录关键）</b>：若请求携带<b>有效</b>的 IAM SSO 会话 Cookie
+     * （由 {@link com.cim.iam.server.sso.SsoSessionService} 签发/校验，等价于「已在 IAM 登录过」），
+     * 且带了合法的 {@code redirect}（回跳地址在白名单内），则<b>不再渲染表单</b>，而是直接为请求方应用
+     * 签发令牌并 302 回跳。于是用户在 IAM 登录一次后，访问 RMS 等其它 ap 的中继页会「秒进」首页，
+     * 不再重复输入口令。</p>
+     *
+     * <p>无有效会话时才渲染登录表单（原有行为不变）。</p>
+     */
+    @GetMapping(value = "/login")
+    public ResponseEntity<String> loginPage(HttpServletRequest request,
+                                            HttpServletResponse response,
+                                            @RequestParam(required = false) String app,
+                                            @RequestParam(required = false) String redirect) {
+        String ssoCookie = readCookie(request, ssoProperties.getCookieName());
+        Optional<SsoSessionService.SsoPrincipal> principal = ssoSessionService.validate(ssoCookie);
+
+        if (principal.isPresent() && redirect != null && !redirect.isBlank() && isRedirectAllowed(redirect)) {
+            SsoSessionService.SsoPrincipal p = principal.get();
+            // 为请求方应用签发全新令牌（复用 IAM 通用签发，各 ap 后端自行按 apps claim 做准入）。
+            String access = tokenIssuerService.issue(new TokenIssueRequest(p.userId(), p.username(), null));
+            String refresh = refreshTokenService.issue(p.userId(), access);
+            // 滑动续期：刷新 SSO 会话 Cookie，维持「一次登录、多 ap 复用」的窗口。
+            ssoSessionService.attach(response, ssoSessionService.create(p.userId(), p.username(), p.version()));
+
+            String sep = redirect.contains("?") ? "&" : "?";
+            String target = redirect + sep
+                    + "token=" + URLEncoder.encode(access, StandardCharsets.UTF_8)
+                    + "&refreshToken=" + URLEncoder.encode(refresh, StandardCharsets.UTF_8);
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(target)).build();
+        }
+
+        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(LOGIN_HTML);
+    }
+
+    /** 读取指定名称的 Cookie 值（不存在返回 null）。 */
+    private String readCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return null;
+        for (jakarta.servlet.http.Cookie c : request.getCookies()) {
+            if (name.equals(c.getName())) {
+                return c.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** 回跳地址必须在白名单主机内，避免开放重定向。相对路径（以 / 开头）视为安全。 */
+    private boolean isRedirectAllowed(String redirect) {
+        try {
+            URI uri = URI.create(redirect);
+            String host = uri.getHost();
+            if (host == null) return true; // 相对路径
+            return ssoProperties.getAllowedRedirectHosts().contains(host);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
