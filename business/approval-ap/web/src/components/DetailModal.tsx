@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '@/components/Modal';
-import { IconClip, IconDownload, IconTrash } from '@/components/Icons';
+import CompleteModal from '@/components/CompleteModal';
+import { IconBell, IconCheck, IconClip, IconDownload, IconUndo, IconTrash } from '@/components/Icons';
 import {
   attachmentDownloadUrl,
+  completeTask,
   deleteAttachment,
   getProcessDetail,
+  urgeInstance,
   uploadAttachment,
+  withdrawInstance,
 } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { fmtDate as formatDateTime } from '@/lib/format';
-import type { FormSchemaField, ProcessDetailView } from '@/types';
+import type { FormSchemaField, ProcessDetailView, TaskView } from '@/types';
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -114,18 +118,23 @@ const ACTION_STYLE: Record<string, string> = {
   CALLBACK_FAILED: 'tag err',
 };
 
-/** 审批详情弹窗：基本信息 / 审批内容 / 当前待办 / 附件 / 审批历史。 */
+/** 审批详情弹窗：基本信息 / 审批内容 / 当前待办 / 附件 / 审批历史。
+ *  <p>详情内直达操作：办理人可审批（通过/驳回），发起人可催办/撤回——消除「关弹窗回列表」断点。</p> */
 export default function DetailModal({
   processInstanceId,
   onClose,
+  onChanged,
 }: {
   processInstanceId: string;
   onClose: () => void;
+  /** 详情内操作成功后通知父页面刷新列表。 */
+  onChanged?: () => void;
 }) {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
   const [detail, setDetail] = useState<ProcessDetailView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [completeFor, setCompleteFor] = useState<{ task: TaskView; outcome: 'APPROVE' | 'REJECT' } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -177,8 +186,87 @@ export default function DetailModal({
   const formDataEntries = detail ? Object.entries(detail.formData ?? {}) : [];
   const running = detail?.status === 'ACTIVE';
 
+  // 详情内直达操作：当前用户是待办办理人/候选人 → 可审批；是发起人 → 可催办/撤回
+  const operableTask: TaskView | null =
+    detail && running
+      ? (detail.activeTasks.find(
+          (tk) => tk.assignee === userId || (tk.candidateUsers ?? []).includes(userId),
+        ) ?? null)
+      : null;
+  const isInitiator = detail?.initiator === userId;
+
+  async function runAction(fn: () => Promise<void>, okMsg: string) {
+    setBusy(true);
+    try {
+      await fn();
+      toast(okMsg, 'ok');
+      await load();
+      onChanged?.();
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Modal title={t('detail.title')} onClose={onClose} width={560}>
+    <Modal
+      title={t('detail.title')}
+      onClose={onClose}
+      width={560}
+      footer={
+        detail && (
+          <div className="detail-actions">
+            {operableTask && (
+              <>
+                <button
+                  className="btn btn-sm"
+                  disabled={busy}
+                  onClick={() => setCompleteFor({ task: operableTask, outcome: 'APPROVE' })}
+                >
+                  <IconCheck width={14} height={14} /> {t('detail.act.approve')}
+                </button>
+                <button
+                  className="btn btn-sm btn-danger"
+                  disabled={busy}
+                  onClick={() => setCompleteFor({ task: operableTask, outcome: 'REJECT' })}
+                >
+                  {t('detail.act.reject')}
+                </button>
+              </>
+            )}
+            {isInitiator && running && (
+              <>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => runAction(() => urgeInstance(detail.processInstanceId, userId), t('init.urgeSent'))}
+                >
+                  <IconBell width={14} height={14} /> {t('init.urge')}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    if (window.confirm(t('init.withdrawConfirm', { bk: detail.businessKey }))) {
+                      runAction(
+                        () => withdrawInstance(detail.processInstanceId, userId),
+                        t('init.withdrawDone'),
+                      );
+                    }
+                  }}
+                >
+                  <IconUndo width={14} height={14} /> {t('init.withdraw')}
+                </button>
+              </>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          </div>
+        )
+      }
+    >
       {!detail ? (
         <div className="empty" style={{ padding: '24px 0' }}>
           <span>{t('common.loading')}</span>
@@ -392,6 +480,22 @@ export default function DetailModal({
             </div>
           </section>
         </div>
+      )}
+      {completeFor && (
+        <CompleteModal
+          task={completeFor.task}
+          busy={busy}
+          defaultOutcome={completeFor.outcome}
+          onClose={() => setCompleteFor(null)}
+          onSubmit={async (r) => {
+            await runAction(
+              () => completeTask(completeFor.task.taskId, { ...r, actor: userId }),
+              t('todo.completeOk'),
+            );
+            setCompleteFor(null);
+            onClose();
+          }}
+        />
       )}
     </Modal>
   );

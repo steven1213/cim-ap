@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Panel from '@/components/Panel';
 import DetailModal from '@/components/DetailModal';
 import { IconCheck, IconRefresh, IconSearch } from '@/components/Icons';
-import { listDone } from '@/lib/api';
+import { listDonePaged, type PageResult } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { fmtDate } from '@/lib/format';
 import type { TaskView } from '@/types';
@@ -11,12 +11,16 @@ import type { TaskView } from '@/types';
 export default function DonePage() {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
-  const [tasks, setTasks] = useState<TaskView[]>([]);
+  const PAGE_SIZE = 10;
+  const [paged, setPaged] = useState<PageResult<TaskView> | null>(null);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
   /** 关键字过滤（标题/业务单号/节点名） */
   const [q, setQ] = useState('');
 
+  const tasks = paged?.records ?? [];
+  const totalPages = paged ? Math.max(1, Math.ceil(paged.total / PAGE_SIZE)) : 1;
   const filtered = tasks.filter((tk) => {
     if (!q.trim()) return true;
     const kw = q.trim().toLowerCase();
@@ -24,10 +28,10 @@ export default function DonePage() {
       .some((v) => v && v.toLowerCase().includes(kw));
   });
 
-  async function load() {
+  async function load(p = 0) {
     setLoading(true);
     try {
-      setTasks(await listDone());
+      setPaged(await listDonePaged(p + 1, PAGE_SIZE));
     } catch (e) {
       // 保留旧列表
     } finally {
@@ -35,9 +39,14 @@ export default function DonePage() {
     }
   }
   useEffect(() => {
-    load();
+    load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  function goto(p: number) {
+    setPage(p);
+    load(p);
+  }
 
   return (
     <div className="page">
@@ -55,7 +64,7 @@ export default function DonePage() {
                 placeholder={t('common.searchPlaceholder')}
               />
             </span>
-            <button className="icon-btn" onClick={load} title={t('common.refresh')} aria-label={t('common.refresh')}>
+            <button className="icon-btn" onClick={() => load(page)} title={t('common.refresh')} aria-label={t('common.refresh')}>
               <IconRefresh width={16} height={16} />
             </button>
           </>
@@ -106,9 +115,21 @@ export default function DonePage() {
             </tbody>
           </table>
         </div>
+
+        {paged && paged.total > PAGE_SIZE && (
+          <div className="pager">
+            <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => goto(page - 1)}>
+              {t('page.prev')}
+            </button>
+            <span className="dim">{t('page.info').replace('{page}', String(page + 1)).replace('{total}', String(totalPages))}</span>
+            <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => goto(page + 1)}>
+              {t('page.next')}
+            </button>
+          </div>
+        )}
       </Panel>
 
-      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} />}
+      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={load} />}
     </div>
   );
 }

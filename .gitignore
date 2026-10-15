@@ -36,3 +36,6 @@ business/approval-ap/web/_*
 
 # vite 缓存
 .vite/
+
+# vite dev 临时产物
+*.timestamp-*.mjs

@@ -9,6 +9,7 @@ import org.flowable.engine.TaskService;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 加签：在当前审批节点增加审批人。
@@ -30,6 +31,7 @@ public class ApprovalAddSignService {
     private final AuditService auditService;
     private final NotificationService notificationService;
 
+    @Transactional
     public void addSign(String taskId, AddSignRequest req) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         if (task == null) {

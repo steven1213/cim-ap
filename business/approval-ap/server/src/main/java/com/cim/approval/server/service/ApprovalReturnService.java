@@ -11,6 +11,7 @@ import org.flowable.engine.history.HistoricActivityInstance;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class ApprovalReturnService {
     private final HistoryService historyService;
     private final AuditService auditService;
 
+    @Transactional
     public void returnTask(String taskId, ReturnRequest req) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         if (task == null) {

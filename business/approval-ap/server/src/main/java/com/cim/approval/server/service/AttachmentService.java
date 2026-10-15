@@ -134,6 +134,12 @@ public class AttachmentService {
         return new DownloadPayload(a, new FileSystemResource(path));
     }
 
+    /** 附件元数据（供控制器做相干性校验，避免与 ApprovalProcessService 形成循环依赖）。 */
+    public ApprovalAttachment meta(String id) {
+        return attachmentRepository.findById(id)
+                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "附件不存在: " + id));
+    }
+
     public record DownloadPayload(ApprovalAttachment meta, Resource resource) {
     }
 

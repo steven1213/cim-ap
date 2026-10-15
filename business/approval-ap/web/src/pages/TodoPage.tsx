@@ -3,37 +3,50 @@ import { useTranslation } from 'react-i18next';
 import Panel from '@/components/Panel';
 import Modal from '@/components/Modal';
 import DetailModal from '@/components/DetailModal';
-import { IconInbox, IconCheck, IconReturn, IconAddUser, IconSwap, IconRefresh, IconSearch } from '@/components/Icons';
-import { listTodo, completeTask, returnTask, addSignTask, reassignTask } from '@/lib/api';
+import CompleteModal from '@/components/CompleteModal';
+import { IconInbox, IconCheck, IconReturn, IconAddUser, IconSwap, IconRefresh, IconSearch, IconUser } from '@/components/Icons';
+import {
+  listTodoPaged, completeTask, returnTask, addSignTask, reassignTask,
+  batchComplete, delegateTask, resolveTask, type PageResult,
+} from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { fmtDate, fmtOverdue } from '@/lib/format';
 import type { TaskView } from '@/types';
 
-type ModalType = 'complete' | 'return' | 'addsign' | 'reassign';
+type ModalType = 'complete' | 'return' | 'addsign' | 'reassign' | 'delegate';
+
+const PAGE_SIZE = 10;
 
 export default function TodoPage() {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
-  const [tasks, setTasks] = useState<TaskView[]>([]);
+  const [paged, setPaged] = useState<PageResult<TaskView> | null>(null);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<{ type: ModalType; task: TaskView } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 勾选批量通过 */
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   /** 关键字过滤（标题/业务单号/节点名/办理人），客户端过滤即可 */
   const [q, setQ] = useState('');
 
+  const tasks = paged?.records ?? [];
   const filtered = tasks.filter((tk) => {
     if (!q.trim()) return true;
     const kw = q.trim().toLowerCase();
     return [tk.title, tk.businessKey, tk.name, tk.assignee]
       .some((v) => v && v.toLowerCase().includes(kw));
   });
+  const totalPages = paged ? Math.max(1, Math.ceil(paged.total / PAGE_SIZE)) : 1;
 
-  async function load() {
+  async function load(p = page) {
     setLoading(true);
     try {
-      setTasks(await listTodo());
+      const res = await listTodoPaged(p + 1, PAGE_SIZE);
+      setPaged(res);
+      setChecked(new Set());
     } catch (e) {
       toast((e as Error).message, 'err');
     } finally {
@@ -41,9 +54,14 @@ export default function TodoPage() {
     }
   }
   useEffect(() => {
-    load();
+    load(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  function goto(p: number) {
+    setPage(p);
+    load(p);
+  }
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
@@ -51,6 +69,36 @@ export default function TodoPage() {
       await fn();
       setActive(null);
       toast(t('common.confirm') + ' ✓', 'ok');
+      await load();
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function toggleCheck(taskId: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  }
+
+  async function runBatch() {
+    if (checked.size === 0) return;
+    if (!window.confirm(t('todo.batchConfirm').replace('{n}', String(checked.size)))) return;
+    setBusy(true);
+    try {
+      const results = await batchComplete({ taskIds: [...checked], outcome: 'APPROVE', actor: userId });
+      const fail = results.filter((r) => !r.ok);
+      if (fail.length === 0) {
+        toast(t('todo.batchOk').replace('{n}', String(results.length)), 'ok');
+      } else {
+        toast(t('todo.batchPartial').replace('{ok}', String(results.length - fail.length)).replace('{fail}', String(fail.length)), 'warn');
+      }
+      setChecked(new Set());
       await load();
     } catch (e) {
       toast((e as Error).message, 'err');
@@ -75,7 +123,12 @@ export default function TodoPage() {
                 placeholder={t('common.searchPlaceholder')}
               />
             </span>
-            <button className="icon-btn" onClick={load} title={t('common.refresh')} aria-label={t('common.refresh')}>
+            {checked.size > 0 && (
+              <button className="btn btn-sm" disabled={busy} onClick={runBatch}>
+                <IconCheck width={13} height={13} /> {t('todo.batchApprove')} ({checked.size})
+              </button>
+            )}
+            <button className="icon-btn" onClick={() => load()} title={t('common.refresh')} aria-label={t('common.refresh')}>
               <IconRefresh width={16} height={16} />
             </button>
           </>
@@ -85,6 +138,7 @@ export default function TodoPage() {
           <table className="data">
             <thead>
               <tr>
+                <th style={{ width: 32 }} />
                 <th>{t('todo.colName')}</th>
                 <th>{t('common.colTitle')}</th>
                 <th>{t('todo.colBusinessKey')}</th>
@@ -97,12 +151,12 @@ export default function TodoPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="dim" style={{ textAlign: 'center' }}>{t('common.loading')}</td>
+                  <td colSpan={8} className="dim" style={{ textAlign: 'center' }}>{t('common.loading')}</td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="empty">
                       <IconInbox width={26} height={26} />
                       <span>{t('todo.empty')}</span>
@@ -113,7 +167,15 @@ export default function TodoPage() {
               {filtered.map((tk) => (
                 <tr key={tk.taskId}>
                   <td>
+                    {tk.delegationState !== 'PENDING' && (
+                      <input type="checkbox" checked={checked.has(tk.taskId)} onChange={() => toggleCheck(tk.taskId)} />
+                    )}
+                  </td>
+                  <td>
                     {tk.name}
+                    {tk.delegationState === 'PENDING' && (
+                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('todo.delegatedToMe')}</span>
+                    )}
                     {tk.overdueMinutes != null && (
                       <span className="tag err" style={{ marginLeft: 6 }}>
                         {t('todo.overdue')} {fmtOverdue(tk.overdueMinutes)}
@@ -132,11 +194,20 @@ export default function TodoPage() {
                   <td className="mono">{fmtDate(tk.createdAt)}</td>
                   <td>
                     <div className="cell-actions">
-                      <button className="btn btn-sm" onClick={() => setActive({ type: 'complete', task: tk })}>
-                        <IconCheck width={13} height={13} /> {t('todo.approve')}/{t('todo.reject')}
-                      </button>
+                      {tk.delegationState === 'PENDING' ? (
+                        <button className="btn btn-sm" onClick={() => run(() => resolveTask(tk.taskId, { actor: userId }))}>
+                          <IconReturn width={13} height={13} /> {t('todo.resolveBack')}
+                        </button>
+                      ) : (
+                        <button className="btn btn-sm" onClick={() => setActive({ type: 'complete', task: tk })}>
+                          <IconCheck width={13} height={13} /> {t('todo.approve')}/{t('todo.reject')}
+                        </button>
+                      )}
                       <button className="btn btn-ghost btn-sm" onClick={() => setDetailId(tk.processInstanceId)} title={tk.title || tk.businessKey}>
                         <IconSearch width={13} height={13} /> {t('common.detail')}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'delegate', task: tk })}>
+                        <IconUser width={13} height={13} /> {t('todo.delegate')}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'return', task: tk })}>
                         <IconReturn width={13} height={13} /> {t('todo.return')}
@@ -154,12 +225,26 @@ export default function TodoPage() {
             </tbody>
           </table>
         </div>
+        {paged && paged.total > PAGE_SIZE && (
+          <div className="pager">
+            <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => goto(page - 1)}>
+              {t('page.prev')}
+            </button>
+            <span className="dim">{t('page.info').replace('{page}', String(page + 1)).replace('{total}', String(totalPages))}</span>
+            <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => goto(page + 1)}>
+              {t('page.next')}
+            </button>
+          </div>
+        )}
       </Panel>
 
-      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} />}
+      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={() => load()} />}
 
       {active?.type === 'complete' && (
         <CompleteModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => completeTask(active.task.taskId, { ...r, actor: userId }))} />
+      )}
+      {active?.type === 'delegate' && (
+        <DelegateModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(assignee, reason) => run(() => delegateTask(active.task.taskId, { assignee, reason, actor: userId }))} />
       )}
       {active?.type === 'return' && (
         <ReturnModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => returnTask(active.task.taskId, { ...r, actor: userId }))} />
@@ -174,34 +259,32 @@ export default function TodoPage() {
   );
 }
 
-function CompleteModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (r: import('@/types').CompleteTaskRequest) => void }) {
+function DelegateModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (assignee: string, reason: string) => void }) {
   const { t } = useTranslation();
-  const [outcome, setOutcome] = useState<'APPROVE' | 'REJECT'>('APPROVE');
-  const [comment, setComment] = useState('');
+  const [assignee, setAssignee] = useState('');
+  const [reason, setReason] = useState('');
   return (
     <Modal
-      title={`${t('todo.completeTitle')} · ${task.name}`}
+      title={`${t('todo.delegateTitle')} · ${task.name}`}
       onClose={onClose}
       footer={
         <>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => onSubmit({ outcome, comment, actor: '' })}>
-            <IconCheck width={14} height={14} /> {t('common.submit')}
+          <button className="btn btn-sm" disabled={busy || !assignee.trim()} onClick={() => onSubmit(assignee.trim(), reason)}>
+            <IconUser width={14} height={14} /> {t('common.submit')}
           </button>
         </>
       }
     >
       <div className="field">
-        <label className="field-label">{t('todo.outcome')}</label>
-        <div className="row">
-          <label className="check"><input type="radio" name="outcome" checked={outcome === 'APPROVE'} onChange={() => setOutcome('APPROVE')} /> {t('todo.outcome.approve')}</label>
-          <label className="check"><input type="radio" name="outcome" checked={outcome === 'REJECT'} onChange={() => setOutcome('REJECT')} /> {t('todo.outcome.reject')}</label>
-        </div>
+        <label className="field-label">{t('todo.delegateUser')}</label>
+        <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="carol" />
       </div>
       <div className="field">
-        <label className="field-label">{t('todo.comment')}</label>
-        <textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} />
+        <label className="field-label">{t('todo.delegateReason')}</label>
+        <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
+      <p className="dim">{t('todo.delegateHint')}</p>
     </Modal>
   );
 }

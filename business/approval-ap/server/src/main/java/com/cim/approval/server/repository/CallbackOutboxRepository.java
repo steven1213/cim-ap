@@ -26,4 +26,5 @@ public interface CallbackOutboxRepository extends JpaRepository<CallbackOutbox, 
     List<CallbackOutbox> findByBusinessKey(String businessKey);
 
     List<CallbackOutbox> findByAppCode(String appCode);
+    long countByStatus(com.cim.approval.server.domain.CallbackOutbox.Status status);
 }

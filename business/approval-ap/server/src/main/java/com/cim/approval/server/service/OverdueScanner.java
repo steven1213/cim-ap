@@ -20,9 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 超时任务扫描：定时检查运行中任务的停留时长，超过阈值（approval.task.timeout-minutes）
- * 向办理人/候选人推送一次 SSE 提醒（TASK_OVERDUE）。
+ * 向办理人/候选人推送 SSE 提醒（TASK_OVERDUE）。
  *
- * <p>每任务只提醒一次（内存去重，重启后会再提醒一次，可接受）；
+ * <p>重推策略：同任务每 {@code approval.task.renotify-hours}（默认 4h）重推一次，
+ * 而非终身一次——持续超时的任务保持提醒压力。内存记录，重启后首轮会重推一次（可接受）；
  * 多实例部署应替换为分布式调度 + DB 去重表。与列表侧的超时标红互补：
  * 列表标红是「查看时可见」，本扫描是「不查看也送达」。</p>
  */
@@ -38,20 +39,26 @@ public class OverdueScanner {
     @Value("${approval.task.timeout-minutes:1440}")
     private double timeoutMinutes;
 
-    /** 已推送提醒的任务集合（简单内存去重）。 */
-    private final Set<String> alerted = ConcurrentHashMap.newKeySet();
+    /** 同任务重推间隔（小时）。 */
+    @Value("${approval.task.renotify-hours:4}")
+    private double renotifyHours;
+
+    /** 任务 → 最近推送时间（内存；重启后首轮重推一次，可接受）。 */
+    private final Map<String, Instant> lastNotified = new ConcurrentHashMap<>();
 
     @Scheduled(
             initialDelayString = "${approval.task.scan-initial-delay-ms:60000}",
             fixedDelayString = "${approval.task.scan-interval-ms:300000}")
     public void scan() {
         Instant threshold = Instant.now().minus(Duration.ofMillis((long) (timeoutMinutes * 60_000)));
+        Duration renotifyGap = Duration.ofMillis((long) (renotifyHours * 3_600_000));
         List<Task> overdue = taskService.createTaskQuery()
                 .active()
                 .taskCreatedBefore(Date.from(threshold))
                 .list();
         for (Task t : overdue) {
-            if (!alerted.add(t.getId())) {
+            Instant last = lastNotified.get(t.getId());
+            if (last != null && Duration.between(last, Instant.now()).compareTo(renotifyGap) < 0) {
                 continue;
             }
             // 扫描间隙实例可能已结束
@@ -76,6 +83,9 @@ public class OverdueScanner {
                         "name", t.getName(),
                         "processInstanceId", t.getProcessInstanceId(),
                         "overdueMinutes", overdueMinutes));
+            }
+            if (!users.isEmpty()) {
+                lastNotified.put(t.getId(), Instant.now());
             }
         }
     }

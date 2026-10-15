@@ -17,6 +17,8 @@ public record TaskView(
         Instant createdAt,
         Instant dueDate,
         /** 超出超时阈值的分钟数（小数）；未超时为 null。 */
-        Double overdueMinutes
+        Double overdueMinutes,
+        /** Flowable 委派状态：PENDING=受托人待归还；历史/普通任务为 null。 */
+        String delegationState
 ) {
 }

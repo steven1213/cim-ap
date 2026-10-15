@@ -44,6 +44,7 @@ public class CallbackService {
     private final CallbackRegistrationRepository registrationRepository;
     private final CallbackOutboxRepository outboxRepository;
     private final AuditService auditService;
+    private final WebhookNotifyService webhookNotifyService;
     private final ObjectMapper objectMapper;
 
     private static final HttpClient HTTP = HttpClient.newBuilder()
@@ -166,6 +167,10 @@ public class CallbackService {
             o.setStatus(CallbackOutbox.Status.DEAD);
             auditService.append(o.getBusinessKey(), null, null, "CALLBACK_FAILED", "system",
                     "RETRY", "DEAD", "messageId=" + o.getMessageId() + " attempts=" + o.getAttempts());
+            // 死信告警：通知运维人工介入（webhook 未配置时降级为日志）
+            webhookNotifyService.alert("【审批平台告警】回调投递死信: businessKey=" + o.getBusinessKey()
+                    + " appCode=" + o.getAppCode() + " messageId=" + o.getMessageId()
+                    + " err=" + o.getLastError());
         } else {
             o.setStatus(CallbackOutbox.Status.PENDING);
             o.setNextRetryAt(Instant.now().plusSeconds(backoff(o.getAttempts())));
@@ -174,6 +179,61 @@ public class CallbackService {
 
     private long backoff(int attempts) {
         return Math.min(30L * (1L << Math.min(attempts, 6)), 600L); // 30s 起指数退避，封顶 10 分钟
+    }
+
+    /** 回调投递统计（原型「回调管理」KPI）：成功/失败/重试中/成功率/平均耗时。 */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Map<String, Object> outboxStats() {
+        long sent = outboxRepository.countByStatus(CallbackOutbox.Status.SENT);
+        long dead = outboxRepository.countByStatus(CallbackOutbox.Status.DEAD);
+        long pending = outboxRepository.countByStatus(CallbackOutbox.Status.PENDING);
+        long total = sent + dead + pending;
+        List<CallbackOutbox> all = outboxRepository.findAll();
+        double avgCostMs = all.stream()
+                .filter(o -> o.getStatus() == CallbackOutbox.Status.SENT)
+                .filter(o -> o.getSentAt() != null)
+                .mapToLong(o -> java.time.Duration.between(o.getCreatedAt(), o.getSentAt()).toMillis())
+                .average().orElse(0);
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("sent", sent);
+        m.put("dead", dead);
+        m.put("pending", pending);
+        m.put("successRate", total > 0 ? (double) sent / total : null);
+        m.put("avgCostMs", avgCostMs);
+        return m;
+    }
+
+    /** 测试请求：写入一条 TEST 事件并立即投递一次，返回投递结果（原型「测试」按钮）。 */
+    @Transactional
+    public Map<String, Object> sendTestCallback(String appCode) {
+        CallbackRegistration reg = registrationRepository.findByAppCode(appCode)
+                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "回调配置不存在: " + appCode));
+        CallbackOutbox o = new CallbackOutbox();
+        o.setId(UUID.randomUUID().toString());
+        o.setMessageId(UUID.randomUUID().toString());
+        o.setAppCode(appCode);
+        o.setBusinessKey("TEST-" + UUID.randomUUID().toString().substring(0, 8));
+        o.setEventType("TEST");
+        try {
+            o.setPayload(objectMapper.writeValueAsString(Map.of(
+                    "type", "TEST",
+                    "message", "审批平台连通性测试",
+                    "sentAt", Instant.now().toString())));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+        o.setStatus(CallbackOutbox.Status.PENDING);
+        o.setAttempts(0);
+        o.setMaxAttempts(1);
+        o.setNextRetryAt(Instant.now());
+        o.setCreatedAt(Instant.now());
+        outboxRepository.save(o);
+        deliver(o);
+        Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("messageId", o.getMessageId());
+        r.put("status", o.getStatus().name());
+        r.put("lastError", o.getLastError());
+        return r;
     }
 
     public List<OutboxView> queryOutbox(String appCode, String businessKey) {

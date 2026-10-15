@@ -91,12 +91,12 @@ class ApprovalFlowIntegrationTest {
 
     private static StartProcessRequest single(String bk, String tenant, String assignee) {
         return new StartProcessRequest("singleApproval", bk, tenant, "initiator", "单级审批",
-                null, assignee, null);
+                null, assignee, null, null, null);
     }
 
     private static StartProcessRequest countersign(String bk, String tenant, List<String> approvers) {
         return new StartProcessRequest("countersignApproval", bk, tenant, "initiator", "会签",
-                approvers, null, null);
+                approvers, null, null, null, null);
     }
 
     private static String taskIdFor(List<TaskView> todos, String user) {
@@ -153,7 +153,7 @@ class ApprovalFlowIntegrationTest {
     void returnTask_backToLeaderCreatesNewTask() {
         String bk = "bk-return";
         processService.startProcess(new StartProcessRequest("twoStepApproval", bk, "default", "init", "两级",
-                null, null, Map.of("leader", "alice", "manager", "bob")));
+                null, null, Map.of("leader", "alice", "manager", "bob"), null, null));
         processService.completeTask(taskIdFor(processService.listTodo("alice", "default"), "alice"),
                 new CompleteTaskRequest("APPROVE", "ok", "alice"));
         // bob 当前待办

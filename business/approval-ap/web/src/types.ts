@@ -6,6 +6,8 @@ export interface ProcessDefinitionView {
   name: string;
   version: number;
   tenantId: string;
+  /** 停用后不可发起新实例。 */
+  suspended?: boolean;
 }
 
 export interface TaskView {
@@ -23,6 +25,8 @@ export interface TaskView {
   dueDate: string | null;
   /** 超出超时阈值的分钟数；未超时为 null。 */
   overdueMinutes?: number | null;
+  /** Flowable 委派状态：PENDING=受托人待归还。 */
+  delegationState?: string | null;
 }
 
 export interface ProcessInstanceView {
@@ -184,4 +188,14 @@ export interface NotificationEvent {
   title?: string;
   businessKey?: string;
   from?: string;
+}
+
+// 审批效率统计（Dashboard）。
+export interface StatsView {
+  todoCount: number;
+  overdueCount: number;
+  avgCompleteHours: number | null;
+  rejectRate: number | null;
+  workloads: { assignee: string; done: number; todo: number }[];
+  trend: { date: string; started: number; completed: number }[];
 }

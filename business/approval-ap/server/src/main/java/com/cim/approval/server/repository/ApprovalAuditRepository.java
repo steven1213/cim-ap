@@ -16,4 +16,9 @@ public interface ApprovalAuditRepository extends JpaRepository<ApprovalAudit, St
     java.util.Optional<ApprovalAudit> findTopByBusinessKeyOrderBySeqDesc(String businessKey);
 
     boolean existsByProcessInstanceIdAndActor(String processInstanceId, String actor);
+
+    long countByActionAndCreatedAtAfter(String action, java.time.Instant since);
+
+    /** 撤回策略：实例已产生任一审批票（COMPLETE_*）则不可撤回。 */
+    boolean existsByProcessInstanceIdAndActionStartingWith(String processInstanceId, String actionPrefix);
 }

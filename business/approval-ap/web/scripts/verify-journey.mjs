@@ -6,8 +6,10 @@ const { chromium } = require('playwright-core');
 const API = 'http://localhost:8085/api/v1/approval';
 async function api(path, opts = {}) {
   const r = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
-  const body = await r.json().catch(() => null);
-  return { status: r.status, body };
+  const raw = await r.json().catch(() => null);
+  // 平台 Result 包装：业务数据在 data
+  const body = raw && typeof raw === 'object' && 'code' in raw ? raw.data : raw;
+  return { status: r.status, body, raw };
 }
 const RUN = 'J' + (Date.now() % 100000);
 const start = (bk) => {
@@ -63,21 +65,40 @@ check(urgeEvent && urgeEvent.type === 'URGE' && urgeEvent.businessKey.startsWith
 const urgeBob = await api(`/processes/instances/${urgeId}/urge?actor=bob`, { method: 'POST' });
 check(urgeBob.status === 403 || urgeBob.body?.code === 2003, '非发起人催办被拒（403/ACCESS_DENIED）');
 
-// ---- 2) 我发起的：ACTIVE 行有催办/撤回按钮；撤回 WD-J-1 ----
+// ---- 2) 我发起的：ACTIVE 行有催办/撤回按钮；撤回 WD 行 ----
+// 注意：列表已分页（size=10），搜索只过滤当前页；历史 ACTIVE 实例可能占满第一页 → 跨页查找
+async function findRow(text) {
+  for (let p = 0; p < 8; p++) {
+    const row = page.locator('tr', { hasText: text }).first();
+    if ((await row.count()) > 0) return row;
+    const nextBtn = page.locator('.pager button', { hasText: '下一页' });
+    if ((await nextBtn.count()) === 0 || (await nextBtn.isDisabled().catch(() => true))) break;
+    await nextBtn.click();
+    await page.waitForTimeout(900);
+  }
+  return null;
+}
+
 await page.goto('http://[::1]:5175/initiated');
 await page.waitForSelector('table.data tbody tr');
 await page.waitForTimeout(600);
-const activeRow = page.locator('tr', { hasText: `URGE-J-${RUN}` }).first();
+const activeRow = await findRow(`URGE-J-${RUN}`);
+check(!!activeRow, '定位到运行中实例行');
 check(await activeRow.locator('button', { hasText: '催办' }).count() === 1, '运行中行显示「催办」按钮');
 check(await activeRow.locator('button', { hasText: '撤回' }).count() === 1, '运行中行显示「撤回」按钮');
 
 page.on('dialog', (d) => d.accept());
-const wdRow = page.locator('tr', { hasText: `WD-J-${RUN}` }).first();
+const wdRow = await findRow(`WD-J-${RUN}`);
+check(!!wdRow, '定位到待撤回实例行');
 await wdRow.locator('button', { hasText: '撤回' }).first().click();
-await page.waitForTimeout(1500);
-const wdText = await wdRow.innerText().catch(() => '');
+let wdText = '';
+for (let i = 0; i < 10; i++) {
+  await page.waitForTimeout(1000);
+  wdText = await wdRow.innerText().catch(() => '');
+  if (wdText.includes('已撤回')) break;
+}
 check(wdText.includes('已撤回'), '撤回后状态变「已撤回」');
-const wRowAfter = page.locator('tr', { hasText: `WD-J-${RUN}` }).first();
+const wRowAfter = await findRow(`WD-J-${RUN}`);
 check(await wRowAfter.locator('button', { hasText: '催办' }).count() === 0, '已撤回行不再显示催办/撤回按钮');
 
 // ---- 3) 详情：历史含 WITHDRAW 标签；状态「已撤回」 ----

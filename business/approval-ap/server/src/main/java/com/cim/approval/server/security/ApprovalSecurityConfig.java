@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -53,6 +54,29 @@ public class ApprovalSecurityConfig {
                 .authorizeHttpRequests(a -> a.anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->
                         response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized")))
+                // EventSource(SSE) 与 <a download> 无法携带 Authorization 头：允许 ?token=<JWT> 注入
+                .addFilterBefore((request, response, chain) -> {
+                    if (request instanceof jakarta.servlet.http.HttpServletRequest req) {
+                        String token = req.getParameter("token");
+                        String existing = req.getHeader(HttpHeaders.AUTHORIZATION);
+                        if (token != null && !token.isBlank()
+                                && (existing == null || !existing.startsWith("Bearer "))) {
+                            String auth = "Bearer " + token;
+                            request = new jakarta.servlet.http.HttpServletRequestWrapper(req) {
+                                @Override public String getHeader(String name) {
+                                    return HttpHeaders.AUTHORIZATION.equalsIgnoreCase(name) ? auth : super.getHeader(name);
+                                }
+                                @Override public java.util.Enumeration<String> getHeaders(String name) {
+                                    if (HttpHeaders.AUTHORIZATION.equalsIgnoreCase(name)) {
+                                        return java.util.Collections.enumeration(java.util.List.of(auth));
+                                    }
+                                    return super.getHeaders(name);
+                                }
+                            };
+                        }
+                    }
+                    chain.doFilter(request, response);
+                }, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

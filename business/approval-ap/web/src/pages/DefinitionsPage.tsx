@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Panel from '@/components/Panel';
 import Modal from '@/components/Modal';
 import { IconFlow, IconPlay, IconPencil, IconPlus, IconX } from '@/components/Icons';
-import { listDefinitions, startProcess } from '@/lib/api';
+import { listDefinitions, startProcess, suspendDefinition, duplicateDefinition } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { parseVariables } from '@/lib/format';
@@ -36,6 +36,35 @@ export default function DefinitionsPage() {
     latestVersionOf.set(d.key, Math.max(latestVersionOf.get(d.key) ?? 0, d.version));
   }
   const isLatest = (d: ProcessDefinitionView) => latestVersionOf.get(d.key) === d.version;
+  const [busyDef, setBusyDef] = useState<string | null>(null);
+
+  const [duplicating, setDuplicating] = useState<string | null>(null);
+
+  async function onDuplicate(d: ProcessDefinitionView) {
+    setDuplicating(d.id);
+    try {
+      const copy = await duplicateDefinition(d.id);
+      toast(t('def.duplicateOk') + '：' + copy.key, 'ok');
+      await load();
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setDuplicating(null);
+    }
+  }
+
+  async function onToggleSuspend(d: ProcessDefinitionView) {
+    setBusyDef(d.id);
+    try {
+      await suspendDefinition(d.id, !d.suspended);
+      toast(d.suspended ? t('def.activateOk') : t('def.suspendOk'), 'ok');
+      await load();
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    } finally {
+      setBusyDef(null);
+    }
+  }
 
   return (
     <div className="page">
@@ -85,6 +114,7 @@ export default function DefinitionsPage() {
                     <td className="num">v{d.version}</td>
                     <td>
                       <span className={'tag ' + (latest ? 'ok' : '')}>{t(latest ? 'def.status.latest' : 'def.status.history')}</span>
+                      {d.suspended && <span className="tag warn" style={{ marginLeft: 4 }}>{t('def.suspended')}</span>}
                     </td>
                     <td>{d.tenantId ?? '—'}</td>
                     <td>
@@ -104,9 +134,27 @@ export default function DefinitionsPage() {
                             {t('def.action.view')}
                           </button>
                         )}
-                        {latest && (
+                        {latest && !d.suspended && (
                           <button className="btn btn-ghost btn-sm" onClick={() => setShowStart(true)}>
                             {t('def.start')}
+                          </button>
+                        )}
+                        {latest && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={duplicating === d.id}
+                            onClick={() => onDuplicate(d)}
+                          >
+                            {t('def.duplicate')}
+                          </button>
+                        )}
+                        {latest && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={busyDef === d.id}
+                            onClick={() => onToggleSuspend(d)}
+                          >
+                            {d.suspended ? t('def.activate') : t('def.suspendAction')}
                           </button>
                         )}
                       </div>
@@ -155,7 +203,9 @@ interface StartModalProps {
 }
 
 /** 发起表单草稿（localStorage 暂存，关闭/刷新不丢；提交成功后清除）。 */
-const DRAFT_KEY = 'approval.draft.v1';
+/** 草稿按 processKey 分槽，避免不同定义字段串台。 */
+const draftKeyOf = (pk: string) => `approval.draft.v1:${pk}`;
+const DRAFT_KEY = 'approval.draft.v1'; // 兼容旧草稿的一次性迁移读取
 
 interface DraftShape {
   processKey: string;
@@ -169,6 +219,17 @@ interface DraftShape {
 
 function loadDraft(): DraftShape | null {
   try {
+    // 优先读分槽草稿（approval.draft.v1:<key>），回退旧版单槽
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('approval.draft.v1:')) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d && typeof d === 'object') return d as DraftShape;
+        }
+      }
+    }
     const raw = localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
@@ -204,6 +265,8 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
   const [draftRestored, setDraftRestored] = useState(
     !!saved && !!(saved.businessKey?.trim() || saved.title?.trim()),
   );
+  /** 会签定义（key 含 countersign）需要 approvers 列表；其余显示单人 assignee——防选错定义 500 */
+  const isCountersign = processKey.toLowerCase().includes('countersign');
 
   // 草稿自动暂存：有任何实质内容即写 localStorage
   useEffect(() => {
@@ -212,7 +275,8 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
     if (!hasContent) return;
     const draft: DraftShape = { processKey, businessKey, title, assignee, approvers, variables, formRows };
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      localStorage.setItem(draftKeyOf(processKey), JSON.stringify(draft));
+      localStorage.removeItem(DRAFT_KEY);
     } catch {
       /* 存储满等异常静默 */
     }
@@ -261,7 +325,7 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
       formSchema: formSchema.length > 0 ? formSchema : null,
     });
     // 提交成功路径由父组件关闭弹窗；无论成败先清草稿（表单内容仍在弹窗中，失败可重试）
-    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(draftKeyOf(processKey));
     setDraftRestored(false);
   }
 
@@ -287,7 +351,7 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
             className="btn btn-ghost btn-sm"
             style={{ marginLeft: 8 }}
             onClick={() => {
-              localStorage.removeItem(DRAFT_KEY);
+              localStorage.removeItem(draftKeyOf(processKey));
               setDraftRestored(false);
             }}
           >
@@ -314,18 +378,21 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="配方签核 / 请假申请" />
       </div>
       <div className="grid-2">
-        <div className="field">
-          <label className="field-label">
-            {t('def.form.assignee')} <span className="opt">(single)</span>
-          </label>
-          <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="alice" />
-        </div>
-        <div className="field">
-          <label className="field-label">
-            {t('def.form.approvers')} <span className="opt">(countersign)</span>
-          </label>
-          <input value={approvers} onChange={(e) => setApprovers(e.target.value)} placeholder="bob,carol" />
-        </div>
+        {isCountersign ? (
+          <div className="field">
+            <label className="field-label">
+              {t('def.form.approvers')} <span className="opt">(countersign · required)</span>
+            </label>
+            <input value={approvers} onChange={(e) => setApprovers(e.target.value)} placeholder="bob,carol" />
+          </div>
+        ) : (
+          <div className="field">
+            <label className="field-label">
+              {t('def.form.assignee')} <span className="opt">(single)</span>
+            </label>
+            <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="alice" />
+          </div>
+        )}
       </div>
       <div className="field">
         <label className="field-label">

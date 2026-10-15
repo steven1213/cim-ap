@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Panel from '@/components/Panel';
 import { IconWebhook, IconPlus, IconSend, IconRefresh } from '@/components/Icons';
-import { listCallbacks, registerCallback, queryOutbox, deliverMessage } from '@/lib/api';
+import { listCallbacks, registerCallback, queryOutbox, deliverMessage, getOutboxStats, testCallback } from '@/lib/api';
 import { toast } from '@/store/toastStore';
 import { fmtDate } from '@/lib/format';
 import type { CallbackRegistrationView, OutboxView } from '@/types';
@@ -17,6 +17,8 @@ export default function CallbacksPage() {
   const { t } = useTranslation();
   const [regs, setRegs] = useState<CallbackRegistrationView[]>([]);
   const [outbox, setOutbox] = useState<OutboxView[]>([]);
+  const [stats, setStats] = useState<Record<string, number> | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
   const [appCode, setAppCode] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [secret, setSecret] = useState('');
@@ -26,6 +28,7 @@ export default function CallbacksPage() {
   async function load() {
     try {
       const [r, o] = await Promise.all([listCallbacks(), queryOutbox()]);
+      getOutboxStats().then(setStats).catch(() => {});
       setRegs(r);
       setOutbox(o);
     } catch (e) {
@@ -96,6 +99,18 @@ export default function CallbacksPage() {
         </div>
       </Panel>
 
+      {stats && (
+        <Panel title={t('cb.stats.title')} sub={t('cb.stats.sub')}>
+          <div className="kpi-grid">
+            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.sent')}</span><span className="kpi-val">{stats.sent}</span></span></div>
+            <div className="kpi warn"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.pending')}</span><span className="kpi-val">{stats.pending}</span></span></div>
+            <div className={'kpi' + (stats.dead > 0 ? ' err' : '')}><span className="kpi-main"><span className="kpi-label">{t('cb.stats.dead')}</span><span className="kpi-val">{stats.dead}</span></span></div>
+            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.rate')}</span><span className="kpi-val">{stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'}</span></span></div>
+            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.cost')}</span><span className="kpi-val">{stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'}</span></span></div>
+          </div>
+        </Panel>
+      )}
+
       <Panel
         title={t('cb.title')}
         sub={t('cb.sub')}
@@ -134,6 +149,27 @@ export default function CallbacksPage() {
                     <span className={'tag ' + (r.enabled ? 'ok' : 'err')}>
                       {r.enabled ? t('status.enabled') : t('status.disabled')}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={testing === r.appCode}
+                      onClick={async () => {
+                        setTesting(r.appCode);
+                        try {
+                          const res = await testCallback(r.appCode);
+                          toast(res.status === 'SENT' ? t('cb.testOk') : `${t('cb.testFail')}：${res.lastError ?? res.status}`,
+                            res.status === 'SENT' ? 'ok' : 'err');
+                          await load();
+                        } catch (e) {
+                          toast((e as Error).message, 'err');
+                        } finally {
+                          setTesting(null);
+                        }
+                      }}
+                    >
+                      {t('cb.test')}
+                    </button>
                   </td>
                   <td className="mono">{fmtDate(r.updatedAt)}</td>
                 </tr>

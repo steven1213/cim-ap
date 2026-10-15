@@ -10,6 +10,7 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.identitylink.api.IdentityLink;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 动态选人（改派）：将任务重新指派给目标办理人，清退原有候选，记入审计并通知新人。
@@ -23,6 +24,7 @@ public class ApprovalReassignService {
     private final AuditService auditService;
     private final NotificationService notificationService;
 
+    @Transactional
     public void reassign(String taskId, ReassignRequest req) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         if (task == null) {

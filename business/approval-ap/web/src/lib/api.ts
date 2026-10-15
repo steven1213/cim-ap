@@ -20,6 +20,7 @@ import type {
   ReassignRequest,
   ReturnRequest,
   StartProcessRequest,
+  StatsView,
   TaskView,
   AttachmentView,
 } from '@/types';
@@ -32,7 +33,21 @@ export interface ApiError extends Error {
 const http: AxiosInstance = axios.create({ baseURL: '/api/v1/approval' });
 
 http.interceptors.response.use(
-  (resp) => resp,
+  (resp) => {
+    // 平台统一返回结构（platform README §4）：{code, msg, data, ...}
+    // code===0 视为成功，把 data 解包给调用方；非 0 统一抛错（HTTP 状态可能为 200）
+    const body = resp?.data;
+    if (body && typeof body === 'object' && 'code' in body && 'data' in body) {
+      if (body.code !== 0) {
+        const e: ApiError = new Error(body.msg || '请求失败');
+        e.code = body.code;
+        e.errors = body.errors;
+        return Promise.reject(e);
+      }
+      resp.data = body.data;
+    }
+    return resp;
+  },
   (error) => {
     const data = error?.response?.data;
     let message = error?.message || '请求失败';
@@ -125,6 +140,50 @@ export function listInitiated(userId?: string, tenantId?: string): Promise<Proce
   return apiGet<ProcessInstanceView[]>('/tasks/initiated', { userId: id, tenantId: tn });
 }
 
+export function listTodoPaged(page1: number, size: number): Promise<PageResult<TaskView>> {
+  const { userId, tenantId } = currentIdentity();
+  return apiGet<PageResult<TaskView>>(`/tasks/todo/page?page=${page1}&size=${size}`, { userId, tenantId });
+}
+export function listDonePaged(page1: number, size: number): Promise<PageResult<TaskView>> {
+  const { userId, tenantId } = currentIdentity();
+  return apiGet<PageResult<TaskView>>(`/tasks/done/page?page=${page1}&size=${size}`, { userId, tenantId });
+}
+export function listInitiatedPaged(page1: number, size: number): Promise<PageResult<ProcessInstanceView>> {
+  const { userId, tenantId } = currentIdentity();
+  return apiGet<PageResult<ProcessInstanceView>>(`/processes/initiated/page?page=${page1}&size=${size}`, { userId, tenantId });
+}
+// 平台分页结构（cim-core PageResult：records/total/page/size）
+export interface PageResult<T> {
+  records: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+export function batchComplete(body: { taskIds: string[]; outcome: string; comment?: string; actor: string })
+  : Promise<{ taskId: string; ok: boolean; error: string | null }[]> {
+  return apiPost('/tasks/batch-complete', body);
+}
+export function delegateTask(taskId: string, body: { assignee: string; reason?: string; actor: string }): Promise<void> {
+  return apiPost(`/tasks/${encodeURIComponent(taskId)}/delegate`, body);
+}
+export function resolveTask(taskId: string, body: { comment?: string; actor: string }): Promise<void> {
+  return apiPost(`/tasks/${encodeURIComponent(taskId)}/resolve`, body);
+}
+export function getStats(days = 30): Promise<StatsView> {
+  return apiGet(`/stats?days=${days}`);
+}
+export function suspendDefinition(definitionId: string, suspend: boolean): Promise<void> {
+  return apiPost(`/processes/${encodeURIComponent(definitionId)}/suspend?suspend=${suspend}`, null);
+}
+export function duplicateDefinition(definitionId: string): Promise<ProcessDefinitionView> {
+  return apiPost<ProcessDefinitionView>(`/processes/${encodeURIComponent(definitionId)}/duplicate`);
+}
+export function getOutboxStats(): Promise<Record<string, number>> {
+  return apiGet('/callbacks/outbox/stats');
+}
+export function testCallback(appCode: string): Promise<{ messageId: string; status: string; lastError: string | null }> {
+  return apiPost(`/callbacks/test/${encodeURIComponent(appCode)}`);
+}
 export function completeTask(taskId: string, req: CompleteTaskRequest): Promise<void> {
   return apiPost<void>(`/tasks/${taskId}/complete`, req);
 }

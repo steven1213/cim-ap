@@ -5,6 +5,8 @@ public record ProcessDefinitionView(
         String key,
         String name,
         int version,
-        String tenantId
+        String tenantId,
+        /** 停用后不可发起新实例。 */
+        boolean suspended
 ) {
 }
