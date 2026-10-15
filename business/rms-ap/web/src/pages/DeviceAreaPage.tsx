@@ -198,7 +198,7 @@ function AreaModal({
           <div className="field">
             <label className="field-label">{t('rms.deviceArea.parent')}</label>
             <select className="text-input" value={parentId} onChange={(e) => setParentId(e.target.value)}>
-              <option value="">—</option>
+              <option value="">{t('rms.deviceArea.parentEmpty')}</option>
               {parentOptions.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}

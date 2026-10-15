@@ -43,6 +43,14 @@ public class Recipe extends BaseDefData {
     @Column(name = "golden", nullable = false)
     private boolean golden = false;
 
+    /** 父配方（Req 15：主 Recipe / 子 Recipe，自引用，不限层级；顶级为 {@code null}）。 */
+    @Column(name = "parent_id", length = 64)
+    private String parentId;
+
+    /** 层级深度（顶级 0，子级 = 父 + 1；冗余便于排序与结构比对展示）。 */
+    @Column(name = "recipe_level", nullable = false)
+    private int recipeLevel = 0;
+
     /** 当前生效版本 ID（至多一个 ACTIVE 的快速索引；约束由服务层保证）。 */
     @Column(name = "active_version_id", length = 64)
     private String activeVersionId;

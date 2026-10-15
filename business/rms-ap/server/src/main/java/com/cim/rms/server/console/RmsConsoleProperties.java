@@ -20,6 +20,9 @@ public class RmsConsoleProperties {
     /** 是否同时种子首管理员的本地授权档案（{@code sys_user} + {@code RMS_ADMIN}）。默认 true。 */
     private boolean seedAdminProfile = true;
 
+    /** 是否同时种子英文译文（{@code sys_i18n}）。默认 true；纯中文环境可关。 */
+    private boolean seedEnglish = true;
+
     /** 控制台管理员的显示名（种子 {@code sys_user.display_name}）。 */
     private String adminDisplayName = "RMS 管理员";
 
@@ -37,6 +40,14 @@ public class RmsConsoleProperties {
 
     public void setSeedAdminProfile(boolean seedAdminProfile) {
         this.seedAdminProfile = seedAdminProfile;
+    }
+
+    public boolean isSeedEnglish() {
+        return seedEnglish;
+    }
+
+    public void setSeedEnglish(boolean seedEnglish) {
+        this.seedEnglish = seedEnglish;
     }
 
     public String getAdminDisplayName() {

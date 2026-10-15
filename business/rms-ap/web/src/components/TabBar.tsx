@@ -1,0 +1,295 @@
+// 多标签导航条（tags-view）：点击菜单打开的页签在此聚合成一行。
+//
+// <p><b>交互契约</b>：
+// <ul>
+//   <li>「概览」为固定签（pinned），无关闭徽标，右键菜单的「关闭标签页」对其禁用；</li>
+//   <li>每个签支持<b>右键菜单</b>：关闭标签页 / 关闭其它标签页 / 关闭右侧标签页 /
+//       关闭全部标签页（对齐 Ant Design Pro / vue-element-admin 的 tags-view 惯例）；</li>
+//   <li>页签溢出时两侧出现滚动箭头，激活签变化时自动滚入可视区；</li>
+//   <li>关闭激活签时由 {@link useTabStore} 决定相邻签并导航过去（优先右邻）。</li>
+// </ul></p>
+//
+// <p>标题解析优先取 {@link NAV_FLAT} 的文案码（随导航配置即时更新），回退到开签时快照——
+// 只存码不存译文，切语言即时生效。</p>
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { NAV_FLAT } from '@/lib/navConfig';
+import { HOME_PATH, useTabStore } from '@/store/tabStore';
+import { IconChevron, IconX } from '@/components/Icons';
+
+/** 右键菜单状态：屏幕坐标 + 目标签路径。 */
+interface CtxMenu {
+  x: number;
+  y: number;
+  path: string;
+}
+
+export default function TabBar() {
+  const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const tabs = useTabStore((s) => s.tabs);
+  const activePath = useTabStore((s) => s.activePath);
+  const scrollTicket = useTabStore((s) => s.scrollTicket);
+  const requestScroll = useTabStore((s) => s.requestScroll);
+  const setActive = useTabStore((s) => s.setActive);
+  const close = useTabStore((s) => s.close);
+  const closeOthers = useTabStore((s) => s.closeOthers);
+  const closeRight = useTabStore((s) => s.closeRight);
+  const closeAll = useTabStore((s) => s.closeAll);
+
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<HTMLDivElement>(null);
+  const [ctx, setCtx] = useState<CtxMenu | null>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+  /** 滑动胶囊指示器：激活签在滚动内容坐标系里的位置与宽度（content 坐标，随滚动自然移动）。 */
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
+
+  /** 标题：导航配置优先（码最新），回退开签快照；两者皆空显示路径。 */
+  function titleOf(path: string, i18nCode: string): string {
+    const code = NAV_FLAT.find((m) => m.path === path)?.i18n ?? i18nCode;
+    return code ? t(code) : path;
+  }
+
+  /** 依据滚动位置刷新左右箭头的可用态（scroll 事件 + ResizeObserver 双触发）。 */
+  const updateArrows = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 1);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    updateArrows();
+    const el = scrollerRef.current;
+    if (!el) return;
+    const onScroll = () => updateArrows();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(onScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, [updateArrows, tabs]);
+
+  /**
+   * 同步激活签：滚入可视区（贴缘留 24px）+ 更新滑动胶囊指示器几何。
+   *
+   * <p>双 rAF 延后一帧再量几何，等 flex/字体布局稳定。测量用
+   * `getBoundingClientRect` 差值 + `scrollLeft`（`offsetLeft` 相对
+   * offsetParent，受祖先定位影响会算偏）。触发时机覆盖：激活签变化、
+   * 页签增删、任意路由跳转（`location.key`）、切语言（标签宽度变化）、
+   * 以及侧栏/页签点击发出的滚动票证（`scrollTicket`）——票证是
+   * 「点击已激活路由菜单」等一切状态都没变场景下的兜底。</p>
+   */
+  const syncTabs = useCallback(() => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = scrollerRef.current;
+        if (!el) return;
+        const track = el.querySelector<HTMLElement>('.tab-track');
+        const active = el.querySelector<HTMLElement>('[data-active="true"]');
+        if (!track || !active) {
+          setIndicator((s) => ({ ...s, ready: false }));
+          return;
+        }
+        // 指示器与签同以 track 为参照（同一滚动内容系，rect 差值免滚动、免 padding 干扰）
+        const left = active.getBoundingClientRect().left - track.getBoundingClientRect().left;
+        const width = active.offsetWidth;
+        setIndicator({ left, width, ready: true });
+        // 滚动判定仍以 scroller 为参照：签的视口位置决定是否需要滚入
+        const contentLeft = left + (track.getBoundingClientRect().left - el.getBoundingClientRect().left) + el.scrollLeft;
+        const r = contentLeft + width;
+        if (contentLeft < el.scrollLeft + 8) {
+          el.scrollTo({ left: Math.max(0, contentLeft - 24), behavior: 'smooth' });
+        } else if (r > el.scrollLeft + el.clientWidth - 8) {
+          el.scrollTo({ left: r - el.clientWidth + 24, behavior: 'smooth' });
+        }
+      }),
+    );
+  }, []);
+
+  useEffect(() => {
+    syncTabs();
+  }, [syncTabs, activePath, tabs, location.key, scrollTicket, i18n.language]);
+
+  // 右键菜单：点击外部 / Escape 关闭
+  useEffect(() => {
+    if (!ctx) return;
+    const onDown = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtx(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCtx(null);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [ctx]);
+
+  function scrollByDir(dir: -1 | 1) {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(180, el.clientWidth * 0.6), behavior: 'smooth' });
+  }
+
+  function onTab(path: string) {
+    if (path === activePath) {
+      requestScroll(); // 已激活：无状态变化，仍要滚回可视区
+      return;
+    }
+    setActive(path);
+    navigate(path);
+  }
+
+  function onCloseBtn(e: React.MouseEvent, path: string) {
+    e.stopPropagation();
+    const next = close(path);
+    if (next) navigate(next);
+  }
+
+  /** 页签右键菜单（对齐参考实现：关闭标签页 / 关闭其它 / 关闭右侧）。 */
+  function onTabCtx(e: React.MouseEvent, path: string) {
+    e.preventDefault();
+    // 简单钳位，避免菜单溢出视口右/下缘
+    setCtx({
+      x: Math.min(e.clientX, window.innerWidth - 170),
+      y: Math.min(e.clientY, window.innerHeight - 130),
+      path,
+    });
+  }
+
+  function ctxCloseThis() {
+    if (!ctx) return;
+    const next = close(ctx.path);
+    setCtx(null);
+    if (next) navigate(next);
+  }
+
+  function ctxCloseOthers() {
+    if (!ctx) return;
+    closeOthers(ctx.path);
+    setCtx(null);
+  }
+
+  function ctxCloseRight() {
+    if (!ctx) return;
+    const next = closeRight(ctx.path);
+    setCtx(null);
+    if (next) navigate(next);
+  }
+
+  function ctxCloseAll() {
+    if (!ctx) return;
+    const home = closeAll();
+    setCtx(null);
+    if (activePath !== home) navigate(home);
+  }
+
+  return (
+    <div className="tabbar" role="tablist" aria-label={t('rms.shell.tabs.label')}>
+      {canLeft && (
+        <button
+          type="button"
+          className="icon-btn tab-nav"
+          aria-label={t('rms.shell.tabs.scrollLeft')}
+          title={t('rms.shell.tabs.scrollLeft')}
+          onClick={() => scrollByDir(-1)}
+        >
+          <span className="rot-l">
+            <IconChevron width={14} height={14} />
+          </span>
+        </button>
+      )}
+
+      <div className="tabbar-scroll" ref={scrollerRef}>
+        <div className="tab-track">
+          {/* 滑动胶囊指示器：位于签层之下，随激活签平滑滑动（content 坐标，随滚动平移） */}
+          <span
+            className={'tab-indicator' + (indicator.ready ? ' on' : '')}
+            style={{
+              width: indicator.width,
+              transform: `translateX(${indicator.left}px)`,
+            }}
+            aria-hidden="true"
+          />
+          {tabs.map((tab) => {
+            const active = tab.path === activePath;
+            const pinned = tab.path === HOME_PATH;
+            const title = titleOf(tab.path, tab.i18nCode);
+            return (
+              <div
+                key={tab.path}
+                role="tab"
+                aria-selected={active}
+                data-active={active}
+                className={'tab-item' + (active ? ' active' : '') + (pinned ? ' pinned' : '')}
+                title={title}
+                onClick={() => onTab(tab.path)}
+                onContextMenu={(e) => onTabCtx(e, tab.path)}
+              >
+                <span className="tab-label">{title}</span>
+                {!pinned && (
+                  <button
+                    type="button"
+                    className="tab-x"
+                    aria-label={t('rms.shell.tabs.close')}
+                    title={t('rms.shell.tabs.close')}
+                    onClick={(e) => onCloseBtn(e, tab.path)}
+                  >
+                    <IconX width={8} height={8} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {canRight && (
+        <button
+          type="button"
+          className="icon-btn tab-nav"
+          aria-label={t('rms.shell.tabs.scrollRight')}
+          title={t('rms.shell.tabs.scrollRight')}
+          onClick={() => scrollByDir(1)}
+        >
+          <IconChevron width={14} height={14} />
+        </button>
+      )}
+
+      {ctx && (
+        <div className="tab-ctx" role="menu" ref={ctxRef} style={{ left: ctx.x, top: ctx.y }}>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={ctx.path === HOME_PATH}
+            onClick={ctxCloseThis}
+          >
+            {t('rms.shell.tabs.closeThis')}
+          </button>
+          <button type="button" role="menuitem" onClick={ctxCloseOthers}>
+            {t('rms.shell.tabs.closeOthers')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={tabs.findIndex((x) => x.path === ctx.path) >= tabs.length - 1}
+            onClick={ctxCloseRight}
+          >
+            {t('rms.shell.tabs.closeRight')}
+          </button>
+          <button type="button" role="menuitem" onClick={ctxCloseAll}>
+            {t('rms.shell.tabs.closeAll')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

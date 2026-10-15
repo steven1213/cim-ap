@@ -29,3 +29,54 @@ export const DEVICE_VIEW = 'rms:device:view';
 export const DEVICE_CREATE = 'rms:device:create';
 export const DEVICE_UPDATE = 'rms:device:update';
 export const DEVICE_DELETE = 'rms:device:delete';
+
+// ---- 签核流 ----
+export const SIGNOFF_VIEW = 'rms:signoff:view';
+export const SIGNOFF_APPROVE = 'rms:signoff:approve';
+
+// ---- 比对 ----
+export const COMPARE_VIEW = 'rms:compare:view';
+
+// ---- 审计 ----
+export const AUDIT_VIEW = 'rms:audit:view';
+
+// ---- 参数规格 / 模板 ----
+export const SPEC_VIEW = 'rms:spec:view';
+export const SPEC_MANAGE = 'rms:spec:manage';
+
+// ---- 设备授权 ----
+export const DEVICE_AUTH_VIEW = 'rms:device-auth:view';
+export const DEVICE_AUTH_MANAGE = 'rms:device-auth:manage';
+
+// ---- Bypass ----
+export const BYPASS_VIEW = 'rms:bypass:view';
+export const BYPASS_MANAGE = 'rms:bypass:manage';
+
+// ---- 资格矩阵 ----
+export const QUALIFICATION_VIEW = 'rms:qualification:view';
+export const QUALIFICATION_MANAGE = 'rms:qualification:manage';
+
+// ---- Golden 机差 ----
+export const GOLDEN_VIEW = 'rms:golden:view';
+export const GOLDEN_MANAGE = 'rms:golden:manage';
+
+// ---- EC/SV ----
+export const ECSV_VIEW = 'rms:ecsv:view';
+export const ECSV_MANAGE = 'rms:ecsv:manage';
+
+// ---- Body IP 保护 ----
+export const BODY_VIEW = 'rms:body:view';
+export const BODY_EXPORT = 'rms:body:export';
+
+// ---- Body 模板（W10） ----
+export const BODY_TEMPLATE_VIEW = 'rms:btemplate:view';
+export const BODY_TEMPLATE_MANAGE = 'rms:btemplate:manage';
+
+// ---- 实验配方通道（W11） ----
+export const EXPERIMENT_VIEW = 'rms:experiment:view';
+export const EXPERIMENT_MANAGE = 'rms:experiment:manage';
+
+// ---- 报表 / 集成 ----
+export const REPORT_VIEW = 'rms:report:view';
+export const INTEGRATION_VIEW = 'rms:integration:view';
+export const INTEGRATION_OPERATE = 'rms:integration:operate';

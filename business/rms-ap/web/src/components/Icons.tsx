@@ -346,3 +346,30 @@ export function IconSave(p: IconProps) {
   );
 }
 
+
+export function IconBell(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 16.5v-5.2a6 6 0 0 1 12 0v5.2l1.6 2.5H4.4L6 16.5z" />
+      <path d="M10 21a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+export function IconFlask(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M9.5 3.5h5M10.5 3.5v5.2L5.4 17a2.4 2.4 0 0 0 2.1 3.5h9a2.4 2.4 0 0 0 2.1-3.5l-5.1-8.3V3.5" />
+      <path d="M7.6 14.5h8.8" />
+    </svg>
+  );
+}
+
+export function IconFile(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 3.5h8l4.5 4.5v12.5H6z" />
+      <path d="M14 3.5V8h4.5M9 12h6M9 15.5h6" />
+    </svg>
+  );
+}

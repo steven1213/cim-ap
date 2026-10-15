@@ -8,10 +8,23 @@ import LoginPage from '@/pages/LoginPage';
 import SsoCallback from '@/pages/SsoCallback';
 import DashboardPage from '@/pages/DashboardPage';
 import RecipeLibraryPage from '@/pages/RecipeLibraryPage';
+import DeviceRecipePage from '@/pages/DeviceRecipePage';
 import DeviceTypePage from '@/pages/DeviceTypePage';
 import DeviceAreaPage from '@/pages/DeviceAreaPage';
 import DevicePage from '@/pages/DevicePage';
-import ComingSoon from '@/pages/ComingSoon';
+import SignoffPage from '@/pages/SignoffPage';
+import ComparePage from '@/pages/ComparePage';
+import AuditLogPage from '@/pages/AuditLogPage';
+import SpecPage from '@/pages/SpecPage';
+import SpecTemplatePage from '@/pages/SpecTemplatePage';
+import EcSvPage from '@/pages/EcSvPage';
+import DeviceAuthPage from '@/pages/DeviceAuthPage';
+import BypassPage from '@/pages/BypassPage';
+import QualificationPage from '@/pages/QualificationPage';
+import GoldenPage from '@/pages/GoldenPage';
+import IntegrationPage from '@/pages/IntegrationPage';
+import BodyTemplatePage from '@/pages/BodyTemplatePage';
+import ExperimentPage from '@/pages/ExperimentPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import ForbiddenPage from '@/pages/ForbiddenPage';
 
@@ -113,6 +126,14 @@ export default function App() {
             }
           />
           <Route
+            path="/device-recipes"
+            element={
+              <RequirePerm code="rms:recipe:view">
+                <DeviceRecipePage />
+              </RequirePerm>
+            }
+          />
+          <Route
             path="/devices"
             element={
               <RequirePerm code="rms:device:view">
@@ -120,9 +141,110 @@ export default function App() {
               </RequirePerm>
             }
           />
-          <Route path="/signoff" element={<ComingSoon />} />
-          <Route path="/compare" element={<ComingSoon />} />
-          <Route path="/audit" element={<ComingSoon />} />
+          <Route
+            path="/signoff"
+            element={
+              <RequirePerm code="rms:signoff:view">
+                <SignoffPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <RequirePerm code="rms:compare:view">
+                <ComparePage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <RequirePerm code="rms:audit:view">
+                <AuditLogPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/specs"
+            element={
+              <RequirePerm code="rms:spec:view">
+                <SpecPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/spec-templates"
+            element={
+              <RequirePerm code="rms:spec:view">
+                <SpecTemplatePage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/ecsv"
+            element={
+              <RequirePerm code="rms:ecsv:view">
+                <EcSvPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/device-auth"
+            element={
+              <RequirePerm code="rms:device-auth:view">
+                <DeviceAuthPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/bypasses"
+            element={
+              <RequirePerm code="rms:bypass:view">
+                <BypassPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/qualifications"
+            element={
+              <RequirePerm code="rms:qualification:view">
+                <QualificationPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/golden"
+            element={
+              <RequirePerm code="rms:golden:view">
+                <GoldenPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/integration"
+            element={
+              <RequirePerm code="rms:integration:view">
+                <IntegrationPage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/body-templates"
+            element={
+              <RequirePerm code="rms:btemplate:view">
+                <BodyTemplatePage />
+              </RequirePerm>
+            }
+          />
+          <Route
+            path="/experiments"
+            element={
+              <RequirePerm code="rms:experiment:view">
+                <ExperimentPage />
+              </RequirePerm>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

@@ -1,13 +1,56 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Perms from '@/components/Perms';
+import DeviceDetailDrawer from '@/components/DeviceDetailDrawer';
+import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
 import * as api from '@/lib/rmsApi';
-import type { Device, DeviceType, DeviceArea, DeviceStatus } from '@/types';
+import type {
+  Device,
+  DeviceType,
+  DeviceArea,
+  DeviceStatus,
+  DeviceRecipeRow,
+  RecipeVersion,
+} from '@/types';
 
 const STATUS_TONE: Record<DeviceStatus, string> = {
   ENABLED: 'ok',
   DISABLED: 'warn',
 };
+
+interface AreaGroup {
+  root: DeviceArea;
+  items: { area: DeviceArea; depth: number }[];
+}
+
+/**
+ * 把扁平区域压成「工厂为组头、其下区域缩进」的分组，供设备归属选择。
+ * 工厂（parentId 为空或指向不存在节点）= 顶层组头，但不可作为设备父节点；
+ * 设备只能选工厂下的区域，从而把「工厂父节点」在录入时显式呈现。
+ */
+function buildAreaGroups(areas: DeviceArea[]): AreaGroup[] {
+  const map = new Map<string, DeviceArea>();
+  areas.forEach((a) => map.set(a.id, a));
+  const childrenOf = new Map<string | null, DeviceArea[]>();
+  for (const a of areas) {
+    const pid = a.parentId && a.parentId.trim() ? a.parentId : null;
+    const resolved = pid && map.has(pid) ? pid : null; // 悬空父 → 视为顶层（与后端 areaTree 一致）
+    if (!childrenOf.has(resolved)) childrenOf.set(resolved, []);
+    childrenOf.get(resolved)!.push(a);
+  }
+  const roots = childrenOf.get(null) ?? [];
+  return roots.map((root) => {
+    const items: { area: DeviceArea; depth: number }[] = [];
+    const walk = (pid: string, depth: number) => {
+      for (const c of childrenOf.get(pid) ?? []) {
+        items.push({ area: c, depth });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(root.id, 1);
+    return { root, items };
+  });
+}
 
 export default function DevicePage() {
   const { t } = useTranslation();
@@ -19,6 +62,21 @@ export default function DevicePage() {
 
   const [editing, setEditing] = useState<Device | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+
+  // 机台详情抽屉（枢纽）+ 配方详情抽屉（互斥渲染：开配方时隐藏机台抽屉，关闭后回到机台）
+  const [detail, setDetail] = useState<Device | null>(null);
+  const [recipeDetail, setRecipeDetail] = useState<{ row: DeviceRecipeRow; versions: RecipeVersion[] } | null>(null);
+
+  async function openRecipe(row: DeviceRecipeRow) {
+    if (!row.recipeId) return;
+    try {
+      const versions = await api.listVersions(row.recipeId);
+      setRecipeDetail({ row, versions });
+    } catch {
+      // 版本拉取失败时仍打开抽屉（抽屉内会展示错误）
+      setRecipeDetail({ row, versions: [] });
+    }
+  }
 
   async function refresh() {
     setLoading(true);
@@ -57,6 +115,21 @@ export default function DevicePage() {
 
   const typeName = useMemo(() => Object.fromEntries(types.map((x) => [x.id, x.name])), [types]);
   const areaName = useMemo(() => Object.fromEntries(areas.map((x) => [x.id, x.name])), [areas]);
+  const areaById = useMemo(() => Object.fromEntries(areas.map((x) => [x.id, x])), [areas]);
+
+  /** 设备所属区域的全路径（工厂 / 区域 …），强化列表里的工厂归属上下文。 */
+  function deviceAreaPath(id: string | null | undefined): string {
+    if (!id) return '';
+    const parts: string[] = [];
+    const seen = new Set<string>();
+    let cur: DeviceArea | undefined = areaById[id];
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      parts.unshift(cur.name);
+      cur = cur.parentId ? areaById[cur.parentId] : undefined;
+    }
+    return parts.join(' / ');
+  }
 
   const filtered = useMemo(() => {
     if (!keyword) return list;
@@ -103,11 +176,15 @@ export default function DevicePage() {
           </thead>
           <tbody>
             {filtered.map((x) => (
-              <tr key={x.id}>
+              <tr
+                key={x.id}
+                className="clickable"
+                onClick={() => setDetail(x)}
+              >
                 <td className="mono">{x.code}</td>
                 <td>{x.name}</td>
                 <td>{x.deviceTypeName ?? (x.deviceTypeId ? typeName[x.deviceTypeId] ?? '?' : t('rms.common.dash'))}</td>
-                <td>{x.areaName ?? (x.areaId ? areaName[x.areaId] ?? '?' : t('rms.common.dash'))}</td>
+                <td>{x.areaId ? (deviceAreaPath(x.areaId) || x.areaName || '?') : t('rms.common.dash')}</td>
                 <td className="mono">{x.ip ?? t('rms.common.dash')}</td>
                 <td>
                   <span className={'tag ' + (STATUS_TONE[x.status] ?? 'info')}>
@@ -116,12 +193,15 @@ export default function DevicePage() {
                 </td>
                 <td className="cell-actions">
                   <Perms code="rms:device:update">
-                    <button className="btn btn-ghost btn-sm" onClick={() => setEditing(x)}>
+                    <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setEditing(x); }}>
                       {t('rms.common.edit')}
                     </button>
                   </Perms>
                   <Perms code="rms:device:delete">
-                    <button className="btn btn-ghost btn-sm danger" onClick={() => doDelete(x)}>
+                    <button
+                      className="btn btn-ghost btn-sm danger"
+                      onClick={(e) => { e.stopPropagation(); doDelete(x); }}
+                    >
                       {t('rms.common.delete')}
                     </button>
                   </Perms>
@@ -138,6 +218,32 @@ export default function DevicePage() {
           </tbody>
         </table>
       </div>
+
+      {/* 机台枢纽（W7 体验整合）：点开一台机 = 一处维护腔体 + 装载配方 + 绑定/解绑。
+          配方详情打开时与机台详情互斥渲染（关闭配方详情回到机台详情）。 */}
+      {detail && !recipeDetail && (
+        <DeviceDetailDrawer
+          device={detail}
+          typeName={detail.deviceTypeId ? typeName[detail.deviceTypeId] : undefined}
+          areaName={detail.areaId ? areaName[detail.areaId] : undefined}
+          onClose={() => setDetail(null)}
+          onChanged={refresh}
+          onOpenRecipe={(row) => openRecipe(row)}
+          onEdit={() => setEditing(detail)}
+        />
+      )}
+
+      {recipeDetail && (
+        <RecipeDetailDrawer
+          recipeId={recipeDetail.row.recipeId!}
+          recipeCode={recipeDetail.row.code}
+          recipeName={recipeDetail.row.name}
+          versions={recipeDetail.versions}
+          initialVersionId={recipeDetail.row.activeVersionId}
+          onClose={() => setRecipeDetail(null)}
+          onChanged={refresh}
+        />
+      )}
 
       {(showCreate || editing) && (
         <DeviceModal
@@ -182,6 +288,9 @@ function DeviceModal({
   const [remark, setRemark] = useState(initial?.remark ?? '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  // 区域按「工厂 / 区域」层级分组显示，工厂作为不可选组头，设备只能选工厂下的区域
+  const areaGroups = useMemo(() => buildAreaGroups(areas), [areas]);
 
   async function submit() {
     if (!code || !name || !deviceTypeId) {
@@ -246,13 +355,19 @@ function DeviceModal({
             <div className="field">
               <label className="field-label">{t('rms.device.area')}</label>
               <select className="text-input" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-                <option value="">—</option>
-                {areas.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
+                <option value="">{t('rms.device.areaEmpty')}</option>
+                {areaGroups.map((g) => (
+                  <optgroup key={g.root.id} label={`${t('rms.deviceRecipes.factoryTag')} · ${g.root.name}`}>
+                    {g.items.map(({ area, depth }) => (
+                      <option key={area.id} value={area.id}>
+                        {'　'.repeat(depth - 1)}
+                        {area.name}（{area.code}）
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
+              <p className="field-hint">{t('rms.device.areaHint')}</p>
             </div>
             <div className="field">
               <label className="field-label">{t('rms.device.ip')}</label>

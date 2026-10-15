@@ -97,6 +97,12 @@ async function request<T>(instance: AxiosInstance, method: string, url: string,
   return r.data.data;
 }
 
+/** Blob 下载（文件导出）：走 /api/v1 实例，响应体为二进制（后端不经 Result 包装）。 */
+export async function downloadBlob(url: string, params?: Record<string, unknown>): Promise<Blob> {
+  const r = await http.request<Blob>({ method: 'GET', url, params, responseType: 'blob' });
+  return r.data;
+}
+
 // ----------------------------------------------------------------- /api/v1
 
 export function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {

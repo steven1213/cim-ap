@@ -44,3 +44,13 @@ cim:
   system:
     enabled: true
     seed-permissions: true
+
+  rms:
+    # 演示数据灌入（H2 开箱即有数据）；生产置 false。测试关认证时自动跳过。
+    demo:
+      seed-enabled: true
+    # D9 Body 加密（W8）：32 字节 AES-256 密钥的 Base64，库内密文存储。
+    # 未配置 = 明文模式（仅限演示/开发）。生产必须配置且妥善保管（密钥丢失的密文数据无法恢复）。
+    # 生成示例: openssl rand -base64 32
+    crypto:
+      body-key: ''

@@ -31,4 +31,11 @@ public interface RecipeRepository extends JpaRepository<Recipe, String> {
     List<Recipe> findByDeviceTypeIdAndDeletedFalse(String deviceTypeId);
 
     List<Recipe> findByAreaIdAndDeletedFalse(String areaId);
+
+    /** 子配方（直接下级，Req 15）。 */
+    List<Recipe> findByParentIdAndDeletedFalseOrderByCodeAsc(String parentId);
+
+    long countByDeletedFalse();
+
+    long countByGoldenAndDeletedFalse(boolean golden);
 }

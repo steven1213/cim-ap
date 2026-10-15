@@ -69,9 +69,18 @@ class DeviceAdminTest {
         typeId = om.readTree(typeRes.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .path("data").path("id").asText();
 
+        // 先建工厂（顶层），再建区域（挂在工厂下）；设备须挂在区域上（新校验：禁止直接挂工厂根）
+        MvcResult fabRes = mvc.perform(post("/api/v1/rms/device-areas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(new AreaReq("FAB-TEST", "测试工厂", null, 0, null))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String fabId = om.readTree(fabRes.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("id").asText();
+
         MvcResult areaRes = mvc.perform(post("/api/v1/rms/device-areas")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(new AreaReq("FAB1-ETC", "一厂刻蚀区", null, 1, null))))
+                        .content(om.writeValueAsString(new AreaReq("FAB1-ETC", "一厂刻蚀区", fabId, 1, null))))
                 .andExpect(status().isOk())
                 .andReturn();
         areaId = om.readTree(areaRes.getResponse().getContentAsString(StandardCharsets.UTF_8))

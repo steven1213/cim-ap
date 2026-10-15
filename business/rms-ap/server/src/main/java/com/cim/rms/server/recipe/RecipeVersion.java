@@ -45,12 +45,16 @@ public class RecipeVersion extends BaseDefData {
     @Column(name = "body_format", length = 16, nullable = false)
     private BodyFormat bodyFormat = BodyFormat.TEXT;
 
-    /** Body 内容（二进制以 Base64 存档；大对象存储方案见已拍板 D4，W1 先行库内 CLOB）。 */
+    /** Body 内容（二进制以 Base64 存档；D9 加密启用时为 AES-GCM 密文 Base64，见 BodyStore）。 */
     @Lob
     @Column(name = "body_base64")
     private String bodyBase64;
 
-    /** Body SHA-256（完整性校验，IF-COM 完整性红线）。 */
+    /** Body 存储加密标记（D9）：0=明文（存量兼容）/ 1=AES-256-GCM 密文。 */
+    @Column(name = "body_enc", nullable = false)
+    private Integer bodyEnc = 0;
+
+    /** Body SHA-256（完整性校验，IF-COM 完整性红线；始终对<b>明文</b>字节计算）。 */
     @Column(name = "body_hash", length = 64)
     private String bodyHash;
 

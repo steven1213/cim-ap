@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
+import { ssoLoginRedirect } from '@/lib/sso';
 
 /**
  * 统一登录入口（SSO 中继页）。
@@ -20,8 +21,7 @@ import { useAuthStore } from '@/store/authStore';
  * {@code VITE_SSO_AUTO_REDIRECT=false} 关闭自动跳转（此时渲染手动按钮）。</p>
  */
 // SSO 中继目标 = IAM 后端(8081) 直出的轻量登录页（/login 由 IAM 后端 serve，不依赖 IAM 控制台 SPA 5171）。
-// 优先 VITE_IAM_LOGIN_BASE，回退 VITE_IAM_BASE，最终回退 8081。
-const IAM_BASE = import.meta.env.VITE_IAM_LOGIN_BASE || import.meta.env.VITE_IAM_BASE || 'http://localhost:8081';
+// 基址与登录/登出的 IdP 协作统一收敛在 `lib/sso.ts`，避免多处各写一份回退链。
 // 默认开启自动跳转：未登录直接中继到 IAM 统一登录，避免多一次点击。
 const AUTO_REDIRECT = (import.meta.env.VITE_SSO_AUTO_REDIRECT ?? 'true') !== 'false';
 
@@ -46,14 +46,12 @@ export default function LoginPage() {
     // 未登录：自动中继到 IAM 统一登录（生产/开发默认开启）。
     // 仅当显式 VITE_SSO_AUTO_REDIRECT=false（如 IAM 不可达的纯本地预览）才停留在当前页。
     if (AUTO_REDIRECT) {
-      const redirect = encodeURIComponent(window.location.origin + '/sso');
-      window.location.href = `${IAM_BASE}/login?app=RMS&redirect=${redirect}`;
+      ssoLoginRedirect('RMS');
     }
   }, [navigate, error]);
 
   function goSso() {
-    const redirect = encodeURIComponent(window.location.origin + '/sso');
-    window.location.href = `${IAM_BASE}/login?app=RMS&redirect=${redirect}`;
+    ssoLoginRedirect('RMS');
   }
 
   function applyDevToken() {

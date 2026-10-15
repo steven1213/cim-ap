@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -32,21 +33,25 @@ public class DeviceAdminController {
 
     // ---------- 设备类型 ----------
 
+    @PreAuthorize("hasAuthority('rms:device-type:view')")
     @GetMapping("/device-types")
     public Result<List<DeviceAdminService.DeviceTypeSummary>> types() {
         return Result.ok(service.listTypes());
     }
 
+    @PreAuthorize("hasAuthority('rms:device-type:create')")
     @PostMapping("/device-types")
     public Result<DeviceAdminService.DeviceTypeSummary> createType(@RequestBody TypeReq req) {
         return Result.ok(service.createType(req.code(), req.name(), req.description(), req.manufacturer(), req.model()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device-type:update')")
     @PutMapping("/device-types/{id}")
     public Result<DeviceAdminService.DeviceTypeSummary> updateType(@PathVariable String id, @RequestBody TypeReq req) {
         return Result.ok(service.updateType(id, req.name(), req.description(), req.manufacturer(), req.model()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device-type:delete')")
     @DeleteMapping("/device-types/{id}")
     public Result<Void> deleteType(@PathVariable String id) {
         service.deleteType(id);
@@ -55,21 +60,32 @@ public class DeviceAdminController {
 
     // ---------- 设备区域 ----------
 
+    @PreAuthorize("hasAuthority('rms:device-area:view')")
     @GetMapping("/device-areas")
     public Result<List<DeviceAdminService.DeviceAreaSummary>> areas() {
         return Result.ok(service.listAreas());
     }
 
+    /** 区域树（嵌套）。设备视角左侧导航直接消费；与扁平 {@code /device-areas} 并存以兼容既有页面。 */
+    @PreAuthorize("hasAuthority('rms:device-area:view')")
+    @GetMapping("/device-areas/tree")
+    public Result<List<DeviceAdminService.AreaNode>> areaTree() {
+        return Result.ok(service.areaTree());
+    }
+
+    @PreAuthorize("hasAuthority('rms:device-area:create')")
     @PostMapping("/device-areas")
     public Result<DeviceAdminService.DeviceAreaSummary> createArea(@RequestBody AreaReq req) {
         return Result.ok(service.createArea(req.code(), req.name(), req.parentId(), req.sortNo(), req.description()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device-area:update')")
     @PutMapping("/device-areas/{id}")
     public Result<DeviceAdminService.DeviceAreaSummary> updateArea(@PathVariable String id, @RequestBody AreaReq req) {
         return Result.ok(service.updateArea(id, req.name(), req.parentId(), req.sortNo(), req.description()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device-area:delete')")
     @DeleteMapping("/device-areas/{id}")
     public Result<Void> deleteArea(@PathVariable String id) {
         service.deleteArea(id);
@@ -78,6 +94,7 @@ public class DeviceAdminController {
 
     // ---------- 设备台账 ----------
 
+    @PreAuthorize("hasAuthority('rms:device:view')")
     @GetMapping("/devices")
     public Result<List<DeviceAdminService.DeviceSummary>> devices(
             @RequestParam(required = false) String keyword,
@@ -87,19 +104,49 @@ public class DeviceAdminController {
         return Result.ok(service.listDevices(keyword, deviceTypeId, areaId, status));
     }
 
+    @PreAuthorize("hasAuthority('rms:device:create')")
     @PostMapping("/devices")
     public Result<DeviceAdminService.DeviceSummary> createDevice(@RequestBody DeviceReq req) {
         return Result.ok(service.createDevice(req.code(), req.name(), req.deviceTypeId(), req.areaId(), req.ip(), req.description()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device:update')")
     @PutMapping("/devices/{id}")
     public Result<DeviceAdminService.DeviceSummary> updateDevice(@PathVariable String id, @RequestBody DeviceReq req) {
         return Result.ok(service.updateDevice(id, req.name(), req.areaId(), req.status(), req.ip(), req.description()));
     }
 
+    @PreAuthorize("hasAuthority('rms:device:delete')")
     @DeleteMapping("/devices/{id}")
     public Result<Void> deleteDevice(@PathVariable String id) {
         service.deleteDevice(id);
+        return Result.ok(null);
+    }
+
+    // ---------- 机台腔体（Chamber；W7） ----------
+
+    @PreAuthorize("hasAuthority('rms:device:view')")
+    @GetMapping("/device-chambers")
+    public Result<List<DeviceAdminService.ChamberSummary>> chambers(@RequestParam(required = false) String deviceId) {
+        return Result.ok(service.listChambers(deviceId));
+    }
+
+    @PreAuthorize("hasAuthority('rms:device:create')")
+    @PostMapping("/device-chambers")
+    public Result<DeviceAdminService.ChamberSummary> createChamber(@RequestBody ChamberReq req) {
+        return Result.ok(service.createChamber(req.deviceId(), req.code(), req.name(), req.sortNo(), req.description()));
+    }
+
+    @PreAuthorize("hasAuthority('rms:device:update')")
+    @PutMapping("/device-chambers/{id}")
+    public Result<DeviceAdminService.ChamberSummary> updateChamber(@PathVariable String id, @RequestBody ChamberReq req) {
+        return Result.ok(service.updateChamber(id, req.name(), req.sortNo(), req.description()));
+    }
+
+    @PreAuthorize("hasAuthority('rms:device:delete')")
+    @DeleteMapping("/device-chambers/{id}")
+    public Result<Void> deleteChamber(@PathVariable String id) {
+        service.deleteChamber(id);
         return Result.ok(null);
     }
 
@@ -109,6 +156,9 @@ public class DeviceAdminController {
     }
 
     public record AreaReq(String code, String name, String parentId, Integer sortNo, String description) {
+    }
+
+    public record ChamberReq(String deviceId, String code, String name, Integer sortNo, String description) {
     }
 
     public record DeviceReq(String code, String name, String deviceTypeId, String areaId,

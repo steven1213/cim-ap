@@ -1,5 +1,6 @@
 package com.cim.rms.server.device;
 
+import com.cim.rms.server.audit.RmsAuditService;
 import com.cim.rms.server.common.Wildcards;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
@@ -10,9 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 设备管理（Req 46/47/48）：设备类型 / 设备区域 / 设备台账 的基础维护。
@@ -27,7 +31,10 @@ public class DeviceAdminService {
     private final DeviceTypeRepository typeRepository;
     private final DeviceAreaRepository areaRepository;
     private final DeviceRepository deviceRepository;
+    private final DeviceChamberRepository chamberRepository;
     private final RecipeRefGuard recipeRefGuard;
+    private final ChamberRefGuard chamberRefGuard;
+    private final RmsAuditService audit;
 
     // ---------- 设备类型（Req 46） ----------
 
@@ -48,7 +55,9 @@ public class DeviceAdminService {
         t.setDescription(description);
         t.setManufacturer(blankToNull(manufacturer));
         t.setModel(blankToNull(model));
-        return toTypeSummary(typeRepository.save(t));
+        DeviceTypeSummary summary = toTypeSummary(typeRepository.save(t));
+        audit.success("DEVICE_TYPE_CREATED", t.getCode(), t.getName());
+        return summary;
     }
 
     @Transactional
@@ -67,7 +76,9 @@ public class DeviceAdminService {
         if (model != null) {
             t.setModel(model.isBlank() ? null : model);
         }
-        return toTypeSummary(typeRepository.save(t));
+        DeviceTypeSummary summary = toTypeSummary(typeRepository.save(t));
+        audit.success("DEVICE_TYPE_UPDATED", t.getCode(), t.getName());
+        return summary;
     }
 
     @Transactional
@@ -78,6 +89,7 @@ public class DeviceAdminService {
         }
         t.setDeleted(true);
         typeRepository.save(t);
+        audit.success("DEVICE_TYPE_DELETED", t.getCode(), t.getName());
     }
 
     // ---------- 设备区域（Req 47） ----------
@@ -98,7 +110,9 @@ public class DeviceAdminService {
         a.setParentId(parentId == null || parentId.isBlank() ? null : requireArea(parentId).getId());
         a.setSortNo(sortNo == null ? 0 : sortNo);
         a.setDescription(description);
-        return toAreaSummary(areaRepository.save(a));
+        DeviceAreaSummary summary = toAreaSummary(areaRepository.save(a));
+        audit.success("DEVICE_AREA_CREATED", a.getCode(), a.getName());
+        return summary;
     }
 
     @Transactional
@@ -120,7 +134,9 @@ public class DeviceAdminService {
         if (description != null) {
             a.setDescription(description);
         }
-        return toAreaSummary(areaRepository.save(a));
+        DeviceAreaSummary summary = toAreaSummary(areaRepository.save(a));
+        audit.success("DEVICE_AREA_UPDATED", a.getCode(), a.getName());
+        return summary;
     }
 
     @Transactional
@@ -137,6 +153,68 @@ public class DeviceAdminService {
         }
         a.setDeleted(true);
         areaRepository.save(a);
+        audit.success("DEVICE_AREA_DELETED", a.getCode(), a.getName());
+    }
+
+    // ---------- 机台腔体（Chamber；W7） ----------
+
+    public List<ChamberSummary> listChambers(String deviceId) {
+        List<DeviceChamber> list = (deviceId == null || deviceId.isBlank())
+                ? chamberRepository.findByDeletedFalseOrderByCreateTimeDesc()
+                : chamberRepository.findByDeviceIdAndDeletedFalseOrderBySortNoAscCode(deviceId);
+        return list.stream().map(this::toChamberSummary).toList();
+    }
+
+    @Transactional
+    public ChamberSummary createChamber(String deviceId, String code, String name, Integer sortNo, String description) {
+        Device d = requireDevice(deviceId);
+        if (chamberRepository.findByDeviceIdAndCodeAndDeletedFalse(deviceId, code).isPresent()) {
+            throw new BizException(BizCode.PARAM_INVALID, "该机台腔体编码已存在: " + code);
+        }
+        DeviceChamber c = new DeviceChamber();
+        c.setDeviceId(d.getId());
+        c.setCode(code);
+        c.setName(name);
+        c.setSortNo(sortNo == null ? 0 : sortNo);
+        c.setDescription(description);
+        ChamberSummary summary = toChamberSummary(chamberRepository.save(c));
+        audit.success("DEVICE_CHAMBER_CREATED", d.getCode() + "/" + code, name);
+        return summary;
+    }
+
+    @Transactional
+    public ChamberSummary updateChamber(String id, String name, Integer sortNo, String description) {
+        DeviceChamber c = requireChamber(id);
+        if (name != null && !name.isBlank()) {
+            c.setName(name);
+        }
+        if (sortNo != null) {
+            c.setSortNo(sortNo);
+        }
+        if (description != null) {
+            c.setDescription(description);
+        }
+        ChamberSummary summary = toChamberSummary(chamberRepository.save(c));
+        audit.success("DEVICE_CHAMBER_UPDATED", c.getCode(), c.getName());
+        return summary;
+    }
+
+    @Transactional
+    public void deleteChamber(String id) {
+        DeviceChamber c = requireChamber(id);
+        // 引用保护：腔体被 PPID 映射引用时禁止删除（否则映射会指向空气）
+        chamberRefGuard.assertChamberUnreferenced(id);
+        c.setDeleted(true);
+        chamberRepository.save(c);
+        audit.success("DEVICE_CHAMBER_DELETED", c.getCode(), c.getName());
+    }
+
+    public DeviceChamber requireChamber(String id) {
+        DeviceChamber c = chamberRepository.findById(id).orElse(null);
+        if (c == null || Boolean.TRUE.equals(c.getDeleted())) {
+            throw new BizException(BizCode.DATA_NOT_FOUND, "腔体不存在: " + id);
+        }
+        return c;
     }
 
     // ---------- 设备台账（Req 48） ----------
@@ -162,10 +240,18 @@ public class DeviceAdminService {
         d.setCode(code);
         d.setName(name);
         d.setDeviceTypeId(requireType(deviceTypeId).getId());
-        d.setAreaId(areaId == null || areaId.isBlank() ? null : requireArea(areaId).getId());
+        if (areaId != null && !areaId.isBlank()) {
+            DeviceArea area = requireArea(areaId);
+            assertAreaUnderFactory(area);
+            d.setAreaId(area.getId());
+        } else {
+            d.setAreaId(null);
+        }
         d.setIp(blankToNull(ip));
         d.setDescription(description);
-        return toDeviceSummary(deviceRepository.save(d));
+        DeviceSummary summary = toDeviceSummary(deviceRepository.save(d));
+        audit.success("DEVICE_CREATED", d.getCode(), d.getName());
+        return summary;
     }
 
     @Transactional
@@ -176,7 +262,13 @@ public class DeviceAdminService {
             d.setName(name);
         }
         if (areaId != null) {
-            d.setAreaId(areaId.isBlank() ? null : requireArea(areaId).getId());
+            if (areaId.isBlank()) {
+                d.setAreaId(null);
+            } else {
+                DeviceArea area = requireArea(areaId);
+                assertAreaUnderFactory(area);
+                d.setAreaId(area.getId());
+            }
         }
         if (status != null) {
             d.setStatus(status);
@@ -187,7 +279,9 @@ public class DeviceAdminService {
         if (description != null) {
             d.setDescription(description);
         }
-        return toDeviceSummary(deviceRepository.save(d));
+        DeviceSummary summary = toDeviceSummary(deviceRepository.save(d));
+        audit.success("DEVICE_UPDATED", d.getCode(), d.getName());
+        return summary;
     }
 
     @Transactional
@@ -196,6 +290,7 @@ public class DeviceAdminService {
         recipeRefGuard.assertDeviceUnreferenced(id);
         d.setDeleted(true);
         deviceRepository.save(d);
+        audit.success("DEVICE_DELETED", d.getCode(), d.getName());
     }
 
     // ---------- helpers ----------
@@ -214,6 +309,34 @@ public class DeviceAdminService {
             throw new BizException(BizCode.DATA_NOT_FOUND, "设备区域不存在: " + id);
         }
         return a;
+    }
+
+    /**
+     * 设备必须挂在「工厂下的区域」：所选区域不得是顶层工厂节点，且向上必须能找到工厂（root）。
+     *
+     * <p>保证「工厂 → 区域 → 机台」动线成立——直接挂工厂、或挂在没有工厂祖先的孤立区域上都会被拒。</p>
+     */
+    private void assertAreaUnderFactory(DeviceArea chosen) {
+        if (chosen.getParentId() == null || chosen.getParentId().isBlank()) {
+            throw new BizException(BizCode.PARAM_INVALID,
+                    "设备不可直接挂在工厂节点下，请选择工厂下的区域: " + chosen.getName());
+        }
+        Map<String, DeviceArea> byId = areaRepository.findByDeletedFalseOrderBySortNoAscCode().stream()
+                .collect(Collectors.toMap(DeviceArea::getId, a -> a, (a, b) -> a));
+        Set<String> visited = new HashSet<>();
+        visited.add(chosen.getId());
+        DeviceArea cur = byId.get(chosen.getParentId());
+        while (cur != null) {
+            if (!visited.add(cur.getId())) {
+                throw new BizException(BizCode.PARAM_INVALID, "区域层级存在环，无法定位工厂: " + chosen.getName());
+            }
+            if (cur.getParentId() == null || cur.getParentId().isBlank()) {
+                return; // 抵达工厂根
+            }
+            cur = byId.get(cur.getParentId());
+        }
+        throw new BizException(BizCode.PARAM_INVALID,
+                "所选区域没有工厂祖先，请将其挂到工厂下: " + chosen.getName());
     }
 
     public Device requireDevice(String id) {
@@ -275,6 +398,51 @@ public class DeviceAdminService {
                                DeviceStatus status, String remark) {
     }
 
+    /** 机台腔体摘要（含所属机台编码/名称）。 */
+    public record ChamberSummary(String id, String deviceId, String deviceCode, String deviceName,
+                                String code, String name, int sortNo, String remark) {
+    }
+
+    /** 区域树节点（嵌套 children，供设备视角左侧导航直接渲染）。 */
+    public record AreaNode(String id, String code, String name, String parentId, int sortNo,
+                           List<AreaNode> children) {
+    }
+
+    private ChamberSummary toChamberSummary(DeviceChamber c) {
+        String deviceCode = deviceRepository.findById(c.getDeviceId()).map(Device::getCode).orElse(null);
+        String deviceName = deviceRepository.findById(c.getDeviceId()).map(Device::getName).orElse(null);
+        return new ChamberSummary(c.getId(), c.getDeviceId(), deviceCode, deviceName,
+                c.getCode(), c.getName(), c.getSortNo(), c.getDescription());
+    }
+
+    /**
+     * 区域树（嵌套结构）。区域自身无序（order by sortNo, code），父子关系由 {@code parentId} 决定；
+     * 悬空父引用（父已被删）的节点按顶层处理，避免整棵子树丢节点。
+     */
+    public List<AreaNode> areaTree() {
+        List<DeviceArea> all = areaRepository.findByDeletedFalseOrderBySortNoAscCode();
+        Map<String, DeviceArea> byId = new HashMap<>();
+        all.forEach(a -> byId.put(a.getId(), a));
+        Map<String, List<DeviceArea>> children = new HashMap<>();
+        List<DeviceArea> roots = new java.util.ArrayList<>();
+        for (DeviceArea a : all) {
+            String pid = a.getParentId();
+            boolean isRoot = pid == null || pid.isBlank() || !byId.containsKey(pid);
+            if (isRoot) {
+                roots.add(a);
+            } else {
+                children.computeIfAbsent(pid, k -> new java.util.ArrayList<>()).add(a);
+            }
+        }
+        return roots.stream().map(r -> toAreaNode(r, children)).toList();
+    }
+
+    private AreaNode toAreaNode(DeviceArea a, Map<String, List<DeviceArea>> children) {
+        List<AreaNode> kids = children.getOrDefault(a.getId(), List.of()).stream()
+                .map(c -> toAreaNode(c, children)).toList();
+        return new AreaNode(a.getId(), a.getCode(), a.getName(), a.getParentId(), a.getSortNo(), kids);
+    }
+
     private static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s;
     }
@@ -282,5 +450,10 @@ public class DeviceAdminService {
     /** 配方侧引用校验的窄接口（避免 device → recipe 循环依赖）。 */
     public interface RecipeRefGuard {
         void assertDeviceUnreferenced(String deviceId);
+    }
+
+    /** 腔体引用校验的窄接口（由 integration 侧实现：PPID 映射引用腔体时禁止删腔体）。 */
+    public interface ChamberRefGuard {
+        void assertChamberUnreferenced(String chamberId);
     }
 }

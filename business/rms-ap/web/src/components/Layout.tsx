@@ -1,76 +1,22 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
+import { useTabStore } from '@/store/tabStore';
 import { hasPermission } from '@/lib/permissions';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
-import {
-  IconGauge,
-  IconSliders,
-  IconApps,
-  IconTree,
-  IconMonitor,
-  IconShield,
-  IconRefresh,
-  IconInbox,
-  IconSidebar,
-  IconMoon,
-  IconSun,
-  IconLogout,
-} from '@/components/Icons';
+import { GROUPS, NAV_FLAT } from '@/lib/navConfig';
+import { IconShield, IconSidebar, IconMoon, IconSun, IconLogout } from '@/components/Icons';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import NotificationBell from '@/components/NotificationBell';
+import TabBar from '@/components/TabBar';
 
 const SIDEBAR_KEY = 'rms-sidebar-collapsed';
 
-type IconCmp = (p: { width?: number; height?: number }) => JSX.Element;
-
-interface NavItem {
-  to: string;
-  i18n: string;
-  Icon: IconCmp;
-  perm?: string;
-}
-interface NavGroup {
-  key: string;
-  capI18n: string;
-  items: NavItem[];
-}
-
-const GROUPS: NavGroup[] = [
-  {
-    key: 'overview',
-    capI18n: '',
-    items: [{ to: '/', i18n: 'rms.nav.dashboard', Icon: IconGauge }],
-  },
-  {
-    key: 'recipe',
-    capI18n: 'rms.nav.recipes',
-    items: [{ to: '/recipes', i18n: 'rms.nav.recipes', Icon: IconSliders, perm: 'rms:recipe:view' }],
-  },
-  {
-    key: 'device',
-    capI18n: 'rms.nav.devices',
-    items: [
-      { to: '/device-types', i18n: 'rms.nav.deviceTypes', Icon: IconApps, perm: 'rms:device-type:view' },
-      { to: '/device-areas', i18n: 'rms.nav.deviceAreas', Icon: IconTree, perm: 'rms:device-area:view' },
-      { to: '/devices', i18n: 'rms.nav.devices', Icon: IconMonitor, perm: 'rms:device:view' },
-    ],
-  },
-  {
-    key: 'advanced',
-    capI18n: 'rms.nav.signoff',
-    items: [
-      { to: '/signoff', i18n: 'rms.nav.signoff', Icon: IconShield },
-      { to: '/compare', i18n: 'rms.nav.compare', Icon: IconRefresh },
-      { to: '/audit', i18n: 'rms.nav.audit', Icon: IconInbox },
-    ],
-  },
-];
-
 /**
- * RMS 控制台外壳：顶部 header + 可收缩左侧菜单 + 内容区 + 底部 footer。
- * 视觉与交互对齐 IAM（四段式、设计令牌、深浅双主题）；菜单为前端静态配置
- * （RMS 自身页面固定，不依赖后端菜单下发）。
+ * RMS 控制台外壳：顶部 header + 可收缩左侧菜单 + 多页签栏 + 内容区 + 底部 footer。
+ * 视觉与交互对齐 IAM（四段式、设计令牌、深浅双主题、多标签导航）；菜单为前端静态配置
+ * （RMS 自身页面固定，不依赖后端菜单下发），定义在 {@link GROUPS}，与多页签 TabBar 共用。
  */
 export default function Layout() {
   const { t } = useTranslation();
@@ -78,6 +24,9 @@ export default function Layout() {
   const permissions = useAuthStore((s) => s.permissions);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const openTab = useTabStore((s) => s.open);
+  const clearTabs = useTabStore((s) => s.clear);
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
   const [theme, setTheme] = useState<Theme>(() => readTheme());
@@ -90,6 +39,12 @@ export default function Layout() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // 路由切换 → 打开/激活对应页签（仅已知导航路径；404 等未知路径不开签）
+  useEffect(() => {
+    const m = NAV_FLAT.find((x) => x.path === pathname);
+    if (m) openTab({ path: m.path, i18nCode: m.i18n });
+  }, [pathname, openTab]);
 
   function toggleSidebar() {
     setCollapsed((v) => {
@@ -105,6 +60,7 @@ export default function Layout() {
   }
   async function onLogout() {
     await logout();
+    clearTabs(); // 下一个登录者不应看到上一个人的页签残留
     navigate('/login');
   }
 
@@ -175,6 +131,8 @@ export default function Layout() {
               {isProd ? 'PRODUCTION' : 'DEVELOPMENT'}
             </span>
 
+            <NotificationBell />
+
             <LanguageSwitcher />
 
             <button
@@ -200,6 +158,8 @@ export default function Layout() {
             </button>
           </div>
         </header>
+
+        <TabBar />
 
         <main className="content">
           <Outlet />

@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as api from '@/lib/api';
+import { idpLogout } from '@/lib/sso';
 import type { MeDto } from '@/types';
 
 interface AuthState {
@@ -40,10 +41,13 @@ export const useAuthStore = create<AuthState>()(
         set({ permissions: codes ?? [], permissionsLoaded: true });
       },
       logout: async () => {
-        try {
-          await api.post<void>('/rms/logout', undefined);
-        } catch {
-          // 登出接口失败也直接前端清态
+        // 走 IdP（IAM）做**服务端吊销**：令牌入黑名单 + 清 SSO 会话 Cookie。
+        // 不能只在本地清 localStorage——那样令牌在有效期内依旧可用（生产缺陷）。
+        const { token, refreshToken } = get();
+        const revoked = await idpLogout(token, refreshToken);
+        if (!revoked) {
+          // 吊销未确认（IdP 不可达 / CORS 未放行）：仍清本地态，但留痕便于排查
+          console.warn('[sso] IdP 登出未确认，已清本地会话；服务端令牌可能仍在有效期内');
         }
         get().clear();
       },
