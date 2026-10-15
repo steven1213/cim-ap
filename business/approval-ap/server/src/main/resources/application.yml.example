@@ -1,0 +1,63 @@
+server:
+  # 审批平台约定端口 8085（iam 8081 / mds 8082 / mes 8083 / rms 8084 顺延）
+  port: 8085
+
+spring:
+  application:
+    name: approval-ap
+  profiles:
+    active: local
+
+  # 持久化（开发/演示：H2 内存库；生产建议独立库，Flowable ACT_/FLW_ 表与业务扩展表分离）
+  datasource:
+    url: jdbc:h2:mem:approval;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    # 业务扩展表由 Hibernate 自动建表（dev）；Flowable 自带表由引擎自管。生产建议改为 Flyway 管理。
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  flyway:
+    # 本 ap 暂用 ddl-auto: update 管理扩展表，关闭 Flyway 以避免无迁移脚本报错。
+    enabled: false
+
+# CIM 平台框架配置键（契约见各 starter *Properties javadoc）
+cim:
+  auth:
+    # 开发态默认关闭，便于无 IAM 联调；生产须置 true 并提供 JWKS 与准入 app-code。
+    enabled: false
+    jwks-uri: http://localhost:8081/.well-known/jwks.json
+    jwks-cache-minutes: 60
+    admission:
+      app-code: approval-ap
+      enabled: true
+
+  jpa:
+    id:
+      mode: SNOWFLAKE
+      worker-id: 1
+      datacenter-id: 1
+    naming:
+      lowercase-snake: true
+    flyway:
+      enabled: false
+
+# Flowable 引擎（独立服务，H2 dev 下自动建表）
+flowable:
+  database-schema-update: true
+  history-level: full
+  async-executor-activate: false
+  # 关闭定时作业线程，避免测试/开发态悬挂
+  job-executor-activate: false
+
+# 审批附件（文件本体存磁盘，元数据入库；生产建议换对象存储）
+approval:
+  attachment:
+    dir: ./data/attachments
+    max-size-mb: 20
+  # 任务超时提醒：待办停留超过 timeout-minutes 后列表标红 + SSE 推送（OverdueScanner）
+  task:
+    timeout-minutes: 1440      # 默认 24h
+    scan-interval-ms: 300000   # 扫描间隔 5min

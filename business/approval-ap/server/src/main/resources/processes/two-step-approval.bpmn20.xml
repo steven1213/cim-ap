@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://cim/approval">
+    <process id="twoStepApproval" name="两级审批" isExecutable="true">
+        <startEvent id="start"/>
+        <userTask id="leaderReview" name="主管审批" flowable:assignee="${leader}"/>
+        <userTask id="managerReview" name="经理审批" flowable:assignee="${manager}"/>
+        <endEvent id="approveEnd" name="通过">
+            <extensionElements>
+                <flowable:executionListener event="start"
+                                          expression="${execution.setVariable('result','APPROVE')}"/>
+            </extensionElements>
+        </endEvent>
+        <sequenceFlow id="f1" sourceRef="start" targetRef="leaderReview"/>
+        <sequenceFlow id="f2" sourceRef="leaderReview" targetRef="managerReview"/>
+        <sequenceFlow id="f3" sourceRef="managerReview" targetRef="approveEnd"/>
+    </process>
+</definitions>

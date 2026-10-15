@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.cim</groupId>
+    <artifactId>cim-approval-ap-server</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>cim-approval-ap-server</name>
+    <description>通用审批流平台（业务层 ap，基于 Flowable 7.2）</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <cim.version>0.0.1-SNAPSHOT</cim.version>
+        <flowable.version>7.0.0</flowable.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.flowable</groupId>
+                <artifactId>flowable-bom</artifactId>
+                <version>${flowable.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- 基础底座能力（与 rms-ap 同代，复用 IAM 鉴权链与 JPA/缓存） -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-spring-support</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-jpa-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-auth-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-cache-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+
+        <!-- 流程引擎（独立服务，与 cim-ap 平台同代 Boot 3.3） -->
+        <dependency>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-spring-boot-starter</artifactId>
+            <version>${flowable.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- H2 内存库（开发/演示数据源）。钉 1.4.200：Flowable 7.0.0 自带 DDL 面向该版本，
+             与 H2 2.2+ 的新建表语法不兼容（50004 语法错误）。 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>1.4.200</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>cim-approval-ap-server</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <parameters>true</parameters>
+                    <compilerArgs>
+                        <arg>-processor</arg>
+                        <arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

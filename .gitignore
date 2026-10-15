@@ -28,3 +28,8 @@ server/**/target/
 
 # ============ TS 增量构建缓存 ============
 *.tsbuildinfo
+
+# ============ 运行产物（日志/本地数据/临时截图） ============
+*.log
+business/approval-ap/server/data/
+business/approval-ap/web/_*

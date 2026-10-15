@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://cim/approval">
+    <process id="countersignApproval" name="会签审批" isExecutable="true">
+        <startEvent id="start"/>
+        <userTask id="approvalTask" name="会签审批" flowable:assignee="${approver}">
+            <extensionElements>
+                <flowable:taskListener event="complete"
+                                      delegateExpression="${countersignListener}"/>
+            </extensionElements>
+            <multiInstanceLoopCharacteristics isSequential="false"
+                                             flowable:collection="${approvers}"
+                                             flowable:elementVariable="approver">
+                <!-- 通过：赞成数达标；或 反对数已超剩余可赞成上限（提前驳回） -->
+                <completionCondition>${approvedCount &gt;= approvalThreshold || rejectedCount &gt; (nrOfInstances - approvalThreshold)}</completionCondition>
+            </multiInstanceLoopCharacteristics>
+        </userTask>
+        <exclusiveGateway id="gate" name="审批结果"/>
+        <endEvent id="approveEnd" name="通过">
+            <extensionElements>
+                <flowable:executionListener event="start"
+                                          expression="${execution.setVariable('result','APPROVE')}"/>
+            </extensionElements>
+        </endEvent>
+        <endEvent id="rejectEnd" name="驳回">
+            <extensionElements>
+                <flowable:executionListener event="start"
+                                          expression="${execution.setVariable('result','REJECT')}"/>
+            </extensionElements>
+        </endEvent>
+        <sequenceFlow id="f1" sourceRef="start" targetRef="approvalTask"/>
+        <sequenceFlow id="f2" sourceRef="approvalTask" targetRef="gate"/>
+        <sequenceFlow id="f3" name="通过" sourceRef="gate" targetRef="approveEnd">
+            <conditionExpression xsi:type="tFormalExpression"
+                                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${approvedCount &gt;= approvalThreshold}</conditionExpression>
+        </sequenceFlow>
+        <sequenceFlow id="f4" name="驳回" sourceRef="gate" targetRef="rejectEnd"/>
+    </process>
+</definitions>
