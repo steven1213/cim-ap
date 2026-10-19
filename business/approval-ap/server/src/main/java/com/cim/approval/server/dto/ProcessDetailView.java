@@ -29,6 +29,10 @@ public record ProcessDetailView(
         List<TaskView> activeTasks,
         /** 审批历史（哈希链审计记录） */
         List<AuditView> history,
-        List<AttachmentView> attachments
+        List<AttachmentView> attachments,
+        /** 当前轮次（退回重提后递增）。 */
+        Integer round,
+        /** 是否等待发起人「修改并重新提交」。 */
+        Boolean awaitingResubmit
 ) {
 }

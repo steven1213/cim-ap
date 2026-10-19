@@ -13,12 +13,14 @@ import type {
   CallbackRegistrationView,
   CompleteTaskRequest,
   DefinitionXmlView,
+  FormSchemaField,
   OutboxView,
   ProcessDefinitionView,
   ProcessDetailView,
   ProcessInstanceView,
   ReassignRequest,
   ReturnRequest,
+  ReturnTargetsView,
   StartProcessRequest,
   StatsView,
   TaskView,
@@ -192,6 +194,22 @@ export function returnTask(taskId: string, req: ReturnRequest): Promise<void> {
   return apiPost<void>(`/tasks/${taskId}/return`, req);
 }
 
+/** 退回弹窗数据源：目标节点选项 + 轮次/上限 + 并行段状态。 */
+export function getReturnTargets(taskId: string): Promise<ReturnTargetsView> {
+  return apiGet<ReturnTargetsView>(`/tasks/${encodeURIComponent(taskId)}/return-targets`);
+}
+
+/** 重新提交：发起人修改表单后重提（退回到发起人后的重提态），审批链从头重走。 */
+export function resubmitInstance(
+  processInstanceId: string,
+  req: { formData?: Record<string, unknown>; formSchema?: FormSchemaField[]; actor?: string },
+): Promise<void> {
+  return apiPost<void>(
+    `/processes/instances/${encodeURIComponent(processInstanceId)}/resubmit`,
+    { ...req, actor: req.actor ?? currentIdentity().userId },
+  );
+}
+
 export function addSignTask(taskId: string, req: AddSignRequest): Promise<void> {
   return apiPost<void>(`/tasks/${taskId}/add-sign`, req);
 }
@@ -275,6 +293,19 @@ export function notificationsStreamUrl(userId: string): string {
   return `${base}/api/v1/approval/notifications/stream?${params.toString()}`;
 }
 
+// ---------- 企微免登（G8 / D9） ----------
+// 生成绑定当前用户 + 任务的短期签名链接；企微内置浏览器打开后后端核销免登录进入办理。
+export function createWeComLink(taskId: string, actor?: string): Promise<{ token: string; link: string }> {
+  const params = actor ? `?userId=${encodeURIComponent(actor)}` : '';
+  return apiPost<{ token: string; link: string }>(`/tasks/${taskId}/wecom-link${params}`);
+}
+
+export function verifyWeComToken(token: string): Promise<{ userId: string; taskId: string; valid: boolean }> {
+  return apiGet<{ userId: string; taskId: string; valid: boolean }>(
+    `/wecom/callback?token=${encodeURIComponent(token)}`,
+  );
+}
+
 export default {
   listDefinitions,
   getDefinitionXml,
@@ -285,6 +316,8 @@ export default {
   listInitiated,
   completeTask,
   returnTask,
+  getReturnTargets,
+  resubmitInstance,
   addSignTask,
   reassignTask,
   registerCallback,
@@ -298,4 +331,6 @@ export default {
   deleteAttachment,
   attachmentDownloadUrl,
   notificationsStreamUrl,
+  createWeComLink,
+  verifyWeComToken,
 };

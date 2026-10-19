@@ -125,6 +125,44 @@ export default function DesignerPage() {
 
   const nodeMap = new Map(model.nodes.map((n) => [n.id, n]));
 
+  // 连线锚点索引：同一节点的多条出/入边沿节点边缘均匀分布，避免所有连线从同一点发出而互相覆盖。
+  const outCount = new Map<string, number>();
+  const inCount = new Map<string, number>();
+  for (const e of model.edges) {
+    outCount.set(e.source, (outCount.get(e.source) ?? 0) + 1);
+    inCount.set(e.target, (inCount.get(e.target) ?? 0) + 1);
+  }
+  const outSeen = new Map<string, number>();
+  const inSeen = new Map<string, number>();
+  const outIdx = new Map<string, number>();
+  const inIdx = new Map<string, number>();
+  for (const e of model.edges) {
+    const oi = outSeen.get(e.source) ?? 0;
+    outIdx.set(e.id, oi); outSeen.set(e.source, oi + 1);
+    const ii = inSeen.get(e.target) ?? 0;
+    inIdx.set(e.id, ii); inSeen.set(e.target, ii + 1);
+  }
+  const anchorY = (n: FlowNode, idx: number, total: number): number =>
+    total <= 1 ? n.y + NODE_H / 2 : n.y + 10 + (idx + 0.5) * (NODE_H - 20) / total;
+  const sourcePt = (n: FlowNode, eid: string) => ({ x: n.x + NODE_W, y: anchorY(n, outIdx.get(eid) ?? 0, outCount.get(n.id) ?? 1) });
+  const targetPt = (n: FlowNode, eid: string) => ({ x: n.x, y: anchorY(n, inIdx.get(eid) ?? 0, inCount.get(n.id) ?? 1) });
+
+  // 节点防重叠：放置/移动后若与其它节点重叠，自动下移到空闲单元格（避免节点互相覆盖）。
+  const overlaps = (a: FlowNode, x: number, y: number): boolean =>
+    x < a.x + NODE_W && x + NODE_W > a.x && y < a.y + NODE_H && y + NODE_H > a.y;
+  const freeSpot = (x: number, y: number): { x: number; y: number } => {
+    let cx = x, cy = y, guard = 0;
+    while (model.nodes.some((n) => overlaps(n, cx, cy)) && guard < 300) { cy += NODE_H + GRID; guard++; }
+    return { x: cx, y: cy };
+  };
+  const resolveOverlap = (id: string) => {
+    const self = nodeMap.get(id);
+    if (!self) return;
+    let { x, y } = self; let guard = 0;
+    while (model.nodes.some((n) => n.id !== id && overlaps(n, x, y)) && guard < 300) { y += NODE_H + GRID; guard++; }
+    if (y !== self.y) updateNode(id, { x, y });
+  };
+
   // ---------- 节点操作 ----------
   function addNode(kind: NodeKind, x: number, y: number) {
     if (readonly) return;
@@ -201,7 +239,8 @@ export default function DesignerPage() {
     if (!rect) return;
     const x = e.clientX - rect.left + (canvasRef.current?.scrollLeft ?? 0);
     const y = e.clientY - rect.top + (canvasRef.current?.scrollTop ?? 0);
-    addNode(kind, x, y);
+    const spot = freeSpot(x - NODE_W / 2, y - NODE_H / 2);
+    addNode(kind, spot.x + NODE_W / 2, spot.y + NODE_H / 2);
   }
 
   // ---------- 节点移动 / 点击 ----------
@@ -227,6 +266,7 @@ export default function DesignerPage() {
     const d = dragRef.current;
     if (d && d.id === n.id) {
       if (!d.moved) onNodeActivate(n.id);
+      else resolveOverlap(n.id);
       dragRef.current = null;
     }
   }
@@ -303,11 +343,13 @@ export default function DesignerPage() {
     const s = nodeMap.get(e.source);
     const tg = nodeMap.get(e.target);
     if (!s || !tg) return '';
-    return bezierPath(endpoints(s).rx, endpoints(s).ry, endpoints(tg).lx, endpoints(tg).ly);
+    const sp = sourcePt(s, e.id);
+    const tp = targetPt(tg, e.id);
+    return bezierPath(sp.x, sp.y, tp.x, tp.y);
   }
 
   function bezierPath(x1: number, y1: number, x2: number, y2: number) {
-    const dist = Math.max(60, Math.abs(x2 - x1) * 0.5);
+    const dist = Math.min(260, Math.max(60, Math.abs(x2 - x1) * 0.5));
     return `M ${x1} ${y1} C ${x1 + dist} ${y1}, ${x2 - dist} ${y2}, ${x2} ${y2}`;
   }
 
@@ -470,7 +512,6 @@ export default function DesignerPage() {
               const isSel = selectedEdge === e.id;
               const sn = nodeMap.get(e.source);
               const isGwOut = sn?.kind === 'gateway' && !!e.branch;
-              const sp = sn ? endpoints(sn) : null;
               return (
                 <g key={e.id}>
                   <path d={d} className="edge-hit" onClick={() => { setSelectedEdge(e.id); setSelectedNode(null); }} />
@@ -480,17 +521,17 @@ export default function DesignerPage() {
                     style={{ stroke: isSel ? 'var(--err)' : 'var(--primary)' }}
                     markerEnd={isSel ? 'url(#arrow-sel)' : 'url(#arrow)'}
                   />
-                  {isGwOut && sp && (() => {
+                  {isGwOut && sn && (() => {
+                    const sp = sourcePt(sn, e.id);
                     const tg = nodeMap.get(e.target);
                     if (!tg) return null;
-                    const tp = endpoints(tg);
-                    // 与 bezierPath 同参数取曲线上的点（t≈0.42），两条出边起点相同、此处已分离
-                    const dist = Math.max(60, Math.abs(tp.lx - sp.rx) * 0.5);
+                    const tp = targetPt(tg, e.id);
+                    const dist = Math.min(260, Math.max(60, Math.abs(tp.x - sp.x) * 0.5));
                     const t = 0.42;
                     const mt = 1 - t;
-                    const lx = mt * mt * mt * sp.rx + 3 * mt * mt * t * (sp.rx + dist) + 3 * mt * t * t * (tp.lx - dist) + t * t * t * tp.lx;
-                    const ly = mt * mt * mt * sp.ry + 3 * mt * mt * t * sp.ry + 3 * mt * t * t * tp.ly + t * t * t * tp.ly;
-                    // 满足分支标在曲线上方、不满足标在下方，即使两目标同高也不会叠
+                    const lx = mt * mt * mt * sp.x + 3 * mt * mt * t * (sp.x + dist) + 3 * mt * t * t * (tp.x - dist) + t * t * t * tp.x;
+                    const ly = mt * mt * mt * sp.y + 3 * mt * mt * t * sp.y + 3 * mt * t * t * tp.y + t * t * t * tp.y;
+                    // 满足分支标签在曲线上方、不满足在下方；锚点已分离，双目标同高也不会叠线
                     const dy = e.branch === 'yes' ? -12 : 18;
                     return (
                       <text

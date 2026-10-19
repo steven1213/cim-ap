@@ -106,6 +106,46 @@ if (shb && ab) {
   console.log('NOTE 未取到开始节点出口坐标，跳过拖拽验证');
 }
 
+// 8. 覆盖修复验证：条件分支两出边指向「同高」目标，修复前两条线从同一点出发会重叠覆盖；
+//    修复后出点沿节点右缘分散，两条线起点 y 必须不同。
+await page.getByRole('button', { name: 'Clear' }).click();
+await page.waitForTimeout(150);
+await page.locator('.palette-item').nth(4).dblclick(); // 条件分支
+await page.locator('.palette-item').nth(1).dblclick(); // 审批1（与网关同位置，待拖开）
+await page.locator('.palette-item').nth(1).dblclick(); // 审批2（同上）
+await page.waitForTimeout(150);
+const gBox = await page.locator('.flow-node.gateway').boundingBox();
+const appr = page.locator('.flow-node.approval');
+async function dragTo(node, tx, ty) {
+  const b = await node.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tx, ty, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+}
+await dragTo(appr.nth(0), gBox.x + 330, gBox.y + 20); // 同高
+await dragTo(appr.nth(1), gBox.x + 640, gBox.y + 20); // 同高、不同 x
+const gh = page.locator('.flow-node.gateway .link-handle');
+const ghb = await gh.boundingBox();
+const t1 = await appr.nth(0).boundingBox();
+const t2 = await appr.nth(1).boundingBox();
+async function link(tx, ty) {
+  await page.mouse.move(ghb.x + ghb.width / 2, ghb.y + ghb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tx, ty, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+}
+await link(t1.x + t1.width / 2, t1.y + t1.height / 2);
+await link(t2.x + t2.width / 2, t2.y + t2.height / 2);
+await page.waitForTimeout(200);
+const ys = await page.evaluate(() => [...document.querySelectorAll('.edge-line')].map((p) => {
+  const m = (p.getAttribute('d') || '').match(/^M\s*([\d.]+)[ ,]+([\d.]+)/);
+  return m ? parseFloat(m[2]) : null;
+}));
+ok(`条件分支两出边起点 y 分散（防覆盖）：[${ys.join(', ')}]`, ys.length === 2 && Math.abs(ys[0] - ys[1]) > 1);
+
 await page.screenshot({ path: 'E:/Personal/CIM/cim-ap/business/approval-ap/web/_designer_check.png' });
 await browser.close();
 console.log(results.join('\n'));

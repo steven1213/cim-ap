@@ -226,3 +226,10 @@ export const IconClip = (p: P) => (
     <path d="M20 11l-7.6 7.6a4.6 4.6 0 0 1-6.5-6.5L13.5 4.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1L15 7.5" />
   </Svg>
 );
+
+export const IconWeCom = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+    <path d="M8 9h8M8 12h5" />
+  </Svg>
+);

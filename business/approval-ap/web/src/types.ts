@@ -27,6 +27,8 @@ export interface TaskView {
   overdueMinutes?: number | null;
   /** Flowable 委派状态：PENDING=受托人待归还。 */
   delegationState?: string | null;
+  /** 当前轮次（第几轮审批；退回重提后递增），发起为 1。 */
+  round?: number;
 }
 
 export interface ProcessInstanceView {
@@ -40,6 +42,10 @@ export interface ProcessInstanceView {
   endedAt: string | null;
   /** 当前待办最大超时分钟数（仅 ACTIVE 且超时时非空）。 */
   overdueMinutes?: number | null;
+  /** 当前轮次（退回重提后递增）。 */
+  round?: number;
+  /** 是否等待发起人「修改并重新提交」（退回到发起人后的重提态）。 */
+  awaitingResubmit?: boolean;
 }
 
 export interface DefinitionXmlView {
@@ -117,6 +123,10 @@ export interface ProcessDetailView {
   activeTasks: TaskView[];
   history: AuditView[];
   attachments: AttachmentView[];
+  /** 当前轮次（退回重提后递增）。 */
+  round?: number;
+  /** 是否等待发起人「修改并重新提交」。 */
+  awaitingResubmit?: boolean;
 }
 
 // ---------- 请求体 ----------
@@ -156,6 +166,26 @@ export interface ReturnRequest {
   targetActivityId?: string | null;
   reason?: string | null;
   actor: string;
+}
+
+/** 退回弹窗数据源（GET /tasks/{taskId}/return-targets）。 */
+export interface ReturnTargetsView {
+  /** 上一用户任务节点（默认目标）。 */
+  previousNodeId: string | null;
+  previousNodeName: string | null;
+  /** 首节点 id（退到发起人=重提模式的目标）。 */
+  initiatorNodeId: string;
+  initiatorNodeName: string;
+  /** 首节点是否为多人（会签）节点：true 时不提供退到发起人。 */
+  initiatorNodeMulti: boolean;
+  /** 已审批过的用户节点（不含首节点，供「指定节点」选择）。 */
+  historicNodes: { id: string; name: string }[];
+  /** 当前轮次。 */
+  currentRound: number;
+  /** 退回上限。 */
+  maxRounds: number;
+  /** 实例当前是否处于并行段（并行段内退回目标受限）。 */
+  parallelActive: boolean;
 }
 
 export interface AddSignRequest {

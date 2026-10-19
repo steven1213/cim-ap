@@ -145,6 +145,12 @@ export default function InitiatedPage() {
                     <span className={'tag ' + (STATUS_TAG[pi.status] ?? '')}>
                       {t('init.status.' + pi.status)}
                     </span>
+                    {pi.round != null && pi.round > 1 && (
+                      <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: pi.round })}</span>
+                    )}
+                    {pi.awaitingResubmit && (
+                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
+                    )}
                     {pi.overdueMinutes != null && (
                       <span className="tag err" style={{ marginLeft: 6 }}>
                         {t('init.overdue')} {fmtOverdue(pi.overdueMinutes)}

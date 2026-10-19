@@ -12,6 +12,10 @@ public record ProcessInstanceView(
         Instant startedAt,
         Instant endedAt,
         /** 实例当前待办的最大超时分钟数（小数，仅 ACTIVE 且超时时非空）。 */
-        Double overdueMinutes
+        Double overdueMinutes,
+        /** 当前轮次（退回重提后递增）。 */
+        Integer round,
+        /** 是否等待发起人「修改并重新提交」（退回到发起人后的重提态）。 */
+        Boolean awaitingResubmit
 ) {
 }

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '@/components/Modal';
 import CompleteModal from '@/components/CompleteModal';
-import { IconBell, IconCheck, IconClip, IconDownload, IconUndo, IconTrash } from '@/components/Icons';
+import ResubmitModal from '@/components/ResubmitModal';
+import { IconBell, IconCheck, IconClip, IconDownload, IconRefresh, IconUndo, IconTrash } from '@/components/Icons';
 import {
   attachmentDownloadUrl,
   completeTask,
@@ -135,6 +136,8 @@ export default function DetailModal({
   const [detail, setDetail] = useState<ProcessDetailView | null>(null);
   const [busy, setBusy] = useState(false);
   const [completeFor, setCompleteFor] = useState<{ task: TaskView; outcome: 'APPROVE' | 'REJECT' } | null>(null);
+  /** 发起人重提弹窗（awaitingResubmit 态）。 */
+  const [resubmitOpen, setResubmitOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -237,6 +240,11 @@ export default function DetailModal({
             )}
             {isInitiator && running && (
               <>
+                {detail.awaitingResubmit && (
+                  <button className="btn btn-sm" disabled={busy} onClick={() => setResubmitOpen(true)}>
+                    <IconRefresh width={14} height={14} /> {t('init.resubmit')}
+                  </button>
+                )}
                 <button
                   className="btn btn-ghost btn-sm"
                   disabled={busy}
@@ -279,12 +287,20 @@ export default function DetailModal({
             <div className="detail-grid">
               <div className="detail-grid-item">
                 <span className="detail-label">{t('detail.status')}</span>
-                <span className={`tag ${detail.status === 'ACTIVE' ? 'info' : detail.status === 'WITHDRAWN' ? 'warn' : 'ok'}`}>
-                  {detail.status === 'ACTIVE'
-                    ? t('detail.statusActive')
-                    : detail.status === 'WITHDRAWN'
-                      ? t('detail.statusWithdrawn')
-                      : t('detail.statusCompleted')}
+                <span>
+                  <span className={`tag ${detail.status === 'ACTIVE' ? 'info' : detail.status === 'WITHDRAWN' ? 'warn' : 'ok'}`}>
+                    {detail.status === 'ACTIVE'
+                      ? t('detail.statusActive')
+                      : detail.status === 'WITHDRAWN'
+                        ? t('detail.statusWithdrawn')
+                        : t('detail.statusCompleted')}
+                  </span>
+                  {detail.round != null && detail.round > 1 && (
+                    <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: detail.round })}</span>
+                  )}
+                  {detail.awaitingResubmit && (
+                    <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
+                  )}
                 </span>
               </div>
               <div className="detail-grid-item">
@@ -494,6 +510,16 @@ export default function DetailModal({
             );
             setCompleteFor(null);
             onClose();
+          }}
+        />
+      )}
+      {resubmitOpen && detail && (
+        <ResubmitModal
+          processInstanceId={detail.processInstanceId}
+          onClose={() => setResubmitOpen(false)}
+          onDone={() => {
+            load();
+            onChanged?.();
           }}
         />
       )}

@@ -4,10 +4,11 @@ import Panel from '@/components/Panel';
 import Modal from '@/components/Modal';
 import DetailModal from '@/components/DetailModal';
 import CompleteModal from '@/components/CompleteModal';
-import { IconInbox, IconCheck, IconReturn, IconAddUser, IconSwap, IconRefresh, IconSearch, IconUser } from '@/components/Icons';
+import ResubmitModal from '@/components/ResubmitModal';
+import { IconInbox, IconCheck, IconReturn, IconAddUser, IconSwap, IconRefresh, IconSearch, IconUser, IconWeCom } from '@/components/Icons';
 import {
-  listTodoPaged, completeTask, returnTask, addSignTask, reassignTask,
-  batchComplete, delegateTask, resolveTask, type PageResult,
+  listTodoPaged, completeTask, returnTask, getReturnTargets, addSignTask, reassignTask,
+  batchComplete, delegateTask, resolveTask, createWeComLink, type PageResult,
 } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
@@ -15,6 +16,9 @@ import { fmtDate, fmtOverdue } from '@/lib/format';
 import type { TaskView } from '@/types';
 
 type ModalType = 'complete' | 'return' | 'addsign' | 'reassign' | 'delegate';
+
+/** 重提态任务名（与后端 ApprovalReturnService.RESUBMIT_TASK_NAME 对齐）。 */
+const RESUBMIT_TASK_NAME = '修改并重新提交';
 
 const PAGE_SIZE = 10;
 
@@ -26,6 +30,8 @@ export default function TodoPage() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<{ type: ModalType; task: TaskView } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** 重提态任务的重新提交弹窗（按流程实例）。 */
+  const [resubmitId, setResubmitId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** 勾选批量通过 */
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -84,6 +90,17 @@ export default function TodoPage() {
       else next.add(taskId);
       return next;
     });
+  }
+
+  async function copyWeComLink(taskId: string) {
+    try {
+      const { link } = await createWeComLink(taskId, userId);
+      const url = `${location.origin}${link}`;
+      await navigator.clipboard.writeText(url).catch(() => {});
+      toast(t('wecom.linkCopied'), 'ok');
+    } catch (e) {
+      toast((e as Error).message, 'err');
+    }
   }
 
   async function runBatch() {
@@ -173,6 +190,12 @@ export default function TodoPage() {
                   </td>
                   <td>
                     {tk.name}
+                    {tk.name === RESUBMIT_TASK_NAME && (
+                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
+                    )}
+                    {tk.round != null && tk.round > 1 && (
+                      <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: tk.round })}</span>
+                    )}
                     {tk.delegationState === 'PENDING' && (
                       <span className="tag warn" style={{ marginLeft: 6 }}>{t('todo.delegatedToMe')}</span>
                     )}
@@ -194,7 +217,11 @@ export default function TodoPage() {
                   <td className="mono">{fmtDate(tk.createdAt)}</td>
                   <td>
                     <div className="cell-actions">
-                      {tk.delegationState === 'PENDING' ? (
+                      {tk.name === RESUBMIT_TASK_NAME ? (
+                        <button className="btn btn-sm" onClick={() => setResubmitId(tk.processInstanceId)}>
+                          <IconRefresh width={13} height={13} /> {t('init.resubmit')}
+                        </button>
+                      ) : tk.delegationState === 'PENDING' ? (
                         <button className="btn btn-sm" onClick={() => run(() => resolveTask(tk.taskId, { actor: userId }))}>
                           <IconReturn width={13} height={13} /> {t('todo.resolveBack')}
                         </button>
@@ -211,6 +238,9 @@ export default function TodoPage() {
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'return', task: tk })}>
                         <IconReturn width={13} height={13} /> {t('todo.return')}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => copyWeComLink(tk.taskId)} title={t('wecom.copyLink')}>
+                        <IconWeCom width={13} height={13} /> {t('wecom.copyLink')}
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'addsign', task: tk })}>
                         <IconAddUser width={13} height={13} /> {t('todo.addSign')}
@@ -239,6 +269,14 @@ export default function TodoPage() {
       </Panel>
 
       {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={() => load()} />}
+
+      {resubmitId && (
+        <ResubmitModal
+          processInstanceId={resubmitId}
+          onClose={() => setResubmitId(null)}
+          onDone={() => load()}
+        />
+      )}
 
       {active?.type === 'complete' && (
         <CompleteModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => completeTask(active.task.taskId, { ...r, actor: userId }))} />
@@ -291,8 +329,25 @@ function DelegateModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy
 
 function ReturnModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (r: import('@/types').ReturnRequest) => void }) {
   const { t } = useTranslation();
-  const [target, setTarget] = useState('');
+  const [targets, setTargets] = useState<import('@/types').ReturnTargetsView | null>(null);
+  const [loadErr, setLoadErr] = useState('');
+  const [mode, setMode] = useState<'previous' | 'initiator' | 'specified'>('previous');
+  const [specified, setSpecified] = useState('');
   const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    getReturnTargets(task.taskId)
+      .then(setTargets)
+      .catch((e) => setLoadErr((e as Error).message));
+  }, [task.taskId]);
+
+  const maxReached = targets != null && targets.currentRound >= targets.maxRounds;
+  const targetId = targets == null ? null
+    : mode === 'previous' ? targets.previousNodeId
+      : mode === 'initiator' ? targets.initiatorNodeId
+        : specified || null;
+  const canSubmit = targets != null && !maxReached && !!targetId && !!reason.trim();
+
   return (
     <Modal
       title={`${t('todo.returnTitle')} · ${task.name}`}
@@ -300,20 +355,57 @@ function ReturnModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: 
       footer={
         <>
           <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => onSubmit({ targetActivityId: target.trim() || null, reason, actor: '' })}>
+          <button className="btn btn-sm" disabled={busy || !canSubmit} onClick={() => onSubmit({ targetActivityId: targetId, reason: reason.trim(), actor: '' })}>
             <IconReturn width={14} height={14} /> {t('common.submit')}
           </button>
         </>
       }
     >
-      <div className="field">
-        <label className="field-label">{t('todo.returnTarget')}</label>
-        <input className="mono" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="(auto = previous node)" />
-      </div>
-      <div className="field">
-        <label className="field-label">{t('todo.returnReason')}</label>
-        <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
+      {loadErr && <p className="dim">{loadErr}</p>}
+      {targets && (
+        <>
+          <p className="dim" style={{ marginTop: 0 }}>
+            {t('todo.returnRound', { n: targets.currentRound, max: targets.maxRounds })}
+          </p>
+          {maxReached && (
+            <p style={{ color: 'var(--err, #d03050)' }}>{t('todo.returnMaxReached', { max: targets.maxRounds })}</p>
+          )}
+          <div className="field">
+            <label className="field-label">{t('todo.returnMode')}</label>
+            <label className="radio-row">
+              <input type="radio" name="return-mode" checked={mode === 'previous'} disabled={!targets.previousNodeId} onChange={() => setMode('previous')} />
+              <span>{t('todo.returnModePrevious')}{targets.previousNodeName ? `（${targets.previousNodeName}）` : ''}</span>
+            </label>
+            <label className="radio-row">
+              <input type="radio" name="return-mode" checked={mode === 'initiator'} disabled={targets.initiatorNodeMulti} onChange={() => setMode('initiator')} />
+              <span>{t('todo.returnModeInitiator')}</span>
+            </label>
+            {targets.initiatorNodeMulti && (
+              <p className="dim" style={{ marginTop: 0 }}>{t('todo.returnMultiInitiatorHint')}</p>
+            )}
+            <label className="radio-row">
+              <input type="radio" name="return-mode" checked={mode === 'specified'} disabled={targets.historicNodes.length === 0} onChange={() => setMode('specified')} />
+              <span>{t('todo.returnModeSpecified')}</span>
+            </label>
+            {mode === 'specified' && (
+              <select value={specified} onChange={(e) => setSpecified(e.target.value)}>
+                <option value="">—</option>
+                {targets.historicNodes.map((n) => (
+                  <option key={n.id} value={n.id}>{n.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          {mode !== 'initiator' && targets.parallelActive && (
+            <p className="dim">{t('todo.returnParallelHint')}</p>
+          )}
+          <div className="field">
+            <label className="field-label">{t('todo.returnReason')}</label>
+            <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </div>
+        </>
+      )}
+      {!targets && !loadErr && <p className="dim">{t('common.loading')}</p>}
     </Modal>
   );
 }

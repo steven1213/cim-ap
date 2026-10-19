@@ -8,6 +8,7 @@ import InitiatedPage from '@/pages/InitiatedPage';
 import CallbacksPage from '@/pages/CallbacksPage';
 import AuditPage from '@/pages/AuditPage';
 import DesignerPage from '@/pages/DesignerPage';
+import WeComCallbackPage from '@/pages/WeComCallbackPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 /**
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/initiated" element={<InitiatedPage />} />
           <Route path="/callbacks" element={<CallbacksPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          <Route path="/wecom/callback" element={<WeComCallbackPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

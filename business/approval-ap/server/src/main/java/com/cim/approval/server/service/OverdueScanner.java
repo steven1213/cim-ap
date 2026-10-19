@@ -8,6 +8,8 @@ import org.flowable.task.api.Task;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import com.cim.approval.server.notification.NotificationDispatcher;
+import com.cim.approval.server.notification.NotificationEvent;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -33,7 +35,7 @@ public class OverdueScanner {
 
     private final TaskService taskService;
     private final RuntimeService runtimeService;
-    private final NotificationService notificationService;
+    private final NotificationDispatcher dispatcher;
 
     /** 超时阈值（分钟，支持小数），与列表标红共用同一配置。 */
     @Value("${approval.task.timeout-minutes:1440}")
@@ -77,12 +79,13 @@ public class OverdueScanner {
                 }
             }
             for (String user : users) {
-                notificationService.pushToUser(user, "TASK_OVERDUE", Map.of(
-                        "type", "TASK_OVERDUE",
-                        "taskId", t.getId(),
-                        "name", t.getName(),
-                        "processInstanceId", t.getProcessInstanceId(),
-                        "overdueMinutes", overdueMinutes));
+                dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.TASK_OVERDUE,
+                        java.util.List.of(user), Map.of(
+                                "type", "TASK_OVERDUE",
+                                "taskId", t.getId(),
+                                "name", t.getName(),
+                                "processInstanceId", t.getProcessInstanceId(),
+                                "overdueMinutes", overdueMinutes)));
             }
             if (!users.isEmpty()) {
                 lastNotified.put(t.getId(), Instant.now());
