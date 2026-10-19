@@ -3,6 +3,8 @@ package com.cim.approval.server.controller;
 import com.cim.approval.server.dto.CallbackRegistrationRequest;
 import com.cim.approval.server.dto.CallbackRegistrationView;
 import com.cim.approval.server.dto.OutboxView;
+import com.cim.approval.server.security.CurrentUserResolver;
+import com.cim.approval.server.security.SecurityGuard;
 import com.cim.approval.server.service.CallbackService;
 import com.cim.spring.support.web.Result;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +20,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 回调配置与投递监控。响应统一 {@link Result} 封装；
- * 统计（成功率/平均耗时）与测试请求对齐原型「回调管理」面板。
+ * 回调配置与投递监控（G1 + G3）。
+ * <ul>
+ *   <li>G1：注册/测试/重投/查看均要求 {@code approval:callback:manage}；dev 放行态默认跳过、dev-enforce 可开启 deny 路径。</li>
+ *   <li>G3：回调与配置按 appCode 收敛；开放 API 强制以令牌绑定域为准，跨域访问 403。</li>
+ * </ul>
  */
 @RestController
 @RequestMapping("/api/v1/approval/callbacks")
@@ -27,26 +32,47 @@ import java.util.Map;
 public class CallbackController {
 
     private final CallbackService callbackService;
+    private final CurrentUserResolver currentUser;
+    private final SecurityGuard securityGuard;
 
     @PostMapping("/register")
-    public Result<CallbackRegistrationView> register(@RequestBody CallbackRegistrationRequest req) {
+    public Result<CallbackRegistrationView> register(@RequestBody CallbackRegistrationRequest req,
+                                                     @RequestParam(required = false) String actor) {
+        securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE,
+                currentUser.resolveNullable(actor));
+        securityGuard.assertAppCodeScope(req.appCode());
         return Result.ok(callbackService.register(req));
     }
 
     @GetMapping
-    public Result<List<CallbackRegistrationView>> list() {
-        return Result.ok(callbackService.listRegistrations());
+    public Result<List<CallbackRegistrationView>> list(@RequestParam(required = false) String appCode) {
+        String scope = securityGuard.resolvedAppCodeOrNull();
+        String effective = scope != null ? scope : appCode;
+        List<CallbackRegistrationView> all = callbackService.listRegistrations();
+        if (effective != null) {
+            securityGuard.assertAppCodeScope(effective);
+            all = all.stream().filter(v -> effective.equals(v.appCode())).toList();
+        }
+        return Result.ok(all);
     }
 
     @GetMapping("/outbox")
     public Result<List<OutboxView>> outbox(@RequestParam(required = false) String appCode,
                                            @RequestParam(required = false) String businessKey) {
-        return Result.ok(callbackService.queryOutbox(appCode, businessKey));
+        String scope = securityGuard.resolvedAppCodeOrNull();
+        String effective = scope != null ? scope : appCode;
+        if (effective != null) {
+            securityGuard.assertAppCodeScope(effective);
+        }
+        return Result.ok(callbackService.queryOutbox(effective, businessKey));
     }
 
     /** 手动触发单次投递（测试/运维用）。 */
     @PostMapping("/deliver/{messageId}")
-    public Result<Void> deliver(@PathVariable String messageId) {
+    public Result<Void> deliver(@PathVariable String messageId,
+                                @RequestParam(required = false) String actor) {
+        securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE,
+                currentUser.resolveNullable(actor));
         callbackService.deliverMessage(messageId);
         return Result.ok();
     }
@@ -59,7 +85,13 @@ public class CallbackController {
 
     /** 测试请求：向指定 appCode 发送一条 TEST 事件并立即投递，返回投递结果。 */
     @PostMapping("/test/{appCode}")
-    public Result<Map<String, Object>> testCallback(@PathVariable String appCode) {
-        return Result.ok(callbackService.sendTestCallback(appCode));
+    public Result<Map<String, Object>> testCallback(@PathVariable String appCode,
+                                                    @RequestParam(required = false) String actor) {
+        securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE,
+                currentUser.resolveNullable(actor));
+        String scope = securityGuard.resolvedAppCodeOrNull();
+        String effective = scope != null ? scope : appCode;
+        securityGuard.assertAppCodeScope(effective);
+        return Result.ok(callbackService.sendTestCallback(effective));
     }
 }

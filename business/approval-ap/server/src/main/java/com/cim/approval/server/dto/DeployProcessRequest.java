@@ -8,10 +8,13 @@ package com.cim.approval.server.dto;
  * @param processKey  流程定义 key（同 key 重复部署自动递增版本）
  * @param processName 流程显示名
  * @param bpmnXml     Flowable 兼容的 BPMN 2.0 XML（含 flowable 命名空间）
+ * @param appCode     归属业务域（可选）。非空时定义以该 appCode 作为 Flowable tenantId，
+ *                    供 G3 按业务域过滤；为空则保持平台全局定义（dev/跨域共享模板）
  */
 public record DeployProcessRequest(
         String processKey,
         String processName,
-        String bpmnXml
+        String bpmnXml,
+        String appCode
 ) {
 }

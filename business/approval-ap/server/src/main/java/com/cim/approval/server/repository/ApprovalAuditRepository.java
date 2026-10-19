@@ -11,6 +11,10 @@ public interface ApprovalAuditRepository extends JpaRepository<ApprovalAudit, St
 
     List<ApprovalAudit> findByBusinessKeyOrderBySeqAsc(String businessKey);
 
+    List<ApprovalAudit> findByBusinessKeyAndAppCodeOrderBySeqAsc(String businessKey, String appCode);
+
+    List<ApprovalAudit> findByAppCodeOrderBySeqAsc(String appCode);
+
     long countByBusinessKey(String businessKey);
 
     java.util.Optional<ApprovalAudit> findTopByBusinessKeyOrderBySeqDesc(String businessKey);

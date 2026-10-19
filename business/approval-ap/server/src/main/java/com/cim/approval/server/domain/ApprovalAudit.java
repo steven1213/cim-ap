@@ -35,6 +35,10 @@ public class ApprovalAudit {
     @Column(name = "business_key", length = 128)
     private String businessKey;
 
+    /** 业务域（= 调用方 appCode / 流程实例 tenantId）。供 G3 按业务域过滤审计，跨域访问被拒。 */
+    @Column(name = "app_code", length = 64)
+    private String appCode;
+
     @Column(name = "process_instance_id", length = 64)
     private String processInstanceId;
 

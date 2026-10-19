@@ -61,3 +61,22 @@ approval:
   task:
     timeout-minutes: 1440      # 默认 24h
     scan-interval-ms: 300000   # 扫描间隔 5min
+  # 开放 API 安全（G9）：服务间调用 AppKey + HMAC-SHA256 签名（timestamp|method|path|body）+ 防重放窗口
+  # + 按 appCode 限流 + IP 白名单。默认关闭；enable 后仅对携带 X-App-Key 的请求生效，JWT 用户态 / dev 放行不受影响。
+  api:
+    security:
+      enabled: false
+      app-keys:
+        rms-ap: "请替换为强随机密钥"
+        mds-ap: "请替换为强随机密钥"
+      replay-window-ms: 300000
+      ip-whitelist: []
+      rate-limit:
+        rms-ap: 60
+        mds-ap: 60
+  # 权限与业务域（G1/G3）dev 态开关：dev-bypass 默认放行既有 E2E；dev-enforce 开启后按 dev-super-admin 白名单 deny 非超管。
+  security:
+    dev-bypass: true
+    dev-enforce: false
+    dev-super-admin:
+      - admin

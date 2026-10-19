@@ -4,10 +4,14 @@ import com.cim.approval.server.dto.DefinitionXmlView;
 import com.cim.approval.server.dto.DeployProcessRequest;
 import com.cim.approval.server.dto.ProcessDefinitionView;
 import com.cim.approval.server.dto.ProcessDetailView;
+import com.cim.approval.server.dto.ResubmitRequest;
 import com.cim.approval.server.dto.StartProcessRequest;
 import com.cim.approval.server.dto.StatsView;
+import com.cim.approval.server.security.ApprovalPermissions;
 import com.cim.approval.server.security.CurrentUserResolver;
+import com.cim.approval.server.security.SecurityGuard;
 import com.cim.approval.server.service.ApprovalProcessService;
+import com.cim.approval.server.service.ApprovalReturnService;
 import com.cim.approval.server.service.StatsService;
 import com.cim.core.shared.PageResult;
 import com.cim.spring.support.web.Result;
@@ -33,12 +37,21 @@ import java.util.Map;
 public class ProcessController {
 
     private final ApprovalProcessService processService;
+    private final ApprovalReturnService returnService;
     private final StatsService statsService;
     private final CurrentUserResolver currentUser;
+    private final SecurityGuard securityGuard;
 
     @GetMapping("/definitions")
-    public Result<List<ProcessDefinitionView>> listDefinitions() {
-        return Result.ok(processService.listDefinitions());
+    public Result<List<ProcessDefinitionView>> listDefinitions(
+            @RequestParam(required = false) String appCode) {
+        // 开放 API：强制以令牌绑定域为准；dev 态可按 appCode 过滤或查看全部
+        String scope = securityGuard.resolvedAppCodeOrNull();
+        String effective = scope != null ? scope : appCode;
+        if (effective != null) {
+            securityGuard.assertAppCodeScope(effective);
+        }
+        return Result.ok(processService.listDefinitions(effective));
     }
 
     /** 读取定义 BPMN XML（设计器编辑/查看入口）。 */
@@ -87,8 +100,21 @@ public class ProcessController {
         return Result.ok();
     }
 
+    /**
+     * 重新提交：发起人修改表单后重提（退回到发起人后的重提态），审批链从头重走。
+     * 身份强制取 JWT（认证态）或请求体（dev 态）。
+     */
+    @PostMapping("/processes/instances/{instanceId}/resubmit")
+    public Result<Void> resubmit(@PathVariable String instanceId, @RequestBody ResubmitRequest req) {
+        returnService.resubmit(instanceId, new ResubmitRequest(req.formData(), req.formSchema(),
+                currentUser.resolve(req.actor())));
+        return Result.ok();
+    }
+
     @PostMapping("/processes/deploy")
-    public Result<ProcessDefinitionView> deployProcess(@RequestBody DeployProcessRequest req) {
+    public Result<ProcessDefinitionView> deployProcess(@RequestBody DeployProcessRequest req,
+                                                     @RequestParam(required = false) String actor) {
+        securityGuard.assertPermission(ApprovalPermissions.DEFINITION_MANAGE, currentUser.resolveNullable(actor));
         return Result.ok(processService.deployProcess(req));
     }
 
@@ -112,7 +138,10 @@ public class ProcessController {
 
     /** 定义停用/启用（管理员运维：停用后不可发起新实例）。 */
     @PostMapping("/processes/{definitionId}/suspend")
-    public Result<Void> suspend(@PathVariable String definitionId, @RequestParam(defaultValue = "true") boolean suspend) {
+    public Result<Void> suspend(@PathVariable String definitionId,
+                               @RequestParam(defaultValue = "true") boolean suspend,
+                               @RequestParam(required = false) String actor) {
+        securityGuard.assertPermission(ApprovalPermissions.DEFINITION_MANAGE, currentUser.resolveNullable(actor));
         processService.suspendDefinition(definitionId, suspend);
         return Result.ok();
     }

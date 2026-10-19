@@ -2,7 +2,10 @@ package com.cim.approval.server.service;
 
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
+import com.cim.approval.server.notification.NotificationDispatcher;
+import com.cim.approval.server.notification.NotificationEvent;
 import com.cim.approval.server.domain.ApprovalAudit;
+import com.cim.approval.server.security.SecurityGuard;
 import com.cim.approval.server.dto.AuditView;
 import com.cim.approval.server.dto.CompleteTaskRequest;
 import com.cim.approval.server.dto.DefinitionXmlView;
@@ -55,10 +58,11 @@ public class ApprovalProcessService {
     private final HistoryService historyService;
     private final AuditService auditService;
     private final CallbackService callbackService;
-    private final NotificationService notificationService;
+    private final NotificationDispatcher dispatcher;
     private final AttachmentService attachmentService;
     private final ApprovalAuditRepository auditRepository;
     private final ObjectMapper objectMapper;
+    private final SecurityGuard securityGuard;
 
     /** 任务超时阈值（分钟，支持小数）：超出后列表标红并由 {@link OverdueScanner} 推送提醒，默认 24h。 */
     @Value("${approval.task.timeout-minutes:1440}")
@@ -68,11 +72,17 @@ public class ApprovalProcessService {
      * 全部版本的定义列表（同 key 按 version 降序）。
      * <p>前端以「同 key 最新版本 = 可编辑、历史版本 = 只可查看」呈现状态。</p>
      */
-    public List<ProcessDefinitionView> listDefinitions() {
+    public List<ProcessDefinitionView> listDefinitions(String appCode) {
         List<ProcessDefinition> defs = repositoryService.createProcessDefinitionQuery()
                 .orderByProcessDefinitionKey().asc()
                 .orderByProcessDefinitionVersion().desc()
                 .list();
+        if (appCode != null && !appCode.isBlank()) {
+            // G3：按业务域收敛（定义以 appCode 作为 Flowable tenantId 部署）
+            defs = defs.stream()
+                    .filter(d -> appCode.equals(d.getTenantId()))
+                    .collect(java.util.stream.Collectors.toList());
+        }
         List<ProcessDefinitionView> views = new ArrayList<>();
         for (ProcessDefinition d : defs) {
             views.add(new ProcessDefinitionView(d.getId(), d.getKey(), d.getName(), d.getVersion(),
@@ -109,10 +119,14 @@ public class ApprovalProcessService {
         if (key == null || key.isBlank()) {
             throw new BizException(BizCode.PARAM_INVALID, "processKey 不能为空");
         }
-        org.flowable.engine.repository.Deployment dep = repositoryService.createDeployment()
+        org.flowable.engine.repository.DeploymentBuilder builder = repositoryService.createDeployment()
                 .addString(key + ".bpmn20.xml", req.bpmnXml())
-                .name(req.processName() == null ? key : req.processName())
-                .deploy();
+                .name(req.processName() == null ? key : req.processName());
+        if (req.appCode() != null && !req.appCode().isBlank()) {
+            // G3：定义归属业务域，以 appCode 作为 Flowable tenantId，供按域过滤与跨域拦截
+            builder = builder.tenantId(req.appCode());
+        }
+        org.flowable.engine.repository.Deployment dep = builder.deploy();
         ProcessDefinition pd = repositoryService.createProcessDefinitionQuery()
                 .deploymentId(dep.getId()).latestVersion().singleResult();
         if (pd == null) {
@@ -188,6 +202,8 @@ public class ApprovalProcessService {
         // 流程实例级 Flowable 租户留空（定义全局共享），租户以变量承载，
         // 查询按 tenantId 变量过滤，实现多业务系统隔离；真正的定义级租户隔离为后续增强。
         vars.put("tenantId", req.tenantId());
+        // 审批轮次：发起为第 1 轮，每次退回重提/重审 +1（上限 approval.return.max-rounds）
+        vars.put("round", 1);
 
         ProcessInstance pi = runtimeService.createProcessInstanceBuilder()
                 .processDefinitionKey(req.processKey())
@@ -210,6 +226,7 @@ public class ApprovalProcessService {
      * 而非每任务单独查实例。
      */
     public PageResult<TaskView> listTodoPaged(String userId, String tenantId, int page, int size) {
+        securityGuard.assertAppCodeScope(tenantId);
         int page0 = Math.max(page, 1) - 1; // 平台分页页号 1 起，Flowable listPage 0 起
         var query = taskService.createTaskQuery()
                 .taskCandidateOrAssigned(userId)
@@ -225,7 +242,8 @@ public class ApprovalProcessService {
             views.add(toView(t, pi != null ? pi.getBusinessKey() : null,
                     pi != null ? pi.getProcessDefinitionKey() : null,
                     pi != null ? (String) pi.getProcessVariables().get("title") : null,
-                    t.getTenantId()));
+                    t.getTenantId(),
+                    pi != null ? (Integer) pi.getProcessVariables().get("round") : null));
         }
         return PageResult.of(views, total, page0 + 1, size);
     }
@@ -406,6 +424,7 @@ public class ApprovalProcessService {
 
     /** 已办分页查询。 */
     public PageResult<TaskView> listDonePaged(String userId, String tenantId, int page, int size) {
+        securityGuard.assertAppCodeScope(tenantId);
         int page0 = Math.max(page, 1) - 1;
         var query = historyService.createHistoricTaskInstanceQuery()
                 .taskAssignee(userId)
@@ -420,6 +439,7 @@ public class ApprovalProcessService {
                     .processInstanceId(t.getProcessInstanceId())
                     .includeProcessVariables().singleResult();
             String title = hpi != null ? (String) hpi.getProcessVariables().get("title") : null;
+            Integer round = hpi != null ? (Integer) hpi.getProcessVariables().get("round") : null;
             views.add(new TaskView(t.getId(), t.getProcessInstanceId(),
                     hpi != null ? hpi.getProcessDefinitionKey() : null,
                     hpi != null ? hpi.getBusinessKey() : null,
@@ -427,7 +447,7 @@ public class ApprovalProcessService {
                     t.getTenantId(), t.getName(), t.getAssignee(),
                     historicCandidateUsersOf(t.getId()), null,
                     toInstant(t.getCreateTime()), toInstant(t.getEndTime()),
-                    null, null));
+                    null, null, round != null ? round : 1));
         }
         return PageResult.of(views, total, page0 + 1, size);
     }
@@ -441,6 +461,7 @@ public class ApprovalProcessService {
      * 排序约定：进行中在前，其余按开始时间倒序（与原全量行为一致）。
      */
     public PageResult<ProcessInstanceView> listInitiatedPaged(String userId, String tenantId, int page, int size) {
+        securityGuard.assertAppCodeScope(tenantId);
         int page0 = Math.max(page, 1) - 1;
         List<ProcessInstanceView> runningList = new ArrayList<>();
         runtimeService.createProcessInstanceQuery()
@@ -452,7 +473,9 @@ public class ApprovalProcessService {
                         pi.getProcessDefinitionKey(), (String) pi.getProcessVariables().get("title"),
                         pi.getTenantId(), "ACTIVE",
                         toInstant(pi.getStartTime()), null,
-                        maxOverdueOf(pi.getId()))));
+                        maxOverdueOf(pi.getId()),
+                        (Integer) pi.getProcessVariables().get("round"),
+                        (Boolean) pi.getProcessVariables().get("awaitingResubmit"))));
 
         var historicQuery = historyService.createHistoricProcessInstanceQuery()
                 .variableValueEquals("tenantId", tenantId)
@@ -478,7 +501,9 @@ public class ApprovalProcessService {
                             hpi.getTenantId(),
                             hpi.getDeleteReason() != null ? "WITHDRAWN" : "COMPLETED",
                             toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
-                            null)));
+                            null,
+                            (Integer) hpi.getProcessVariables().get("round"),
+                            (Boolean) hpi.getProcessVariables().get("awaitingResubmit"))));
         }
         return PageResult.of(items, total, page0 + 1, size);
     }
@@ -531,6 +556,7 @@ public class ApprovalProcessService {
         String businessKey = hpi.getBusinessKey();
         String tenant = String.valueOf(
                 hpi.getProcessVariables() != null ? hpi.getProcessVariables().get("tenantId") : null);
+        securityGuard.assertAppCodeScope(tenant);
 
         runtimeService.deleteProcessInstance(instanceId, "WITHDRAW");
 
@@ -565,6 +591,9 @@ public class ApprovalProcessService {
         }
         String businessKey = hpi.getBusinessKey();
         String title = String.valueOf(hpi.getProcessVariables().get("title"));
+        String tenant = (String) (hpi.getProcessVariables() != null
+                ? hpi.getProcessVariables().get("tenantId") : null);
+        securityGuard.assertAppCodeScope(tenant);
         List<Task> tasks = taskService.createTaskQuery()
                 .processInstanceId(instanceId).active()
                 .orderByTaskCreateTime().asc().list();
@@ -573,25 +602,27 @@ public class ApprovalProcessService {
         for (Task t : tasks) {
             if (t.getAssignee() != null && !t.getAssignee().isBlank()) {
                 notified.add(t.getAssignee());
-                notificationService.pushToUser(t.getAssignee(), "URGE", Map.of(
-                        "type", "URGE",
-                        "taskId", t.getId(),
-                        "name", t.getName(),
-                        "processInstanceId", instanceId,
-                        "businessKey", businessKey,
-                        "title", title,
-                        "from", actor));
+                dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.URGE,
+                        java.util.List.of(t.getAssignee()), Map.of(
+                                "type", "URGE",
+                                "taskId", t.getId(),
+                                "name", t.getName(),
+                                "processInstanceId", instanceId,
+                                "businessKey", businessKey,
+                                "title", title,
+                                "from", actor)));
             }
             for (String candidate : candidateUsersOf(t.getId())) {
                 if (notified.add(candidate)) {
-                    notificationService.pushToUser(candidate, "URGE", Map.of(
-                            "type", "URGE",
-                            "taskId", t.getId(),
-                            "name", t.getName(),
-                            "processInstanceId", instanceId,
-                            "businessKey", businessKey,
-                            "title", title,
-                            "from", actor));
+                    dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.URGE,
+                            java.util.List.of(candidate), Map.of(
+                                    "type", "URGE",
+                                    "taskId", t.getId(),
+                                    "name", t.getName(),
+                                    "processInstanceId", instanceId,
+                                    "businessKey", businessKey,
+                                    "title", title,
+                                    "from", actor)));
                 }
             }
         }
@@ -665,10 +696,13 @@ public class ApprovalProcessService {
         String initiator = (String) vars.get("initiator");
 
         assertInstanceVisible(instanceId, userId);
+        securityGuard.assertAppCodeScope((String) vars.get("tenantId"));
 
         String businessKey = hpi.getBusinessKey();
         Map<String, Object> formData = parseFormData(vars.get("formDataJson"));
         List<FormSchemaField> formSchema = parseFormSchema(vars.get("formSchemaJson"));
+        Integer round = (Integer) vars.get("round");
+        Boolean awaitingResubmit = (Boolean) vars.get("awaitingResubmit");
 
         List<TaskView> activeTasks = new ArrayList<>();
         List<String> activeNodes = new ArrayList<>();
@@ -679,7 +713,7 @@ public class ApprovalProcessService {
             for (Task t : taskService.createTaskQuery()
                     .processInstanceId(instanceId).active()
                     .orderByTaskCreateTime().asc().list()) {
-                activeTasks.add(toView(t, businessKey, pi.getProcessDefinitionKey(), title, t.getTenantId()));
+                activeTasks.add(toView(t, businessKey, pi.getProcessDefinitionKey(), title, t.getTenantId(), round));
             }
             try {
                 List<String> ids = runtimeService.getActiveActivityIds(instanceId);
@@ -710,7 +744,8 @@ public class ApprovalProcessService {
                 running ? "ACTIVE" : (hpi.getDeleteReason() != null ? "WITHDRAWN" : "COMPLETED"),
                 toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
                 formData, formSchema, activeNodes, activeTasks, history,
-                attachmentService.listByBusinessKey(businessKey));
+                attachmentService.listByBusinessKey(businessKey),
+                round != null ? round : 1, awaitingResubmit);
     }
 
     /**
@@ -788,13 +823,15 @@ public class ApprovalProcessService {
                 : "UNKNOWN";
     }
 
-    private TaskView toView(Task t, String businessKey, String processKey, String title, String tenantId) {
+    private TaskView toView(Task t, String businessKey, String processKey, String title, String tenantId,
+                            Integer round) {
         return new TaskView(t.getId(), t.getProcessInstanceId(), processKey, businessKey, title, tenantId,
                 t.getName(), t.getAssignee(), candidateUsersOf(t.getId()),
                 (String) t.getTaskLocalVariables().get("outcome"),
                 toInstant(t.getCreateTime()), toInstant(t.getDueDate()),
                 overdueMinutes(toInstant(t.getCreateTime())),
-                t.getDelegationState() != null ? t.getDelegationState().name() : null);
+                t.getDelegationState() != null ? t.getDelegationState().name() : null,
+                round != null ? round : 1);
     }
 
     private Instant toInstant(Date date) {

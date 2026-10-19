@@ -149,7 +149,7 @@ public class CallbackService {
             if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
                 o.setStatus(CallbackOutbox.Status.SENT);
                 o.setSentAt(Instant.now());
-                auditService.append(o.getBusinessKey(), null, null, "CALLBACK_SENT", "system",
+                auditService.appendCallback(o.getAppCode(), o.getBusinessKey(), "CALLBACK_SENT", "system",
                         "PENDING", "SENT", "messageId=" + o.getMessageId());
             } else {
                 fail(o, "HTTP " + resp.statusCode());
@@ -165,7 +165,7 @@ public class CallbackService {
         o.setLastError(truncate(err, 1000));
         if (o.getAttempts() >= o.getMaxAttempts()) {
             o.setStatus(CallbackOutbox.Status.DEAD);
-            auditService.append(o.getBusinessKey(), null, null, "CALLBACK_FAILED", "system",
+            auditService.appendCallback(o.getAppCode(), o.getBusinessKey(), "CALLBACK_FAILED", "system",
                     "RETRY", "DEAD", "messageId=" + o.getMessageId() + " attempts=" + o.getAttempts());
             // 死信告警：通知运维人工介入（webhook 未配置时降级为日志）
             webhookNotifyService.alert("【审批平台告警】回调投递死信: businessKey=" + o.getBusinessKey()
