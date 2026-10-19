@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Modal from '@/components/Modal';
 import CompleteModal from '@/components/CompleteModal';
+import { DisplayFields } from '@/components/DisplayFields';
 import ResubmitModal from '@/components/ResubmitModal';
 import { IconBell, IconCheck, IconClip, IconDownload, IconRefresh, IconUndo, IconTrash } from '@/components/Icons';
 import {
@@ -284,6 +285,7 @@ export default function DetailModal({
           {/* 基本信息 */}
           <section className="detail-section">
             <h3 className="detail-section-title">{detail.title || detail.businessKey}</h3>
+            <DisplayFields fields={detail.displayFields} />
             <div className="detail-grid">
               <div className="detail-grid-item">
                 <span className="detail-label">{t('detail.status')}</span>

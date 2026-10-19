@@ -33,6 +33,8 @@ public record ProcessDetailView(
         /** 当前轮次（退回重提后递增）。 */
         Integer round,
         /** 是否等待发起人「修改并重新提交」。 */
-        Boolean awaitingResubmit
+        Boolean awaitingResubmit,
+        /** 业务摘要字段（G5）：详情页顶部摘要。 */
+        List<DisplayField> displayFields
 ) {
 }

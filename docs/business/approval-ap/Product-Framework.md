@@ -262,7 +262,7 @@
 | **M0 信创 POC**（并行） | §5 POC | 通过标准六项全过 或 给出引擎替换结论 |
 | **M1 信任层** | G1 权限三层 + G2 回调收编 + G9 开放 API 安全 | 无码 403；回调注册仅受信账号；服务间签名+限流生效 |
 | **M2 业务域隔离** | G3 appCode 隔离 + 前端收敛 | 跨域 403；五类查询过滤；E2E 双域用例 |
-| **M3 契约层** | G4 结果语义（**含退回/重提状态机 §2.2**）+ G5 displayFields | 三态终态 result 由平台写；语义表入 Integration-API.md；待办卡片可见业务摘要 |
+| **M3 契约层** | G4 结果语义（**含退回/重提状态机 §2.2**）+ G5 displayFields | ✅ 已交付（契约 PRD `Integration-API.md` §7/§8/§9 + 后端实现 + 前端渲染）；`verify-g5` 15/15 |
 | **M4 选人与触达** | G6 角色选人 + G7 渠道 SPI+企微 + G8 免登办理 | 企微收待办→点击→免登办理→结果回调业务方，端到端一通 |
 | **M5 业务规则核心批** | §2.2 退回流程（**本批 P0 子项，第一个交付**）+ F1-F12 | 退回 4 条 GWT 验收全过；请假+报销两场景走查通过 |
 | **M6 RMS 端到端** | 配方签核经 businessKey+回调接入，平台编排 + RMS 回放；补一个通用场景（采购/合同）验证平台性 | 配方审批全闭环；通用场景端到端 |
@@ -279,7 +279,7 @@
 - `Feature-Roadmap.md`：P0/P1/P2 分级**作废**，缺口池按本文 §2 重排
 - `approval-design-v2.md`：架构决策不变；§5.4 选人策略按 D8 分期；§10 多租户按 D5 细化为业务域隔离；§12 开放问题已由 D1/D3/D10 回答
 - `Product-Review.md`：旧 P0 四项已修复关闭；本文 §2.1 为新一轮闸门
-- `Integration-API.md`：需补审批结果语义表（G4 出口）+ displayFields 契约（G5 出口）+ 中间事件目录（F20 出口）+ 退回状态机（§2.2 出口）
+- `Integration-API.md`：已补 G4 审批结果语义表（§7，含 `APPROVE/APPROVED` 词尾迁移说明）+ G5 displayFields 契约（§8）+ §2.2 退回/重提状态机（§9）；F20 中间事件**目录**待 M4/M7 统一补（§9.2 已引用 TASK_RETURNED/TASK_RESUBMITTED 事件类型）
 
 ---
 
@@ -304,6 +304,7 @@
 | 2. 通知渠道 SPI + 企微免登 | D1/D3/D9：事件→模板→渠道三层；InApp SSE + 企微 webhook；15min 免登令牌 | ✅ 已交付 | `verify-wecom.mjs` 12/12 |
 | 3. 权限与业务域 | **G1 权限码三层 + G3 appCode 业务域隔离 + G9 开放 API 安全**（D5/D6/D2） | ✅ 已交付 | `verify-security.mjs` 11/11 + `verify-g1.mjs` 6/6 |
 | 3b. 回调注册收编（G2） | D6+体检#2：受信操作 + 重复注册同 appCode 二次确认 | ✅ 已交付 | `verify-g2.mjs` 14/14 |
+| 4. 契约层（M3：G4+G5） | D4 结果语义 + D7 displayFields + §2.2 状态机 | ✅ 已交付（后端实现 + 前端渲染 + verify-g5 15/15） | `Integration-API.md` §7/§8/§9 |
 
 ### 切片3 落点（G1/G3/G9）
 - **G9 开放 API 安全**：`ApiAuthFilter`（`@ConditionalOnProperty approval.api.security.enabled`）。仅对携带 `X-App-Key` 的服务间调用生效，不影响 JWT 用户态 / dev 放行。校验链：未知 appKey → 缺/错签名 → 时间戳超重放窗口（默认 5min）→ IP 白名单 → 按 appCode 限流（默认 60/min）→ 跨业务域；任一失败 403 + `[API-SEC-ALERT]` 告警（`WebhookNotifyService`）。签名 = `HMAC-SHA256(timestamp|method|path|body)`，常量时间比较。
@@ -321,6 +322,17 @@
 > ✅ G2 已完成，M1 信任层（G1+G2+G9）闭环。
 >
 > 运行时 `application.yml`（gitignored）已置 `approval.api.security.enabled=true` 便于验证；`application.yml.example` 以 `enabled:false` 为推荐默认。E2E：`web/scripts/verify-security.mjs`、`verify-g1.mjs`、`verify-wecom.mjs`。
+
+### G5 落点（业务摘要 displayFields + G4 结果枚举迁移）
+
+- **G5 后端**：`StartProcessRequest` 增 `displayFields`（`List<DisplayField>`），发起时持久化为流程变量 `displayFieldsJson`；`ApprovalProcessService.resolveDisplayFields(vars)` 按 §8.3 兜底优先级解析——①显式 `displayFieldsJson` 直用（值截断 24 字符）；②未传但 `formSchema.display:true` 字段存在且有 `formData` → 取这些字段（按 `order`，值取自 formData）；③皆无 → 空列表（前端回退仅 title）。解析结果注入 `TaskView` / `ProcessInstanceView` / `ProcessDetailView` 的 `displayFields` 字段（待办卡片、我发起的列表、详情页顶部共享同一来源）。`FormSchemaField` 增 `display` 标记位（仅持久化与兜底用，不影响既有字段）。
+- **G5 前端**：`types.ts` 增 `DisplayField` 接口并挂到三视图；新增 `components/DisplayFields.tsx`（前 4 项、超长截断、`+N` 折叠）+ `styles.css` 样式；`TodoPage`/`InitiatedPage` 标题单元格、`DetailModal` 标题下均挂载该组件。前端 `npm run build` 通过。
+- **G4 枚举迁移**：BPMN 终态事件 `result` 变量由 `APPROVE/REJECT` 重命名为过去分词式 `APPROVED/REJECTED`（single/countersign/two-step 三处）；撤回回调 `result` 由 `WITHDRAW` → `WITHDRAWN`（与 §7.4 契约统一）。任务级 `outcome`（APPROVE/REJECT）与 `status`/审计动作（WITHDRAW 等）保持不变。集成方仍应兼容双套值（迁移过渡期）。
+- **SDK 对齐**：`sdk` 模块新增 `DisplayField`/`FormSchemaField`（含 `display`）DTO，`StartProcessRequest` 补齐 `formData`/`formSchema`/`displayFields`，与平台契约一致；`sdk` 编译通过。
+- **验证**：`verify-g5.mjs` 15/15（显式/派生/空三态 + 待办卡片 + G4 BPMN 内容校验）；回归 `verify-security` 11/11、`verify-g2` 14/14、`verify-wecom` 12/12、`verify-hardening` 15/15、`verify-g1` 6/6 全绿。
+- **实现期踩坑**：①`detail` 接口用 `userId=` 入参（非 `actor=`），脚本误用 `actor` 触发 400，已修正；②`ProcessInstanceView` 缺 `import java.util.List`，编译期补；③集成测试 `StartProcessRequest` 构造点需补新字段实参。
+
+> ✅ M3 契约层（G4+G5）已交付，详情/列表/待办/SDK 全链路贯通。
 
 ---
 

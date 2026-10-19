@@ -13,6 +13,7 @@ import {
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { fmtDate, fmtOverdue } from '@/lib/format';
+import { DisplayFields } from '@/components/DisplayFields';
 import type { TaskView } from '@/types';
 
 type ModalType = 'complete' | 'return' | 'addsign' | 'reassign' | 'delegate';
@@ -205,7 +206,10 @@ export default function TodoPage() {
                       </span>
                     )}
                   </td>
-                  <td>{tk.title || '—'}</td>
+                  <td>
+                    {tk.title || '—'}
+                    <DisplayFields fields={tk.displayFields} />
+                  </td>
                   <td className="mono">{tk.businessKey}</td>
                   <td>{tk.assignee ?? '—'}</td>
                   <td className="tag-list">

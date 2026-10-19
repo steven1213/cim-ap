@@ -65,7 +65,8 @@ public class ProcessController {
         // 发起人身份强制取可信来源：认证态=JWT（忽略请求体 initiator），dev 态=请求体
         StartProcessRequest safe = new StartProcessRequest(req.processKey(), req.businessKey(),
                 req.tenantId(), currentUser.resolve(req.initiator()), req.title(),
-                req.approvers(), req.assignee(), req.variables(), req.formData(), req.formSchema());
+                req.approvers(), req.assignee(), req.variables(), req.formData(), req.formSchema(),
+                req.displayFields());
         String piId = processService.startProcess(safe);
         return Result.ok(Map.of("processInstanceId", piId));
     }

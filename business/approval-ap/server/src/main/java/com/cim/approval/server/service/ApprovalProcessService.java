@@ -10,6 +10,7 @@ import com.cim.approval.server.dto.AuditView;
 import com.cim.approval.server.dto.CompleteTaskRequest;
 import com.cim.approval.server.dto.DefinitionXmlView;
 import com.cim.approval.server.dto.DeployProcessRequest;
+import com.cim.approval.server.dto.DisplayField;
 import com.cim.approval.server.dto.FormSchemaField;
 import com.cim.core.shared.PageResult;
 import com.cim.approval.server.dto.ProcessDefinitionView;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -191,6 +193,14 @@ public class ApprovalProcessService {
                 // 同上，缺 schema 时详情页回退为纯键值展示
             }
         }
+        if (req.displayFields() != null && !req.displayFields().isEmpty()) {
+            // 业务摘要字段持久化为变量，待办卡片/列表/审计据此渲染（详见 Integration-API.md §8）
+            try {
+                vars.put("displayFieldsJson", objectMapper.writeValueAsString(req.displayFields()));
+            } catch (Exception ignored) {
+                // 序列化失败不阻塞发起，前端回退为仅 title
+            }
+        }
         if (req.initiator() != null) {
             vars.put("initiator", req.initiator());
         }
@@ -243,7 +253,8 @@ public class ApprovalProcessService {
                     pi != null ? pi.getProcessDefinitionKey() : null,
                     pi != null ? (String) pi.getProcessVariables().get("title") : null,
                     t.getTenantId(),
-                    pi != null ? (Integer) pi.getProcessVariables().get("round") : null));
+                    pi != null ? (Integer) pi.getProcessVariables().get("round") : null,
+                    pi != null ? resolveDisplayFields(pi.getProcessVariables()) : List.of()));
         }
         return PageResult.of(views, total, page0 + 1, size);
     }
@@ -447,7 +458,8 @@ public class ApprovalProcessService {
                     t.getTenantId(), t.getName(), t.getAssignee(),
                     historicCandidateUsersOf(t.getId()), null,
                     toInstant(t.getCreateTime()), toInstant(t.getEndTime()),
-                    null, null, round != null ? round : 1));
+                    null, null, round != null ? round : 1,
+                    hpi != null ? resolveDisplayFields(hpi.getProcessVariables()) : List.of()));
         }
         return PageResult.of(views, total, page0 + 1, size);
     }
@@ -475,7 +487,8 @@ public class ApprovalProcessService {
                         toInstant(pi.getStartTime()), null,
                         maxOverdueOf(pi.getId()),
                         (Integer) pi.getProcessVariables().get("round"),
-                        (Boolean) pi.getProcessVariables().get("awaitingResubmit"))));
+                        (Boolean) pi.getProcessVariables().get("awaitingResubmit"),
+                        resolveDisplayFields(pi.getProcessVariables()))));
 
         var historicQuery = historyService.createHistoricProcessInstanceQuery()
                 .variableValueEquals("tenantId", tenantId)
@@ -503,7 +516,8 @@ public class ApprovalProcessService {
                             toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
                             null,
                             (Integer) hpi.getProcessVariables().get("round"),
-                            (Boolean) hpi.getProcessVariables().get("awaitingResubmit"))));
+                            (Boolean) hpi.getProcessVariables().get("awaitingResubmit"),
+                            resolveDisplayFields(hpi.getProcessVariables()))));
         }
         return PageResult.of(items, total, page0 + 1, size);
     }
@@ -562,7 +576,7 @@ public class ApprovalProcessService {
 
         auditService.append(businessKey, instanceId, null, "WITHDRAW", actor,
                 "RUNNING", "WITHDRAW", "title=" + hpi.getProcessVariables().get("title"));
-        callbackService.enqueueOnComplete(instanceId, businessKey, tenant, "WITHDRAW");
+        callbackService.enqueueOnComplete(instanceId, businessKey, tenant, "WITHDRAWN");
     }
 
     /**
@@ -713,7 +727,7 @@ public class ApprovalProcessService {
             for (Task t : taskService.createTaskQuery()
                     .processInstanceId(instanceId).active()
                     .orderByTaskCreateTime().asc().list()) {
-                activeTasks.add(toView(t, businessKey, pi.getProcessDefinitionKey(), title, t.getTenantId(), round));
+                activeTasks.add(toView(t, businessKey, pi.getProcessDefinitionKey(), title, t.getTenantId(), round, resolveDisplayFields(vars)));
             }
             try {
                 List<String> ids = runtimeService.getActiveActivityIds(instanceId);
@@ -745,7 +759,7 @@ public class ApprovalProcessService {
                 toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
                 formData, formSchema, activeNodes, activeTasks, history,
                 attachmentService.listByBusinessKey(businessKey),
-                round != null ? round : 1, awaitingResubmit);
+                round != null ? round : 1, awaitingResubmit, resolveDisplayFields(vars));
     }
 
     /**
@@ -814,6 +828,68 @@ public class ApprovalProcessService {
         }
     }
 
+    /**
+     * 解析业务摘要（G5）：按 §8.3 兜底优先级选择来源。
+     * 1) 发起时显式传入 displayFieldsJson → 直接使用；
+     * 2) 未传但 formSchema 含 display:true 字段且有 formData → 取这些字段（按 order）派生；
+     * 3) 二者皆无 → 空列表（前端回退仅显示 title）。
+     * 单字段 value 截断至 24 字符（超长加「…」），与契约一致。
+     */
+    private List<DisplayField> resolveDisplayFields(Map<String, Object> vars) {
+        if (vars == null) {
+            return List.of();
+        }
+        Object rawDisplay = vars.get("displayFieldsJson");
+        if (rawDisplay != null) {
+            List<DisplayField> explicit = parseDisplayFields(rawDisplay);
+            if (!explicit.isEmpty()) {
+                return explicit.stream().map(f -> new DisplayField(f.key(), f.label(), truncate(f.value())))
+                        .toList();
+            }
+        }
+        // 兜底：formSchema.display:true + formData
+        List<FormSchemaField> schema = parseFormSchema(vars.get("formSchemaJson"));
+        Map<String, Object> formData = parseFormData(vars.get("formDataJson"));
+        if (schema.isEmpty() || formData.isEmpty()) {
+            return List.of();
+        }
+        List<DisplayField> derived = new ArrayList<>();
+        schema.stream()
+                .filter(f -> Boolean.TRUE.equals(f.display()))
+                .sorted(Comparator.comparingInt(f -> f.order() == null ? Integer.MAX_VALUE : f.order()))
+                .forEach(f -> {
+                    Object v = formData.get(f.key());
+                    if (v != null) {
+                        derived.add(new DisplayField(f.key(),
+                                f.label() != null ? f.label() : f.key(),
+                                truncate(String.valueOf(v))));
+                    }
+                });
+        return derived;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<DisplayField> parseDisplayFields(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(String.valueOf(raw),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, DisplayField.class));
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** 摘要值截断：不超过 24 字符，超出加「…」（契约 §8.3）。 */
+    private static String truncate(String s) {
+        if (s == null) {
+            return null;
+        }
+        final int max = 24;
+        return s.length() <= max ? s : s.substring(0, max) + "…";
+    }
+
     private String readResult(String processInstanceId) {        return historyService.createHistoricVariableInstanceQuery()
                 .processInstanceId(processInstanceId)
                 .variableName("result")
@@ -824,14 +900,15 @@ public class ApprovalProcessService {
     }
 
     private TaskView toView(Task t, String businessKey, String processKey, String title, String tenantId,
-                            Integer round) {
+                            Integer round, List<DisplayField> displayFields) {
         return new TaskView(t.getId(), t.getProcessInstanceId(), processKey, businessKey, title, tenantId,
                 t.getName(), t.getAssignee(), candidateUsersOf(t.getId()),
                 (String) t.getTaskLocalVariables().get("outcome"),
                 toInstant(t.getCreateTime()), toInstant(t.getDueDate()),
                 overdueMinutes(toInstant(t.getCreateTime())),
                 t.getDelegationState() != null ? t.getDelegationState().name() : null,
-                round != null ? round : 1);
+                round != null ? round : 1,
+                displayFields != null ? displayFields : List.of());
     }
 
     private Instant toInstant(Date date) {

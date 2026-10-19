@@ -9,7 +9,7 @@
         <endEvent id="approveEnd" name="通过">
             <extensionElements>
                 <flowable:executionListener event="start"
-                                          expression="${execution.setVariable('result','APPROVE')}"/>
+                                          expression="${execution.setVariable('result','APPROVED')}"/>
             </extensionElements>
         </endEvent>
         <sequenceFlow id="f1" sourceRef="start" targetRef="leaderReview"/>

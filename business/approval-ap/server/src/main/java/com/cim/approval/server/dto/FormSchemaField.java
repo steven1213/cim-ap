@@ -11,6 +11,8 @@ package com.cim.approval.server.dto;
  * @param group    分组名（如「基本信息」，可选；缺省归入「其他」）
  * @param required 是否必填提示（可选，仅展示用）
  * @param order    展示顺序（可选，越小越靠前；缺省按传入顺序）
+ * @param display  是否作为业务摘要（G5 兜底）：true 时在未传 displayFields 时，
+ *                 取该字段的 key/label/value 作为卡片/列表摘要；缺省 false
  */
 public record FormSchemaField(
         String key,
@@ -19,6 +21,7 @@ public record FormSchemaField(
         String unit,
         String group,
         Boolean required,
-        Integer order
+        Integer order,
+        Boolean display
 ) {
 }

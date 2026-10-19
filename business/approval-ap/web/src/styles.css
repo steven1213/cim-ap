@@ -1338,6 +1338,32 @@ button.side-cap.page-cap {
   color: var(--muted);
 }
 
+/* ---------- 业务摘要（G5） ---------- */
+.df-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 5px;
+}
+.df-item {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  border-radius: 4px;
+  padding: 1px 6px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df-more {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--accent);
+  padding: 1px 2px;
+}
+
 /* ---------- 数据表 ---------- */
 .table-wrap {
   width: 100%;

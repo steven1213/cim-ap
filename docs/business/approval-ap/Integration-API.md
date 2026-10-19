@@ -125,6 +125,13 @@ Content-Type: application/json
 | formData 为空 | 「发起时未填写结构化业务表单」 |
 | formSchema JSON 解析失败 | 静默回退键值表，不阻塞发起 |
 
+### 2.4 业务摘要 displayFields（可选，G5）
+
+发起请求可附带 `displayFields`（key-label-value 数组），作为待办卡片/列表/审计的**摘要层**。详见 §8。
+
+- 不传时：详情页仍由 `formSchema`（或键值表）完整渲染；卡片摘要按 §8.3 兜底规则从 `formSchema.display:true` 提取。
+- 传了 `displayFields`：卡片/列表直接展示该数组，平台原样渲染 `value`。
+
 ---
 
 ## 3. 附件对接
@@ -151,14 +158,14 @@ POST /api/v1/approval/attachments/upload   (multipart/form-data)
 
 ## 4. 审批结果回调
 
-流程结束（批准/驳回）时，审批平台向回调注册表中该 `appCode`（= 发起时的 `tenantId`）登记的 URL 推送：
+流程结束（批准 / 驳回 / 撤回）时，审批平台向回调注册表中该 `appCode`（= 发起时的 `tenantId`）登记的 URL 推送：
 
 ```json
 {
   "eventType": "PROCESS_COMPLETED",
   "processInstanceId": "0ded55ab-...",
   "businessKey": "MES-2026-0031",
-  "result": "APPROVE",
+  "result": "APPROVED",
   "tenantId": "mes-ap",
   "completedAt": "2026-10-15T06:20:00Z"
 }
@@ -167,6 +174,7 @@ POST /api/v1/approval/attachments/upload   (multipart/form-data)
 - 可靠性：DB Outbox + 失败重试 + 死信；消费方需按 `businessKey` **幂等**处理。
 - 安全：`X-Callback-Signature`（HMAC-SHA256），用 SDK 的 `CallbackVerifier` 验签。
 - 回调只带结论不带表单：业务方如需表单快照，凭 `businessKey` 回查详情接口，或在自己侧于发起前留存。
+- ⚠️ `result` 枚举命名见 §7.4 迁移说明：当前运行版实际回传 `APPROVE/REJECT/WITHDRAW`，集成方需兼容两套值。
 
 **Java SDK**（`business/approval-ap/sdk/`）：`ApprovalClient` 封装发起/查询/完成任务；release 17，无 Spring 强依赖。
 
@@ -189,3 +197,156 @@ POST /api/v1/approval/attachments/upload   (multipart/form-data)
 1. 发起带 formSchema 的实例（见 2.2）。
 2. 打开前端「我发起的 → 详情」：应看到分组标题（蓝色分隔线）、中文标签、`¥ 860,000.00` 千分位、`2 台` 单位、`是/否` 布尔。
 3. 对照脚本 `web/scripts/verify-form-schema.mjs`（9 项断言）可作回归。
+
+---
+
+## 7. 审批结果语义（G4 闸门出口）
+
+审批流终态由**平台统一写入**，业务方不应自行解读流程变量推断结论，只消费下方契约。
+
+### 7.1 两个字段的区分
+
+| 字段 | 含义 | 取值 | 写入时机 |
+|---|---|---|---|
+| `status` | 流程实例**生命周期态** | `ACTIVE` / `COMPLETED` / `WITHDRAWN` | 详情/列表接口返回，反映实例是否还在跑 |
+| `result` | 终态**业务结论** | `APPROVED` / `REJECTED` / `WITHDRAWN` | 末级审批或撤回发生时由平台落库 |
+
+> 中间态（退回 `RETURNED`、重提 `RESUBMITTED`）**不进入 `result`**——它们发生在 `RUNNING` 周期内，不是终态，见 §9。
+
+### 7.2 result 取值表
+
+| result | 触发 | 业务语义 |
+|---|---|---|
+| `APPROVED` | 末级审批通过（`outcome=APPROVE`） | 审批通过，业务方据此放行 |
+| `REJECTED` | 末级审批驳回（`outcome=REJECT`，意见必填） | 审批不通过，流程终止 |
+| `WITHDRAWN` | 发起人撤回 | 发起人主动终止，流程已结束 |
+
+### 7.3 回调 payload（终态统一出口）
+
+流程到达任一终态时，回调注册表中该 `tenantId`（=appCode）的 URL 收到：
+
+```json
+{
+  "eventType": "PROCESS_COMPLETED",
+  "processInstanceId": "0ded55ab-...",
+  "businessKey": "MES-2026-0031",
+  "result": "APPROVED",
+  "tenantId": "mes-ap",
+  "completedAt": "2026-10-15T06:20:00Z"
+}
+```
+
+- `eventType` 恒为 `PROCESS_COMPLETED`——批准、驳回、撤回**共用同一事件类型**，靠 `result` 区分。
+- 撤回同样走此出口，`result=WITHDRAWN`（流程实例以 `deleteReason=WITHDRAW` 落历史）。
+- 可靠性：DB Outbox + 失败重试（最多 6 次，5s 轮询）+ 死信；`messageId` 幂等，消费方按 `businessKey` 幂等处理。
+- 安全：`X-Callback-Signature`（HMAC-SHA256），用 SDK `CallbackVerifier` 验签。
+
+### 7.4 ⚠️ 枚举命名迁移说明（重要）
+
+本文契约以**过去分词式** `APPROVED / REJECTED / WITHDRAWN` 为权威命名（对齐框架 G4）。
+
+**当前运行版（v1.x）代码实际回写 `APPROVE` / `REJECT` / `WITHDRAW`**（BPMN 结束事件 `execution.setVariable('result','APPROVE')` 与撤回常量）。二者仅词尾差异，语义一致。
+
+> **集成方须知**：M3 落地时将统一重命名（BPMN expression + 撤回常量 → 过去分词式）。过渡期内，消费端**应同时兼容两套值**，直至平台发布迁移完成公告。建议解析逻辑：`value in {APPROVED, APPROVE} → 通过`；`{REJECTED, REJECT} → 不通过`；`{WITHDRAWN, WITHDRAW} → 撤回`。
+
+---
+
+## 8. 业务摘要 displayFields（G5 闸门出口）
+
+### 8.1 三层数据定位
+
+| 层 | 字段 | 用途 | 渲染位置 |
+|---|---|---|---|
+| 数据本体 | `formData` | 全量业务数据（落库，审计/回查源） | 详情页完整表单 |
+| 详情描述 | `formSchema` | 全量字段的中文标签/分组/类型化渲染 | 详情页 |
+| **业务摘要** | **`displayFields`** | **卡片/列表/审计摘要**，审批人一眼看到的关键 3~5 项 | 待办卡片、我发起的列表、审计摘要 |
+
+`displayFields` 是**展示合同**：业务系统挑出最该被一眼看到的字段，预渲染好展示值，平台原样渲染，不做二次解析。
+
+### 8.2 契约（发起请求可选字段）
+
+在 `StartProcessRequest` 增加可选 `displayFields`（数组）：
+
+```json
+{
+  "processKey": "singleApproval",
+  "businessKey": "MES-2026-0031",
+  "tenantId": "mes-ap",
+  "initiator": "zhang.san",
+  "title": "偏差放行申请",
+  "assignee": "li.si",
+  "formData": { "woNo": "WO-88", "estimatedLoss": 3500.5, "applicant": "张三" },
+  "displayFields": [
+    { "key": "woNo",          "label": "工单号",   "value": "WO-88" },
+    { "key": "estimatedLoss", "label": "预估损失", "value": "¥3,500.00" },
+    { "key": "applicant",     "label": "申请人",   "value": "张三" }
+  ]
+}
+```
+
+字段说明：
+
+| 属性 | 必填 | 说明 |
+|---|---|---|
+| `key` | ✅ | 与 `formData` 键一致，用于关联/回查 |
+| `label` | 推荐 | 卡片展示中文标签；缺省回退 `key` |
+| `value` | ✅ | 业务系统**预渲染的展示值**（已格式化：金额带符号、日期本地化、布尔转「是/否」）。平台原样渲染 |
+
+### 8.3 兜底与截断规则
+
+**兜底优先级**（平台自动选择摘要来源）：
+1. 传入 `displayFields` → 直接使用；
+2. 未传但传了 `formSchema` → 取 `formSchema` 中标记 `display:true` 的字段（按 `order`）作为摘要；
+3. 二者皆无 → 卡片仅显示 `title`，无业务摘要。
+
+**截断规则**：
+- 单字段 `value` 展示上限 **24 字符**（中文计 1，英文/数字计 0.5），超出加 `…`；
+- 卡片默认展示前 **4** 个摘要字段，其余折叠为「+N」展开。
+
+### 8.4 渲染位置
+
+- 待办卡片「业务信息」行；
+- 「我发起的」列表副标题；
+- 审计哈希链摘要列（如有）。
+
+> 修改摘要只改 `displayFields` 数组，不影响 `formData` 落库与详情页完整渲染；历史实例的摘要按发起时快照保留。
+
+---
+
+## 9. 退回 / 重提状态机（G4 §2.2 契约出口）
+
+退回是**唯一非终止的打回路径**（驳回=终止，见框架 D4）。其状态机作为 M3 契约出口，供业务方感知「卡在谁那、第几轮」。
+
+### 9.1 状态流转
+
+```
+RUNNING(round=n)
+  ├─ 末级通过 ──────────────▶ APPROVED    （终态，result=APPROVED）
+  ├─ 末级驳回 ──────────────▶ REJECTED    （终态，result=REJECTED）
+  ├─ 发起人撤回 ────────────▶ WITHDRAWN   （终态，result=WITHDRAWN）
+  └─ 审批人「退回」(意见必填) ─▶ RETURNED(round=n, 中间态)
+        └─ 发起人「修改并重新提交」 ─▶ RUNNING(round=n+1)  ──回到上方终态分支
+```
+
+- `round`：每次重新提交 +1，**流程定义版本不变**（BR-01）；旧轮次任务全部关闭。
+- 轮次上限（默认可配，如 3）：达上限后前端禁用退回、后端 400 双保险（E3）。
+
+### 9.2 中间事件（F20，默认关，按 appCode 开启）
+
+| eventType | 触发 | 默认 |
+|---|---|---|
+| `TASK_RETURNED` | 审批人退回 | 关 |
+| `TASK_RESUBMITTED` | 发起人重新提交 | 关 |
+
+> 中间事件与 §7 终态回调（`PROCESS_COMPLETED`）相互独立：退回/重提若开启 F20 则经中间事件回调暴露；终态仍走 §7 统一出口。其余 `NEW_TASK`/`TASK_DONE`/`TASK_OVERDUE`/`URGE` 见 G7 通知章节。
+
+### 9.3 审计与业务方感知
+
+- 审计动作：`RETURN`（操作人/目标节点/原因/轮次）、`RESUBMIT`（发起人/轮次/表单变更摘要）入哈希链。
+- 业务方感知「卡在谁那」：已退回实例 `status` 仍为 `RUNNING`；可通过 F20 中间事件、审计链、或详情接口 `activeTasks`（当前节点 + 轮次）感知。
+
+### 9.4 业务方对接要点
+
+- 不要依据 `result` 判断「是否被打回」——被打回时实例仍在 `RUNNING`，`result` 尚未写入。
+- 判断「待修改」：实例 `status=RUNNING` 且最近审计动作含 `RETURN`、无后续 `RESUBMIT`/`APPROVED`。
+- 轮次展示：从详情/审计读取 `round`，向发起人呈现「第 N 轮 · 已退回」。

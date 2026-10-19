@@ -29,6 +29,8 @@ export interface TaskView {
   delegationState?: string | null;
   /** 当前轮次（第几轮审批；退回重提后递增），发起为 1。 */
   round?: number;
+  /** 业务摘要字段（G5）：卡片一眼可见的关键业务项。 */
+  displayFields?: DisplayField[];
 }
 
 export interface ProcessInstanceView {
@@ -46,6 +48,8 @@ export interface ProcessInstanceView {
   round?: number;
   /** 是否等待发起人「修改并重新提交」（退回到发起人后的重提态）。 */
   awaitingResubmit?: boolean;
+  /** 业务摘要字段（G5）：我发起的列表副标题。 */
+  displayFields?: DisplayField[];
 }
 
 export interface DefinitionXmlView {
@@ -131,6 +135,15 @@ export interface ProcessDetailView {
   round?: number;
   /** 是否等待发起人「修改并重新提交」。 */
   awaitingResubmit?: boolean;
+  /** 业务摘要字段（G5）：详情页顶部摘要。 */
+  displayFields?: DisplayField[];
+}
+
+/** 业务摘要字段（G5 闸门出口，对应后端 DisplayField）。 */
+export interface DisplayField {
+  key: string;
+  label?: string | null;
+  value?: string | null;
 }
 
 // ---------- 请求体 ----------
@@ -145,6 +158,8 @@ export interface FormSchemaField {
   group?: string | null;
   required?: boolean | null;
   order?: number | null;
+  /** 是否作为业务摘要（G5 兜底）：true 时在未传 displayFields 时取该字段作摘要 */
+  display?: boolean | null;
 }
 
 export interface StartProcessRequest {
@@ -158,6 +173,8 @@ export interface StartProcessRequest {
   variables?: Record<string, unknown> | null;
   formData?: Record<string, unknown> | null;
   formSchema?: FormSchemaField[] | null;
+  /** 业务摘要字段（可选，G5）：卡片/列表/审计一眼可见的关键项。 */
+  displayFields?: DisplayField[] | null;
 }
 
 export interface CompleteTaskRequest {

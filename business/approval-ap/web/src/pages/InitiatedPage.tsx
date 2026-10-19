@@ -8,6 +8,7 @@ import { listInitiatedPaged, urgeInstance, withdrawInstance, type PageResult } f
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { fmtDate, fmtOverdue } from '@/lib/format';
+import { DisplayFields } from '@/components/DisplayFields';
 import type { ProcessInstanceView } from '@/types';
 
 /** 实例状态 → 标签色。 */
@@ -139,7 +140,10 @@ export default function InitiatedPage() {
               {filtered.map((pi) => (
                 <tr key={pi.processInstanceId}>
                   <td className="mono">{pi.businessKey}</td>
-                  <td>{pi.title || '—'}</td>
+                  <td>
+                    {pi.title || '—'}
+                    <DisplayFields fields={pi.displayFields} />
+                  </td>
                   <td className="mono">{pi.processKey}</td>
                   <td>
                     <span className={'tag ' + (STATUS_TAG[pi.status] ?? '')}>
