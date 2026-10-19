@@ -804,8 +804,10 @@ public class ApprovalProcessService {
                     a.getDetail(), a.getPrevHash(), a.getHash(), a.getCreatedAt()));
         }
 
-        List<FlowNodeTrace> flowNodes = resolveFlowNodes(hpi.getId(), hpi.getProcessDefinitionId(),
-                activeNodes, running, auditList);
+        List<FlowNodeTrace> flowNodes = resolveFlowNodes(instanceId, hpi.getProcessDefinitionId(),
+                activeNodes, running, auditList, initiator,
+                toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
+                (String) vars.get("result"));
 
         return new ProcessDetailView(instanceId, businessKey, hpi.getProcessDefinitionKey(), definitionName,
                 (String) vars.get("title"), initiator, (String) vars.get("tenantId"),
@@ -817,15 +819,19 @@ public class ApprovalProcessService {
     }
 
     /**
-     * 节点轨迹（详情页进度可视化）：BPMN 定义中 userTask 的文档序 × 运行时状态交叉。
+     * 节点轨迹（详情页进度可视化）：完整链路「发起 → 各审批节点（BPMN 文档序）→ 结束」× 运行时状态交叉。
      *
      * <p>状态判定优先级：当前活动（ACTIVE）&gt; 历史已完成（DONE，退回重走取最近一轮）&gt;
      * 流程已终态但未经过（SKIPPED，如条件分支未走）&gt; 未到达（PENDING）。
-     * 定义不可读或无 userTask 时返回空列表，前端回退为不展示进度条。</p>
+     * 发起节点恒 DONE（actor=发起人）；结束节点在流程终态后 DONE（outcome=最终结果）。
+     * 定义不可读或无 userTask 时返回空列表，前端回退为不展示进度条。
+     * 注：仅取主流程顶层 userTask（设计器为平铺结构，不支持子流程）。</p>
      */
     private List<FlowNodeTrace> resolveFlowNodes(String instanceId, String definitionId,
                                                  List<String> activeNodes, boolean running,
-                                                 List<ApprovalAudit> audits) {
+                                                 List<ApprovalAudit> audits,
+                                                 String initiator, java.time.Instant startedAt,
+                                                 java.time.Instant endedAt, String result) {
         List<UserTask> nodes = new ArrayList<>();
         try {
             BpmnModel model = repositoryService.getBpmnModel(definitionId);
@@ -849,7 +855,10 @@ public class ApprovalProcessService {
                 .orderByHistoricActivityInstanceEndTime().asc().list()) {
             finishedByNode.put(a.getActivityId(), a);
         }
-        List<FlowNodeTrace> result = new ArrayList<>();
+        List<FlowNodeTrace> result1 = new ArrayList<>();
+        // 发起节点（恒已完成，办理人=发起人）
+        result1.add(new FlowNodeTrace("__start__", null, FlowNodeTrace.DONE,
+                initiator, null, startedAt));
         for (UserTask ut : nodes) {
             HistoricActivityInstance fin = finishedByNode.get(ut.getId());
             String status;
@@ -877,10 +886,17 @@ public class ApprovalProcessService {
                             .findFirst().orElse(null);
                 }
             }
-            result.add(new FlowNodeTrace(ut.getId(), ut.getName() != null ? ut.getName() : ut.getId(),
+            result1.add(new FlowNodeTrace(ut.getId(), ut.getName() != null ? ut.getName() : ut.getId(),
                     status, actor, outcome, completedAt));
         }
-        return result;
+        // 结束节点（流程终态即亮起；result 变量为可选标注——自定义 BPMN 可能不写终态结果）
+        if (!running) {
+            result1.add(new FlowNodeTrace("__end__", null, FlowNodeTrace.DONE,
+                    null, result, endedAt));
+        } else {
+            result1.add(new FlowNodeTrace("__end__", null, FlowNodeTrace.PENDING, null, null, null));
+        }
+        return result1;
     }
 
     /**

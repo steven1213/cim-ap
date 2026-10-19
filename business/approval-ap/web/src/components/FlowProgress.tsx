@@ -1,11 +1,22 @@
 import { useTranslation } from 'react-i18next';
 import type { FlowNodeTrace } from '../types';
 
+/** 首尾哨兵节点 id（后端 FlowNodeTrace 约定）。 */
+const START_ID = '__start__';
+const END_ID = '__end__';
+
+/** 结束节点结果 → i18n 键后缀。 */
+const RESULT_KEY: Record<string, string> = {
+  APPROVED: 'resultApproved',
+  REJECTED: 'resultRejected',
+  WITHDRAWN: 'resultWithdrawn',
+};
+
 /**
- * 审批进度节点条（详情页）。
+ * 审批进度节点条（详情页）：完整链路「发起 → 各审批节点 → 结束」。
  *
- * <p>按 BPMN 顺序展示全部审批节点：已完成=绿点亮起 ✓、进行中=主色高亮脉冲、
- * 未到达=灰空心、未经过（条件分支未走）=灰虚线。数据源为后端 detail.flowNodes。</p>
+ * <p>已到达节点亮起（完成=绿✓、进行中=主色光晕），未到达置灰，未经过（条件分支未走）虚线。
+ * 数据源为后端 detail.flowNodes（含 __start__/__end__ 哨兵节点）。</p>
  */
 export function FlowProgress({ nodes }: { nodes?: FlowNodeTrace[] | null }) {
   const { t } = useTranslation();
@@ -15,14 +26,23 @@ export function FlowProgress({ nodes }: { nodes?: FlowNodeTrace[] | null }) {
       {nodes.map((n, i) => {
         const st = n.status === 'DONE' || n.status === 'ACTIVE' || n.status === 'SKIPPED'
           ? n.status.toLowerCase() : 'pending';
+        const name = n.nodeId === START_ID
+          ? t('detail.flow.start')
+          : n.nodeId === END_ID
+            ? t('detail.flow.end')
+            : n.name;
         const sub =
-          st === 'done'
-            ? [n.actor, n.outcome].filter(Boolean).join(' · ') || t('detail.flow.done')
-            : st === 'active'
-              ? t('detail.flow.active')
-              : st === 'skipped'
-                ? t('detail.flow.skipped')
-                : t('detail.flow.pending');
+          n.nodeId === START_ID
+            ? n.actor || t('detail.flow.done')
+            : n.nodeId === END_ID
+              ? (n.outcome && RESULT_KEY[n.outcome] ? t(`detail.flow.${RESULT_KEY[n.outcome]}`) : t('detail.flow.done'))
+              : st === 'done'
+                ? [n.actor, n.outcome].filter(Boolean).join(' · ') || t('detail.flow.done')
+                : st === 'active'
+                  ? t('detail.flow.active')
+                  : st === 'skipped'
+                    ? t('detail.flow.skipped')
+                    : t('detail.flow.pending');
         return (
           <div key={n.nodeId + '-' + i} className={`fp-step fp-${st}`} role="listitem">
             {i > 0 && <div className="fp-line" aria-hidden="true" />}
@@ -34,7 +54,7 @@ export function FlowProgress({ nodes }: { nodes?: FlowNodeTrace[] | null }) {
                 </svg>
               )}
             </div>
-            <div className="fp-name" title={n.name}>{n.name}</div>
+            <div className="fp-name" title={name}>{name}</div>
             <div className="fp-sub" title={sub}>{sub}</div>
           </div>
         );
