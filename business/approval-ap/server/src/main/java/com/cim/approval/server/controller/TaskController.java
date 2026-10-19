@@ -45,14 +45,18 @@ public class TaskController {
 
     @GetMapping("/todo")
     public Result<List<TaskView>> todo(@RequestParam(required = false) String userId,
+                                       @RequestParam(required = false) List<String> roles,
                                        @RequestParam(defaultValue = "default") String tenantId) {
-        return Result.ok(processService.listTodo(currentUser.resolve(userId), tenantId));
+        String uid = currentUser.resolve(userId);
+        return Result.ok(processService.listTodo(uid, currentUser.resolveRoles(roles), tenantId));
     }
 
     @GetMapping("/done")
     public Result<List<TaskView>> done(@RequestParam(required = false) String userId,
+                                       @RequestParam(required = false) List<String> roles,
                                        @RequestParam(defaultValue = "default") String tenantId) {
-        return Result.ok(processService.listDone(currentUser.resolve(userId), tenantId));
+        String uid = currentUser.resolve(userId);
+        return Result.ok(processService.listDone(uid, currentUser.resolveRoles(roles), tenantId));
     }
 
     @GetMapping("/initiated")
@@ -65,20 +69,24 @@ public class TaskController {
 
     @GetMapping("/todo/page")
     public Result<PageResult<TaskView>> todoPaged(@RequestParam(required = false) String userId,
+                                                  @RequestParam(required = false) List<String> roles,
                                                   @RequestParam(defaultValue = "default") String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "20") int size) {
+        String uid = currentUser.resolve(userId);
         return Result.ok(processService.listTodoPaged(
-                currentUser.resolve(userId), tenantId, Math.max(page, 1), Math.min(size, 100)));
+                uid, currentUser.resolveRoles(roles), tenantId, Math.max(page, 1), Math.min(size, 100)));
     }
 
     @GetMapping("/done/page")
     public Result<PageResult<TaskView>> donePaged(@RequestParam(required = false) String userId,
+                                                  @RequestParam(required = false) List<String> roles,
                                                   @RequestParam(defaultValue = "default") String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "20") int size) {
+        String uid = currentUser.resolve(userId);
         return Result.ok(processService.listDonePaged(
-                currentUser.resolve(userId), tenantId, Math.max(page, 1), Math.min(size, 100)));
+                uid, currentUser.resolveRoles(roles), tenantId, Math.max(page, 1), Math.min(size, 100)));
     }
 
     @GetMapping("/initiated/page")
@@ -91,9 +99,10 @@ public class TaskController {
     }
 
     @PostMapping("/{taskId}/complete")
-    public Result<Void> complete(@PathVariable String taskId, @RequestBody CompleteTaskRequest req) {
+    public Result<Void> complete(@PathVariable String taskId, @RequestBody CompleteTaskRequest req,
+                                @RequestParam(required = false) List<String> roles) {
         String actor = currentUser.resolve(req.actor());
-        processService.assertTaskOperator(taskId, actor);
+        processService.assertTaskOperator(taskId, actor, currentUser.resolveRoles(roles));
         processService.completeTask(taskId, new CompleteTaskRequest(req.outcome(), req.comment(), actor));
         return Result.ok();
     }
@@ -130,9 +139,10 @@ public class TaskController {
     }
 
     @PostMapping("/{taskId}/return")
-    public Result<Void> returnTask(@PathVariable String taskId, @RequestBody ReturnRequest req) {
+    public Result<Void> returnTask(@PathVariable String taskId, @RequestBody ReturnRequest req,
+                                   @RequestParam(required = false) List<String> roles) {
         String actor = currentUser.resolve(req.actor());
-        processService.assertTaskOperator(taskId, actor);
+        processService.assertTaskOperator(taskId, actor, currentUser.resolveRoles(roles));
         returnService.returnTask(taskId, new ReturnRequest(req.targetActivityId(), req.reason(), actor));
         return Result.ok();
     }
@@ -147,17 +157,19 @@ public class TaskController {
     }
 
     @PostMapping("/{taskId}/add-sign")
-    public Result<Void> addSign(@PathVariable String taskId, @RequestBody AddSignRequest req) {
+    public Result<Void> addSign(@PathVariable String taskId, @RequestBody AddSignRequest req,
+                                @RequestParam(required = false) List<String> roles) {
         String actor = currentUser.resolve(req.actor());
-        processService.assertTaskOperator(taskId, actor);
+        processService.assertTaskOperator(taskId, actor, currentUser.resolveRoles(roles));
         addSignService.addSign(taskId, new AddSignRequest(req.assignee(), req.type(), req.reason(), actor));
         return Result.ok();
     }
 
     @PostMapping("/{taskId}/reassign")
-    public Result<Void> reassign(@PathVariable String taskId, @RequestBody ReassignRequest req) {
+    public Result<Void> reassign(@PathVariable String taskId, @RequestBody ReassignRequest req,
+                                 @RequestParam(required = false) List<String> roles) {
         String actor = currentUser.resolve(req.actor());
-        processService.assertTaskOperator(taskId, actor);
+        processService.assertTaskOperator(taskId, actor, currentUser.resolveRoles(roles));
         reassignService.reassign(taskId, new ReassignRequest(req.newAssignee(), req.reason(), actor));
         return Result.ok();
     }

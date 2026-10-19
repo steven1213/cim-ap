@@ -4,11 +4,29 @@ import { useTranslation } from 'react-i18next';
 import Panel from '@/components/Panel';
 import Modal from '@/components/Modal';
 import { IconFlow, IconPlay, IconPencil, IconPlus, IconX } from '@/components/Icons';
-import { listDefinitions, startProcess, suspendDefinition, duplicateDefinition } from '@/lib/api';
+import { listDefinitions, startProcess, suspendDefinition, duplicateDefinition, getDefinitionXml } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { toast } from '@/store/toastStore';
 import { parseVariables } from '@/lib/format';
 import type { ProcessDefinitionView } from '@/types';
+
+/** 从 BPMN 提取角色型审批节点（G6 / D8）：userTask 上 flowable:candidateGroups="${ccg_<nodeId>}"。返回 nodeId + 节点名。 */
+function parseRoleNodes(xml: string): { nodeId: string; name: string }[] {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    if (doc.querySelector('parsererror')) return [];
+    const tasks = Array.from(doc.getElementsByTagNameNS('*', 'userTask'));
+    const out: { nodeId: string; name: string }[] = [];
+    for (const t of tasks) {
+      const cg = t.getAttribute('flowable:candidateGroups') || '';
+      const m = cg.match(/ccg_([A-Za-z0-9_]+)/);
+      if (m) out.push({ nodeId: m[1], name: t.getAttribute('name') || '角色审批' });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
 
 export default function DefinitionsPage() {
   const { t } = useTranslation();
@@ -268,6 +286,19 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
   /** 会签定义（key 含 countersign）需要 approvers 列表；其余显示单人 assignee——防选错定义 500 */
   const isCountersign = processKey.toLowerCase().includes('countersign');
 
+  /** 角色型节点（G6 / D8）：选中定义后解析 BPMN 中 ccg_<id> 引用的审批节点，逐节点收集角色。 */
+  const [roleNodes, setRoleNodes] = useState<{ nodeId: string; name: string }[]>([]);
+  const [roleInput, setRoleInput] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const def = latestByKey.get(processKey);
+    if (!def) { setRoleNodes([]); return; }
+    getDefinitionXml(def.id)
+      .then((v) => { if (!cancelled) setRoleNodes(parseRoleNodes(v.bpmnXml)); })
+      .catch(() => { if (!cancelled) setRoleNodes([]); });
+    return () => { cancelled = true; };
+  }, [processKey, latestByKey]);
+
   // 草稿自动暂存：有任何实质内容即写 localStorage
   useEffect(() => {
     const hasContent =
@@ -310,7 +341,13 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
         formSchema.push({ key, label: r.label.trim(), type: r.type });
       }
     }
-    onSubmit({
+    // G6 角色选人：仅收集填写了的节点，组装为 { nodeId: [roles] }
+  const candidateGroups: Record<string, string[]> = {};
+  for (const rn of roleNodes) {
+    const raw = (roleInput[rn.nodeId] ?? '').trim();
+    if (raw) candidateGroups[rn.nodeId] = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  onSubmit({
       processKey,
       businessKey,
       tenantId: defaultTenant,
@@ -323,6 +360,7 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
       variables: vars,
       formData: Object.keys(formData).length > 0 ? formData : null,
       formSchema: formSchema.length > 0 ? formSchema : null,
+      candidateGroups: Object.keys(candidateGroups).length > 0 ? candidateGroups : null,
     });
     // 提交成功路径由父组件关闭弹窗；无论成败先清草稿（表单内容仍在弹窗中，失败可重试）
     localStorage.removeItem(draftKeyOf(processKey));
@@ -394,6 +432,27 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
           </div>
         )}
       </div>
+
+      {/* G6 角色选人：每个角色型审批节点收集一组角色 key（逗号分隔） */}
+      {roleNodes.length > 0 && (
+        <div className="field">
+          <label className="field-label">{t('def.form.roleCandidates')}</label>
+          <small>{t('def.form.roleCandidatesHint')}</small>
+          <div className="role-node-list">
+            {roleNodes.map((rn) => (
+              <div className="field-row" key={rn.nodeId}>
+                <span className="role-node-name">{rn.name}</span>
+                <input
+                  className="mono"
+                  value={roleInput[rn.nodeId] ?? ''}
+                  onChange={(e) => setRoleInput((p) => ({ ...p, [rn.nodeId]: e.target.value }))}
+                  placeholder="manager,finance"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="field">
         <label className="field-label">
           {t('def.form.formData')} <span className="opt">{t('def.form.formDataHint')}</span>

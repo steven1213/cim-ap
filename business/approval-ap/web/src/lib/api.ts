@@ -67,9 +67,9 @@ http.interceptors.response.use(
   },
 );
 
-function currentIdentity(): { userId: string; tenantId: string } {
-  const { userId, tenantId } = useIdentityStore.getState();
-  return { userId, tenantId };
+function currentIdentity(): { userId: string; tenantId: string; roles: string[] } {
+  const { userId, tenantId, roles } = useIdentityStore.getState();
+  return { userId, tenantId, roles: roles ?? [] };
 }
 
 async function apiGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
@@ -77,8 +77,8 @@ async function apiGet<T>(url: string, params?: Record<string, unknown>): Promise
   return r.data;
 }
 
-async function apiPost<T>(url: string, body?: unknown): Promise<T> {
-  const r = await http.post<T>(url, body);
+async function apiPost<T>(url: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
+  const r = await http.post<T>(url, body, params ? { params } : undefined);
   return r.data;
 }
 
@@ -125,15 +125,13 @@ export function deployProcess(req: DeployProcessRequest): Promise<ProcessDefinit
 // ---------- 任务 ----------
 
 export function listTodo(userId?: string, tenantId?: string): Promise<TaskView[]> {
-  const id = userId ?? currentIdentity().userId;
-  const tn = tenantId ?? currentIdentity().tenantId;
-  return apiGet<TaskView[]>('/tasks/todo', { userId: id, tenantId: tn });
+  const { userId: id, tenantId: tn, roles } = currentIdentity();
+  return apiGet<TaskView[]>('/tasks/todo', { userId: userId ?? id, tenantId: tenantId ?? tn, roles });
 }
 
 export function listDone(userId?: string, tenantId?: string): Promise<TaskView[]> {
-  const id = userId ?? currentIdentity().userId;
-  const tn = tenantId ?? currentIdentity().tenantId;
-  return apiGet<TaskView[]>('/tasks/done', { userId: id, tenantId: tn });
+  const { userId: id, tenantId: tn, roles } = currentIdentity();
+  return apiGet<TaskView[]>('/tasks/done', { userId: userId ?? id, tenantId: tenantId ?? tn, roles });
 }
 
 export function listInitiated(userId?: string, tenantId?: string): Promise<ProcessInstanceView[]> {
@@ -143,12 +141,12 @@ export function listInitiated(userId?: string, tenantId?: string): Promise<Proce
 }
 
 export function listTodoPaged(page1: number, size: number): Promise<PageResult<TaskView>> {
-  const { userId, tenantId } = currentIdentity();
-  return apiGet<PageResult<TaskView>>(`/tasks/todo/page?page=${page1}&size=${size}`, { userId, tenantId });
+  const { userId, tenantId, roles } = currentIdentity();
+  return apiGet<PageResult<TaskView>>(`/tasks/todo/page?page=${page1}&size=${size}`, { userId, tenantId, roles });
 }
 export function listDonePaged(page1: number, size: number): Promise<PageResult<TaskView>> {
-  const { userId, tenantId } = currentIdentity();
-  return apiGet<PageResult<TaskView>>(`/tasks/done/page?page=${page1}&size=${size}`, { userId, tenantId });
+  const { userId, tenantId, roles } = currentIdentity();
+  return apiGet<PageResult<TaskView>>(`/tasks/done/page?page=${page1}&size=${size}`, { userId, tenantId, roles });
 }
 export function listInitiatedPaged(page1: number, size: number): Promise<PageResult<ProcessInstanceView>> {
   const { userId, tenantId } = currentIdentity();
@@ -187,11 +185,13 @@ export function testCallback(appCode: string): Promise<{ messageId: string; stat
   return apiPost(`/callbacks/test/${encodeURIComponent(appCode)}`);
 }
 export function completeTask(taskId: string, req: CompleteTaskRequest): Promise<void> {
-  return apiPost<void>(`/tasks/${taskId}/complete`, req);
+  const { roles } = currentIdentity();
+  return apiPost<void>(`/tasks/${taskId}/complete`, req, { roles });
 }
 
 export function returnTask(taskId: string, req: ReturnRequest): Promise<void> {
-  return apiPost<void>(`/tasks/${taskId}/return`, req);
+  const { roles } = currentIdentity();
+  return apiPost<void>(`/tasks/${taskId}/return`, req, { roles });
 }
 
 /** 退回弹窗数据源：目标节点选项 + 轮次/上限 + 并行段状态。 */
@@ -211,11 +211,13 @@ export function resubmitInstance(
 }
 
 export function addSignTask(taskId: string, req: AddSignRequest): Promise<void> {
-  return apiPost<void>(`/tasks/${taskId}/add-sign`, req);
+  const { roles } = currentIdentity();
+  return apiPost<void>(`/tasks/${taskId}/add-sign`, req, { roles });
 }
 
 export function reassignTask(taskId: string, req: ReassignRequest): Promise<void> {
-  return apiPost<void>(`/tasks/${taskId}/reassign`, req);
+  const { roles } = currentIdentity();
+  return apiPost<void>(`/tasks/${taskId}/reassign`, req, { roles });
 }
 
 // ---------- 回调注册 / 查询 ----------

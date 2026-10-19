@@ -78,15 +78,22 @@ export function toBpmn(m: FlowModel, processKey: string, processName: string): s
     const needsMulti = n.kind === 'countersign' || n.kind === 'anyone';
     const assigneeVar = needsMulti ? n.approversVar || 'approvers' : n.assigneeVar || 'assignee';
     const extraAttrs: string[] = [];
-    if (n.candidateUsers?.trim()) extraAttrs.push(`flowable:candidateUsers="${esc(n.candidateUsers.trim())}"`);
-    if (n.candidateGroups?.trim()) extraAttrs.push(`flowable:candidateGroups="${esc(n.candidateGroups.trim())}"`);
+    // G6 选人来源（单人审批节点生效）：角色候选组 > 指定人候选 > 指定办理人
+    const roleBased = !needsMulti && !!n.candidateGroups?.trim();
+    const userBased = !needsMulti && !!n.candidateUsers?.trim();
+    if (roleBased) {
+      // 角色型：每个节点引用独立变量 ccg_<nodeId>，发起时由 candidateGroups 映射填充
+      extraAttrs.push(`flowable:candidateGroups="\${ccg_${n.id}}"`);
+    } else if (userBased) {
+      extraAttrs.push(`flowable:candidateUsers="${esc(n.candidateUsers!.trim())}"`);
+    }
     if (n.dueDate?.trim()) extraAttrs.push(`flowable:dueDate="${esc(n.dueDate.trim())}"`);
     if (n.priority !== undefined && !Number.isNaN(n.priority)) {
       extraAttrs.push(`flowable:priority="${Math.max(0, Math.min(100, n.priority))}"`);
     }
     if (needsMulti) {
       // 会签 / 或签 使用 element variable，不直接挂 assignee 属性
-    } else {
+    } else if (!roleBased && !userBased) {
       extraAttrs.push(`flowable:assignee="\${${assigneeVar}}"`);
     }
     const attrs = extraAttrs.join(' ');

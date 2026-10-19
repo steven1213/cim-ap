@@ -85,7 +85,7 @@ public class AttachmentController {
         }
         var meta = attachmentService.meta(attachmentId);
         if (meta.getProcessInstanceId() != null && !meta.getProcessInstanceId().isBlank()) {
-            processService.assertInstanceVisible(meta.getProcessInstanceId(), user);
+            processService.assertInstanceVisible(meta.getProcessInstanceId(), user, null);
         }
     }
 }

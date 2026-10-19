@@ -36,8 +36,10 @@ export interface FlowNode {
 
   /** 候选人用户 ID，逗号分隔。与 assigneeVar 二选一即可，优先级低于直接办理人。 */
   candidateUsers?: string;
-  /** 候选组，逗号分隔。用于 group-task 场景。 */
+  /** 候选组（角色 key），逗号分隔。用于 group-task 场景（G6 角色选人）。 */
   candidateGroups?: string;
+  /** 选人方式（G6 / D8）：assignee=指定办理人；user=指定人候选；role=角色候选组。设计器据此区分两种来源。 */
+  candidateType?: 'assignee' | 'user' | 'role';
   /** 任务截止时长 ISO-8601，如 PT2H（2 小时）。 */
   dueDate?: string;
   /** 任务优先级 0-100。 */

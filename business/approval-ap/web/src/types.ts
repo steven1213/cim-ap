@@ -175,6 +175,8 @@ export interface StartProcessRequest {
   formSchema?: FormSchemaField[] | null;
   /** 业务摘要字段（可选，G5）：卡片/列表/审计一眼可见的关键项。 */
   displayFields?: DisplayField[] | null;
+  /** 角色选人（G6 / D8）：节点 id → 角色 key 列表；发起时平台据此建立候选组。 */
+  candidateGroups?: Record<string, string[]> | null;
 }
 
 export interface CompleteTaskRequest {

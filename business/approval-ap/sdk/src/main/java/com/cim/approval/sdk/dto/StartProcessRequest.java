@@ -20,6 +20,8 @@ public record StartProcessRequest(
         /** 表单字段描述（可选）：详情页渲染中文标签/分组/类型 */
         List<FormSchemaField> formSchema,
         /** 业务摘要字段（可选，G5）：卡片/列表/审计一眼可见的关键项 */
-        List<DisplayField> displayFields
+        List<DisplayField> displayFields,
+        /** 角色选人（G6 / D8）：节点 id → 角色 key 列表，供 BPMN 候选组表达式引用 */
+        Map<String, List<String>> candidateGroups
 ) {
 }

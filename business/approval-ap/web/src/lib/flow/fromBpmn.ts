@@ -102,8 +102,16 @@ export function fromBpmn(xml: string): Parsed {
     } else {
       extra = { assigneeVar: varOf(t.getAttribute('flowable:assignee')) || 'assignee' };
     }
-    if (candidateUsers) extra.candidateUsers = candidateUsers;
-    if (candidateGroups) extra.candidateGroups = candidateGroups;
+    if (candidateUsers) { extra.candidateUsers = candidateUsers; extra.candidateType = 'user'; }
+    if (candidateGroups) {
+      // 角色候选在 BPMN 中表现为 ${ccg_<nodeId>} 变量引用；直接字面量视为旧式候选组
+      if (candidateGroups.trim().startsWith('${')) {
+        extra.candidateType = 'role';
+      } else {
+        extra.candidateGroups = candidateGroups;
+        extra.candidateType = 'role';
+      }
+    }
     if (dueDate) extra.dueDate = dueDate;
     if (priority != null && !Number.isNaN(priority)) extra.priority = priority;
 

@@ -673,6 +673,16 @@ function NodeProps({ node, onChange, onDelete }: {
     return 'half';
   }
 
+  /** 推导当前节点的选人方式（G6 / D8）：显式 candidateType 优先，否则按已填字段回退。 */
+  function candidateTypeVal(): 'assignee' | 'user' | 'role' {
+    if (node.candidateType === 'assignee' || node.candidateType === 'user' || node.candidateType === 'role') {
+      return node.candidateType;
+    }
+    if (node.candidateGroups?.trim()) return 'role';
+    if (node.candidateUsers?.trim()) return 'user';
+    return 'assignee';
+  }
+
   return (
     <div className="props-form">
       <div className="props-title">{KIND_LABEL[node.kind]}</div>
@@ -697,9 +707,48 @@ function NodeProps({ node, onChange, onDelete }: {
 
       {node.kind === 'approval' && (
         <div className="field">
+          <label className="field-label">{t('designer.field.candidateType')}</label>
+          <select
+            value={candidateTypeVal()}
+            onChange={(e) => {
+              const v = e.target.value as 'assignee' | 'user' | 'role';
+              onChange({
+                candidateType: v,
+                candidateUsers: v === 'role' ? '' : node.candidateUsers,
+                candidateGroups: v === 'user' ? '' : node.candidateGroups,
+                assigneeVar: v === 'assignee' ? (node.assigneeVar || 'assignee') : '',
+              });
+            }}
+          >
+            <option value="assignee">{t('designer.candidateType.assignee')}</option>
+            <option value="user">{t('designer.candidateType.user')}</option>
+            <option value="role">{t('designer.candidateType.role')}</option>
+          </select>
+          <small>{t('designer.field.candidateTypeHint')}</small>
+        </div>
+      )}
+
+      {node.kind === 'approval' && candidateTypeVal() === 'assignee' && (
+        <div className="field">
           <label className="field-label">{t('designer.field.assigneeVar')}</label>
           <input value={node.assigneeVar || ''} onChange={(e) => onChange({ assigneeVar: e.target.value })} placeholder="assignee" />
           <small>{t('designer.field.assigneeVarHint')}</small>
+        </div>
+      )}
+
+      {node.kind === 'approval' && candidateTypeVal() === 'user' && (
+        <div className="field">
+          <label className="field-label">{t('designer.field.candidateUsers')}</label>
+          <input value={node.candidateUsers || ''} onChange={(e) => onChange({ candidateUsers: e.target.value })} placeholder="alice, bob" />
+          <small>{t('designer.field.candidateUsersHint')}</small>
+        </div>
+      )}
+
+      {node.kind === 'approval' && candidateTypeVal() === 'role' && (
+        <div className="field">
+          <label className="field-label">{t('designer.field.candidateGroups')}</label>
+          <input value={node.candidateGroups || ''} onChange={(e) => onChange({ candidateGroups: e.target.value })} placeholder="manager, finance" />
+          <small>{t('designer.field.candidateGroupsHint')}</small>
         </div>
       )}
 
@@ -742,34 +791,22 @@ function NodeProps({ node, onChange, onDelete }: {
       )}
 
       {isApprovalKind && (
-        <>
-          <div className="field">
-            <label className="field-label">{t('designer.field.candidateUsers')}</label>
-            <input value={node.candidateUsers || ''} onChange={(e) => onChange({ candidateUsers: e.target.value })} placeholder="alice, bob" />
-            <small>{t('designer.field.candidateUsersHint')}</small>
+        <div className="field-row">
+          <div className="field" style={{ flex: 1 }}>
+            <label className="field-label">{t('designer.field.dueDate')}</label>
+            <input value={node.dueDate || ''} onChange={(e) => onChange({ dueDate: e.target.value })} placeholder="PT2H" />
           </div>
-          <div className="field">
-            <label className="field-label">{t('designer.field.candidateGroups')}</label>
-            <input value={node.candidateGroups || ''} onChange={(e) => onChange({ candidateGroups: e.target.value })} placeholder="manager, finance" />
-            <small>{t('designer.field.candidateGroupsHint')}</small>
+          <div className="field" style={{ width: 90 }}>
+            <label className="field-label">{t('designer.field.priority')}</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={node.priority ?? ''}
+              onChange={(e) => onChange({ priority: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
           </div>
-          <div className="field-row">
-            <div className="field" style={{ flex: 1 }}>
-              <label className="field-label">{t('designer.field.dueDate')}</label>
-              <input value={node.dueDate || ''} onChange={(e) => onChange({ dueDate: e.target.value })} placeholder="PT2H" />
-            </div>
-            <div className="field" style={{ width: 90 }}>
-              <label className="field-label">{t('designer.field.priority')}</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={node.priority ?? ''}
-                onChange={(e) => onChange({ priority: e.target.value === '' ? undefined : Number(e.target.value) })}
-              />
-            </div>
-          </div>
-        </>
+        </div>
       )}
 
       {node.kind !== 'start' && node.kind !== 'end' && (

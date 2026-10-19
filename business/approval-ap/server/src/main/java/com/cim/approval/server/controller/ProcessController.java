@@ -66,7 +66,7 @@ public class ProcessController {
         StartProcessRequest safe = new StartProcessRequest(req.processKey(), req.businessKey(),
                 req.tenantId(), currentUser.resolve(req.initiator()), req.title(),
                 req.approvers(), req.assignee(), req.variables(), req.formData(), req.formSchema(),
-                req.displayFields());
+                req.displayFields(), req.candidateGroups());
         String piId = processService.startProcess(safe);
         return Result.ok(Map.of("processInstanceId", piId));
     }
@@ -80,8 +80,9 @@ public class ProcessController {
     /** 审批详情聚合（实例 + 业务表单 + 实时状态 + 审批历史 + 附件）。可见性服务端强制。 */
     @GetMapping("/processes/instances/{instanceId}/detail")
     public Result<ProcessDetailView> getDetail(@PathVariable String instanceId,
-                                               @RequestParam(required = false) String userId) {
-        return Result.ok(processService.getDetail(instanceId, currentUser.resolve(userId)));
+                                               @RequestParam(required = false) String userId,
+                                               @RequestParam(required = false) List<String> roles) {
+        return Result.ok(processService.getDetail(instanceId, currentUser.resolve(userId), currentUser.resolveRoles(roles)));
     }
 
     /**

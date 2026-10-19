@@ -162,8 +162,9 @@ public class ApprovalProcessService {
             vars.put("approvalThreshold", (int) Math.ceil(req.approvers().size() / 2.0));
         } else if (req.assignee() != null && !req.assignee().isBlank()) {
             vars.put("assignee", req.assignee());
-        } else if (req.variables() != null && !req.variables().isEmpty()) {
-            // 由流程定义自行使用传入变量（如两级审批的 leader/manager）
+        } else if ((req.variables() != null && !req.variables().isEmpty())
+                || (req.candidateGroups() != null && !req.candidateGroups().isEmpty())) {
+            // 由流程定义自行使用传入变量（如两级审批的 leader/manager），或纯角色选人模式（candidateGroups）
         } else {
             throw new BizException(BizCode.PARAM_INVALID, "approvers 与 assignee 至少提供一个，或通过 variables 传入流程变量");
         }
@@ -204,6 +205,14 @@ public class ApprovalProcessService {
         if (req.initiator() != null) {
             vars.put("initiator", req.initiator());
         }
+        if (req.candidateGroups() != null && !req.candidateGroups().isEmpty()) {
+            // G6 角色型选人：节点 id → 角色 key 列表，写入 ccg_<nodeId> 变量供 BPMN 候选组表达式引用
+            for (Map.Entry<String, List<String>> e : req.candidateGroups().entrySet()) {
+                if (e.getValue() != null && !e.getValue().isEmpty()) {
+                    vars.put("ccg_" + e.getKey(), new ArrayList<>(e.getValue()));
+                }
+            }
+        }
         if (req.variables() != null) {
             vars.putAll(req.variables());
         }
@@ -227,22 +236,30 @@ public class ApprovalProcessService {
         return pi.getProcessInstanceId();
     }
 
+    public List<TaskView> listTodo(String userId, List<String> roles, String tenantId) {
+        return listTodoPaged(userId, roles, tenantId, 1, Integer.MAX_VALUE).records();
+    }
+
+    /** @deprecated 兼容旧调用：不含角色候选，按受理人/候选人查询。 */
+    @Deprecated
     public List<TaskView> listTodo(String userId, String tenantId) {
-        return listTodoPaged(userId, tenantId, 1, Integer.MAX_VALUE).records();
+        return listTodo(userId, List.of(), tenantId);
     }
 
     /**
      * 待办分页查询。<b>批量取实例消除 N+1</b>：任务页取回后一次 processInstanceIds 批查，
      * 而非每任务单独查实例。
+     * <p>角色型候选（G6 / D8）：除受理人/候选人外，额外命中当前用户 roles claim 所属的候选组
+     * （{@code taskCandidateGroup}），用 OR 合并到同一查询。</p>
      */
-    public PageResult<TaskView> listTodoPaged(String userId, String tenantId, int page, int size) {
+    public PageResult<TaskView> listTodoPaged(String userId, List<String> roles, String tenantId, int page, int size) {
         securityGuard.assertAppCodeScope(tenantId);
         int page0 = Math.max(page, 1) - 1; // 平台分页页号 1 起，Flowable listPage 0 起
         var query = taskService.createTaskQuery()
-                .taskCandidateOrAssigned(userId)
                 .processVariableValueEquals("tenantId", tenantId)
                 .active()
                 .orderByTaskCreateTime().desc();
+        applyCandidateFilter(query, userId, roles);
         long total = query.count();
         List<Task> tasks = query.listPage(page0 * size, size);
         Map<String, ProcessInstance> pis = instancesOf(tasks);
@@ -288,6 +305,23 @@ public class ApprovalProcessService {
             throw new BizException(BizCode.PARAM_INVALID,
                     "该流程需要指定审批人（assignee），请填写后重试");
         }
+        // G6 角色型节点：BPMN 引用 ccg_<nodeId> 变量，发起必须提供对应角色集合
+        java.util.regex.Matcher cg = java.util.regex.Pattern
+                .compile("ccg_([A-Za-z0-9_]+)").matcher(xml);
+        java.util.Set<String> requiredNodes = new java.util.HashSet<>();
+        while (cg.find()) {
+            requiredNodes.add(cg.group(1));
+        }
+        if (!requiredNodes.isEmpty()) {
+            Map<String, List<String>> provided = req.candidateGroups() != null ? req.candidateGroups() : Map.of();
+            for (String nodeId : requiredNodes) {
+                List<String> roles = provided.get(nodeId);
+                if (roles == null || roles.isEmpty()) {
+                    throw new BizException(BizCode.PARAM_INVALID,
+                            "节点 " + nodeId + " 为角色选人，发起时必须在 candidateGroups 中提供其角色集合");
+                }
+            }
+        }
     }
 
 
@@ -315,7 +349,7 @@ public class ApprovalProcessService {
         if (task == null) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "任务不存在: " + taskId);
         }
-        assertTaskOperator(taskId, actor);
+        assertTaskOperator(taskId, actor, null);
         if (toAssignee == null || toAssignee.isBlank() || toAssignee.equals(actor)) {
             throw new BizException(BizCode.PARAM_INVALID, "受托人不能为空且不能是自己");
         }
@@ -333,7 +367,7 @@ public class ApprovalProcessService {
         if (task == null) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "任务不存在: " + taskId);
         }
-        assertTaskOperator(taskId, actor);
+        assertTaskOperator(taskId, actor, null);
         String before = task.getName() + "@" + task.getAssignee();
         taskService.resolveTask(taskId);
         auditService.append(businessKeyOf(task.getProcessInstanceId()), task.getProcessInstanceId(),
@@ -429,19 +463,25 @@ public class ApprovalProcessService {
         return map;
     }
 
+    public List<TaskView> listDone(String userId, List<String> roles, String tenantId) {
+        return listDonePaged(userId, roles, tenantId, 1, Integer.MAX_VALUE).records();
+    }
+
+    /** @deprecated 兼容旧调用：不含角色候选，按受理人查询。 */
+    @Deprecated
     public List<TaskView> listDone(String userId, String tenantId) {
-        return listDonePaged(userId, tenantId, 1, Integer.MAX_VALUE).records();
+        return listDone(userId, List.of(), tenantId);
     }
 
     /** 已办分页查询。 */
-    public PageResult<TaskView> listDonePaged(String userId, String tenantId, int page, int size) {
+    public PageResult<TaskView> listDonePaged(String userId, List<String> roles, String tenantId, int page, int size) {
         securityGuard.assertAppCodeScope(tenantId);
         int page0 = Math.max(page, 1) - 1;
         var query = historyService.createHistoricTaskInstanceQuery()
-                .taskAssignee(userId)
                 .processVariableValueEquals("tenantId", tenantId)
                 .finished()
                 .orderByHistoricTaskInstanceEndTime().desc();
+        applyHistoricCandidateFilter(query, userId, roles);
         long total = query.count();
         List<HistoricTaskInstance> tasks = query.listPage(page0 * size, size);
         List<TaskView> views = new ArrayList<>();
@@ -698,7 +738,7 @@ public class ApprovalProcessService {
      * <p>可见性：发起人、审计参与人（审批/回退/加签等动作 actor）、历史任务受理人、
      * 当前任务候选/受理人。</p>
      */
-    public ProcessDetailView getDetail(String instanceId, String userId) {
+    public ProcessDetailView getDetail(String instanceId, String userId, List<String> roles) {
         HistoricProcessInstance hpi = historyService.createHistoricProcessInstanceQuery()
                 .processInstanceId(instanceId).includeProcessVariables().singleResult();
         if (hpi == null) {
@@ -709,7 +749,7 @@ public class ApprovalProcessService {
         Map<String, Object> vars = hpi.getProcessVariables() != null ? hpi.getProcessVariables() : Map.of();
         String initiator = (String) vars.get("initiator");
 
-        assertInstanceVisible(instanceId, userId);
+        assertInstanceVisible(instanceId, userId, roles);
         securityGuard.assertAppCodeScope((String) vars.get("tenantId"));
 
         String businessKey = hpi.getBusinessKey();
@@ -763,9 +803,10 @@ public class ApprovalProcessService {
     }
 
     /**
-     * 实例可见性（详情/附件共用）：发起人 ∪ 审计参与人 ∪ 历史任务受理人 ∪ 当前候选/受理人。
+     * 实例可见性（详情/附件共用）：发起人 ∪ 审计参与人 ∪ 历史任务受理人 ∪ 当前候选/受理人
+     * （含角色型候选组，G6）。roles 为当前用户角色集合（dev 态由前端传参）。
      */
-    public void assertInstanceVisible(String instanceId, String userId) {
+    public void assertInstanceVisible(String instanceId, String userId, List<String> roles) {
         if (userId == null || userId.isBlank()) {
             throw new BizException(BizCode.ACCESS_DENIED, "无权查看该审批");
         }
@@ -779,18 +820,43 @@ public class ApprovalProcessService {
                 || auditRepository.existsByProcessInstanceIdAndActor(instanceId, userId)
                 || historyService.createHistoricTaskInstanceQuery()
                 .processInstanceId(instanceId).taskAssignee(userId).count() > 0
-                || taskService.createTaskQuery()
-                .processInstanceId(instanceId).taskCandidateOrAssigned(userId).count() > 0;
+                || isCandidate(instanceId, userId, roles);
         if (!allowed) {
             throw new BizException(BizCode.ACCESS_DENIED, "无权查看该审批详情");
         }
     }
 
+    /** 当前用户（含其角色）是否为实例中某任务的候选（用户候选或角色候选组）。 */
+    private boolean isCandidate(String instanceId, String userId, List<String> roles) {
+        if (userId == null) {
+            return false;
+        }
+        var q = taskService.createTaskQuery().processInstanceId(instanceId).active().or().taskCandidateUser(userId);
+        if (roles != null) {
+            for (String r : roles) {
+                q.taskCandidateGroup(r);
+            }
+        }
+        q.endOr();
+        if (q.count() > 0) {
+            return true;
+        }
+        var h = historyService.createHistoricTaskInstanceQuery().processInstanceId(instanceId)
+                .or().taskCandidateUser(userId);
+        if (roles != null) {
+            for (String r : roles) {
+                h.taskCandidateGroup(r);
+            }
+        }
+        h.endOr();
+        return h.count() > 0;
+    }
+
     /**
-     * 任务办理授权：仅当前任务的受理人或候选人可执行办理/回退/加签/改派。
-     * 认证态下 actor 已来自 JWT，杜绝伪造身份代办。
+     * 任务办理授权：仅当前任务的受理人或候选人（含角色型候选组，G6）可执行办理/回退/加签/改派。
+     * 认证态下 actor 已来自 JWT，杜绝伪造身份代办；roles 为当前用户角色集合（dev 态由前端传参）。
      */
-    public void assertTaskOperator(String taskId, String userId) {
+    public void assertTaskOperator(String taskId, String userId, List<String> roles) {
         Task task = taskService.createTaskQuery().taskId(taskId).active().singleResult();
         if (task == null) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "任务不存在或已办理: " + taskId);
@@ -798,7 +864,10 @@ public class ApprovalProcessService {
         boolean assignee = userId != null && userId.equals(task.getAssignee());
         boolean candidate = !assignee && userId != null && taskService.createTaskQuery()
                 .taskId(taskId).taskCandidateUser(userId).active().count() > 0;
-        if (!assignee && !candidate) {
+        boolean group = !assignee && !candidate && userId != null && roles != null && !roles.isEmpty()
+                && taskService.getIdentityLinksForTask(taskId).stream().anyMatch(
+                l -> "candidate".equals(l.getType()) && l.getGroupId() != null && roles.contains(l.getGroupId()));
+        if (!assignee && !candidate && !group) {
             throw new BizException(BizCode.ACCESS_DENIED, "只有该任务的办理人或候选人可以执行此操作");
         }
     }
@@ -913,6 +982,40 @@ public class ApprovalProcessService {
 
     private Instant toInstant(Date date) {
         return date == null ? null : date.toInstant();
+    }
+
+    /**
+     * 待办候选过滤（G6 / D8）：角色型审批节点以候选组承载，Flowable 的
+     * {@code taskCandidateOrAssigned} 不展开候选组，故带 roles 时用 OR 合并
+     * 受理人 / 候选人 / 候选组三种来源。
+     */
+    private void applyCandidateFilter(org.flowable.task.api.TaskQuery query, String userId, List<String> roles) {
+        if (roles != null && !roles.isEmpty()) {
+            query.or().taskAssignee(userId).taskCandidateUser(userId);
+            for (String r : roles) {
+                query.taskCandidateGroup(r);
+            }
+            query.endOr();
+        } else {
+            query.taskCandidateOrAssigned(userId);
+        }
+    }
+
+    /**
+     * 已办候选过滤（G6 / D8）：与 {@link #applyCandidateFilter} 语义对应，作用于历史任务查询。
+     * 角色型任务被当前用户完成后，历史任务以候选组归属，需 OR 命中。
+     */
+    private void applyHistoricCandidateFilter(org.flowable.task.api.history.HistoricTaskInstanceQuery query,
+                                             String userId, List<String> roles) {
+        if (roles != null && !roles.isEmpty()) {
+            query.or().taskAssignee(userId).taskCandidateUser(userId);
+            for (String r : roles) {
+                query.taskCandidateGroup(r);
+            }
+            query.endOr();
+        } else {
+            query.taskAssignee(userId);
+        }
     }
 
     private List<String> candidateUsersOf(String taskId) {

@@ -23,17 +23,25 @@ export const PRESET_USERS = [
 interface IdentityState {
   userId: string;
   tenantId: string;
-  setIdentity: (userId: string, tenantId: string) => void;
+  /** 当前用户角色集合（G6 / D8）：用于命中角色型候选组；dev 态随身份切换，生产由 JWT roles claim 注入。 */
+  roles: string[];
+  setIdentity: (userId: string, tenantId: string, roles?: string[]) => void;
+  setRoles: (roles: string[]) => void;
   clear: () => void;
 }
+
+// dev 演示用预置角色：默认用户 alice 具有 manager 角色，便于在 UI 直接体验角色型候选命中
+export const DEFAULT_ROLES = ['manager'];
 
 export const useIdentityStore = create<IdentityState>()(
   persist(
     (set) => ({
       userId: 'alice',
       tenantId: 'default',
-      setIdentity: (userId, tenantId) => set({ userId, tenantId }),
-      clear: () => set({ userId: 'alice', tenantId: 'default' }),
+      roles: DEFAULT_ROLES,
+      setIdentity: (userId, tenantId, roles) => set({ userId, tenantId, roles: roles ?? DEFAULT_ROLES }),
+      setRoles: (roles) => set({ roles }),
+      clear: () => set({ userId: 'alice', tenantId: 'default', roles: DEFAULT_ROLES }),
     }),
     { name: 'approval-identity' },
   ),

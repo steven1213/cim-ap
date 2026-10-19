@@ -1,6 +1,7 @@
 package com.cim.approval.server.security;
 
 import com.cim.auth.principal.CimUserPrincipal;
+import java.util.List;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +47,21 @@ public class CurrentUserResolver {
 
     public boolean authEnabled() {
         return authEnabled;
+    }
+
+    /**
+     * 解析当前用户角色集合（G6 / D8）：认证态从 JWT 的 {@code roles} claim 取，
+     * dev 态用前端传入的 {@code roles} 参数（缺省为空，仅影响角色型候选命中）。
+     */
+    public List<String> resolveRoles(List<String> paramRoles) {
+        if (authEnabled) {
+            Authentication a = SecurityContextHolder.getContext().getAuthentication();
+            if (a != null && a.getPrincipal() instanceof CimUserPrincipal p && p.roles() != null) {
+                return List.copyOf(p.roles());
+            }
+            return List.of();
+        }
+        return paramRoles != null ? paramRoles : List.of();
     }
 
     private String jwtUser() {

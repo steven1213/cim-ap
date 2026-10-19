@@ -263,7 +263,7 @@
 | **M1 信任层** | G1 权限三层 + G2 回调收编 + G9 开放 API 安全 | 无码 403；回调注册仅受信账号；服务间签名+限流生效 |
 | **M2 业务域隔离** | G3 appCode 隔离 + 前端收敛 | 跨域 403；五类查询过滤；E2E 双域用例 |
 | **M3 契约层** | G4 结果语义（**含退回/重提状态机 §2.2**）+ G5 displayFields | ✅ 已交付（契约 PRD `Integration-API.md` §7/§8/§9 + 后端实现 + 前端渲染）；`verify-g5` 15/15 |
-| **M4 选人与触达** | G6 角色选人 + G7 渠道 SPI+企微 + G8 免登办理 | 企微收待办→点击→免登办理→结果回调业务方，端到端一通 |
+| **M4 选人与触达** | G6 角色选人 + G7 渠道 SPI+企微 + G8 免登办理 | ✅ 已交付（G7/G8 见切片2；G6 角色选人端到端贯通，`verify-g6` 14/14） |
 | **M5 业务规则核心批** | §2.2 退回流程（**本批 P0 子项，第一个交付**）+ F1-F12 | 退回 4 条 GWT 验收全过；请假+报销两场景走查通过 |
 | **M6 RMS 端到端** | 配方签核经 businessKey+回调接入，平台编排 + RMS 回放；补一个通用场景（采购/合同）验证平台性 | 配方审批全闭环；通用场景端到端 |
 | **M7 运营化** | F13-F25 | 看板带口径脚注；抄送/中间事件/发起前校验端到端 |
@@ -305,6 +305,7 @@
 | 3. 权限与业务域 | **G1 权限码三层 + G3 appCode 业务域隔离 + G9 开放 API 安全**（D5/D6/D2） | ✅ 已交付 | `verify-security.mjs` 11/11 + `verify-g1.mjs` 6/6 |
 | 3b. 回调注册收编（G2） | D6+体检#2：受信操作 + 重复注册同 appCode 二次确认 | ✅ 已交付 | `verify-g2.mjs` 14/14 |
 | 4. 契约层（M3：G4+G5） | D4 结果语义 + D7 displayFields + §2.2 状态机 | ✅ 已交付（后端实现 + 前端渲染 + verify-g5 15/15） | `Integration-API.md` §7/§8/§9 |
+| 5. 选人（M4：G6） | D8 角色选人：设计器节点配置 → BPMN 引用 `ccg_<nodeId>` → 发起注入 → 待办按 roles claim 命中 → 办理授权校验 | ✅ 已交付（G7/G8 已由切片2交付） | `verify-g6.mjs` 14/14 + 集成测试 9/9 |
 
 ### 切片3 落点（G1/G3/G9）
 - **G9 开放 API 安全**：`ApiAuthFilter`（`@ConditionalOnProperty approval.api.security.enabled`）。仅对携带 `X-App-Key` 的服务间调用生效，不影响 JWT 用户态 / dev 放行。校验链：未知 appKey → 缺/错签名 → 时间戳超重放窗口（默认 5min）→ IP 白名单 → 按 appCode 限流（默认 60/min）→ 跨业务域；任一失败 403 + `[API-SEC-ALERT]` 告警（`WebhookNotifyService`）。签名 = `HMAC-SHA256(timestamp|method|path|body)`，常量时间比较。
@@ -333,6 +334,19 @@
 - **实现期踩坑**：①`detail` 接口用 `userId=` 入参（非 `actor=`），脚本误用 `actor` 触发 400，已修正；②`ProcessInstanceView` 缺 `import java.util.List`，编译期补；③集成测试 `StartProcessRequest` 构造点需补新字段实参。
 
 > ✅ M3 契约层（G4+G5）已交付，详情/列表/待办/SDK 全链路贯通。
+
+### G6 落点（角色选人，D8）
+
+- **设计器**：审批节点「选人方式」三选（指定人 assigneeVar / 候选人 candidateUsers / 角色 candidateGroups）；选「角色」时导出 BPMN 该节点带 `flowable:candidateGroups="${ccg_<nodeId>}"`（每节点独立变量，替代旧共享 `${candidateGroups}` 无法区分节点的问题）。
+- **发起**：`StartProcessRequest.candidateGroups`（节点 id → 角色 key 列表）写入流程变量 `ccg_<nodeId>`（List）；`validateStartAgainstBpmn` 正则扫描 BPMN 中 `ccg_<nodeId>` 引用，缺对应角色集合 → 400 明确文案；纯角色选人（无 assignee/approvers/variables）合法。
+- **待办/已办**：`listTodo/listDone` 带 `roles`（认证态取 JWT `roles` claim，dev 态取查询参数）——`applyCandidateFilter` 以 `or()` 合并 assignee + candidateUser + 各 `taskCandidateGroup(roles[i])`；历史查询对应 `applyHistoricCandidateFilter`。旧 2 参签名保留 `@Deprecated` 兼容。
+- **授权**：`assertTaskOperator(taskId, userId, roles)` 增候选组判定——`getIdentityLinksForTask` 中 `type=candidate && groupId∈roles` 放行；detail 可见性同步加入 `isCandidate`。
+- **前端**：发起弹窗（DefinitionsPage）解析所选定义 BPMN，自动为角色型节点渲染角色输入框；identityStore 增 `roles`（默认 `['manager']`），api.ts 各待办/办理调用透传。
+- **Flowable 坑**：`taskCandidateOrAssigned` **不展开候选组**——只对 assignee + candidateUser 生效，角色候选必须 OR `taskCandidateGroup` 并人工核对 identityLink 的 groupId。
+- **验证**：集成测试 `g6_roleCandidate_visibleOnlyToMatchingRole`（角色命中/未命中/无角色/授权放行/授权拒绝/办理后清空）+ `g6_roleCandidate_missingCandidateGroupsRejected`（发起校验）；E2E `verify-g6.mjs` 14/14（部署→角色发起→三类待办命中→免登令牌签发核销→角色办理闭环）。
+- **实现期踩坑**：`deployProcess` 以 BPMN 内 `<process id>` 为定义 key（不改写资源文件名），脚本部署时传的 `processKey` 必须与 XML id 一致，否则发起按 key 查不到（404）。
+
+> ✅ M4 选人与触达（G6+G7+G8）全部交付。
 
 ---
 
