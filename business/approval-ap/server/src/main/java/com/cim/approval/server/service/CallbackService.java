@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 回调可靠投递：注册 → 流程结束写入 Outbox → 调度器指数退避重试 → 死信告警。
@@ -50,11 +51,51 @@ public class CallbackService {
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3)).build();
 
+    /** G2 二次确认：重复注册同 appCode 时，首调仅签发令牌、不覆盖；回填令牌且未过期才执行覆盖。单实例内存态，重启即失效（调用方重新发起即可）。 */
+    private final Map<String, PendingToken> pendingConfirmations = new ConcurrentHashMap<>();
+    private record PendingToken(String appCode, Instant expiresAt) {}
+
+    private static final long CONFIRM_TTL_MINUTES = 5;
+
     @Transactional
-    public CallbackRegistrationView register(CallbackRegistrationRequest req) {
+    public CallbackRegistrationView register(CallbackRegistrationRequest req, String confirmToken, String actor) {
+        String appCode = req.appCode();
+        final String actorName = (actor == null || actor.isBlank()) ? "system" : actor;
+        Optional<CallbackRegistration> existing = registrationRepository.findByAppCode(appCode);
+        if (existing.isPresent()) {
+            if (confirmToken == null || confirmToken.isBlank()) {
+                // 重复注册首调：签发二次确认令牌，返回既有配置（不覆盖）
+                String token = UUID.randomUUID().toString();
+                pendingConfirmations.put(token, new PendingToken(appCode, Instant.now().plusSeconds(CONFIRM_TTL_MINUTES * 60)));
+                CallbackRegistration e = existing.get();
+                return new CallbackRegistrationView(e.getId(), e.getAppCode(), e.getBaseUrl(),
+                        e.isEnabled(), e.getCreatedAt(), e.getUpdatedAt(), true, token);
+            }
+            // 二次确认回填：校验令牌归属与有效期
+            PendingToken pt = pendingConfirmations.get(confirmToken);
+            if (pt == null || !pt.appCode().equals(appCode) || pt.expiresAt().isBefore(Instant.now())) {
+                pendingConfirmations.remove(confirmToken);
+                throw new BizException(BizCode.PARAM_INVALID,
+                        "回调二次确认令牌无效或已过期，请重新发起注册以覆盖 " + appCode);
+            }
+            pendingConfirmations.remove(confirmToken);
+            CallbackRegistration e = existing.get();
+            String before = e.getBaseUrl();
+            e.setBaseUrl(req.baseUrl());
+            if (req.secret() != null && !req.secret().isBlank()) {
+                e.setSecret(req.secret());
+            }
+            e.setUpdatedAt(Instant.now());
+            registrationRepository.save(e);
+            auditService.appendCallback(appCode, "-", "CALLBACK_UPDATE", actorName, before, req.baseUrl(),
+                    "二次确认覆盖回调配置");
+            return new CallbackRegistrationView(e.getId(), e.getAppCode(), e.getBaseUrl(),
+                    e.isEnabled(), e.getCreatedAt(), e.getUpdatedAt(), false, null);
+        }
+        // 首次注册：新建
         CallbackRegistration r = new CallbackRegistration();
         r.setId(UUID.randomUUID().toString());
-        r.setAppCode(req.appCode());
+        r.setAppCode(appCode);
         r.setBaseUrl(req.baseUrl());
         String secret = (req.secret() != null && !req.secret().isBlank())
                 ? req.secret() : randomHex(32);
@@ -64,8 +105,10 @@ public class CallbackService {
         r.setCreatedAt(now);
         r.setUpdatedAt(now);
         registrationRepository.save(r);
+        auditService.appendCallback(appCode, "-", "CALLBACK_REGISTER", actorName, null, "REGISTERED",
+                "baseUrl=" + req.baseUrl());
         return new CallbackRegistrationView(r.getId(), r.getAppCode(), r.getBaseUrl(),
-                r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt());
+                r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt(), false, null);
     }
 
     @Transactional
@@ -269,7 +312,7 @@ public class CallbackService {
         List<CallbackRegistrationView> views = new ArrayList<>();
         for (CallbackRegistration r : registrationRepository.findAll()) {
             views.add(new CallbackRegistrationView(r.getId(), r.getAppCode(), r.getBaseUrl(),
-                    r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt()));
+                    r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt(), false, null));
         }
         return views;
     }

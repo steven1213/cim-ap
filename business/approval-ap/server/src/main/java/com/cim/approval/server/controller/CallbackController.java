@@ -37,11 +37,12 @@ public class CallbackController {
 
     @PostMapping("/register")
     public Result<CallbackRegistrationView> register(@RequestBody CallbackRegistrationRequest req,
-                                                     @RequestParam(required = false) String actor) {
-        securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE,
-                currentUser.resolveNullable(actor));
+                                                     @RequestParam(required = false) String actor,
+                                                     @RequestParam(required = false) String confirmToken) {
+        String actorVal = currentUser.resolveNullable(actor);
+        securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE, actorVal);
         securityGuard.assertAppCodeScope(req.appCode());
-        return Result.ok(callbackService.register(req));
+        return Result.ok(callbackService.register(req, confirmToken, actorVal));
     }
 
     @GetMapping

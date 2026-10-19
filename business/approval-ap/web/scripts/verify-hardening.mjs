@@ -17,6 +17,17 @@ async function api(path, opts = {}) {
   return { status: res.status, body: data, raw: body };
 }
 
+// G2 二次确认：重复注册同 appCode 时首调返回 confirmRequired，须回填令牌再次提交才覆盖。
+async function registerWithConfirm(payload) {
+  let res = await api('/callbacks/register', { method: 'POST', body: JSON.stringify(payload) });
+  if (res.body && res.body.confirmRequired && res.body.confirmToken) {
+    res = await api(`/callbacks/register?confirmToken=${encodeURIComponent(res.body.confirmToken)}`, {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+  }
+  return res;
+}
+
 const RUN = 'H' + (Date.now() % 100000);
 async function start(bkSuffix, assignee = 'bob') {
   const r = await api('/processes/start', {
@@ -102,10 +113,7 @@ ok('duplicate-definition', !!dup.body?.key && dup.body.key.startsWith('singleApp
 const stats = await api('/callbacks/outbox/stats');
 ok('outbox-stats', stats.body && 'sent' in stats.body && 'successRate' in stats.body,
   JSON.stringify(stats.body).slice(0, 90));
-await api('/callbacks/register', {
-  method: 'POST',
-  body: JSON.stringify({ appCode: 'e2e-probe', baseUrl: 'http://127.0.0.1:9/none', secret: 'test-secret' }),
-});
+await registerWithConfirm({ appCode: 'e2e-probe', baseUrl: 'http://127.0.0.1:9/none', secret: 'test-secret' });
 const test = await api(`/callbacks/test/e2e-probe`, { method: 'POST' });
 ok('callback-test', ['SENT','DEAD'].includes(test.body?.status),
   `status=${test.body?.status} err=${test.body?.lastError ?? '无'}`);

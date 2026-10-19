@@ -221,7 +221,8 @@ export function reassignTask(taskId: string, req: ReassignRequest): Promise<void
 // ---------- 回调注册 / 查询 ----------
 
 export function registerCallback(req: CallbackRegistrationRequest): Promise<CallbackRegistrationView> {
-  return apiPost<CallbackRegistrationView>('/callbacks/register', req);
+  const qs = req.confirmToken ? `?confirmToken=${encodeURIComponent(req.confirmToken)}` : '';
+  return apiPost<CallbackRegistrationView>(`/callbacks/register${qs}`, req);
 }
 
 export function listCallbacks(): Promise<CallbackRegistrationView[]> {

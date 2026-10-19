@@ -5,7 +5,7 @@ import { IconWebhook, IconPlus, IconSend, IconRefresh } from '@/components/Icons
 import { listCallbacks, registerCallback, queryOutbox, deliverMessage, getOutboxStats, testCallback } from '@/lib/api';
 import { toast } from '@/store/toastStore';
 import { fmtDate } from '@/lib/format';
-import type { CallbackRegistrationView, OutboxView } from '@/types';
+import type { CallbackRegistrationRequest, CallbackRegistrationView, OutboxView } from '@/types';
 
 function statusTag(status: string): string {
   if (status === 'SENT') return 'ok';
@@ -24,6 +24,7 @@ export default function CallbacksPage() {
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [delivering, setDelivering] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ appCode: string; baseUrl: string; secret: string; token: string; existingUrl: string } | null>(null);
 
   async function load() {
     try {
@@ -44,19 +45,35 @@ export default function CallbacksPage() {
       toast(t('common.confirm') + '：' + t('cb.form.appCode') + ' / ' + t('cb.form.baseUrl'), 'warn');
       return;
     }
+    await doRegister({ appCode: appCode.trim(), baseUrl: baseUrl.trim(), secret: secret.trim() || null }, null);
+  }
+
+  // G2 二次确认：重复注册同 appCode 时首调仅签发令牌（confirmRequired=true），回填令牌后再次提交才覆盖。
+  async function doRegister(req: CallbackRegistrationRequest, token: string | null) {
     setBusy(true);
     try {
-      const v = await registerCallback({ appCode: appCode.trim(), baseUrl: baseUrl.trim(), secret: secret.trim() || null });
+      const v = await registerCallback({ ...req, confirmToken: token ?? undefined });
+      if (v.confirmRequired && v.confirmToken) {
+        setConfirm({ appCode: req.appCode, baseUrl: req.baseUrl, secret: req.secret ?? '', token: v.confirmToken, existingUrl: v.baseUrl });
+        setBusy(false);
+        return;
+      }
       toast(`${t('cb.register')} ✓ ${v.appCode} → ${v.baseUrl}`, 'ok');
       setAppCode('');
       setBaseUrl('');
       setSecret('');
+      setConfirm(null);
       await load();
     } catch (e) {
       toast((e as Error).message, 'err');
     } finally {
       setBusy(false);
     }
+  }
+
+  async function confirmOverwrite() {
+    if (!confirm) return;
+    await doRegister({ appCode: confirm.appCode, baseUrl: confirm.baseUrl, secret: confirm.secret || null }, confirm.token);
   }
 
   async function redeliver(messageId: string) {
@@ -230,6 +247,21 @@ export default function CallbacksPage() {
           </table>
         </div>
       </Panel>
+
+      {confirm && (
+        <div className="modal-scrim" onClick={() => setConfirm(null)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">{t('cb.confirmOverwrite')}</div>
+            <div className="modal-body">
+              <p>{t('cb.confirmOverwriteBody', { appCode: confirm.appCode, baseUrl: confirm.existingUrl })}</p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>{t('common.cancel')}</button>
+              <button className="btn btn-sm" disabled={busy} onClick={confirmOverwrite}>{t('common.confirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

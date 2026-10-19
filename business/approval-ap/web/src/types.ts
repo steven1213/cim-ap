@@ -63,6 +63,10 @@ export interface CallbackRegistrationView {
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
+  /** G2 二次确认：重复注册同 appCode 时首调返回 true，需携带 confirmToken 再次提交 */
+  confirmRequired?: boolean;
+  /** G2 二次确认令牌（confirmRequired=true 时非空） */
+  confirmToken?: string;
 }
 
 export interface OutboxView {
@@ -205,6 +209,8 @@ export interface CallbackRegistrationRequest {
   appCode: string;
   baseUrl: string;
   secret?: string | null;
+  /** G2 二次确认令牌：重复注册时由后端签发，前端回填后再次提交以覆盖既有配置 */
+  confirmToken?: string;
 }
 
 // SSE 通知负载（NEW_TASK：任务创建/指派；URGE：发起人催办）。
