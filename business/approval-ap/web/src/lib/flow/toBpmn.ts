@@ -24,7 +24,7 @@ function esc(s: string): string {
 
 function nodeId(n: FlowNode): string {
   if (n.kind === 'start') return 'start';
-  if (n.kind === 'end') return 'end';
+  // end 允许多个（各分支独立终点），id 不可共享 'end'，按节点实例生成
   return `n_${n.id}`;
 }
 
@@ -41,7 +41,6 @@ function thresholdExpr(n: FlowNode): string {
 export function toBpmn(m: FlowModel, processKey: string, processName: string): string {
   const outEdges = (id: string) => m.edges.filter((e) => e.source === id);
   const startNode = m.nodes.find((n) => n.kind === 'start');
-  const endNode = m.nodes.find((n) => n.kind === 'end');
 
   const elements: string[] = [];
 
@@ -52,10 +51,12 @@ export function toBpmn(m: FlowModel, processKey: string, processName: string): s
   for (const n of m.nodes) {
     if (n.kind === 'start') continue;
     if (n.kind === 'end') {
+      // 结果语义（G4 对齐，过去分词式）：默认 APPROVED，显式驳回终点写 REJECTED
+      const result = n.result === 'REJECTED' ? 'REJECTED' : 'APPROVED';
       elements.push(
-        `    <endEvent id="end" name="${esc(n.label)}">`,
+        `    <endEvent id="${nodeId(n)}" name="${esc(n.label)}">`,
         `      <extensionElements>`,
-        `        <flowable:executionListener event="start" expression="\${execution.setVariable('result','APPROVE')}"/>`,
+        `        <flowable:executionListener event="start" expression="\${execution.setVariable('result','${result}')}"/>`,
         `      </extensionElements>`,
         `    </endEvent>`,
       );
@@ -201,7 +202,6 @@ export function toBpmn(m: FlowModel, processKey: string, processName: string): s
     // end 节点无出边
   }
 
-  void endNode;
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',

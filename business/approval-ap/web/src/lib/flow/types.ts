@@ -44,6 +44,9 @@ export interface FlowNode {
   dueDate?: string;
   /** 任务优先级 0-100。 */
   priority?: number;
+
+  /** 结束节点结果语义（多结束节点时各终点独立标注）：导出为 result 流程变量，与 G4 契约对齐。 */
+  result?: 'APPROVED' | 'REJECTED';
 }
 
 export interface FlowEdge {
@@ -104,8 +107,8 @@ export function validateModel(m: FlowModel): string[] {
   const ends = m.nodes.filter((n) => n.kind === 'end');
   if (starts.length === 0) errs.push('缺少「开始」节点');
   if (starts.length > 1) errs.push('只能有一个「开始」节点');
+  // 结束节点允许多个（条件分支可各自汇入「通过/驳回」终点），但至少要有一个
   if (ends.length === 0) errs.push('缺少「结束」节点');
-  if (ends.length > 1) errs.push('只能有一个「结束」节点');
   if (m.nodes.length < 2) errs.push('流程至少需要开始与结束两个节点');
 
   const outEdgesOf = (id: string) => m.edges.filter((e) => e.source === id);
@@ -114,6 +117,9 @@ export function validateModel(m: FlowModel): string[] {
   for (const n of m.nodes) {
     if (n.kind !== 'start' && n.kind !== 'end' && inEdgesOf(n.id).length === 0) {
       errs.push(`节点「${n.label}」没有入口连线`);
+    }
+    if (n.kind === 'end' && inEdgesOf(n.id).length === 0) {
+      errs.push(`结束节点「${n.label}」没有入口连线`);
     }
     if (n.kind !== 'end' && outEdgesOf(n.id).length === 0) {
       errs.push(`节点「${n.label}」没有出口连线`);

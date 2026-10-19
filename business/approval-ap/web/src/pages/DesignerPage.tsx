@@ -705,6 +705,20 @@ function NodeProps({ node, onChange, onDelete }: {
       {node.kind === 'parallel' && <p className="props-note">{t('designer.parallel.hint')}</p>}
       {node.kind === 'join' && <p className="props-note">{t('designer.join.hint')}</p>}
 
+      {node.kind === 'end' && (
+        <div className="field">
+          <label className="field-label">{t('designer.field.endResult')}</label>
+          <select
+            value={node.result === 'REJECTED' ? 'REJECTED' : 'APPROVED'}
+            onChange={(e) => onChange({ result: e.target.value as 'APPROVED' | 'REJECTED' })}
+          >
+            <option value="APPROVED">{t('designer.endResult.approved')}</option>
+            <option value="REJECTED">{t('designer.endResult.rejected')}</option>
+          </select>
+          <small>{t('designer.field.endResultHint')}</small>
+        </div>
+      )}
+
       {node.kind === 'approval' && (
         <div className="field">
           <label className="field-label">{t('designer.field.candidateType')}</label>

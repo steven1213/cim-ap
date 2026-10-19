@@ -69,15 +69,20 @@ export function fromBpmn(xml: string): Parsed {
     id: mid, kind: 'start', x: 0, y: 0, label: startEl.getAttribute('name') || '开始',
   }));
 
-  // 结束节点：跳过自动驳回终点（id=reject_* 或 REJECT listener）
+  // 结束节点：允许多个（各分支独立终点）。仅跳过网关自动生成的驳回终点（id=reject_*）；
+  // 显式「驳回」终点（result=REJECTED）保留并回读结果语义。
   for (const end of ends) {
     const eid = end.getAttribute('id') || '';
     if (eid.startsWith('reject_')) continue;
-    const isReject = Array.from(end.getElementsByTagNameNS('*', 'executionListener'))
-      .some((l) => (l.getAttribute('expression') || '').includes("'REJECT'"));
-    if (isReject) continue;
+    const listener = Array.from(end.getElementsByTagNameNS('*', 'executionListener'))
+      .map((l) => l.getAttribute('expression') || '').find((e) => e.includes("'REJECT") || e.includes("'APPROVE"));
+    let result: 'APPROVED' | 'REJECTED' | undefined;
+    if (listener?.includes("'REJECTED'")) result = 'REJECTED';
+    else if (listener?.includes("'REJECT'")) result = 'REJECTED'; // 旧版单数式兼容
+    else if (listener?.includes("'APPROVED'") || listener?.includes("'APPROVE'")) result = 'APPROVED';
     register(eid || 'end', (mid) => ({
       id: mid, kind: 'end', x: 0, y: 0, label: end.getAttribute('name') || '结束',
+      ...(result ? { result } : {}),
     }));
   }
 
