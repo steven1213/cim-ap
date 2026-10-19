@@ -35,6 +35,8 @@ public record ProcessDetailView(
         /** 是否等待发起人「修改并重新提交」。 */
         Boolean awaitingResubmit,
         /** 业务摘要字段（G5）：详情页顶部摘要。 */
-        List<DisplayField> displayFields
+        List<DisplayField> displayFields,
+        /** 节点轨迹（进度可视化）：按 BPMN 顺序的全部审批节点及到达状态（PENDING/ACTIVE/DONE/SKIPPED）。 */
+        List<FlowNodeTrace> flowNodes
 ) {
 }

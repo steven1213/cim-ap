@@ -89,6 +89,12 @@ async function main() {
   ok('G8-2 返回 userId=alice', data(cb)?.userId === 'alice', 'uid=' + data(cb)?.userId);
   ok('G8-2 返回 taskId 一致', data(cb)?.taskId === taskId, 'tid=' + data(cb)?.taskId);
 
+  // 进度可视化（flowNodes）：办理前进行中（ACTIVE），办理后已完成（DONE+办理人+结果）
+  const detActive = data(await call(`/processes/instances/${instId}/detail?${q({ userId: 'g6init' })}`));
+  const fnActive = (detActive?.flowNodes || []).find((n) => n.nodeId === 'review');
+  ok('FLOW 办理前节点进行中(ACTIVE)', fnActive?.status === 'ACTIVE', 'st=' + fnActive?.status);
+  ok('FLOW 返回节点名称', !!fnActive?.name, 'name=' + fnActive?.name);
+
   // G6-4 角色成员办理（带 roles=manager 通过授权校验）
   const done = await call(`/tasks/${taskId}/complete?${q({ roles: 'manager' })}`, 'POST',
     { outcome: 'APPROVE', comment: 'ok', actor: 'alice' });
@@ -96,6 +102,13 @@ async function main() {
 
   const todoAfter = data(await call(`/tasks/todo?${q({ userId: 'alice', roles: 'manager', tenantId: domain })}`));
   ok('G6-4 完成后待办清空', !(todoAfter || []).some((t) => t.processInstanceId === instId));
+
+  const detDone = data(await call(`/processes/instances/${instId}/detail?${q({ userId: 'g6init' })}`));
+  const fnDone = (detDone?.flowNodes || []).find((n) => n.nodeId === 'review');
+  ok('FLOW 办理后节点已完成(DONE)', fnDone?.status === 'DONE', 'st=' + fnDone?.status);
+  ok('FLOW 记录办理人', fnDone?.actor === 'alice', 'actor=' + fnDone?.actor);
+  ok('FLOW 记录办理结果', fnDone?.outcome === 'APPROVE', 'outcome=' + fnDone?.outcome);
+  ok('FLOW 记录完成时间', !!fnDone?.completedAt);
 
   console.log(`\n结果：${pass} 通过 / ${fail} 失败` + (fails.length ? '  ⟵ ' + fails.join(', ') : ''));
   process.exit(fail === 0 ? 0 : 1);

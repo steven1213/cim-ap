@@ -12,6 +12,7 @@ import com.cim.approval.server.dto.DefinitionXmlView;
 import com.cim.approval.server.dto.DeployProcessRequest;
 import com.cim.approval.server.dto.DisplayField;
 import com.cim.approval.server.dto.FormSchemaField;
+import com.cim.approval.server.dto.FlowNodeTrace;
 import com.cim.core.shared.PageResult;
 import com.cim.approval.server.dto.ProcessDefinitionView;
 import com.cim.approval.server.dto.ProcessDetailView;
@@ -26,6 +27,10 @@ import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
+import org.flowable.bpmn.model.BpmnModel;
+import org.flowable.bpmn.model.FlowElement;
+import org.flowable.bpmn.model.UserTask;
+import org.flowable.engine.history.HistoricActivityInstance;
 import org.flowable.engine.history.HistoricProcessInstance;
 import org.flowable.engine.repository.ProcessDefinition;
 import org.flowable.engine.runtime.ProcessInstance;
@@ -43,6 +48,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -709,6 +715,10 @@ public class ApprovalProcessService {
         if ("REJECT".equals(req.outcome()) && (req.comment() == null || req.comment().isBlank())) {
             throw new BizException(BizCode.PARAM_INVALID, "驳回时必须填写审批意见");
         }
+        // 候选任务（指定候选人/角色组）办理时认领到办理人名下：办理留痕进历史（详情进度条展示办理人）
+        if (task.getAssignee() == null || task.getAssignee().isBlank()) {
+            taskService.setAssignee(task.getId(), req.actor());
+        }
         Map<String, Object> vars = new HashMap<>();
         vars.put("outcome", req.outcome());
         if (req.comment() != null) {
@@ -786,12 +796,16 @@ public class ApprovalProcessService {
             definitionName = def.getName();
         }
 
+        List<ApprovalAudit> auditList = auditService.listByBusinessKey(businessKey);
         List<AuditView> history = new ArrayList<>();
-        for (ApprovalAudit a : auditService.listByBusinessKey(businessKey)) {
+        for (ApprovalAudit a : auditList) {
             history.add(new AuditView(a.getId(), a.getSeq(), a.getBusinessKey(), a.getProcessInstanceId(),
                     a.getTaskId(), a.getAction(), a.getActor(), a.getBeforeState(), a.getAfterState(),
                     a.getDetail(), a.getPrevHash(), a.getHash(), a.getCreatedAt()));
         }
+
+        List<FlowNodeTrace> flowNodes = resolveFlowNodes(hpi.getId(), hpi.getProcessDefinitionId(),
+                activeNodes, running, auditList);
 
         return new ProcessDetailView(instanceId, businessKey, hpi.getProcessDefinitionKey(), definitionName,
                 (String) vars.get("title"), initiator, (String) vars.get("tenantId"),
@@ -799,7 +813,74 @@ public class ApprovalProcessService {
                 toInstant(hpi.getStartTime()), toInstant(hpi.getEndTime()),
                 formData, formSchema, activeNodes, activeTasks, history,
                 attachmentService.listByBusinessKey(businessKey),
-                round != null ? round : 1, awaitingResubmit, resolveDisplayFields(vars));
+                round != null ? round : 1, awaitingResubmit, resolveDisplayFields(vars), flowNodes);
+    }
+
+    /**
+     * 节点轨迹（详情页进度可视化）：BPMN 定义中 userTask 的文档序 × 运行时状态交叉。
+     *
+     * <p>状态判定优先级：当前活动（ACTIVE）&gt; 历史已完成（DONE，退回重走取最近一轮）&gt;
+     * 流程已终态但未经过（SKIPPED，如条件分支未走）&gt; 未到达（PENDING）。
+     * 定义不可读或无 userTask 时返回空列表，前端回退为不展示进度条。</p>
+     */
+    private List<FlowNodeTrace> resolveFlowNodes(String instanceId, String definitionId,
+                                                 List<String> activeNodes, boolean running,
+                                                 List<ApprovalAudit> audits) {
+        List<UserTask> nodes = new ArrayList<>();
+        try {
+            BpmnModel model = repositoryService.getBpmnModel(definitionId);
+            if (model != null && model.getMainProcess() != null) {
+                for (FlowElement fe : model.getMainProcess().getFlowElements()) {
+                    if (fe instanceof UserTask ut) {
+                        nodes.add(ut);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 定义不可读（如已清理）时返回空轨迹，前端不展示进度条
+        }
+        if (nodes.isEmpty()) {
+            return List.of();
+        }
+        // 历史完成实例按节点分组：endTime 升序遍历后写覆盖 = 退回重走取最新一轮
+        Map<String, HistoricActivityInstance> finishedByNode = new LinkedHashMap<>();
+        for (HistoricActivityInstance a : historyService.createHistoricActivityInstanceQuery()
+                .processInstanceId(instanceId).activityType("userTask").finished()
+                .orderByHistoricActivityInstanceEndTime().asc().list()) {
+            finishedByNode.put(a.getActivityId(), a);
+        }
+        List<FlowNodeTrace> result = new ArrayList<>();
+        for (UserTask ut : nodes) {
+            HistoricActivityInstance fin = finishedByNode.get(ut.getId());
+            String status;
+            if (activeNodes.contains(ut.getId())) {
+                status = FlowNodeTrace.ACTIVE;
+            } else if (fin != null) {
+                status = FlowNodeTrace.DONE;
+            } else {
+                status = running ? FlowNodeTrace.PENDING : FlowNodeTrace.SKIPPED;
+            }
+            String actor = null;
+            String outcome = null;
+            java.time.Instant completedAt = null;
+            if (fin != null) {
+                actor = fin.getAssignee();
+                completedAt = toInstant(fin.getEndTime());
+                String taskId = fin.getTaskId();
+                if (taskId != null) {
+                    // 办理审计 action=COMPLETE_APPROVE/COMPLETE_REJECT，映射回任务级 outcome
+                    outcome = audits.stream()
+                            .filter(a -> taskId.equals(a.getTaskId())
+                                    && ("COMPLETE_APPROVE".equals(a.getAction())
+                                        || "COMPLETE_REJECT".equals(a.getAction())))
+                            .map(a -> "COMPLETE_REJECT".equals(a.getAction()) ? "REJECT" : "APPROVE")
+                            .findFirst().orElse(null);
+                }
+            }
+            result.add(new FlowNodeTrace(ut.getId(), ut.getName() != null ? ut.getName() : ut.getId(),
+                    status, actor, outcome, completedAt));
+        }
+        return result;
     }
 
     /**

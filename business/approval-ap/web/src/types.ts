@@ -137,6 +137,19 @@ export interface ProcessDetailView {
   awaitingResubmit?: boolean;
   /** 业务摘要字段（G5）：详情页顶部摘要。 */
   displayFields?: DisplayField[];
+  /** 节点轨迹（进度可视化）：按 BPMN 顺序的全部审批节点及到达状态。 */
+  flowNodes?: FlowNodeTrace[];
+}
+
+/** 流程节点轨迹（详情页进度条，对应后端 FlowNodeTrace）。 */
+export interface FlowNodeTrace {
+  nodeId: string;
+  name: string;
+  /** PENDING 未到达 | ACTIVE 进行中 | DONE 已完成 | SKIPPED 未经过 */
+  status: string;
+  actor?: string | null;
+  outcome?: string | null;
+  completedAt?: string | null;
 }
 
 /** 业务摘要字段（G5 闸门出口，对应后端 DisplayField）。 */

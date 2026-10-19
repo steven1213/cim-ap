@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Modal from '@/components/Modal';
 import CompleteModal from '@/components/CompleteModal';
 import { DisplayFields } from '@/components/DisplayFields';
+import { FlowProgress } from '@/components/FlowProgress';
 import ResubmitModal from '@/components/ResubmitModal';
 import { IconBell, IconCheck, IconClip, IconDownload, IconRefresh, IconUndo, IconTrash } from '@/components/Icons';
 import {
@@ -286,6 +287,8 @@ export default function DetailModal({
           <section className="detail-section">
             <h3 className="detail-section-title">{detail.title || detail.businessKey}</h3>
             <DisplayFields fields={detail.displayFields} />
+            {/* 审批进度节点条：已到达节点亮起，未到达置灰 */}
+            <FlowProgress nodes={detail.flowNodes} />
             <div className="detail-grid">
               <div className="detail-grid-item">
                 <span className="detail-label">{t('detail.status')}</span>

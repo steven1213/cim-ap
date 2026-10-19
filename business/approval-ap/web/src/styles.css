@@ -3305,3 +3305,89 @@ table.data tbody tr.row-link:hover td {
 }
 .dot.started { background: var(--primary); }
 .dot.completed { background: var(--ok, #2e9e6b); }
+
+/* ---------- 审批进度节点条（详情页 FlowProgress） ---------- */
+.flow-progress {
+  display: flex;
+  align-items: flex-start;
+  margin: 10px 0 4px;
+  padding: 12px 8px 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.fp-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.fp-dot {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+.fp-line {
+  position: absolute;
+  top: 8px;
+  left: calc(-50% + 12px);
+  right: calc(50% + 12px);
+  height: 2px;
+  background: var(--line-strong);
+}
+.fp-name {
+  max-width: 100%;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fp-sub {
+  max-width: 100%;
+  font-size: var(--fs-micro);
+  color: var(--muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 已完成：绿点亮起 */
+.fp-done .fp-dot {
+  background: var(--ok);
+  border: none;
+  color: #fff;
+}
+.fp-done .fp-line { background: var(--ok); }
+/* 进行中：主色高亮 + 光晕 */
+.fp-active .fp-dot {
+  background: var(--panel);
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-soft);
+}
+.fp-active .fp-line { background: var(--ok); }
+.fp-active .fp-name { color: var(--primary); font-weight: 600; }
+.fp-active .fp-sub { color: var(--primary); }
+/* 未到达：灰空心 */
+.fp-pending .fp-dot {
+  background: var(--panel);
+  border: 2px solid var(--line-strong);
+}
+/* 未经过（条件分支未走）：灰虚线 */
+.fp-skipped .fp-dot {
+  background: transparent;
+  border: 2px dashed var(--line-strong);
+}
+.fp-skipped .fp-name,
+.fp-skipped .fp-sub { opacity: 0.65; }
