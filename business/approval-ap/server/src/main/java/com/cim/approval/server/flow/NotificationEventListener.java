@@ -1,6 +1,7 @@
 package com.cim.approval.server.flow;
 
-import com.cim.approval.server.service.NotificationService;
+import com.cim.approval.server.notification.NotificationDispatcher;
+import com.cim.approval.server.notification.NotificationEvent;
 import lombok.RequiredArgsConstructor;
 import org.flowable.common.engine.api.delegate.event.FlowableEngineEventType;
 import org.flowable.common.engine.api.delegate.event.FlowableEntityEvent;
@@ -21,7 +22,7 @@ import jakarta.annotation.PostConstruct;
 @RequiredArgsConstructor
 public class NotificationEventListener implements FlowableEventListener {
 
-    private final NotificationService notificationService;
+    private final NotificationDispatcher dispatcher;
     private final org.flowable.engine.ProcessEngine processEngine;
 
     @PostConstruct
@@ -43,11 +44,12 @@ public class NotificationEventListener implements FlowableEventListener {
         if (assignee == null || assignee.isBlank()) {
             return;
         }
-        notificationService.pushToUser(assignee, "NEW_TASK",
+        dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.NEW_TASK,
+                java.util.List.of(assignee),
                 java.util.Map.of(
                         "taskId", task.getId(),
                         "name", task.getName(),
-                        "processInstanceId", task.getProcessInstanceId()));
+                        "processInstanceId", task.getProcessInstanceId())));
     }
 
     @Override
