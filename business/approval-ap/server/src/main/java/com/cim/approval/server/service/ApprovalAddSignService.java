@@ -10,6 +10,8 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.cim.approval.server.notification.NotificationDispatcher;
+import com.cim.approval.server.notification.NotificationEvent;
 
 /**
  * 加签：在当前审批节点增加审批人。
@@ -29,7 +31,7 @@ public class ApprovalAddSignService {
     private final RuntimeService runtimeService;
     private final TaskService taskService;
     private final AuditService auditService;
-    private final NotificationService notificationService;
+    private final NotificationDispatcher dispatcher;
 
     @Transactional
     public void addSign(String taskId, AddSignRequest req) {
@@ -58,8 +60,9 @@ public class ApprovalAddSignService {
                 original, req.assignee(),
                 "type=" + type + " reason=" + (req.reason() == null ? "" : req.reason()));
 
-        notificationService.pushToUser(req.assignee(), "ADDED_TO_TASK",
-                java.util.Map.of("taskId", taskId, "type", type));
+        dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.ADDED_TO_TASK,
+                java.util.List.of(req.assignee()),
+                java.util.Map.of("taskId", taskId, "type", type)));
     }
 
     private String businessKeyOf(String procInstId) {

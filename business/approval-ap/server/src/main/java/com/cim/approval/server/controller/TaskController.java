@@ -6,6 +6,7 @@ import com.cim.core.shared.PageResult;
 import com.cim.approval.server.dto.ProcessInstanceView;
 import com.cim.approval.server.dto.ReassignRequest;
 import com.cim.approval.server.dto.ReturnRequest;
+import com.cim.approval.server.dto.ReturnTargetsView;
 import com.cim.approval.server.dto.TaskView;
 import com.cim.approval.server.security.CurrentUserResolver;
 import com.cim.approval.server.service.ApprovalAddSignService;
@@ -134,6 +135,15 @@ public class TaskController {
         processService.assertTaskOperator(taskId, actor);
         returnService.returnTask(taskId, new ReturnRequest(req.targetActivityId(), req.reason(), actor));
         return Result.ok();
+    }
+
+    /**
+     * 退回弹窗数据源：可选目标节点（上一节点/退到发起人/指定已审批节点）、当前轮次与上限、
+     * 并行段状态。前端据此渲染单选与「已达上限禁用」。
+     */
+    @GetMapping("/{taskId}/return-targets")
+    public Result<ReturnTargetsView> returnTargets(@PathVariable String taskId) {
+        return Result.ok(returnService.returnTargets(taskId));
     }
 
     @PostMapping("/{taskId}/add-sign")

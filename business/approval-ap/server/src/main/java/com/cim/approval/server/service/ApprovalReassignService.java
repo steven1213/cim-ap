@@ -10,6 +10,8 @@ import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.identitylink.api.IdentityLink;
 import org.flowable.task.api.Task;
 import org.springframework.stereotype.Service;
+import com.cim.approval.server.notification.NotificationDispatcher;
+import com.cim.approval.server.notification.NotificationEvent;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -22,7 +24,7 @@ public class ApprovalReassignService {
     private final RuntimeService runtimeService;
     private final TaskService taskService;
     private final AuditService auditService;
-    private final NotificationService notificationService;
+    private final NotificationDispatcher dispatcher;
 
     @Transactional
     public void reassign(String taskId, ReassignRequest req) {
@@ -43,8 +45,9 @@ public class ApprovalReassignService {
                 before, req.newAssignee(),
                 "reason=" + (req.reason() == null ? "" : req.reason()));
 
-        notificationService.pushToUser(req.newAssignee(), "REASSIGNED",
-                java.util.Map.of("taskId", taskId));
+        dispatcher.dispatch(NotificationEvent.of(NotificationEvent.Type.REASSIGNED,
+                java.util.List.of(req.newAssignee()),
+                java.util.Map.of("taskId", taskId)));
     }
 
     private String businessKeyOf(String procInstId) {
