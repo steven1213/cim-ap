@@ -9,13 +9,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * T1.5 Flyway 多目录迁移验收（H2）：开启 {@code cim.jpa.flyway.enabled} 后，按库类型选中
+ * T1.5 Flyway 多目录迁移验收（H2）：开启 {@code spring.flyway.enabled} 后，按库类型选中
  * {@code db/migration/h2} 执行迁移建表，JPA 以 {@code ddl-auto=validate} 校验通过
  * （证明「迁移自动化 + validate 不报错」）。
  */
 @SpringBootTest(classes = FlywayTestApplication.class, properties = {
         "spring.flyway.enabled=true",
-        "cim.jpa.flyway.enabled=true",
+        "spring.flyway.enabled=true",
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.open-in-view=false"
 })
