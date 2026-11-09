@@ -33,6 +33,8 @@ server/**/target/
 *.log
 business/approval-ap/server/data/
 business/approval-ap/web/_*
+# 本地 E2E 校验的中间产物（curl 响应、临时 BPMN）
+.tmp-verify/
 
 # vite 缓存
 .vite/

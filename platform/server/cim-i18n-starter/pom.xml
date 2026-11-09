@@ -61,4 +61,26 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              单点例外：i18n 的文案要落库（sys_i18n），必须依赖 cim-jpa-starter。
+              这是「功能必需」而非图省事，故豁免父 POM 的 enforce-arch；
+              其余 any-to-any 的 starter 横向依赖仍在 other starters 上强制生效。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-arch</id>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

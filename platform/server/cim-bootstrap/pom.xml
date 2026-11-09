@@ -99,6 +99,23 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!--
+              装配层例外：本模块的职责就是「把所有 starter 与业务域装到一起」，
+              因此豁免父 POM 的 enforce-arch（starter 禁横向依赖 / 禁依赖业务域）。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-arch</id>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

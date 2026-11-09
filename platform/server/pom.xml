@@ -37,7 +37,6 @@
         <module>cim-notify-starter</module>
         <module>cim-gen-starter</module>
         <module>cim-system</module>
-        <module>cim-business</module>
         <module>cim-bootstrap</module>
     </modules>
 
@@ -108,11 +107,6 @@
                 <artifactId>cim-system</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.cim</groupId>
-                <artifactId>cim-business</artifactId>
-                <version>${project.version}</version>
-            </dependency>
 
             <!-- JWT（RS256 验签，见 README §5 / design.md §2.4） -->
             <dependency>
@@ -177,6 +171,18 @@
                                 <artifactId>lombok</artifactId>
                                 <version>${lombok.version}</version>
                             </path>
+                            <!--
+                              配置元数据：为各 starter 的 @ConfigurationProperties 生成
+                              META-INF/spring-configuration-metadata.json，
+                              IDE 才能对 cim.* / spring.* 键做补全、类型校验与「未知键」告警。
+                              放在 processorPath 而非 dependencies：不进入任何模块的编译/运行类路径，
+                              因此 cim-core 的「零 Spring 依赖」架构约束不受影响。
+                            -->
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                                <version>${spring-boot.version}</version>
+                            </path>
                             <path>
                                 <groupId>org.mapstruct</groupId>
                                 <artifactId>mapstruct-processor</artifactId>
@@ -218,6 +224,44 @@
                                 <requireJavaVersion>
                                     <version>[21,)</version>
                                 </requireJavaVersion>
+                            </rules>
+                            <fail>true</fail>
+                        </configuration>
+                    </execution>
+
+                    <!--
+                      架构约束（design.md §1.1）：把「分层依赖方向」从文档变成构建失败。
+                      违反即中断，不再依赖人肉 review。
+
+                      规则一：任何模块都不得依赖业务域（cim-system / cim-business）。
+                      规则二：starter 之间禁止横向依赖（cim-*-starter 互引），避免
+                              纯能力层因为一个工具类而互相传染。
+                      仅检查 com.cim 内部坐标，外部技术栈不受影响。
+
+                      例外的模块在本模块 pom 里以同名 execution 设 <skip>true</skip>：
+                        cim-bootstrap      （装配层，必须依赖全部）
+                        cim-system         （业务域可依赖基础设施 starter）
+                        cim-i18n-starter   （i18n 需要持久化，允许依赖 cim-jpa-starter）
+                    -->
+                    <execution>
+                        <id>enforce-arch</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>com.cim:cim-system</exclude>
+                                        <exclude>com.cim:cim-business</exclude>
+                                        <exclude>com.cim:cim-*-starter</exclude>
+                                    </excludes>
+                                    <searchTransitive>true</searchTransitive>
+                                    <message>
+                                        违反分层约束（design.md §1.1）：starter 不得依赖业务域，starter 之间禁止横向依赖。
+                                        若确属必要（如 i18n 需要持久化），请在该模块 pom.xml 的 enforce-arch execution 中显式 skip 并说明理由。
+                                    </message>
+                                </bannedDependencies>
                             </rules>
                             <fail>true</fail>
                         </configuration>
