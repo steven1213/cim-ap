@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import * as api from '@/lib/rmsApi';
+import { SseClient } from '@cim/notify-client';
+import { useAuthStore } from '@/store/authStore';
 import { IconBell } from '@/components/Icons';
 import type { AppNotification } from '@/types';
 
 /**
- * 顶栏通知铃铛（W9 审批实时通知）：30s 轮询未读数 + 下拉通知面板。
+ * 顶栏通知铃铛（W9 审批实时通知）：轮询未读数（红点真相在持久表 rms_notification）+ SSE 实时刷新（cim-notify-starter）。
+ * SSE 仅做在线即时提醒；刷新/重连必然丢消息，故 onOpen（重连）与收到消息都回拉 /unread-count 自愈。
  * 点击通知 → 按引用类型直达对应页并标记已读；全部已读一键兜底。
  */
 export default function NotificationBell() {
@@ -17,6 +20,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(false);
 
   const poll = useCallback(async () => {
     try {
@@ -26,11 +30,63 @@ export default function NotificationBell() {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const page = await api.listNotifications(false);
+      setItems(page.items);
+      setUnread(page.unread);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // 轮询兜底（红点真相在持久表）
   useEffect(() => {
     poll();
     const timer = setInterval(poll, 30_000);
     return () => clearInterval(timer);
   }, [poll]);
+
+  // 实时通道：订阅本 ap /sys/notify/stream；到消息即时刷新；重连自愈。
+  useEffect(() => {
+    const { token, user } = useAuthStore.getState();
+    let url: string;
+    let getToken: () => string | null;
+    if (token) {
+      url = '/sys/notify/stream';
+      getToken = () => useAuthStore.getState().token;
+    } else {
+      // dev 直连（cim.auth.enabled=false + dev-accept-query-identity=true）
+      const uid = user?.userId ?? 'anonymous';
+      const tid = user?.tenantId ?? 'default';
+      url = `/sys/notify/stream?userId=${encodeURIComponent(uid)}&tenantId=${encodeURIComponent(tid)}`;
+      getToken = () => null;
+    }
+    const client = new SseClient({
+      url,
+      getToken,
+      mode: 'event-source',
+      onMessage: () => {
+        poll();
+        if (openRef.current) refresh();
+      },
+      onOpen: () => {
+        poll(); // 重连自愈：回拉未读真相
+      },
+      onError: () => {
+        // 静默，轮询仍兜底红点
+      },
+    });
+    client.connect();
+    return () => client.close();
+  }, [poll, refresh]);
 
   // 点击外部关闭
   useEffect(() => {
@@ -48,16 +104,7 @@ export default function NotificationBell() {
     const next = !open;
     setOpen(next);
     if (next) {
-      setLoading(true);
-      try {
-        const page = await api.listNotifications(false);
-        setItems(page.items);
-        setUnread(page.unread);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
+      await refresh();
     }
   }
 

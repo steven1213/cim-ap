@@ -289,11 +289,13 @@ export function listAudit(businessKey: string): Promise<AuditView[]> {
 
 // ---------- SSE 通知 ----------
 //
-// 后端 dev 态以 userId 查询参数区分接收者；返回 EventSource 供组件管理生命周期。
-export function notificationsStreamUrl(userId: string): string {
-  const base = import.meta.env.MODE === 'production' ? '' : '';
-  const params = new URLSearchParams({ userId });
-  return `${base}/api/v1/approval/notifications/stream?${params.toString()}`;
+// 统一经 cim-notify-starter 的 /sys/notify/stream 端点（平台前缀 /sys/**）。
+// dev 态（cim.auth.enabled=false + dev-accept-query-identity=true）以 userId/tenantId 查询参数直连；
+// 生产接入 IAM 后由组件内 SseClient 的 getToken 拼装 ?token=<JWT>（此处仅返回基础地址）。
+export function notificationsStreamUrl(): string {
+  const { userId, tenantId } = useIdentityStore.getState();
+  const params = new URLSearchParams({ userId, tenantId });
+  return `/sys/notify/stream?${params.toString()}`;
 }
 
 // ---------- 企微免登（G8 / D9） ----------

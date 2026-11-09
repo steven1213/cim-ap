@@ -2,44 +2,65 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIdentityStore } from '@/store/identityStore';
 import { notificationsStreamUrl } from '@/lib/api';
+import { SseClient } from '@cim/notify-client';
 import { toast } from '@/store/toastStore';
 import { IconBell, IconInbox } from '@/components/Icons';
 import type { NotificationEvent } from '@/types';
 
-// SSE 通知铃：订阅 /api/v1/approval/notifications/stream?userId=<current>，新任务时弹 toast + 角标。
+// SSE 推送信封（与后端 cim-notify-starter 对齐）：payload 为业务 JSON 字符串（双编码）。
+interface NotifyEnvelope {
+  id?: string;
+  ts?: number;
+  appCode?: string;
+  type?: string;
+  payload?: string;
+}
+
+// SSE 通知铃：订阅本 ap 的 /sys/notify/stream（统一 cim-notify-starter），新任务时弹 toast + 角标。
+// 前端不持久化红点：刷新/重连必然丢消息，故 onOpen（重连）也应回拉各 ap 的 /unread-count 自愈
+// （approval-ap 当前未持久化通知，红点以本会话内存角标表示；后续可按各 AP 自管原则补通知表）。
 export default function NotificationBell() {
   const { t } = useTranslation();
   const userId = useIdentityStore((s) => s.userId);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationEvent[]>([]);
   const [connected, setConnected] = useState(false);
-  const esRef = useRef<EventSource | null>(null);
+  const clientRef = useRef<SseClient | null>(null);
 
   useEffect(() => {
-    if (esRef.current) esRef.current.close();
+    if (clientRef.current) clientRef.current.close();
     setConnected(false);
-    const es = new EventSource(notificationsStreamUrl(userId));
-    esRef.current = es;
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-    es.onmessage = (ev) => {
-      try {
-        const data = JSON.parse(ev.data) as NotificationEvent;
-        if (data.type === 'NEW_TASK') {
-          setItems((prev) => [data, ...prev].slice(0, 12));
-          toast(`${t('notify.newTask')}: ${data.name ?? data.taskId ?? ''}`, 'info');
-        } else if (data.type === 'URGE') {
-          setItems((prev) => [data, ...prev].slice(0, 12));
-          toast(`${t('notify.urge')}: ${data.title ?? data.name ?? ''}`, 'warn');
-        } else if (data.type === 'TASK_OVERDUE') {
-          setItems((prev) => [data, ...prev].slice(0, 12));
-          toast(`${t('notify.overdue')}: ${data.name ?? data.taskId ?? ''}`, 'warn');
+    const client = new SseClient({
+      url: notificationsStreamUrl(), // dev 直连 ?userId=&tenantId=；生产应改用 getToken 注入 ?token=
+      getToken: () => null,
+      mode: 'event-source',
+      onOpen: () => setConnected(true),
+      onError: () => setConnected(false),
+      onMessage: (m) => {
+        try {
+          const env = (m.data ?? {}) as NotifyEnvelope;
+          const biz = (typeof env.payload === 'string'
+            ? JSON.parse(env.payload)
+            : env) as NotificationEvent;
+          if (!biz || !biz.type) return;
+          if (biz.type === 'NEW_TASK') {
+            setItems((prev) => [biz, ...prev].slice(0, 12));
+            toast(`${t('notify.newTask')}: ${biz.name ?? biz.taskId ?? ''}`, 'info');
+          } else if (biz.type === 'URGE') {
+            setItems((prev) => [biz, ...prev].slice(0, 12));
+            toast(`${t('notify.urge')}: ${biz.title ?? biz.name ?? ''}`, 'warn');
+          } else if (biz.type === 'TASK_OVERDUE') {
+            setItems((prev) => [biz, ...prev].slice(0, 12));
+            toast(`${t('notify.overdue')}: ${biz.name ?? biz.taskId ?? ''}`, 'warn');
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
-      }
-    };
-    return () => es.close();
+      },
+    });
+    clientRef.current = client;
+    client.connect();
+    return () => client.close();
   }, [userId, t]);
 
   return (

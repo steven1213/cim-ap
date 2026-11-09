@@ -1,0 +1,24 @@
+{
+  "name": "@cim/notify-client",
+  "version": "0.0.1",
+  "description": "CIM 实时消息推送前端客户端（SSE）：指数退避重连 / 死连接探测 / 401 刷新重连 / 重连自愈。供各业务 ap 以 file: 依赖引用。",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true }
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "^18.2.0"
+  }
+}

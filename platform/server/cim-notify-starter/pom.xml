@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.cim</groupId>
+        <artifactId>cim-ap-parent</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>cim-notify-starter</artifactId>
+    <packaging>jar</packaging>
+    <name>cim-notify-starter</name>
+    <description>实时消息推送 starter：SSE 连接管理 + Redis 跨实例扇出 + 鉴权集成 + 租户隔离（见 docs/platform/server/notify-starter-design.md）</description>
+
+    <dependencies>
+        <!-- 领域内核 + 租户上下文（TenantContext） -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-spring-support</artifactId>
+        </dependency>
+
+        <!--
+          指标：只依赖 micrometer 的「接口」（MeterRegistry），不依赖 cim-obs-starter。
+          这样纯传输层不会把 actuator / prometheus 拖进依赖闭包；宿主装了 obs 时
+          obs 提供的正是 MeterRegistry，指标自动联通（见 com.cim.notify.metrics.NotifyMetrics）。
+        -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
+        <!-- SSE 端点（SseEmitter / @RestController） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 鉴权链路只读 SecurityContext（仅编译期核心类，不引入 security 自动装配冲突） -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+        <!-- Redis 跨实例扇出（复用宿主 ap 既有 StringRedisTemplate） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- JSON（事件序列化 / 跨语言可读） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

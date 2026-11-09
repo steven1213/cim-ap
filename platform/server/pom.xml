@@ -34,6 +34,7 @@
         <module>cim-mq-starter</module>
         <module>cim-i18n-starter</module>
         <module>cim-obs-starter</module>
+        <module>cim-notify-starter</module>
         <module>cim-gen-starter</module>
         <module>cim-system</module>
         <module>cim-business</module>
@@ -90,6 +91,11 @@
             <dependency>
                 <groupId>com.cim</groupId>
                 <artifactId>cim-obs-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cim</groupId>
+                <artifactId>cim-notify-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

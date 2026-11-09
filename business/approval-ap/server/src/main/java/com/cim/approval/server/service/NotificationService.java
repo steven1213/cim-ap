@@ -1,41 +1,49 @@
 package com.cim.approval.server.service;
 
+import com.cim.notify.api.NotifyEvent;
+import com.cim.notify.api.NotifyPublisher;
+import com.cim.notify.config.NotifyProperties;
+import com.cim.spring.support.tenant.TenantContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 实时通知：基于 SSE 的内存级推送（演示/单实例）。
+ * 实时通知：基于 {@code cim-notify-starter} 的统一 SSE 推送（多实例经 Redis 扇出）。
  *
- * <p>生产多实例部署应替换为 Redis Pub/Sub 或消息队列广播；此处用内存 Map 维持 userId→SseEmitter 映射，
- * 由 {@code NotificationEventListener} 在任务创建/改派时主动推送。</p>
+ * <p>取代原先的内存级 SseEmitter Map（单实例不可上生产）。{@link NotifyPublisher} 负责扇出，
+ * 本服务只负责把业务事件转换为 {@link NotifyEvent}。租户取自 {@link TenantContext}（通知分发在
+ * 请求线程内触发，租户上下文已写入）。</p>
+ *
+ * <p>红点（未读数）由各 AP 自有持久表负责（见 cim-notify-starter 设计稿 §0 铁律）：SSE 仅做在线实时
+ * 提醒，离线/重连补差由前端回拉各 AP 的 /unread-count 完成。approval-ap 当前未持久化通知，
+ * 如需要红点历史，后续按各 AP 自管原则补一张通知表。</p>
  */
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
 
-    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
-
-    public SseEmitter subscribe(String userId) {
-        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
-        emitter.onCompletion(() -> emitters.remove(userId, emitter));
-        emitter.onTimeout(() -> emitters.remove(userId, emitter));
-        emitters.put(userId, emitter);
-        return emitter;
-    }
+    private final NotifyPublisher notifyPublisher;
+    private final ObjectMapper objectMapper;
+    private final NotifyProperties notifyProperties;
 
     public void pushToUser(String userId, String eventType, Object payload) {
-        SseEmitter emitter = emitters.get(userId);
-        if (emitter == null) {
+        if (userId == null || userId.isBlank()) {
             return;
         }
+        String tenant = TenantContext.get();
+        String json;
         try {
-            emitter.send(SseEmitter.event().name(eventType).data(payload));
-        } catch (IOException e) {
-            emitters.remove(userId, emitter);
+            json = objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            json = String.valueOf(payload);
         }
+        notifyPublisher.publish(new NotifyEvent(tenant, NotifyEvent.TargetType.USER, List.of(userId),
+                notifyProperties.getAppCode(), eventType, json));
     }
 
     public void pushEvent(Map<String, Object> event) {

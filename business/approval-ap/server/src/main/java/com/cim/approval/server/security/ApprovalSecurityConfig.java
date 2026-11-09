@@ -6,6 +6,8 @@ import com.cim.auth.rbac.LocalAuthorityLoader;
 import com.cim.auth.token.JwtVerifier;
 import com.cim.auth.token.TokenBlacklistChecker;
 import com.cim.auth.token.TokenVersionChecker;
+import com.cim.notify.security.BearerTokenQueryParamFilter;
+import com.cim.notify.transport.SseController;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,32 @@ public class ApprovalSecurityConfig {
     private final TokenBlacklistChecker tokenBlacklistChecker;
     private final AppAdmissionChecker admissionChecker;
     private final LocalAuthorityLoader authorityLoader;
+    private final BearerTokenQueryParamFilter bearerFilter;
+
+    /**
+     * SSE 实时推送端点 {@code /sys/notify/stream} 的安全链（先于 /api 链）。
+     *
+     * <p>端点不在 /api/** 内，且平台默认链对 /sys/** 为 permitAll；故必须在此显式收紧为
+     * authenticated，并复用 {@link BearerTokenQueryParamFilter} 把 EventSource 的
+     * ?token= 还原为 Bearer 头（与 /api 链同一套 JWT 过滤器）。dev 态（auth 关闭）下端点由
+     * {@code cim.notify.dev-accept-query-identity} 允许 ?userId=&tenantId= 直连。</p>
+     */
+    @Bean
+    @Order(0)
+    public SecurityFilterChain notifySecurityFilterChain(HttpSecurity http) throws Exception {
+        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(
+                jwtVerifier, tokenVersionChecker, tokenBlacklistChecker, admissionChecker, authorityLoader);
+        http
+                .securityMatcher(SseController.STREAM)
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+                .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->
+                        response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized")))
+                .addFilterBefore(bearerFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(jwtFilter, JwtAuthenticationFilter.class);
+        return http.build();
+    }
 
     @Bean
     @Order(1)

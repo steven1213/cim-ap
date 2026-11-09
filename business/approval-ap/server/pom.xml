@@ -57,6 +57,11 @@
             <artifactId>cim-cache-starter</artifactId>
             <version>${cim.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-notify-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
 
         <!-- 流程引擎（独立服务，与 cim-ap 平台同代 Boot 3.3） -->
         <dependency>

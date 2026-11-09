@@ -59,6 +59,12 @@
             <artifactId>cim-mq-starter</artifactId>
             <version>${cim.version}</version>
         </dependency>
+        <!-- 实时消息推送（SSE，多实例经 Redis 扇出）：取代前端退化轮询，统一长连接。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-notify-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
         <!--
             域模块 cim-system（sys_menu 父子树 + sys_permission(module:res:action) + RBAC），
             不另造表；其 DbLocalAuthorityLoader 会顶替 cim-auth-starter 的默认

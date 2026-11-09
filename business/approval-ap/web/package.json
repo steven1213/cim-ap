@@ -15,7 +15,8 @@
     "zustand": "^4.5.5",
     "axios": "^1.7.7",
     "i18next": "^23.15.1",
-    "react-i18next": "^15.0.2"
+    "react-i18next": "^15.0.2",
+    "@cim/notify-client": "file:../../../platform/web/cim-notify-client"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
