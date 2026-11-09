@@ -10,6 +10,8 @@ target/
 # 本地配置（模板以 .example 形式提交）
 **/application.yml
 !**/application.yml.example
+# 例外：测试资源里的 application.yml 是测试夹具的一部分，必须入库（否则新克隆机器跑 mvn test 会大面积失败）
+!**/src/test/resources/application.yml
 
 # OS
 .DS_Store

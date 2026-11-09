@@ -1,0 +1,31 @@
+# cim-system 集成测试配置：H2 内存库 + 真跑 Flyway（顺带验证模块自带 DDL 可执行）
+spring:
+  application:
+    name: cim-system-test
+  datasource:
+    url: jdbc:h2:mem:cim_system;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    # 表结构由 Flyway 管（模块自带 db/migration/system/h2），Hibernate 只校验——与生产姿态一致
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+cim:
+  auth:
+    # 仅为让 cim-auth-starter 的自动装配生效（从而验证 LocalAuthorityLoader 的实现覆盖关系）；
+    # JWKS 拉取是懒加载的，测试不会真正访问该地址。
+    jwks-uri: http://127.0.0.1:1/jwks
+  system:
+    rbac:
+      # 生产默认：本 ap 权限以本 ap 授权表为准，未建档即拒绝
+      fallback-to-claims: false
+
+logging:
+  level:
+    com.cim.system: INFO
+    org.flywaydb: WARN

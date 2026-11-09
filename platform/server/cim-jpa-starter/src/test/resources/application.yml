@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:cim_it;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  # 默认关闭 Boot 的 Flyway（避免其按默认位置扫描到 vendor 子目录）；
+  # 仅在 FlywayMigrationTest 中按需开启。
+  flyway:
+    enabled: false
+
+cim:
+  jpa:
+    id:
+      mode: SNOWFLAKE
+      worker-id: 1
+      datacenter-id: 1
+    history:
+      enabled: true
+      write-mode: IN_TRANSACTION
+    naming:
+      table-prefix: ""

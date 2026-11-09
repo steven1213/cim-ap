@@ -19,6 +19,8 @@ server/**/target/
 # 本地 application.yml 不入库，仅模板 application.yml.example 入库
 **/application.yml
 !**/application.yml.example
+# 例外：测试资源里的 application.yml 是测试夹具的一部分，必须入库（否则新克隆机器跑 mvn test 会大面积失败）
+!**/src/test/resources/application.yml
 
 # ============ OS ============
 .DS_Store

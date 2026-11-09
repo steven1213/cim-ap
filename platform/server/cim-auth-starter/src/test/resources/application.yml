@@ -1,0 +1,9 @@
+cim:
+  auth:
+    enabled: true
+    jwks-uri: http://localhost/placeholder-jwks
+    jwks-cache-ttl: 60m
+    admission:
+      app-code: mds-ap
+      enabled: true
+    authorities-claim: authorities

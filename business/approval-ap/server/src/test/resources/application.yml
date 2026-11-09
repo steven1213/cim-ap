@@ -1,0 +1,35 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: approval-ap
+  task:
+    scheduling:
+      enabled: false
+  datasource:
+    url: jdbc:h2:mem:approval_test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  flyway:
+    enabled: false
+
+cim:
+  auth:
+    enabled: false
+  jpa:
+    id:
+      mode: SNOWFLAKE
+      worker-id: 1
+      datacenter-id: 1
+
+flowable:
+  database-schema-update: true
+  history-level: full
+  async-executor-activate: false
+  job-executor-activate: false
