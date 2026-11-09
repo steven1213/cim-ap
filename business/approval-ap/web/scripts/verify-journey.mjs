@@ -45,12 +45,18 @@ await page.waitForTimeout(1500);
 const urgePromise = page.evaluate(
   (piId) =>
     new Promise((resolve) => {
-      const es = new EventSource(`/api/v1/approval/notifications/stream?userId=bob`);
+      // 统一端点 /sys/notify/stream（cim-notify-starter）；dev 态以 userId/tenantId 直连。
+      const es = new EventSource(`/sys/notify/stream?userId=bob&tenantId=default`);
       const timer = setTimeout(() => { es.close(); resolve(null); }, 15000);
       es.addEventListener('URGE', (ev) => {
         clearTimeout(timer);
         es.close();
-        try { resolve(JSON.parse(ev.data)); } catch { resolve(null); }
+        try {
+          // data 为信封 {id,ts,appCode,type,payload}，payload 内才是业务 NotificationEvent（JSON 字符串）。
+          const env = JSON.parse(ev.data);
+          const biz = typeof env.payload === 'string' ? JSON.parse(env.payload) : env;
+          resolve(biz);
+        } catch { resolve(null); }
       });
     }),
   urgeId,
