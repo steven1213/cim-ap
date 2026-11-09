@@ -166,6 +166,7 @@
 | W9 | 签核通知（站内信 + 任务中心红点） | #3 |
 | W10 | 配方 Body 模板（强制键 + 默认值 + 新建向导） | #5 |
 | W11+ | 实验配方通道 / 效果跟踪挂钩 / 解析器 SPI 开放 | #6–#8 |
+| W12+ ⏸ **挂起** | 签核外置到 approval-ap（SDK 发起 businessKey + 回调重放 DRAFT→PENDING_SIGN→ACTIVE） | 跨系统 —— 两侧设计均未收敛（RMS 签核语义仍在演进、平台节点级审批人/候选人组未落地），**本期不排期**；理由与三条重启条件见 `docs/business/approval-ap/Product-Framework.md` **D13** |
 
 ---
 
