@@ -57,7 +57,6 @@ server/                      # 后端工程根（对应仓库顶层 `server/`，
 ├── cim-obs-starter        # 可观测 starter（指标 / 链路 / 日志，见 §14）
 ├── cim-gen-starter        # 代码生成器 starter（主/历实体 + 成对 DDL，见 §25，provided 作用域）
 ├── cim-system             # 系统域模块：用户(授权档案)/角色/菜单/权限/字典/参数/日志（自包含 ctrl→entity，见 §21.1）
-├── cim-business           # 业务域模块（后续按域孵化，每个域自包含）
 └── cim-bootstrap         # 启动装配模块（仅 Main + 配置，按需引入各 starter/域）
 ```
 
@@ -95,10 +94,8 @@ flowchart LR
   end
   subgraph Modules[业务域]
     SYS[cim-system] -->|依赖接口| D
-    BIZ[cim-business] -->|依赖接口| D
   end
   BOOT[cim-bootstrap] -->|仅装配| SYS
-  BOOT -->|仅装配| BIZ
   BOOT --> JPA & AUTH & CACHE & MQ
   style D fill:#eef,stroke:#333
 ```
@@ -109,7 +106,7 @@ flowchart LR
 2. **`cim-core` 零 Spring 依赖**：只放领域模型、`Repository` 端口接口、应用服务接口；保持纯净以便单测与复用。
 3. **依赖单向（箭头向内）**：`business → core`，`infra adapter → core`，`bootstrap → 选择装配`；`core` 绝不反向依赖业务或基础设施。
 4. **common 收口为 `cim-core` + `cim-spring-support`**，杜绝「万能桶」与循环依赖。
-5. **父 BOM + enforcer** 统一版本、拦截冲突；每个域模块可独立打包，微服务化零改造。
+5. **父 BOM + enforcer 统一版本、拦截冲突，并把分层约束固化成构建门禁**：`enforce-arch` 禁止 starter 依赖业务域（`cim-system`）、禁止 starter 之间横向依赖（唯一例外 `cim-i18n-starter → cim-jpa-starter`，因文案必须落库，已在模块 pom 中显式豁免并注明理由）；`cim-core` 另有 `enforce-core-purity` 禁 Spring 与所有 `com.cim:*`。违规即 `mvn validate` 失败，不依赖 Code Review 兜底。业务域不在本 reactor 内（`business/{ap}` 独立工程，从私仓引用平台构件），各可独立打包，微服务化零改造。
 6. **横切能力 starter 化**（cache/mq/obs/gen 新增），与 §8 可插拔一致：引入依赖即具备能力，移除即降级；`cim-gen-starter` 为 `provided` 作用域，不进生产包。
 
 ---
@@ -266,8 +263,9 @@ public class OracleJpaConfig {
 @Component
 public class IdGenerator {
     private final Snowflake snowflake;
-    public IdGenerator(@Value("${cim.id.worker-id}") int workerId) {
-        this.snowflake = new Snowflake(workerId, 1);
+    public IdGenerator(@Value("${cim.jpa.id.worker-id}") int workerId,
+                       @Value("${cim.jpa.id.datacenter-id}") int datacenterId) {
+        this.snowflake = new Snowflake(workerId, datacenterId);
     }
     public String nextId() {
         try { return snowflake.nextIdStr(); }
@@ -278,7 +276,11 @@ public class IdGenerator {
 
 > **§3.1 时间有序 ID 的生产级风险（资深架构必看）**
 > - **时钟回拨**：雪花依赖机器时钟，NTP 校正或虚拟机迁移可能回拨，导致 ID 重复/递减。框架捕获 `ClockBackwardsException` 并**降级到 UUIDv7**，或启用「时钟回拨等待+告警」。
-> - **workerId 分配**：硬编码 workerId 在容器随机调度时会冲突。应由**部署平台/配置中心下发**（K8s StatefulSet 序号、或 Consul/Redis 自增分配），保证同数据中心唯一。
+> - **workerId 分配**：硬编码 workerId 在容器随机调度时会冲突，多副本会生成**重复 ID**。框架已在各 ap 的 yml 里留出环境变量入口：
+    `cim.jpa.id.worker-id: ${CIM_WORKER_ID:1}` / `cim.jpa.id.datacenter-id: ${CIM_DATACENTER_ID:1}`，
+    两者各占 5 bit（合法区间 0-31）。部署时由平台注入（K8s StatefulSet 序号、Consul/Redis 自增分配、配置中心下发均可）；
+    也支持 Spring relaxed 形式的 `CIM_JPA_ID_WORKER_ID`（环境变量优先级高于 yml 默认值）。
+    **未注入时回落 1，仅适用于单实例**；非法值（越界/空串）启动即失败，不会带病运行。
 > - **可读性**：雪花为数值，跨库关联排查不便；对可读性要求高的实体可用 **UUIDv7**（时间前缀 + 随机，索引局部性接近雪花）。
 > - 统一封装在 `IdGenerator`，业务与具体算法解耦，未来切换不影响实体。
 
@@ -289,7 +291,7 @@ public class IdGenerator {
 达梦 DM 与 Oracle 语法高度兼容，接入方式与 Oracle 基本一致，差异点如下（能力抽象见 `DbCapabilities`：产品名 `DM DBMS` → `dm`）：
 
 - **驱动与方言外置**：DM JDBC 驱动（`com.dameng:DmJdbcDriver18`，驱动类 `dm.jdbc.driver.DmDriver`，URL `jdbc:dm://host:5236`）与 Hibernate 方言（`com.dameng:DmDialect-for-hibernate6.x` 提供的 `org.hibernate.dialect.DmDialect`）**不在 Maven Central**，由业务 app 本地安装/私仓引入，并显式配置 `spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.DmDialect`（Hibernate 6 无内置 DmDialect）。starter 不内置这些依赖。
-- **Flyway 目录**：`db/migration/dm`（见 `db/migration/dm/README.md`）；因 DM 与 Oracle 兼容，也可直接复用 `oracle` 目录脚本，或经 `cim.jpa.flyway.locations` 覆盖。Spring Boot 3.3.5 的 Flyway 10.x 下 `flyway-database-dameng` 社区模块可能需 Teams 许可，故不强制依赖。
+- **Flyway 目录**：`db/migration/dm`（见 `db/migration/dm/README.md`）；因 DM 与 Oracle 兼容，也可直接复用 `oracle` 目录脚本，或经 `spring.flyway.locations` 覆盖。Spring Boot 3.3.5 的 Flyway 10.x 下 `flyway-database-dameng` 社区模块可能需 Teams 许可，故不强制依赖。
 - **模块自带迁移**：模块（如 `cim-system`）把自己的 DDL 放在 `classpath:db/migration/system/{vendor}`，由模块追加到 Flyway locations。故 `db/migration/system/dm` 存在时亦按同一规则生效；因 Hibernate 6 无内置 `DmDialect`，该目录当前由 Oracle 方言导出（引入达梦官方方言包后建议重新生成，避免 `ddl-auto=validate` 在类型名上误报）。
 - **能力约定**：`nullsLastByDefault=false`（NULL 默认排最前，排序需显式 `NULLS LAST`）、`supportsJsonFunctions=false`（JSON 字段走 `@Convert` 存 `TEXT/CLOB`）、`supportsLimitSyntax=true`（DM8 起支持 `LIMIT/OFFSET`）。
 - **大小写**：沿用统一小写蛇形命名策略，DM 与 Oracle 一样会折叠未加引号标识符为大写，框架已一致处理。
@@ -789,13 +791,11 @@ graph LR
   S3["cim-jpa-starter"]
   S4["cim-cache-starter"]
   S5["cim-mq-starter"]
-  BIZ["cim-business<br/>业务模块"]
   CORE -. "@ConditionalOnProperty" .-> S1
   CORE -. .-> S2
   CORE -. .-> S3
   CORE -. .-> S4
   CORE -. .-> S5
-  BIZ --> CORE
 ```
 
 #### 代码示例
@@ -1652,6 +1652,7 @@ flowchart TB
 2. **密钥外置**：数据库口令、JWT 私钥、Redis 口令等由 Vault/KMS 注入，**不进 Git、不进镜像**；私钥定期轮换，旧公钥保留过渡期（呼应 §15）。
 3. **环境隔离纪律**：`prod` 不允许回退到本地 yml；CI 部署时按环境注入对应 namespace，杜绝串环境。
 4. **与可插拔联动**：配置即 §8 的「配置外部化 + Feature Flag」落地，能力开关、策略选择全部由配置中心驱动。
+5. **键名遵循 Spring 惯例（详见 [design.md §5.1](design.md)）**：同一概念只留一套键，能用 Spring 标准键就绝不自造（`spring.flyway.*` / `management.metrics.tags.*` / `spring.jpa.hibernate.naming.physical-strategy`）；时间一律 `Duration`（`30s` / `5m` / `24h`）而非 `xxx-ms`；唯一例外是 `@Scheduled` 的 `*DelayString`，只接受纯数字毫秒或 ISO-8601（`PT5M`）。父 POM 已接入 `spring-boot-configuration-processor`，每个 starter 产出 `spring-configuration-metadata.json`，IDE 可补全与校验。
 
 ---
 

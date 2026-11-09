@@ -269,7 +269,7 @@ flowchart LR
 | R1 | Oracle 环境/授权不可用，多库验证受阻 | 中 | 高 | 先 PG+MySQL；Oracle 用 Testcontainers(XE)，用例后置 |
 | R2 | 历史拦截器与 JPA 生命周期边界 bug | 中 | 高 | 单测覆盖插入/更新/删除/批量/回滚；变更检测闸门 |
 | R3 | IAM 侧未就绪，认证联调阻塞 | 中 | 中 | 本地自签令牌 + 假 JWKS 先行；接口按 §8 冻结 |
-| R4 | 时钟回拨致主键异常 | 低 | 高 | `IdGenerator` 降级 UUIDv7 + 告警；workerId 由部署平台下发 |
+| R4 | 时钟回拨致主键异常 | 低 | 高 | `IdGenerator` 降级 UUIDv7 + 告警；workerId/datacenterId 由部署平台经 `CIM_WORKER_ID` / `CIM_DATACENTER_ID` 注入 |
 | R5 | 生成器二次生成覆盖手写代码 | 中 | 中 | `/* region biz */` 保护 + AST 增量 + dry-run |
 | R6 | 多租户过滤与业务查询冲突 | 低 | 中 | Filter 可显式关闭；跨租户仅超管白名单 |
 | R7 | 沙箱/CI 无法跑 Maven，验证后置到本机 | 中 | 低 | 本机执行 `mvn verify`；CI 配置为权威验证点 |

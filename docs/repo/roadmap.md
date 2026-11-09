@@ -7,7 +7,7 @@
 | 层次 | 内容 | 状态 |
 | --- | --- | --- |
 | 设计文档 | 总文档 §1–§9、后端文档 §1–§25、前端文档 §1–§13 | ✅ 完成 |
-| 后端基础框架 | `platform/server`：父 BOM + 全部模块骨架。**已实现功能**：`cim-core`、`cim-spring-support`、`cim-jpa-starter`（多库/主键/审计/历史/多租户/Flyway 多目录）、`cim-auth-starter`（验签/准入/数据权限）、`cim-cache-starter`（多级缓存 + 三守卫 + 跨节点失效 + BloomFilter）、`cim-mq-starter`、`cim-obs-starter`、`cim-system`（RBAC 系统域，63 类）。**仍为占位**：`cim-i18n-starter`、`cim-gen-starter`、`cim-business`、`cim-bootstrap` | 🟡 部分已实现 |
+| 后端基础框架 | `platform/server`：父 BOM + 全部模块骨架。**已实现功能**：`cim-core`、`cim-spring-support`、`cim-jpa-starter`（多库/主键/审计/历史/多租户/Flyway 多目录）、`cim-auth-starter`（验签/准入/数据权限）、`cim-cache-starter`（多级缓存 + 三守卫 + 跨节点失效 + BloomFilter）、`cim-mq-starter`、`cim-obs-starter`、`cim-system`（RBAC 系统域，63 类）。**仍为占位**：`cim-i18n-starter`、`cim-gen-starter`（上游模块未稳定，待其定型后实现）、`cim-bootstrap` | 🟡 部分已实现 |
 | 前端基础框架 | `platform/web`：Vite + React + TS 脚手架、目录结构、请求层/权限组件/路由/i18n 占位 | 🟡 骨架已生成 |
 | 业务层代码 | `business/iam-ap`、`business/mds-ap`、`business/mes-ap` 各自的 `server`（Maven 应用）+ `web`（Vite 应用）骨架 | 🟡 骨架已生成 |
 | 基础设施 | `docker-compose.yml`、各工程 `Dockerfile` 已生成；CI 流水线、K8s 编排未生成 | 🟡 部分已生成 |
@@ -39,4 +39,4 @@
 | 一期 | 本框架底座 + RBAC + 通用 CRUD（当前目标） |
 | 二期 | 代码生成器、工作流引擎、文件中心 |
 | 三期 | 多租户 SaaS 化、灰度发布、可观测平台 |
-| 业务 | 在 `cim-business` 中孵化 MES / EAP / SPC 模块 |
+| 业务 | 在 `business/{ap}` 下**独立 Maven 工程**孵化 MES / EAP / SPC 等（不在 `platform/server` reactor 内） |

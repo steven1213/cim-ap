@@ -122,23 +122,23 @@ cim:
     idempotent:
       enabled: true               # 消费幂等（去重）总开关
       store: redis                # redis | memory（无 Redis 时降级 memory）
-      ttl-sec: 86400              # 去重键 TTL（秒），过期后允许重新处理（自愈）
+      ttl: 24h                    # 去重键 TTL（Duration），过期后允许重新处理（自愈）
       prefix: "mq:idem:"
 
     resilience:
       retry-max-attempts: 5
-      retry-initial-backoff-ms: 500
+      retry-initial-backoff: 500ms
       retry-factor: 2.0
-      retry-max-backoff-ms: 30000
+      retry-max-backoff: 30s
       cb-failure-threshold: 5     # 熔断器触发阈值
-      cb-cooldown-ms: 30000
+      cb-cooldown: 30s
 
     outbox:
       enabled: true               # 发件箱：业务与消息同事务，保证"不丢"
       relay-enabled: true         # 中继定时轮询投递开关
       table: sys_outbox           # 发件箱表名
       batch-size: 100             # 每轮轮询批量大小
-      interval-ms: 1000           # 轮询间隔
+      interval: 1s                # 轮询间隔（Duration）
       init-schema: true           # 启动时自动 CREATE TABLE IF NOT EXISTS
 ```
 
@@ -348,8 +348,8 @@ public class InventoryListener {
 ## 9. 运维与排查要点
 
 - **发件箱表**：默认 `sys_outbox`（`outbox.table` 可改）。`outbox.init-schema=true` 时框架启动时自动建表（`CREATE TABLE IF NOT EXISTS`）。生产环境若由 Flyway 管理 DDL，可设 `init-schema=false` 并自行建表（字段见 `OutboxRecord`）。
-- **中继**：`outbox.relay-enabled=true` 时由单线程 `Scheduler` 每 `interval-ms` 轮询一次，批量 `batch-size` 投递后删除。监控该表堆积即可发现投递瓶颈。
-- **幂等 TTL**：`idempotent.ttl-sec` 控制去重键存活；过期后允许重复处理（自愈），状态类事件配合 `version` 仍可去重。
+- **中继**：`outbox.relay-enabled=true` 时由单线程 `Scheduler` 每 `interval`（默认 1s）轮询一次，批量 `batch-size` 投递后删除。监控该表堆积即可发现投递瓶颈。
+- **幂等 TTL**：`idempotent.ttl`（Duration，默认 `24h`）控制去重键存活；过期后允许重复处理（自愈），状态类事件配合 `version` 仍可去重。
 - **死信**：消费超限转死信队列，建议对死信做监控告警与人工/补偿处理。
 - **Redis 降级**：未引入 `spring-boot-starter-data-redis` 时 `store=redis` 会自动降级为内存去重，日志可见；生产集群务必引入 Redis。
 

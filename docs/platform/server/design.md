@@ -53,9 +53,8 @@ flowchart TB
     MODEL[基类族 Auditable/Base*Data]
     PORT[端口接口 IdGenerator/Repository/Event]
   end
-  subgraph biz[业务域]
+  subgraph biz[业务域（平台内仅 cim-system）]
     SYS[cim-system RBAC/字典/日志]
-    BIZ[cim-business 占位]
   end
   boot --> infra
   boot --> biz
@@ -67,15 +66,27 @@ flowchart TB
   style dom fill:#eef,stroke:#333
 ```
 
-**依赖规则（由 maven-enforcer 强制）：**
+**依赖规则（由 maven-enforcer 强制，违规即 `mvn validate` 失败）：**
 
-| 模块                            | 允许依赖                                                 | 禁止依赖                             |
-| ----------------------------- | ---------------------------------------------------- | -------------------------------- |
-| `cim-core`                    | `jakarta.persistence`(spec)、`jakarta.validation`、JDK | Spring、其他 `cim-*`                |
-| `cim-spring-support`          | Spring Web/Core、`cim-core`、MapStruct                 | 各 starter、业务域                    |
-| `cim-*-starter`               | `cim-spring-support`、`cim-core`、各自技术栈                | 业务域（`cim-system`/`cim-business`） |
-| `cim-system` / `cim-business` | `cim-spring-support`、`cim-core`、按需 starter           | 其他业务域循环                          |
-| `cim-bootstrap`               | 全部（仅装配）                                              | —                                |
+| 模块                      | 允许依赖                                                 | 禁止依赖                                       |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------ |
+| `cim-core`              | `jakarta.persistence`(spec)、`jakarta.validation`、JDK | Spring、其他 `cim-*`                          |
+| `cim-spring-support`    | Spring Web/Core、`cim-core`、MapStruct                 | 各 starter、业务域                              |
+| `cim-*-starter`         | `cim-spring-support`、`cim-core`、各自技术栈                | 业务域（`cim-system`）、**其他 starter**          |
+| `cim-system`            | `cim-spring-support`、`cim-core`、按需 starter           | 其他业务域循环                                    |
+| `cim-bootstrap`         | 全部（仅装配）                                              | —                                          |
+
+**唯一例外**：`cim-i18n-starter → cim-jpa-starter`。i18n 的文案要落库（`sys_i18n` 表），属**功能必需**而非图省事；该模块 pom 里显式 `skip` 了 `enforce-arch` 并注明理由。其余 starter 之间一律禁止横向依赖——纯能力层因为一个工具类互相传染，是多模块工程最常见的退化方式。
+
+**enforcer 的实际落地**（`platform/server/pom.xml` 的 `enforce-arch` execution）：
+- 禁止依赖 `com.cim:cim-system`、`com.cim:cim-business`、`com.cim:cim-*-starter`（`searchTransitive=true`，传递引入同样拦截）。
+- `cim-core` 另有一条 `enforce-core-purity`：禁 `org.springframework:*`、`org.springframework.*:*` 与所有 `com.cim:*`。
+- 三处显式豁免：`cim-bootstrap`（装配层必须依赖全部）、`cim-system`（业务域可向下依赖基础设施 starter）、`cim-i18n-starter`（上述唯一例外）。
+- 注意：**不要给 `bannedDependencies` 配 `includes` 白名单**——includes 为白名单语义，写错一个通配就会让整条规则静默空转（实测 `com.cim:*` 会导致所有 `com.cim` 依赖被跳过）。只写 `excludes` 即可，外部技术栈不匹配排除项自然通过。
+
+> **业务域不在平台 reactor 内孵化**：原 `cim-business` 占位模块已删除。真实业务域（`approval-ap`、`rms-ap`、`iam-ap` …）都是 `business/` 下的**独立 Maven 工程**，从本地仓/私仓引用 `com.cim:*` 平台构件，本来就不在 `platform/server` 的模块列表里。留一个空占位只会让 reactor 每次多跑一个模块、让依赖表多一行需要解释的条目。
+>
+> `cim-gen-starter` **保留为空壳占位**：它依赖的上游（历史/审计/命名策略）仍在演进，此时写实现随后续调整就要重写；待上游稳定后按 §2.9 落地。
 
 > `cim-core` 的「零 Spring」允许 `jakarta.persistence` 规范注解（`@MappedSuperclass` / `@Id`，见 [README §9](README.md#9-通用数据模型审计基类--分级历史参考成熟实践并优化)）；JPA **实现**（EMF/Repository 实现/Flyway）一律在 `cim-jpa-starter`。这是对 README §1「零 Spring」与 §2「不 import JPA 注解」的调和：**规范注解可入 core，实现与容器依赖不入 core**。
 
@@ -208,7 +219,7 @@ com.cim.spring.support
 ```
 com.cim.jpa
 ├── config
-│   ├── CimJpaProperties           # cim.jpa.*（id / history / naming / datasources / flyway）
+│   ├── CimJpaProperties           # cim.jpa.*（id / history / naming / datasources / sql-log）
 │   ├── JpaAutoConfiguration       # 自动装配入口（主键/回调/命名/DbCapability/租户启用器）
 │   ├── CimMultiDataSourceAutoConfiguration  # 【T1.1 ✅】每库独立 EMF+TxManager+Hikari（动态注册）
 │   ├── CimFlywayAutoConfiguration # 【T1.5 ✅】按库型选 db/migration/{vendor}
@@ -234,6 +245,10 @@ com.cim.jpa
 │   ├── BeanProperties             # 反射读写 id / historyId
 │   ├── BaseRepository<T,ID>       # JpaRepository + SpecificationExecutor
 │   └── AbstractJpaService<T>      # 实现 CrudService，写操作触发历史（主键固定 String）
+├── sqllog
+│   ├── SqlLogFormatter            # 占位符→实参，渲染可直接执行的单行 SQL
+│   ├── SqlLoggingDataSource       # DataSource 代理（Connection/PreparedStatement 动态代理）
+│   └── SqlLoggingDataSourcePostProcessor  # 包裹全部 DataSource Bean（含多库）
 └── history
     ├── OpType                     # I / U / D
     ├── ChangeDetector             # 字段级 diff（include 白名单 / exclude 黑名单）
@@ -250,8 +265,20 @@ com.cim.jpa
 - **租户（T2.6 落地）**：基于 `TenantContext` 开启 Hibernate Filter 自动追加 `tenant_id` 条件，业务零感知。落地为 `TenantFilterApplier`（框架 Bean），由 `AbstractJpaService` 在每个读写方法入口按 `TenantContext.get()` 启用名为 `cimTenantFilter` 的过滤器并注入参数；上下文为空（超管跨租户）时不启用（风险 R6）。**约定（ADR-12，勿违反）**：`@FilterDef(name="cimTenantFilter", parameters=@ParamDef(name="tenantId", type=String.class))` 的<b>唯一声明点</b>是 **`cim-system` 的 `com.cim.system.package-info`**（平台必备的系统域模块，且已由 `CimSystemConfiguration` 声明 `@EntityScan("com.cim.system")`）；**其他任何模块/starter/业务 ap 都不得再声明**，各租户化实体仅标注 `@Filter(name="cimTenantFilter", condition="tenant_id = :tenantId")`。原因：Hibernate 要求 `@FilterDef` 名<b>在每个持久化单元内唯一</b>，同名重复声明自 6.2 起为**硬错误**（`AnnotationException: Multiple '@FilterDef' annotations define a filter named '…'`，HHH-16581 / HHH-16803，无开关可关）——「同名同参即幂等」是 6.1 及更早的旧行为，**已不成立**。注：Hibernate **不解析元注解**，故 `@FilterDef`/`@Filter`/`@SQLRestriction` 须直接标注（不能封装成 `@CimTenantFilter` 之类的元注解）。
 - **软删唯一约束（T2.5 落地）**：逻辑删除以 `deleted` 布尔列表示；**唯一约束须含 `deleted` 列**（如 `(biz_key, tenant_id, deleted)`），使「一删一活可并存」（同键仅允许一条有效 + 一条已删）。查询侧以 `@SQLRestriction("deleted = false")` 直接标注实体（同上，不可用元注解），使逻辑删除行对业务查询不可见；`AbstractJpaService.remove` 置 `deleted=true` 完成软删。
 - **三层版本语义（T2.7 落地）**：① `@Version`（行级乐观锁，Hibernate 自动 +1，不进历史，落在 `BaseDefData`/`BaseStateData`）；② `revision`（业务版本，由发布/归档等业务动作驱动，落在 `BaseRevisionData`）；③ 历史表（`{X}Hist`/`{X}StateLog`，独立变更流水）。三者相互独立、各自演进，已由 H2 用例验证。
-- **迁移（T1.5 落地）**：`db/migration/{mysql,oracle,postgresql,dm,h2}` + `common` 多目录（达梦 DM 见 `dm/` 目录，与 Oracle 兼容可复用其脚本）；`CimFlywayAutoConfiguration` 在 `cim.jpa.flyway.enabled=true` 时按当前库产品名选择 `common` + `{vendor}` 目录；生产配合 `ddl-auto=validate`、**主/历 DDL 成对**（见 §6.2）。
+- **迁移（T1.5 落地）**：`db/migration/{mysql,oracle,postgresql,dm,h2}` + `common` 多目录（达梦 DM 见 `dm/` 目录，与 Oracle 兼容可复用其脚本）；`CimFlywayAutoConfiguration` 在 `spring.flyway.enabled=true`（含缺省）且用户未显式配置 `spring.flyway.locations` 时，按当前库产品名选择 `common` + `{vendor}` 目录；生产配合 `ddl-auto=validate`、**主/历 DDL 成对**（见 §6.2）。
   - **域模块自带迁移**（`cim-system` 起）：模块把 DDL 发布在 `classpath:db/migration/system/{vendor}`，并由模块自己的 `FlywayConfigurationCustomizer`**追加**到 locations。追加语义依赖 cim-jpa 侧 customizer 声明 `@Order(HIGHEST_PRECEDENCE)`（它整体改写 locations，必须最先执行）。模块 DDL 由实体元数据导出（见 `db/migration/system/README.md`），不手写。
+- **可执行 SQL 调试日志（`cim.jpa.sql-log.*`）**：Hibernate 的 `show-sql` 只给带 `?` 的模板，排障时还要人工对参数。本 starter 的做法是把**所有 `DataSource`**（Boot 主库 + `cim.jpa.datasources.*` 生成的额外库）经 `BeanPostProcessor` 包成 `SqlLoggingDataSource`：`PreparedStatement`/`CallableStatement` 在 `setXxx` 时记录参数、`execute*` 返回后按「耗时 + 已内联参数的单行 SQL」输出，例如
+  `[SQL] 4.3ms | select ed1_0.id,... from equipment_def ed1_0 where ed1_0.id='378081333387333632' and (ed1_0.deleted = false)` —— **可直接粘贴到数据库客户端执行**。
+  - **两级开关（装不装 / 打不打）**：`cim.jpa.sql-log.enabled`（默认 `true`）决定**是否安装代理**，这是「能动态打开」的前提；**是否真的输出**由 logger 级别在每次取连接时实时判定（`DEBUG`/`TRACE` 才建代理，否则直接返回真实连接）。因此：默认 INFO 下静默且几乎零开销（每连接一次级别判断），切成 DEBUG 立即输出，**全程无需重启**；`enabled: false` 才是「完全不装、也不可开启」的终极省开销选项。
+  - **运行时开关（HTTP）**：设 `cim.jpa.sql-log.admin-enabled: true` 后暴露 `GET/POST /sys/sql-log`（`SqlLogAdminController`，返回平台统一 `Result`）：
+    - `GET /sys/sql-log` → `{logger, level, active, maxSqlLength, dataSources:{dataSource:"WRAPPED"}}`
+    - `POST /sys/sql-log?enabled=true|false` 或 `POST /sys/sql-log {"enabled":true}` → 切 DEBUG / INFO
+    - `POST /sys/sql-log?level=TRACE` → 精确指定级别
+    - 实现走 Spring Boot `LoggingSystem`（logback/log4j2 通用），故也等价于 actuator `POST /actuator/loggers/cim.jpa.sql`（若宿主暴露 `loggers` 端点）。
+    - ⚠️ 安全：该端点会改进程日志级别并使**参数值进入日志**，默认 `admin-enabled: false`；仅调试环境开启，生产须保持关闭或由宿主安全链收紧 `/sys/sql-log`（改动以 WARN 落审计）。
+  - **渲染规则**：只替换字符串字面量/注释之外的 `?`（`like '%?%'` 不受影响）；字符串与时间加引号并转义单引号，数字/布尔原样，`null`→`NULL`，`byte[]`→`X'..'`，流/LOB→`'<stream>'`；空白与注释折叠为单行；单参数超 512 字符、单条超 `max-sql-length`（默认 4000）截断并加 `<truncated>` 标记。
+  - **不破坏生态**：继承 `DelegatingDataSource`，Boot 健康检查/连接池指标仍能 `unwrap` 到 `HikariDataSource`；`close()` 透传给真实连接池，Bean 销毁阶段正常关池。
+  - **已知边界**：输出仅供排障——超长文本参数、`<stream>`/`<bytes>` 标记不保证与原值等价；`java.time.Instant`/`OffsetDateTime` 按 ISO-8601 文本渲染（H2/PG 可直接执行，Oracle/MySQL 视版本可能需 `TO_TIMESTAMP`/`STR_TO_DATE`）；Oracle 无布尔字面量，需自行改 `1/0`。级别切换对**已借出**的连接在下一次取连接后生效（连接池按事务借还，实际为「下一个事务」）。生产环境勿开。
 - 依赖：Spring Data JPA、Hibernate、Flyway、`cim-spring-support`、`cim-core`。
 
 ### 2.4 cim-auth-starter（认证与鉴权 · 资源服务器侧）
@@ -537,9 +564,13 @@ com.cim.system
 > 准入与统一登录在 `business/iam-ap`；本 ap 侧只做「验签 + 准入 claim 判定 + 业务鉴权」，
 > 详见本文档 §8「IAM 对接边界」与 [README §5 安全认证](README.md#5-安全认证jwt--spring-security)。
 
-### 2.11 cim-business（业务域占位）
+### 2.11 业务域模块（不在平台 reactor 内）
 
-按业务域孵化，每个域自包含 `controller→service→repository→entity`（[README §1](README.md#1-maven-多模块)）。当前仅占位标记类；业务实现落在各 `business/{ap}` 工程。
+平台 reactor **只含基础设施与 `cim-system`**。业务实现一律落在仓库顶层 `business/{ap}` 下的**独立 Maven 工程**（`approval-ap` / `rms-ap` / `iam-ap` …），各自独立 `pom.xml`，通过本地仓或私仓引用 `com.cim:*` 平台构件。
+
+这样划分的理由：平台代码应当稳定、变更频率低；业务代码迭代快。绑在同一个 reactor 里会让「改一行业务」触发整条平台链路的构建与测试，也让平台版本被业务发布节奏拖累。
+
+> 原 `cim-business` 占位模块已删除——它从未承载过真实业务，真实业务域始终是独立工程；空占位只会增加 reactor 与文档的维护成本。
 
 ### 2.12 cim-bootstrap（启动装配）
 
@@ -648,6 +679,48 @@ public interface TenantPort { String tenantId(); }
 | `cim.obs`   | 可观测       | `enabled=true`               |
 | `cim.gen`   | 代码生成      | `provided`，运行时不存在            |
 
+### 5.1 配置键约定（Spring 优先）
+
+**铁律：同一个概念只允许一套键，且优先用 Spring Boot 标准键。** 平台只在「Spring 没有对应概念」时才自定义 `cim.*` 前缀，避免出现「两套开关必须同时为真才生效」「用户配了标准键却被框架悄悄覆盖」这类隐蔽故障。
+
+1. **能映射到 Spring 标准键的，一律复用**，不再提供 `cim.*` 同名开关（历史键已删除）：
+
+   | 概念 | 唯一正确的键 | 已删除的平台键 |
+   | --- | --- | --- |
+   | 是否跑迁移 | `spring.flyway.enabled` | ~~`cim.jpa.flyway.enabled`~~ |
+   | 迁移目录 | `spring.flyway.locations` | ~~`cim.jpa.flyway.locations`~~ |
+   | 空库基线 | `spring.flyway.baseline-on-migrate` | ~~`cim.jpa.flyway.baseline-on-migrate`~~ |
+   | 物理命名策略 | `spring.jpa.hibernate.naming.physical-strategy` | ~~`cim.jpa.naming.lowercase-snake`~~ |
+   | 指标公共标签 | `management.metrics.tags.*` | ~~`cim.obs.metrics.common-tags.*`~~ |
+   | 链路追踪开关 | `management.tracing.enabled` | ~~`cim.obs.trace.enabled`~~ |
+
+2. **让位而非覆盖**：框架只在用户**未显式配置**标准键时补默认值（Flyway locations、物理命名策略均按此实现）。用户一旦写了标准键，框架静默退让并打日志，绝不覆盖。
+
+3. **时间一律 `Duration`**：字段类型用 `java.time.Duration`，值写 `30s` / `5m` / `24h` / `1d`；不再用 `xxx-seconds` / `xxx-ms` / `xxx-minutes` 这类「数字 + 单位塞进键名」的形式。裸数字仍可解析（`@DurationUnit` 兜底）。已完成的改名：
+
+   | 旧键 | 新键 |
+   | --- | --- |
+   | `cim.notify.heartbeat-seconds` | `cim.notify.heartbeat`（`25s`） |
+   | `cim.notify.timeout-seconds` | `cim.notify.timeout`（`5m`） |
+   | `cim.auth.jwks-cache-minutes` | `cim.auth.jwks-cache-ttl`（`60m`） |
+   | `cim.auth.token-version.cache-minutes` | `cim.auth.token-version.cache-ttl` |
+   | `cim.auth.token-blacklist.cache-minutes` | `cim.auth.token-blacklist.cache-ttl` |
+   | `cim.mq.idempotent.ttl-sec` | `cim.mq.idempotent.ttl`（`24h`） |
+   | `cim.mq.outbox.interval-ms` | `cim.mq.outbox.interval`（`1s`） |
+   | `cim.mq.resilience.retry-initial-backoff-ms` | `cim.mq.resilience.retry-initial-backoff` |
+   | `cim.mq.resilience.retry-max-backoff-ms` | `cim.mq.resilience.retry-max-backoff` |
+   | `cim.mq.resilience.cb-cooldown-ms` | `cim.mq.resilience.cb-cooldown` |
+   | `approval.task.timeout-minutes`（小数分钟） | `approval.task.timeout`（`24h`） |
+   | `approval.task.renotify-hours` | `approval.task.renotify`（`4h`） |
+   | `approval.task.scan-interval-ms` / `scan-initial-delay-ms` | `approval.task.scan-interval` / `scan-initial-delay`（**ISO-8601**，见 4） |
+   | `cim.iam.directory.ad.sync-interval-ms` | `cim.iam.directory.ad.sync-interval`（**ISO-8601**，见 4） |
+
+4. **⚠️ `@Scheduled` 是唯一例外**：其 `*DelayString` 只接受**纯数字毫秒**或 **ISO-8601**（`PT5M`），不认 Spring Boot 配置里的 `5m`。故注解里写 `PT5M`/`PT60S`，并在代码注释中标注原因——不要为了「看起来统一」写成 `5m`，那会在启动时直接抛 `NumberFormatException`。
+
+5. **自定义前缀只留给系统独有概念**：`cim.auth.admission`、`cim.notify`、`cim.system`、`cim.tenant`、`cim.i18n`、`cim.mq`（其 `kafka`/`rabbit`/`pulsar` 连接项形态已对齐 `spring.kafka.*`/`spring.rabbitmq.*`）、各 ap 的 `iam.*`/`rms.*`/`approval.*`。
+
+6. **配置元数据必须产出**：父 POM 已为所有模块接入 `spring-boot-configuration-processor`，每个 starter 的 jar 内含 `META-INF/spring-configuration-metadata.json`。新增/改名配置项后，IDE 应能补全并校验；**若元数据里查不到某个键，说明该键没被 `@ConfigurationProperties` 承载**，需要检查是否漏改。
+
 ---
 
 ## 6. 数据模型与迁移规范
@@ -746,7 +819,7 @@ public interface TenantPort { String tenantId(); }
 
 - IAM 在固定路径发布：`{iam-base-url}/.well-known/jwks.json`（遵循 RFC 7517/8414 风格）。
 - 消费方通过 `cim.auth.jwks-uri` 配置指向该地址（配置键定义见 `CimAuthProperties` javadoc 与 `cim-bootstrap/application.yml.example`）。
-- 公钥按 `kid` 缓存，`cim.auth.jwks-cache-minutes`（默认 60）到期重新拉取以支持轮换。
+- 公钥按 `kid` 缓存，`cim.auth.jwks-cache-ttl`（默认 `60m`）到期重新拉取以支持轮换。
 
 **(e) ap 接入码（app-code）约定**
 
@@ -778,7 +851,7 @@ public interface TenantPort { String tenantId(); }
 - **存储/拉黑端**（`business/iam-ap`）：`BlacklistedToken`（`token_blacklist` 表，`jti` 唯一）+ `TokenBlacklistService.revoke/isRevoked` + `TokenBlacklistController.GET /api/v1/internal/token-blacklist?jti=` 返回 `true/false`。`LoginService.logout` 解析当前访问令牌 `jti+uid` → 拉黑该 `jti` + bump 用户版本（兜底）+ 撤销刷新令牌，实现「登出即杀当前会话、并兜底杀其余存量令牌」。
 - **与版本机制的关系**：两者互补。黑名单精细（单条令牌），版本粗放（用户级全量）。登出通常同时做「拉黑当前 `jti` + bump 用户版本」。
 - **⚠️ 装配顺序约束（2026-10-08 修复）**：`SecurityAutoConfiguration` 中 `iamTokenBlacklistChecker` / `iamTokenVersionChecker`（具体实现，按属性 `cim.auth.token-*.iam-base-url` 启用）必须**声明在**默认 `acceptAll` Bean **之前**，且默认 Bean 仅用 `@ConditionalOnMissingBean` 兜底（不再叠加 `@ConditionalOnProperty(havingValue="", matchIfMissing=true)`）。原因：原默认 Bean 的 `@ConditionalOnProperty(havingValue="", matchIfMissing=true)` 在「属性已配置且为 truthy 值（真实 URL）」时同样成立，会与具体 Bean 同时命中；靠「具体 Bean 先注册 + 默认 Bean 的 `@ConditionalOnMissingBean` 兜底」才能保证「有 IAM 实现则用之、否则放行」。该缺陷曾导致「配了 IAM 黑名单/版本端点却仍走 acceptAll」的隐蔽 bug（端到端测试 `SessionIntegrationTest` 暴露）。
-- **⚠️ 缓存 TTL 交互**：`IamTokenBlacklistChecker` 对 `jti` 查询结果做本地 TTL 缓存（默认 5 分钟）。若某令牌在「被拉黑前的瞬间」曾通过校验并被缓存为「未吊销」，则在 TTL 内仍会被判为可接受；这是 fail-open 缓存的固有窗口，生产环境按安全需要调小 `cim.auth.token-blacklist.cache-minutes`（如数秒级）。登出请求本身会先以「未吊销」状态校验当前令牌、再执行拉黑，故此窗口对「登出即时失效」影响有限（版本 bump 仍兜底）。
+- **⚠️ 缓存 TTL 交互**：`IamTokenBlacklistChecker` 对 `jti` 查询结果做本地 TTL 缓存（默认 5 分钟）。若某令牌在「被拉黑前的瞬间」曾通过校验并被缓存为「未吊销」，则在 TTL 内仍会被判为可接受；这是 fail-open 缓存的固有窗口，生产环境按安全需要调小 `cim.auth.token-blacklist.cache-ttl`（如 `10s`）。登出请求本身会先以「未吊销」状态校验当前令牌、再执行拉黑，故此窗口对「登出即时失效」影响有限（版本 bump 仍兜底）。
 - **落地状态（2026-10-08）**：存储/拉黑 + 下发已落 `business/iam-ap/server` 的 `token` 包；验证端 `IamTokenBlacklistChecker` 已就绪并修正装配顺序；端到端由 `iam-ap` 的 `SessionIntegrationTest` 验证（真实端口启动 IAM，验证侧 `jwks-uri` 与 `token-blacklist.iam-base-url` 指向 IAM 自身，跑通「登录 → 刷新轮转 → 登出拉黑 → 验证侧 401 拒绝」全链路）。
 
 **(i) 登录失败锁定（暴力破解防护）的落点**
