@@ -3,6 +3,10 @@ package com.cim.auth.config;
 import com.cim.auth.admission.AdmissionProperties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.convert.DurationUnit;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 /**
  * cim-auth-starter 配置键（前缀 {@code cim.auth.*}）。
@@ -19,8 +23,9 @@ public class CimAuthProperties {
     /** IAM 发布的 JWKS 地址（含 RS256 公钥，按 kid 轮换）。 */
     private String jwksUri;
 
-    /** JWKS 公钥缓存时长（分钟），到期重新拉取以支持密钥轮换。 */
-    private long jwksCacheMinutes = 60;
+    /** JWKS 公钥缓存时长（默认 60m），到期重新拉取以支持密钥轮换。 */
+    @DurationUnit(ChronoUnit.MINUTES)
+    private Duration jwksCacheTtl = Duration.ofMinutes(60);
 
     /** 准入配置（本 ap 的接入码等）。 */
     private AdmissionProperties admission = new AdmissionProperties();
@@ -50,12 +55,12 @@ public class CimAuthProperties {
         this.jwksUri = jwksUri;
     }
 
-    public long getJwksCacheMinutes() {
-        return jwksCacheMinutes;
+    public Duration getJwksCacheTtl() {
+        return jwksCacheTtl;
     }
 
-    public void setJwksCacheMinutes(long jwksCacheMinutes) {
-        this.jwksCacheMinutes = jwksCacheMinutes;
+    public void setJwksCacheTtl(Duration jwksCacheTtl) {
+        this.jwksCacheTtl = jwksCacheTtl;
     }
 
     public AdmissionProperties getAdmission() {
@@ -103,8 +108,9 @@ public class CimAuthProperties {
         /** IAM 版本查询端点路径（默认 {@code /api/v1/internal/token-version}）。 */
         private String endpoint = "/api/v1/internal/token-version";
 
-        /** 本地版本缓存时长（分钟），到期重拉；默认 5。 */
-        private long cacheMinutes = 5;
+        /** 本地版本缓存时长（默认 5m），到期重拉。 */
+        @DurationUnit(ChronoUnit.MINUTES)
+        private Duration cacheTtl = Duration.ofMinutes(5);
 
         public String getIamBaseUrl() {
             return iamBaseUrl;
@@ -122,12 +128,12 @@ public class CimAuthProperties {
             this.endpoint = endpoint;
         }
 
-        public long getCacheMinutes() {
-            return cacheMinutes;
+        public Duration getCacheTtl() {
+            return cacheTtl;
         }
 
-        public void setCacheMinutes(long cacheMinutes) {
-            this.cacheMinutes = cacheMinutes;
+        public void setCacheTtl(Duration cacheTtl) {
+            this.cacheTtl = cacheTtl;
         }
     }
 
@@ -144,8 +150,9 @@ public class CimAuthProperties {
         /** IAM 黑名单查询端点路径（默认 {@code /api/v1/internal/token-blacklist}）。 */
         private String endpoint = "/api/v1/internal/token-blacklist";
 
-        /** 本地黑名单缓存时长（分钟），到期重拉；默认 5。 */
-        private long cacheMinutes = 5;
+        /** 本地黑名单缓存时长（默认 5m），到期重拉。 */
+        @DurationUnit(ChronoUnit.MINUTES)
+        private Duration cacheTtl = Duration.ofMinutes(5);
 
         public String getIamBaseUrl() {
             return iamBaseUrl;
@@ -163,12 +170,12 @@ public class CimAuthProperties {
             this.endpoint = endpoint;
         }
 
-        public long getCacheMinutes() {
-            return cacheMinutes;
+        public Duration getCacheTtl() {
+            return cacheTtl;
         }
 
-        public void setCacheMinutes(long cacheMinutes) {
-            this.cacheMinutes = cacheMinutes;
+        public void setCacheTtl(Duration cacheTtl) {
+            this.cacheTtl = cacheTtl;
         }
     }
 }

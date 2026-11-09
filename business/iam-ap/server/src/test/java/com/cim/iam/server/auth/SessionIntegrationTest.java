@@ -74,7 +74,7 @@ class SessionIntegrationTest {
         r.add("cim.auth.token-blacklist.iam-base-url", () -> "http://localhost:" + PORT);
         // 黑名单缓存置 0：登出请求本身会先以「未吊销」状态缓存当前 jti（校验发生在控制器拉黑之前），
         // 若不禁用缓存，同一次测试中后续「拉黑后拒绝」断言会被陈旧缓存误判为通过。生产环境保留合理 TTL。
-        r.add("cim.auth.token-blacklist.cache-minutes", () -> "0");
+        r.add("cim.auth.token-blacklist.cache-ttl", () -> "0s");
     }
 
     @BeforeEach

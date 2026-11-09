@@ -72,9 +72,9 @@ public class ApprovalProcessService {
     private final ObjectMapper objectMapper;
     private final SecurityGuard securityGuard;
 
-    /** 任务超时阈值（分钟，支持小数）：超出后列表标红并由 {@link OverdueScanner} 推送提醒，默认 24h。 */
-    @Value("${approval.task.timeout-minutes:1440}")
-    private double timeoutMinutes;
+    /** 任务超时阈值（Duration）：超出后列表标红并由 {@link OverdueScanner} 推送提醒，默认 24h。 */
+    @Value("${approval.task.timeout:24h}")
+    private Duration timeout;
 
     /**
      * 全部版本的定义列表（同 key 按 version 降序）。
@@ -586,7 +586,7 @@ public class ApprovalProcessService {
             return null;
         }
         long millis = java.time.Duration.between(createdAt, Instant.now()).toMillis();
-        return millis >= timeoutMinutes * 60_000 ? millis / 60_000.0 : null;
+        return millis >= timeout.toMillis() ? millis / 60_000.0 : null;
     }
 
     /**

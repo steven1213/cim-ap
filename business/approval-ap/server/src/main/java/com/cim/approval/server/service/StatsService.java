@@ -31,9 +31,9 @@ public class StatsService {
     private final TaskService taskService;
     private final ApprovalAuditRepository auditRepository;
 
-    /** 超时阈值（分钟），与 OverdueScanner/列表标红共用同一配置。 */
-    @org.springframework.beans.factory.annotation.Value("${approval.task.timeout-minutes:1440}")
-    private double timeoutMinutes;
+    /** 超时阈值（Duration），与 OverdueScanner/列表标红共用同一配置。 */
+    @org.springframework.beans.factory.annotation.Value("${approval.task.timeout:24h}")
+    private Duration timeout;
 
     public StatsView stats(String tenantId, int days) {
         Instant since = Instant.now().minus(Duration.ofDays(days));
@@ -118,7 +118,7 @@ public class StatsService {
         long todoCount = taskService.createTaskQuery().active().count();
         long overdueCount = taskService.createTaskQuery().active()
                 .taskCreatedBefore(java.util.Date.from(
-                        Instant.now().minus(Duration.ofMinutes((long) (timeoutMinutes * 60)))))
+                        Instant.now().minus(timeout)))
                 .count();
         return new StatsView(todoCount, overdueCount, avgHours, rejectRate, workloads, trend);
     }

@@ -67,7 +67,7 @@
 ### P1 —— 效率与体验（已落地三项 ✅）
 | 项 | 说明 | 状态 |
 |---|---|---|
-| 超时提醒 | 任务停留超阈值（`approval.task.timeout-minutes`，默认 24h）→ `OverdueScanner` 定时扫描推 SSE（TASK_OVERDUE，每任务一次）+ 待办/我发起的列表标红「已超时 N」 | ✅ |
+| 超时提醒 | 任务停留超阈值（`approval.task.timeout`，默认 24h）→ `OverdueScanner` 定时扫描推 SSE（TASK_OVERDUE，每任务一次）+ 待办/我发起的列表标红「已超时 N」 | ✅ |
 | 待办筛选/搜索 | 待办/已办/我发起的右上角关键字过滤（标题/业务单号/节点名），客户端过滤 | ✅ |
 | 草稿箱 | 发起表单自动暂存 localStorage（含业务表单行），重开自动恢复 + 可放弃；提交后清除 | ✅ |
 | 统计报表 | 审批效率分析：平均处理时长、驳回率、各定义/审批人工作量 TOP、近 30 天趋势；工作台增强或独立页 | ❌ |
@@ -95,11 +95,11 @@
 
 ### P1（效率与体验）
 - **后端**：`TaskView/ProcessInstanceView` 增加 `overdueMinutes`（Double 小数分钟）；
-  `OverdueScanner`（`@Scheduled`，阈值 `approval.task.timeout-minutes` 支持小数、间隔/首扫可配）超时任务向办理人/候选人推一次 `TASK_OVERDUE` SSE（内存去重）。
+  `OverdueScanner`（`@Scheduled`，阈值 `approval.task.timeout`（Duration）、间隔/首扫可配）超时任务向办理人/候选人推一次 `TASK_OVERDUE` SSE（内存去重）。
 - **前端**：待办/我发起的超时红色标签（`fmtOverdue` 人性化 min/h/d）；三列表关键字过滤（`search-inline`）；
   发起弹窗草稿自动暂存/恢复/放弃（`approval.draft.v1`）；铃铛识别 TASK_OVERDUE。
 - **回归脚本**：`web/scripts/verify-p1.mjs`（10 项：API overdueMinutes + UI 标红/过滤/草稿恢复）。
-  ⚠️ 脚本依赖短阈值启动：`--approval.task.timeout-minutes=0.05 --approval.task.scan-interval-ms=5000 --approval.task.scan-initial-delay-ms=3000`。
+  ⚠️ 脚本依赖短阈值启动：`--approval.task.timeout=PT3S --approval.task.scan-interval=PT5S --approval.task.scan-initial-delay=PT3S`。
 
 ## 5. 决策记录
 

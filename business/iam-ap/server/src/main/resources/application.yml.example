@@ -39,7 +39,7 @@ cim:
     # IAM 自身是签发方：验证自己的令牌优先走 in-JVM 公钥（IamJwksKeyProvider），
     # 此 URI 仅作为回退/对外发布地址。
     jwks-uri: http://localhost:8081/.well-known/jwks.json
-    jwks-cache-minutes: 60
+    jwks-cache-ttl: 60m
     # IAM 不对「自己」做准入（它是签发方），app-code 留空即放行
     admission:
       app-code: ""
@@ -48,16 +48,14 @@ cim:
   # 持久化（cim-jpa-starter）
   jpa:
     id:
-      mode: SNOWFLAKE             # SNOWFLAKE | UUIDV7
-      worker-id: 1                # 生产由部署平台下发，保证同数据中心唯一（后端 §3.1）
-      datacenter-id: 1
+      mode: SNOWFLAKE                    # SNOWFLAKE | UUIDV7
+      # 机器号/机房号由部署环境下发（容器随机调度时硬编码必然冲突，见后端 §3.1）：
+      # 优先级 环境变量 > 此处默认值；合法区间 0-31（各 5 bit）。
+      worker-id: ${CIM_WORKER_ID:1}           # 同数据中心内必须唯一
+      datacenter-id: ${CIM_DATACENTER_ID:1}   # 机房/数据中心编号
     history:
       enabled: true
       write-mode: IN_TRANSACTION  # IN_TRANSACTION | OUTBOX
-    naming:
-      lowercase-snake: true
-    flyway:
-      enabled: true
 
   # 系统域（cim-system 域模块）——IAM 控制台自身的菜单/按钮权限/角色（本 ap 内部权限）。
   system:
@@ -164,7 +162,7 @@ cim:
         bind-dn: CN=iam-sync,OU=Service,DC=corp,DC=example,DC=com
         bind-password: ${IAM_AD_BIND_PASSWORD}
         base-dn: DC=corp,DC=example,DC=com
-        sync-interval-ms: 300000
+        sync-interval: PT5M
 
 management:
   endpoints:

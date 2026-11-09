@@ -13,6 +13,7 @@ import com.cim.mq.idempotent.IdempotencyStore;
 import com.cim.mq.outbox.OutboxStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *  1) 不丢：下单 → outbox → 中继 → 真实 Pulsar → 消费者，且 outbox 投递后被清。
  *  2) 不重：同一 eventId 被 broker 重复投递时，业务方法仅执行一次。</p>
  */
+@EnabledIf("com.cim.mq.BrokerProbe#pulsar")
 @SpringBootTest(classes = PulsarMqIntegrationTest.TestApp.class, properties = {
         "cim.mq.enabled=true",
         "cim.mq.type=pulsar",
@@ -37,11 +39,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "cim.mq.pulsar.enable-batching=false",
         "cim.mq.outbox.enabled=true",
         "cim.mq.outbox.relay-enabled=true",
-        "cim.mq.outbox.interval-ms=500",
+        "cim.mq.outbox.interval=500ms",
         "cim.mq.outbox.init-schema=true",
         "cim.mq.outbox.table=sys_outbox",
         "cim.mq.idempotent.store=memory",
-        "cim.mq.idempotent.ttl-sec=86400",
+        "cim.mq.idempotent.ttl=86400s",
         "spring.datasource.url=jdbc:h2:mem:cimpulsar;DB_CLOSE_DELAY=-1;MODE=MySQL",
         "spring.datasource.driver-class-name=org.h2.Driver",
         "spring.datasource.username=sa",

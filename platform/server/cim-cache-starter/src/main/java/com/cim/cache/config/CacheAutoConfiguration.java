@@ -68,7 +68,7 @@ public class CacheAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public LocalCaffeineCache localCaffeineCache() {
-        return new LocalCaffeineCache(props.getCaffeine().getMaxSize(), props.getCaffeine().getTtl());
+        return new LocalCaffeineCache(props.getCaffeine().getMaxSize(), props.getCaffeine().getTtl().toSeconds());
     }
 
     /** L2 RedisTemplate：键用 String，值用 GenericJackson（带类型信息，跨语言可读）。 */
@@ -130,9 +130,9 @@ public class CacheAutoConfiguration {
                                           ObjectProvider<BloomFilterGuard> bloomGuardProvider) {
         RedisCache l2 = l2Provider.getIfAvailable();
         NullValueGuard nullGuard = new NullValueGuard(
-                props.getNullValue().isEnabled(), props.getNullValue().getTtl());
+                props.getNullValue().isEnabled(), props.getNullValue().getTtl().toSeconds());
         TtlJitter jitter = new TtlJitter(
-                props.getTtlJitter().getPercent(), props.getTtlJitter().getMaxJitter());
+                props.getTtlJitter().getPercent(), props.getTtlJitter().getMaxJitter().toSeconds());
         MutexRebuild mutex = new MutexRebuild(lockProvider, 30);
         ObjectMapper om = objectMapperProvider.getIfAvailable();
         if (om == null) {
@@ -141,7 +141,8 @@ public class CacheAutoConfiguration {
         om.registerModule(new JavaTimeModule());
         BloomFilterGuard bloomGuard = bloomGuardProvider.getIfAvailable();
         return new MultiLevelCache(l1, l2, nullGuard, jitter, mutex,
-                props.getCaffeine().getTtl(), props.getRedis().getDefaultTtl(), om, bloomGuard);
+                props.getCaffeine().getTtl().toSeconds(), props.getRedis().getDefaultTtl().toSeconds(),
+                om, bloomGuard);
     }
 
     /** 跨节点失效用的 String 序列化模板（pub/sub 通道，JSON 明文便于跨语言）。 */

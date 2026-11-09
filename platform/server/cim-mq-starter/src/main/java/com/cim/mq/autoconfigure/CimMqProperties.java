@@ -1,15 +1,22 @@
 package com.cim.mq.autoconfigure;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.convert.DurationUnit;
 
 /**
  * cim-mq 配置（{@code cim.mq.*}）。
  *
  * <p>公共项（enabled/type/defaultTopic/consumer/idempotent/resilience/outbox）由框架统一消费；
- * 各 provider 专属项（kafka/pulsar/rabbit）仅对应 provider 读取。</p>
+ * 各 provider 专属项（kafka/pulsar/rabbit）仅对应 provider 读取，键形与 Spring 同名概念对齐
+ * （{@code bootstrap-servers} / {@code addresses} / {@code service-url} / {@code virtual-host}）。</p>
+ *
+ * <p>时间类配置统一用 {@link Duration}（{@code 24h} / {@code 500ms}），并用 {@link DurationUnit}
+ * 保持裸数字的旧语义（秒级项按秒、毫秒级项按毫秒）。</p>
  */
 @ConfigurationProperties(prefix = "cim.mq")
 public class CimMqProperties {
@@ -57,8 +64,9 @@ public class CimMqProperties {
 
     public static class Idempotent {
         private boolean enabled = true;
-        /** 去重键 TTL（秒），过期后可重新处理（自愈）。 */
-        private int ttlSec = 86400;
+        /** 去重键 TTL（默认 24h，{@code 24h}/{@code 86400s} 均可），过期后允许重新处理（自愈）。 */
+        @DurationUnit(ChronoUnit.SECONDS)
+        private Duration ttl = Duration.ofSeconds(86400);
         /** 存储后端：redis | memory（无 Redis 时降级）。 */
         private String store = "redis";
         private String prefix = "mq:idem:";
@@ -71,12 +79,12 @@ public class CimMqProperties {
             this.enabled = v;
         }
 
-        public int getTtlSec() {
-            return ttlSec;
+        public Duration getTtl() {
+            return ttl;
         }
 
-        public void setTtlSec(int v) {
-            this.ttlSec = v;
+        public void setTtl(Duration v) {
+            this.ttl = v;
         }
 
         public String getStore() {
@@ -98,11 +106,17 @@ public class CimMqProperties {
 
     public static class Resilience {
         private int retryMaxAttempts = 5;
-        private long retryInitialBackoffMs = 500;
+        /** 首次退避（默认 500ms）。 */
+        @DurationUnit(ChronoUnit.MILLIS)
+        private Duration retryInitialBackoff = Duration.ofMillis(500);
         private double retryFactor = 2.0;
-        private long retryMaxBackoffMs = 30000;
+        /** 退避上限（默认 30s）。 */
+        @DurationUnit(ChronoUnit.MILLIS)
+        private Duration retryMaxBackoff = Duration.ofMillis(30000);
         private int cbFailureThreshold = 5;
-        private long cbCooldownMs = 30000;
+        /** 熔断冷却时长（默认 30s）。 */
+        @DurationUnit(ChronoUnit.MILLIS)
+        private Duration cbCooldown = Duration.ofMillis(30000);
 
         public int getRetryMaxAttempts() {
             return retryMaxAttempts;
@@ -112,12 +126,12 @@ public class CimMqProperties {
             this.retryMaxAttempts = v;
         }
 
-        public long getRetryInitialBackoffMs() {
-            return retryInitialBackoffMs;
+        public Duration getRetryInitialBackoff() {
+            return retryInitialBackoff;
         }
 
-        public void setRetryInitialBackoffMs(long v) {
-            this.retryInitialBackoffMs = v;
+        public void setRetryInitialBackoff(Duration v) {
+            this.retryInitialBackoff = v;
         }
 
         public double getRetryFactor() {
@@ -128,12 +142,12 @@ public class CimMqProperties {
             this.retryFactor = v;
         }
 
-        public long getRetryMaxBackoffMs() {
-            return retryMaxBackoffMs;
+        public Duration getRetryMaxBackoff() {
+            return retryMaxBackoff;
         }
 
-        public void setRetryMaxBackoffMs(long v) {
-            this.retryMaxBackoffMs = v;
+        public void setRetryMaxBackoff(Duration v) {
+            this.retryMaxBackoff = v;
         }
 
         public int getCbFailureThreshold() {
@@ -144,12 +158,12 @@ public class CimMqProperties {
             this.cbFailureThreshold = v;
         }
 
-        public long getCbCooldownMs() {
-            return cbCooldownMs;
+        public Duration getCbCooldown() {
+            return cbCooldown;
         }
 
-        public void setCbCooldownMs(long v) {
-            this.cbCooldownMs = v;
+        public void setCbCooldown(Duration v) {
+            this.cbCooldown = v;
         }
     }
 
@@ -160,7 +174,9 @@ public class CimMqProperties {
         private boolean relayEnabled = true;
         private String table = "sys_outbox";
         private int batchSize = 100;
-        private long intervalMs = 1000;
+        /** 中继轮询间隔（默认 1s）。 */
+        @DurationUnit(ChronoUnit.MILLIS)
+        private Duration interval = Duration.ofMillis(1000);
         /** 启动时自动建表（CREATE TABLE IF NOT EXISTS）。 */
         private boolean initSchema = true;
 
@@ -196,14 +212,13 @@ public class CimMqProperties {
             this.batchSize = v;
         }
 
-        public long getIntervalMs() {
-            return intervalMs;
+        public Duration getInterval() {
+            return interval;
         }
 
-        public void setIntervalMs(long v) {
-            this.intervalMs = v;
+        public void setInterval(Duration v) {
+            this.interval = v;
         }
-
         public boolean isInitSchema() {
             return initSchema;
         }

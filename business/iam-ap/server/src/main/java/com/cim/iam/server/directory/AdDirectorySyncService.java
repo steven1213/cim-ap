@@ -72,7 +72,8 @@ public class AdDirectorySyncService {
     }
 
     /** 定时同步：任何异常都不得影响服务运行。 */
-    @Scheduled(fixedDelayString = "${cim.iam.directory.ad.sync-interval-ms:300000}")
+    // 注：@Scheduled 的 *DelayString 只接受「纯数字毫秒」或「ISO-8601 时长」，故用 PT5M。
+    @Scheduled(fixedDelayString = "${cim.iam.directory.ad.sync-interval:PT5M}")
     public void scheduledSync() {
         try {
             SyncResult r = syncNow();

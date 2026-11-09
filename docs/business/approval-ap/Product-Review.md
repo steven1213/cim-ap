@@ -118,7 +118,7 @@
 | 💡 详情内审批 | ✅ DetailModal 内嵌通过/驳回（复用 CompleteModal），发起人内嵌催办/撤回 |
 | 🟡 会签默认选错 500 | ✅ StartModal 按定义类型动态渲染 + BPMN 感知 400 校验 |
 | 🟡 列表无分页/N+1 | ✅ 平台 PageResult（page 1 起）+ 批量实例查询消 N+1 |
-| 🟡 超时提醒策略 | ✅ 每任务周期重推（renotify-hours 可配） |
+| 🟡 超时提醒策略 | ✅ 每任务周期重推（`approval.task.renotify` 可配，默认 4h） |
 | 🟡 formData 无限制 | ✅ 64KB 上限，超限 400 提示走附件 |
 | P2 催办频控 | ✅ 同实例同发起人冷却（cooldown-minutes 可配） |
 | P2 草稿串台 | ✅ 按 processKey 分槽 |

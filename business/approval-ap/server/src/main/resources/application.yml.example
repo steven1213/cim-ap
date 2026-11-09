@@ -29,7 +29,7 @@ cim:
     # 开发态默认关闭，便于无 IAM 联调；生产须置 true 并提供 JWKS 与准入 app-code。
     enabled: false
     jwks-uri: http://localhost:8081/.well-known/jwks.json
-    jwks-cache-minutes: 60
+    jwks-cache-ttl: 60m
     admission:
       app-code: approval-ap
       enabled: true
@@ -37,12 +37,9 @@ cim:
   jpa:
     id:
       mode: SNOWFLAKE
-      worker-id: 1
-      datacenter-id: 1
-    naming:
-      lowercase-snake: true
-    flyway:
-      enabled: false
+      # 机器号/机房号由部署环境下发；合法区间 0-31（各 5 bit）。
+      worker-id: ${CIM_WORKER_ID:1}           # 同数据中心内必须唯一
+      datacenter-id: ${CIM_DATACENTER_ID:1}   # 机房/数据中心编号
 
 # Flowable 引擎（独立服务，H2 dev 下自动建表）
 flowable:
@@ -60,7 +57,7 @@ approval:
   # 任务超时提醒：待办停留超过 timeout-minutes 后列表标红 + SSE 推送（OverdueScanner）
   task:
     timeout-minutes: 1440      # 默认 24h
-    scan-interval-ms: 300000   # 扫描间隔 5min
+    scan-interval: PT5M        # 扫描间隔（@Scheduled 只认 ISO-8601 / 毫秒）
   # 开放 API 安全（G9）：服务间调用 AppKey + HMAC-SHA256 签名（timestamp|method|path|body）+ 防重放窗口
   # + 按 appCode 限流 + IP 白名单。默认关闭；enable 后仅对携带 X-App-Key 的请求生效，JWT 用户态 / dev 放行不受影响。
   api:

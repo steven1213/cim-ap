@@ -78,7 +78,7 @@ public class MqAutoConfiguration {
                 .initialBackoff(Duration.ofMillis(500))
                 .factor(2.0).maxBackoff(Duration.ofSeconds(30)).build();
         DeadLetterPolicy deadLetter = new DeadLetterPolicy(props.getConsumer().getMaxAttempts());
-        Duration idemTtl = Duration.ofSeconds(props.getIdempotent().getTtlSec());
+        Duration idemTtl = props.getIdempotent().getTtl();
 
         return new MqTemplate(provider, ctx, serializer, idempotency, consumerRetry, deadLetter, idemTtl);
     }
@@ -110,11 +110,11 @@ public class MqAutoConfiguration {
         public OutboxRelay mqOutboxRelay(OutboxStore store, MqTemplate template, CimMqProperties props) {
             RetryPolicy relayRetry = RetryPolicy.builder()
                     .maxAttempts(props.getResilience().getRetryMaxAttempts())
-                    .initialBackoff(Duration.ofMillis(props.getResilience().getRetryInitialBackoffMs()))
+                    .initialBackoff(props.getResilience().getRetryInitialBackoff())
                     .factor(props.getResilience().getRetryFactor())
-                    .maxBackoff(Duration.ofMillis(props.getResilience().getRetryMaxBackoffMs())).build();
+                    .maxBackoff(props.getResilience().getRetryMaxBackoff()).build();
             CircuitBreaker cb = new CircuitBreaker(props.getResilience().getCbFailureThreshold(),
-                    Duration.ofMillis(props.getResilience().getCbCooldownMs()));
+                    props.getResilience().getCbCooldown());
             return new OutboxRelay(store, template.producer(), serializerOf(template), relayRetry, cb,
                     props.getOutbox().getBatchSize());
         }
@@ -138,7 +138,7 @@ public class MqAutoConfiguration {
         public java.util.concurrent.ScheduledFuture<?> mqOutboxRelayTask(OutboxRelay relay,
                                                                        TaskScheduler scheduler,
                                                                        CimMqProperties props) {
-            return scheduler.scheduleAtFixedRate(relay, Duration.ofMillis(props.getOutbox().getIntervalMs()));
+            return scheduler.scheduleAtFixedRate(relay, props.getOutbox().getInterval());
         }
     }
 }

@@ -43,18 +43,21 @@ class ObsAutoConfigurationTest {
     }
 
     @Test
-    @DisplayName("公共标签被追加到指标")
-    void appliesCommonTags() {
-        runner.withPropertyValues("cim.obs.metrics.commonTags.app=cim-ap")
+    @DisplayName("指标前缀可由 cim.obs.metrics.prefix 覆盖（公共标签统一走 management.metrics.tags）")
+    void appliesCustomPrefix() {
+        runner.withPropertyValues("cim.obs.metrics.prefix=app.")
                 .run(context -> {
                     MeterRegistry registry = context.getBean(MeterRegistry.class);
-                    MetricsRegistry metrics = context.getBean(MetricsRegistry.class);
-                    // 模拟 actuator 的 MeterRegistryConfigurer：将所有 MeterFilter 套用到注册表
-                    registry.config().meterFilter(context.getBean(MeterFilter.class));
-                    metrics.counter("order.created", "zone", "east").increment();
-                    assertThat(registry.find("cim.order.created").counter())
-                            .satisfies(c -> assertThat(c.getId().getTag("app")).isEqualTo("cim-ap"));
+                    context.getBean(MetricsRegistry.class).counter("order.created").increment();
+                    assertThat(registry.find("app.order.created").counter()).isNotNull();
                 });
+    }
+
+    @Test
+    @DisplayName("本 starter 不再注册 MeterFilter（公共标签由 Boot 的 management.metrics.tags 统一套用）")
+    void doesNotRegisterMeterFilter() {
+        runner.withPropertyValues("management.metrics.tags.app=cim-ap")
+                .run(context -> assertThat(context).doesNotHaveBean(MeterFilter.class));
     }
 
     @Configuration

@@ -21,7 +21,9 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
-    # locations 由 cim.jpa.flyway 自动选择（见下），域模块（cim-system）再追加自己的目录
+    # locations 不写则由平台按库类型自动选择（common + {vendor}），域模块再追加自己的目录；
+    # 一旦在此显式声明，平台让位、以本值为准（Spring 键优先）。
+    # locations: classpath:db/migration/common,classpath:db/migration/mysql
 
 # =============================================================================
 # cim-* 框架配置键（完整定义见各 starter 的 *Properties javadoc；
@@ -38,14 +40,17 @@ cim:
   # 持久化（cim-jpa-starter）
   jpa:
     id:
-      mode: SNOWFLAKE             # SNOWFLAKE | UUIDV7
-      worker-id: 1                # 生产由部署平台下发，保证同数据中心唯一（README §3.1）
-      datacenter-id: 1
+      mode: SNOWFLAKE                    # SNOWFLAKE | UUIDV7
+      # 机器号/机房号由部署环境下发（容器随机调度时硬编码必然冲突，见 README §3.1）：
+      # 优先级 环境变量 > 此处默认值；合法区间 0-31（各 5 bit）。
+      worker-id: ${CIM_WORKER_ID:1}           # 同数据中心内必须唯一
+      datacenter-id: ${CIM_DATACENTER_ID:1}   # 机房/数据中心编号
     history:
       enabled: true
       write-mode: IN_TRANSACTION  # IN_TRANSACTION | OUTBOX
     naming:
-      lowercase-snake: true
+      # 小写蛇形为框架默认（等价 Boot 默认），无开关；换策略用
+      # spring.jpa.hibernate.naming.physical-strategy（框架检测到即让位）
       table-prefix: ""
     # 额外数据源（T1.1）：每个逻辑库一套独立 EMF/TxManager/Hikari；不配置则不启用。
     # datasources:
@@ -56,18 +61,15 @@ cim:
     #     driver-class-name: org.postgresql.Driver
     #     packages-to-scan: com.cim.report.entity
     #     ddl-auto: none
-    # Flyway 多目录迁移（T1.5）：按库类型选 db/migration/common + db/migration/{vendor}
-    flyway:
-      enabled: true
-      # locations: classpath:db/migration/common,classpath:db/migration/mysql  # 显式覆盖
-      baseline-on-migrate: false
+    # Flyway 多目录迁移（T1.5）：全部沿用 Spring Boot 键——spring.flyway.enabled / locations /
+    # baseline-on-migrate（见上方 spring.flyway），框架只补默认 locations，不另立开关。
 
   # 认证（cim-auth-starter；对接 IAM JWKS，契约见 design.md §8.1）
   # 只做验证侧：验签 + 版本失效 + 准入 + 业务鉴权 + 数据权限；登录/签发/吊销在 business/iam-ap。
   auth:
     enabled: true
     jwks-uri: http://iam-ap:8081/.well-known/jwks.json   # IAM 公钥地址（按 kid 轮换）
-    jwks-cache-minutes: 60              # 公钥缓存时长，到期重拉以支持密钥轮换
+    jwks-cache-ttl: 60m                 # 公钥缓存时长，到期重拉以支持密钥轮换
     authorities-claim: authorities      # 业务权限集所在 claim 键
     admission:
       app-code: ""                      # 本 ap 接入码（mds-ap/mes-ap），校验令牌 apps claim
@@ -104,3 +106,10 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+  # 指标公共标签 / 链路开关一律用 Spring 标准键（原 cim.obs.metrics.common-tags.*、cim.obs.trace.enabled 已删除）
+  metrics:
+    tags:
+      app: cim-ap
+      env: dev
+  tracing:
+    enabled: false                # 需要 OTel 链路时改 true，并引入对应 otel 依赖

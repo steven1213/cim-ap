@@ -29,12 +29,12 @@ import java.util.List;
  * {@code CimFlywayAutoConfiguration.cimFlywayLocationsCustomizer}（后者会整体改写 locations，
  * 它已声明 {@code @Order(HIGHEST_PRECEDENCE)}），故此处用更高的 order 值。</p>
  *
- * <p>仅当 {@code cim.jpa.flyway.enabled=true} 且 Flyway 在 classpath 上时生效；
+ * <p>仅当 Spring Boot 的 {@code spring.flyway.enabled} 为真（含缺省）且 Flyway 在 classpath 上时生效；
  * 目录不存在（例如该库型尚无脚本）时静默跳过，避免 Flyway 因无法解析位置而报错。</p>
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(FluentConfiguration.class)
-@ConditionalOnProperty(prefix = "cim.jpa.flyway", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class CimSystemFlywayConfiguration {
 
     /** 模块迁移目录根（classpath 相对路径）。 */

@@ -24,7 +24,7 @@ cim:
     enabled: true
     # IAM 的 JWKS 公钥端点（生产换成 IAM 集群地址）
     jwks-uri: http://iam-ap:8081/.well-known/jwks.json
-    jwks-cache-minutes: 60
+    jwks-cache-ttl: 60m
     admission:
       app-code: rms-ap
       enabled: true
@@ -32,18 +32,23 @@ cim:
   jpa:
     id:
       mode: SNOWFLAKE
-      worker-id: 1          # 多实例部署时每实例唯一（可用环境变量注入）
-      datacenter-id: 1
-    naming:
-      lowercase-snake: true
-    flyway:
-      enabled: true
+      # 机器号/机房号由部署环境下发；合法区间 0-31（各 5 bit）。
+      worker-id: ${CIM_WORKER_ID:1}           # 多实例部署时每实例唯一
+      datacenter-id: ${CIM_DATACENTER_ID:1}   # 机房/数据中心编号
 
   # 业务内部 RBAC（域模块 cim-system）：权限源由「令牌 roles」转「本 ap 库内 sys_* 授权表」。
   # enabled / seed-permissions 默认即 true，此处显式声明以消歧义（见 design.md §2.10）。
   system:
     enabled: true
     seed-permissions: true
+
+  # 实时推送（cim-notify-starter）：app-code 必填，用于 Redis 频道命名空间隔离。
+  # dev 态（cim.auth.enabled=false）允许 ?userId=&tenantId= 直连，便于无 IAM 联调。
+  notify:
+    app-code: rms-ap
+    cluster:
+      enabled: true
+    dev-accept-query-identity: true
 
   rms:
     # 演示数据灌入（H2 开箱即有数据）；生产置 false。测试关认证时自动跳过。
@@ -54,3 +59,18 @@ cim:
     # 生成示例: openssl rand -base64 32
     crypto:
       body-key: ''
+
+# 排障：可执行 SQL 日志（参数已内联，可直接粘贴执行；见 platform/server/design.md §2.3）
+# 方式一：启动即输出
+# logging:
+#   level:
+#     cim.jpa.sql: DEBUG
+# 方式二（推荐）：运行时动态开关，无需重启
+# cim:
+#   jpa:
+#     sql-log:
+#       admin-enabled: true            # 暴露 GET/POST /sys/sql-log
+# 然后：
+#   curl -X POST 'http://localhost:<port>/sys/sql-log?enabled=true'    开启
+#   curl -X POST 'http://localhost:<port>/sys/sql-log?enabled=false'   关闭
+#   curl 'http://localhost:<port>/sys/sql-log'                         查看状态

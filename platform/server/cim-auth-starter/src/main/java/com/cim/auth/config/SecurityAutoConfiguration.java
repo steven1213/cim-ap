@@ -34,8 +34,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import java.time.Duration;
-
 /**
  * cim-auth-starter 自动装配（design.md §2.4 / §5）。
  *
@@ -57,7 +55,7 @@ public class SecurityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public JwksKeyProvider jwksKeyProvider(CimAuthProperties props) {
-        return new JwksKeyProvider(props.getJwksUri(), Duration.ofMinutes(props.getJwksCacheMinutes()));
+        return new JwksKeyProvider(props.getJwksUri(), props.getJwksCacheTtl());
     }
 
     @Bean
@@ -93,7 +91,7 @@ public class SecurityAutoConfiguration {
     public TokenVersionChecker iamTokenVersionChecker(CimAuthProperties props) {
         CimAuthProperties.TokenVersion tv = props.getTokenVersion();
         return new IamTokenVersionChecker(
-                tv.getIamBaseUrl(), tv.getEndpoint(), Duration.ofMinutes(tv.getCacheMinutes()));
+                tv.getIamBaseUrl(), tv.getEndpoint(), tv.getCacheTtl());
     }
 
     /**
@@ -122,7 +120,7 @@ public class SecurityAutoConfiguration {
     public TokenBlacklistChecker iamTokenBlacklistChecker(CimAuthProperties props) {
         CimAuthProperties.TokenBlacklist bl = props.getTokenBlacklist();
         return new IamTokenBlacklistChecker(
-                bl.getIamBaseUrl(), bl.getEndpoint(), Duration.ofMinutes(bl.getCacheMinutes()));
+                bl.getIamBaseUrl(), bl.getEndpoint(), bl.getCacheTtl());
     }
 
     /**

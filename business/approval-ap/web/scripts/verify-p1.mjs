@@ -1,5 +1,5 @@
 // P1 批次 E2E：超时标红（待办/我发起的）+ 列表关键字过滤 + 发起草稿恢复
-// 前置：后端以 --approval.task.timeout-minutes=0.05（3 秒）启动，扫描间隔 5s
+// 前置：后端以 --approval.task.timeout=PT3S（3 秒）启动，扫描间隔 5s
 import { createRequire } from 'node:module';
 const require = createRequire('C:/Users/CL/.workbuddy/binaries/node/workspace/node_modules/playwright-core/package.json');
 const { chromium } = require('playwright-core');

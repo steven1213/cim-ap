@@ -2,13 +2,19 @@ package com.cim.obs.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
  * cim-obs-starter 配置键（前缀 {@code cim.obs.*}，见 design.md §2.8 / T4.4）。
  *
- * <p>指标/日志脱敏/链路三类能力均可通过配置开关独立启停；缺席时优雅降级。</p>
+ * <p>指标/日志脱敏两类能力可通过配置开关独立启停；缺席时优雅降级。</p>
+ *
+ * <p><b>配置边界（与 Spring Boot 对齐）——本类刻意只留 Spring 没有的概念：</b></p>
+ * <ul>
+ *   <li>指标公共标签 → {@code management.metrics.tags.*}（Boot 的 {@code PropertiesMeterFilter} 统一套用，
+ *       本 starter 不再自建 {@code MeterFilter}，避免两套标签互相覆盖）；</li>
+ *   <li>链路开关 → {@code management.tracing.enabled}；</li>
+ *   <li>导出端点/采样率 → {@code management.*} 既有键。</li>
+ * </ul>
+ * <p>故原先的 {@code cim.obs.metrics.common-tags} 与 {@code cim.obs.trace.enabled} 已删除。</p>
  */
 @ConfigurationProperties(prefix = "cim.obs")
 public class CimObsProperties {
@@ -21,9 +27,6 @@ public class CimObsProperties {
 
     /** 日志脱敏。 */
     private LoggingProperties logging = new LoggingProperties();
-
-    /** 链路（OTel，条件激活）。 */
-    private TraceProperties trace = new TraceProperties();
 
     public boolean isEnabled() {
         return enabled;
@@ -49,22 +52,12 @@ public class CimObsProperties {
         this.logging = logging;
     }
 
-    public TraceProperties getTrace() {
-        return trace;
-    }
-
-    public void setTrace(TraceProperties trace) {
-        this.trace = trace;
-    }
-
     /** 指标配置。 */
     public static class MetricsProperties {
         /** 是否启用指标收集。 */
         private boolean enabled = true;
-        /** 指标名前缀（默认 {@code cim.}）。 */
+        /** 指标名前缀（默认 {@code cim.}；Spring/Micrometer 无「全局名前缀」这一概念，故保留）。 */
         private String prefix = "cim.";
-        /** 公共标签（如 app/env），追加到所有指标。 */
-        private Map<String, String> commonTags = new LinkedHashMap<>();
 
         public boolean isEnabled() {
             return enabled;
@@ -81,14 +74,6 @@ public class CimObsProperties {
         public void setPrefix(String prefix) {
             this.prefix = prefix;
         }
-
-        public Map<String, String> getCommonTags() {
-            return commonTags;
-        }
-
-        public void setCommonTags(Map<String, String> commonTags) {
-            this.commonTags = commonTags;
-        }
     }
 
     /** 日志脱敏配置。 */
@@ -102,20 +87,6 @@ public class CimObsProperties {
 
         public void setMaskingEnabled(boolean maskingEnabled) {
             this.maskingEnabled = maskingEnabled;
-        }
-    }
-
-    /** 链路配置。 */
-    public static class TraceProperties {
-        /** 是否启用 OTel 链路桥接（需 micrometer-tracing + otel bridge 在 classpath）。 */
-        private boolean enabled = true;
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
         }
     }
 }

@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(FluentConfiguration.class)
-@ConditionalOnProperty(prefix = "cim.jpa.flyway", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "spring.flyway", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class I18nFlywayConfiguration {
 
     private static final String MODULE_ROOT = "db/migration/i18n/";

@@ -3,12 +3,21 @@ package com.cim.cache.config;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.convert.DurationUnit;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 缓存配置（{@code cim.cache.*}，见 design.md §2.5 / README §11）。
  *
  * <p>总开关 {@link #enabled} 默认开启；Redis 未配置或不可达时自动降级为本地 Caffeine 缓存
  * （{@link #useMultiLevel} 仍按配置，但 L2 实际不可用）。</p>
+ *
+ * <p><b>配置边界（与 Spring Boot 对齐）</b>：Redis 连接参数一律用 {@code spring.data.redis.*}
+ * （本 starter 直接消费 Boot 装配的 {@code RedisConnectionFactory}，不另设连接配置）；
+ * 本类只承载「多级缓存自身的语义」（键前缀、各级 TTL、防穿透/雪崩开关）。
+ * 时间类配置统一用 {@link Duration}（{@code 5m} / {@code 300s}），裸数字按秒解释。</p>
  */
 @Getter
 @Setter
@@ -49,8 +58,9 @@ public class CimCacheProperties {
         private boolean enabled = true;
         /** L2 键前缀（追加在全局前缀之后）。 */
         private String keyPrefix = "cache:";
-        /** L2 默认 TTL（秒）。 */
-        private long defaultTtl = 300;
+        /** L2 默认 TTL（默认 5m）。 */
+        @DurationUnit(ChronoUnit.SECONDS)
+        private Duration defaultTtl = Duration.ofSeconds(300);
     }
 
     @Getter
@@ -58,8 +68,9 @@ public class CimCacheProperties {
     public static class Caffeine {
         /** L1 最大条目数。 */
         private int maxSize = 10000;
-        /** L1 TTL（秒）。0 表示不过期。 */
-        private long ttl = 300;
+        /** L1 TTL（默认 5m）；{@link Duration#ZERO} 表示不过期。 */
+        @DurationUnit(ChronoUnit.SECONDS)
+        private Duration ttl = Duration.ofSeconds(300);
     }
 
     @Getter
@@ -67,8 +78,9 @@ public class CimCacheProperties {
     public static class NullValue {
         /** 是否启用空值占位（防穿透）。 */
         private boolean enabled = true;
-        /** 空值占位 TTL（秒，宜短）。 */
-        private long ttl = 60;
+        /** 空值占位 TTL（默认 1m，宜短）。 */
+        @DurationUnit(ChronoUnit.SECONDS)
+        private Duration ttl = Duration.ofSeconds(60);
     }
 
     @Getter
@@ -76,8 +88,9 @@ public class CimCacheProperties {
     public static class TtlJitter {
         /** 抖动比例（0.1 = ±10%）。 */
         private double percent = 0.1;
-        /** 抖动上限（秒），避免长 TTL 抖动过大。 */
-        private long maxJitter = 60;
+        /** 抖动上限（默认 1m），避免长 TTL 抖动过大。 */
+        @DurationUnit(ChronoUnit.SECONDS)
+        private Duration maxJitter = Duration.ofSeconds(60);
     }
 
     @Getter
