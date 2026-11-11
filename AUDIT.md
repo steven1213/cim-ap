@@ -281,6 +281,100 @@
   - 当前仅种子管理员（RMS_ADMIN 超管）；RMS_OPERATOR/RMS_VIEWER 角色已定义并授予对应 `rms:*`，但尚无「在 IAM 侧为非管理员用户授予 rms-ap 准入 + 在 RMS 侧将其 `sys_user` 关联到 RMS_OPERATOR/VIEWER」的运行时开通链路（属 W3 多角色开通，待 IAM 用户/组织授权与 RMS 用户建档打通后联调）。
   - 菜单树（`sys_menu`）未种子：RMS 前端菜单为硬编码 + permCodes 门禁，本轮未引入后端菜单树；若后续采用后端驱动菜单，须补 `sys_menu` 种子与 `sys_role_menu` 授权。
 
+## 2026-10-15 approval-ap 全量落地 + IAM SSO + RMS W3–W11
+
+> 2026-10-12 之后至 2026-11-11 的 61 个提交此前未登记（唯一空档）。本节起补记，证据取自当日工作日志与提交内容，不补造未跑过的验证。
+
+### 25. feat(approval/iam/rms)：审批流平台建成 + 跨 ap 单点登录 + RMS 业务全量功能
+
+- **范围**：
+  - `business/approval-ap/**`（新建）：Flowable 引擎集成、流程设计器（拖拽连线 + BPMN 双向转换）、前端 8 页（`Dashboard`/`Definitions`/`Todo`/`Done`/`Initiated`/`Callbacks`/`Audit`/`Designer`）、`sdk/`（`ApprovalClient` + `CallbackVerifier` + 12 个 DTO record）。
+  - `business/iam-ap`：方案 C 跨 ap SSO（会话 Cookie 共享）`dff840b`。
+  - `business/rms-ap`：W3–W11 全量功能（配方治理 / 机台授权 / 签核 / 导入导出 / 实验通道）`fc9ee5e`。
+  - 两处 `React.StrictMode` 移除（approval 17:40、rms 17:45）`8b7ef1a`。
+- **验证（已跑通）**：
+  - `ApprovalFlowIntegrationTest` + `ApprovalApApplicationTests` **8 用例全绿**（会签 / 回退 / 加签 / 改派 / 回调 HMAC+重试+幂等 / 审计哈希链 / 多租户）。
+  - 8085 HTTP 冒烟：`definitions → start → todo → complete → audit` 端到端通过，审计 `prevHash → hash` 衔接正确、完成后待办清空。
+  - 设计器 E2E 闭环：`gen-sample-bpmn.mjs` 用**真实 `toBpmn.ts`** 生成覆盖全节点类型的 `richApproval` → `POST /processes/deploy` 200 → `/definitions` 出现 → `start(amount=2000)` → alice 待办「主管审批」正确；`npm run build` 150 模块。
+  - `verify-hardening.mjs` **15/15**（统一返回契约 + 撤回/驳回策略）、`journey` **13/13**。
+  - 菜单切换双发修复后无头浏览器量化：`/todo`、`/initiated` 各**仅 1 次**请求。
+- **关键修复 / 设计决策**：
+  - `completeTask` 必须在 `taskService.complete` **之前**读 `tenantId` 流程变量——流程结束后 execution 被删，再 `getVariable` 抛 `FlowableObjectNotFoundException`。
+  - **安全链拆两个互斥配置**：原 `ApprovalSecurityConfig` 挂 `@ConditionalOnProperty(enabled=true)`，`enabled=false` 时**不加载任何链** → Spring 回退默认链要求认证 → 全部 `/api/**` 401（集成测试直调 service 层绕过 HTTP 安全，才一直没暴露）。改为认证链 + `ApprovalDevSecurityConfig(matchIfMissing=true)` 放行链。
+  - BPMN schema 两条硬约束：`multiInstanceLoopCharacteristics` 必须是 `userTask` **直接子元素**（放 `extensionElements` 内 → SAXParseException 部署 500）；`condition`/`completionCondition` 表达式必须 `esc()` 转义 `<`/`>`。
+  - 设计器 SVG：presentation attribute **不支持 `var()`**（`stroke="var(--accent)"` 静默变 `stroke:none`，线看不见；marker fill 回退黑色 → 悬空黑箭头），颜色一律走 `style={{}}`；marker 加 `markerUnits="userSpaceOnUse"`；连线命中加 24px 容差（`HIT_PAD`）。
+  - 统一返回：全控制器包 `Result.ok()`，删自造 `PagedView` 改平台 `PageResult`（**页号 1 起**），前端 axios 拦截器统一解包（`body.code !== 0` 抛错）。
+  - 业务加固：撤回策略（首节点未审批前，audit 存在 `COMPLETE_*` 即拒）、驳回意见必填（前后端双校验）、附件相干性校验、全部写操作 `@Transactional`（Flowable + 审计同事务，修孤儿实例）。
+- **风险 / 待办**：节点级审批人类型（依赖 IAM 组织树）、节点级超时策略、定义列表「节点数 / 发起次数」列、邮件通道（SMTP）；RMS 实际回调接线见 §26 之后的 D13（2026-11-09 挂起）。
+- **坑**：`BizException` 双参 `(code, msg)` 的 msg 会被 `MessageSource` 当 i18n 键吞掉（平台 handler 只用 `i18nKey + args`）。
+
+## 2026-10-19 approval 三切片 + G2 网关 + M3/M4 契约 + 进度可视化 + 设计器多结束
+
+### 26. feat(approval)：G1/G3/G9 安全加固、G2 二次确认、G4/G5 契约、G6 选人、流程进度可视化
+
+- **范围**（10 提交）：切片1 退回-驳回与重提 `c46730c`、切片2 通知 SPI + 企微免登 `fa37f2e`、切片3 权限与业务域 `f4d4893`、文档与前端联动 `1024e06`、G2 网关 `5eeb6ff`、M3 契约 `8dfe808`、M4 选人 `6fe5203`、进度节点条 `679092c` + 链路扩展 `1b034a8`、设计器多结束 `701901b`。
+- **验证（已跑通）**：
+  - `verify-security` **11/11**（合法签名 200 / 缺错签名 403 / 超重放 403 / 跨域 403 / 限流 403）；`verify-g1` **6/6**（第二实例 8086 `dev-enforce`：超管通过、非超管 403）；`verify-wecom` **12/12**（无 app-key 调用透传，回归无破坏）。
+  - `verify-g2` **14/14**、`verify-hardening` **15/15**（此前 `callback-test` 因下述 ACTOR NOT NULL 缺陷失败，修复后 DEAD 态正常）。
+  - `verify-g5` **15/15**（显式 / 派生 / 空三态 + 待办卡片 + G4 BPMN 内容校验）；M4 集成测试 **9/9**、`verify-g6` **14/14**。
+  - `verify-multi-end.mjs` **8/8**（设计器多结束节点）。
+- **关键修复 / 设计决策**：
+  - G9 签名 = `HMAC-SHA256(timestamp|method|path|body)`，常量时间比较；重放窗口 5min、IP 白名单、按 appCode 限流、跨域 403 并 `WebhookNotifyService` 告警。
+  - G3 审计表加 `app_code` 列（从流程实例 `tenantId` 解析），定义/实例/任务/审计/回调五类查询按 appCode 收敛，`SecurityGuard.assertAppCodeScope` 统一拦 403（**不是 404**，避免把「无权」伪装成「不存在」）。
+  - G2 二次确认：首调签发 5min TTL 令牌且**不覆盖**，回填令牌才覆盖 `baseUrl/secret`；注册/变更补入哈希链审计（原先只有 deliver 有）；`confirmToken` 走 `@RequestParam` 而非改 request record（避免 Jackson 反序列化破坏）。
+  - ⚠️ **`approval_audit.ACTOR` 为 NOT NULL**：G2 新增审计在 dev 未传 actor 时传 `null` → `DataIntegrityViolationException`。service 内兜 `actorName = actor 为空 ? "system" : actor`，与既有 `CALLBACK_SENT/FAILED` 的硬编码口径一致。
+  - G4 枚举迁移：BPMN 终态 `result` 与撤回回调由 `APPROVE/REJECT/WITHDRAW` → `APPROVED/REJECTED/WITHDRAWN`（任务级 `outcome`、`status`、审计动作**不变**）；集成方需兼容双套值至迁移完成。
+  - G5 `displayFields` 落地：持久化为变量 `displayFieldsJson`，`resolveDisplayFields` 三档兜底（显式 → `formSchema.display:true` 派生 → 空），注入三个视图 DTO；前端 `DisplayFields.tsx` 前 4 项 + 24 字符截断 + `+N`。
+  - 进度可视化：`flowNodes` = BPMN `userTask` 文档序 × `PENDING/ACTIVE/DONE/SKIPPED`（历史取最近一轮）+ `__start__`/`__end__` 哨兵；⚠️ **终态判定不能依赖 `result` 变量存在**（自定义 BPMN 无终态事件时结束节点会被误判 PENDING）。
+  - 设计器多结束：`validateModel` 放开单结束并新增「end 无入口」校验；`toBpmn` 的 end id **按实例生成**（原硬编码 `id=end` 多终点冲突）；`fromBpmn` 显式驳回终点不再被当自动 `reject_*` 丢弃。
+  - ⚠️ `deployProcess` **不改写** BPMN `<process id>` → 部署时 processKey 必须与 XML 内 process id 一致，否则发起按 key 查不到（404）。
+  - `completeTask` 对候选任务办理时 `setAssignee` 认领留痕（否则历史 `assignee=null`）；节点 outcome 从审计 `COMPLETE_APPROVE/COMPLETE_REJECT` 映射（审计 action 不是裸 `APPROVE`）。
+- **风险 / 待办**：① `verify-return`/`verify-wecom` 共用 `default` 租户且 `todo()` 全量查询、断言未按 businessKey 过滤 → 跨脚本残留会误报并连锁污染，须重启清库后运行（应改为按实例过滤）；② 设计器错误横幅只显示 `errs[0]`，多条错误时首条抢占。
+
+## 2026-11-09 平台治理批次（notify 平台化 / SQL 日志 / 配置键 / 模块治理 / MDS DDL）
+
+### 27. refactor(platform)：7 个主题提交 + 2 个仓库卫生修正
+
+- **范围**：`12372b8` SSE 通知平台化（新 `cim-notify-starter` + `platform/web/cim-notify-client` + 两 ap 接入，46 文件）、`e04460a` 可执行 SQL 日志（15 文件）、`a200b5a` 配置键对齐 Spring + workerId 外部化（28 文件）、`e6d29f3` 模块治理（删 `cim-business`、enforcer 真正生效）、`11f206c` MDS 主数据基线 DDL（5 文件）、`ce9a7e2` verify-journey 适配统一 SSE、`5c1a734` 文档同步；`e3c97af` `.gitignore` 卫生修正、`80ea8aa` 决策 D13。
+- **验证（已跑通）**：
+  - notify：**10 → 11 例全绿**（新增 `NotifyEndToEndTest` 走真实 `/sys/notify/stream` 收信封；`NotifyRedisFanoutTest` 真实 Redis 扇出）。
+  - jpa SQL 日志：**34 → 41 例全绿**；approval-ap jar 真机（H2，8085→18085）端到端——关闭态 `[SQL]` 行数 0 → `POST /sys/sql-log?enabled=true` 立刻输出内联参数 SQL → 再关闭后打 3 次接口行数 3→3 不再增长。
+  - 平台 `mvn -o test` **13/13**（166 用例，7 skipped = 4 broker + 1 redis + 2 DdlExport）；admission rms-ap **90/90**、iam-ap **72/72**、approval-ap **10/10**。
+  - 全平台 `mvn -o install -DskipTests` **12/12 SUCCESS**；干净副本 `git archive HEAD` → `E:/tmp/fresh-check` 跑 `cim-system` 16/16、`cim-jpa-starter` 43/43。
+  - 主键外部化：`IdEnvInjectionTest` 2 用例（env 7/3 → 绑定 7/3，缺省 1/1）+ 真机 `CIM_WORKER_ID=7 CIM_DATACENTER_ID=3` 日志 `SNOWFLAKE (workerId=7, datacenterId=3)`。
+- **关键修复 / 设计决策**：
+  - ⚠️ **生产级 bug**：`NotifyAutoConfiguration` 的 `@ConditionalOnBean(StringRedisTemplate.class)` 与 `RedisAutoConfiguration` 存在排序竞态——先于 Redis autoconfig 求值时 fan-out Bean 不装配，**集群扇出静默退化成 `LocalSseFanout`**。加 `@AutoConfigureAfter(RedisAutoConfiguration.class)`。
+  - ⚠️ **enforcer 静默空转**：`bannedDependencies` 配 `includes` 白名单（`com.cim:*`）会导致所有 `com.cim` 依赖被跳过，规则实测不生效；只写 `excludes`。反向验证：给 cache 注入 obs 依赖 → BUILD FAILURE，恢复后通过。
+  - ⚠️ **`@Scheduled` 的 `*DelayString` 不认 `5m`**：Spring 6.1 只接受纯数字毫秒或 ISO-8601，写 `5m`/`60s` 启动即 `NumberFormatException`（approval-ap 10 个用例全红）。改 `PT5M`/`PT60S`/`PT3S`；**注解属性是 Duration 统一的唯一例外**，已写死进 `docs/platform/server/design.md §5.1`。
+  - ⚠️ **`.gitignore` 的 `**/application.yml` 过宽**：把 5 个模块的 `src/test/resources/application.yml` 一起忽略且无兜底 → 本地全绿只因文件在磁盘上，**新克隆跑 `mvn test` 会缺数据源/Flowable/认证夹具**。根与 `platform/server/` 两级 `.gitignore` 各补 `!**/src/test/resources/application.yml`（`git check-ignore` 正反两面验过）。
+  - SQL 日志两级开关：`cim.jpa.sql-log.enabled` 管「装不装代理」，是否输出在 `getConnection()` 时实时判 `logger.isDebugEnabled()` → 可 HTTP 动态开关，关闭时直接返回真实连接（零开销）。
+  - notify 解耦 obs：新增 `NotifyMetrics` 门面（只依赖 micrometer-core，`ObjectProvider<MeterRegistry>` 可选注入），去掉 `cim-obs-starter` 依赖。
+  - 配置键铁律：同一概念只留一套键，能映射 Spring 标准键就不自造 `cim.*`（删 `cim.jpa.flyway.*`、`cim.jpa.naming.lowercase-snake`、`cim.obs.metrics.common-tags.*`、`cim.obs.trace.enabled`），框架只在用户未显式配标准键时补默认值。
+  - 真集成测试门控：mq 的 Rabbit/Pulsar、notify 的 Redis 改**类级 `@EnabledIf` 端口探测**——这些测试在上下文启动阶段就连 broker，方法内 `assumeTrue` 来不及，会把构建判红。
+- **风险 / 待办**：跨实例 Redis 扇出与真实 JWT 鉴权拒绝路径需含 Redis/真令牌环境确认；`BearerTokenQueryParamFilter` 在真实 `JwtAuthenticationFilter` 链下的拒绝路径待验；**approval-ap 原本靠 notify→obs 传递拿到 actuator，现已没有**——将来要 health probe 须显式加 `spring-boot-starter-actuator`。
+
+## 2026-11-11 前端组件中台 P0–P20（5 个包 + 三应用页面全量迁移）
+
+### 28. feat(web)：`@cim/{theme,ui,data,shell,i18n}` 建成，RMS 19/19 + IAM 16/16 + approval 9/9 收敛
+
+- **范围**（33 提交）：`platform/web/packages/{theme,ui,data,shell,i18n}` 五个包；三应用 `Layout`/页面/共享弹窗改为薄适配层；`docs/platform/web/component-platform-design.md`（P0–P20 设计稿 + 逐批实施记录）。
+- **验证（已跑通）**：
+  - 每批均 `tsc -p tsconfig.json --noEmit`（strict + `noUnusedLocals/Parameters`）零错误 + `vite build` 通过。
+  - 契约桩 + 无头 Chrome 自驱动探针，**累计 100+ 场景**：RMS 17 场景 / 49 项断言（§10.10–§10.15）、IAM 55 场景（P14–P16d）、approval 47 场景（P17 13 + P18 16 + P19 10 + P20 8），**0 未捕获异常**。
+  - 关键量化证据：已办/我发起翻页**不再发请求**（全量取回 + 本地分页），关键字在全 25 条中命中 6 条并回第 1 页；工作台 `?route=stats` 注入失败后 KPI 只剩 5 项 + 「其中 1 / 6 项数据未取到」；发起弹窗 XML 请求**恰好 1 次**（自激循环修复）；详情内重提使 detail 请求 **2 → 1**；待办表格 `scrollWidth 1325 / clientWidth 745` 判定为列内换行而非溢出。
+- **关键修复（迁移过程中暴露的真缺陷）**：
+  - `DeviceRepository.search` 的 keyword 只匹配 `code`/`name`，列表却有 IP 列 → **IP 搜索从来没工作过**（服务端已丢弃不匹配行，前端那段客户端过滤是死代码）。JPQL 补 `ip` + `DeviceAdminTest` 一条断言。
+  - 已办/我发起「关键字只过滤当前页」：第 3 页的单号永远搜不到却显示「没有」→ 改全量取回 + 本地分页。
+  - 工作台 `Promise.all` + `try/catch` 把「没取到」和「真没有」混成 0 → `Promise.allSettled`，单路失败只让该格显示 `—`。
+  - 发起弹窗角色节点解析把每次 render 新建的 Map 放进 effect 依赖 → **自激请求循环**（渲染→请求→setState→再渲染）。
+  - 草稿按「第一个 `approval.draft.v1:*` 槽」加载 → 两个流程都有草稿时打开 A 会加载 B 并把 `processKey` 切走。
+  - 待办刷新后旧勾选残留 → 「批量通过 3 条」实际通过 0 条还报成功。
+  - 设计器「复制成功」提示先于实际 `writeText`（剪贴板被拒也报成功）。
+  - 回调事件类型只登记 1/5，其余 humanize 成半截英文。
+  - 语义色第 6 色（`info`）：`StatusTone` 只有 `ok/warn/err/run/idle` 五档，`info` 一律映射 `run`。
+  - 详情弹窗取数失败 `catch { toast; onClose() }` → 关掉弹窗等于把错误一起关掉；改为错误留窗内 + 可重试。
+- **风险 / 待办**：§12 待定项 #2（HTTP 传输层是否合并）、#3（字典 i18n 化）、#5（列定义后端下发）、#8（基础令牌加 `--cim-` 前缀）、#9（译文灌入 `sys_i18n`）**仍开放**，均有明确触发条件；`useDict`/`EnumTag` 已实现但**三应用未注入 `UiDictProvider`**（当前仅内置兜底形态）；a11y 按 WCAG 2.1 AA 基线设计，**尚未做自动断言**（前端目前无单元测试设施，验证靠 tsc + build + 探针）。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
