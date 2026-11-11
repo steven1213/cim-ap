@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P7 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）。
+> 状态：**P0–P13 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；IAM 21 页、approval 9 页按各自节奏排期。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -448,6 +448,12 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | **P5** ✅ | `@cim/i18n`（`createI18n`）+ 三应用 `lib/i18n.ts` 收成声明式适配 | 包级 25 项 + 应用级 15 项断言，见 §10.7。**RMS/approval 仍走内置包**（原因见 §6.2） |
 | **P6** ✅ | 第二批页面迁移：SpecPage / DeviceAuthPage / ExperimentPage / QualificationPage + 共享 `SpecEditModal` | 真页面 + 8084 接口桩 + 6 个场景 33 项断言，见 §10.8 |
 | **P7** ✅ | 第三批页面迁移：DevicePage / BodyTemplatePage / SpecTemplatePage + `DeviceAreaPage` 对齐 `useResource` | 真页面 + 8084 接口桩 + 10 个场景 40 项断言 + `DeviceAdminTest` 6/6，见 §10.9。**设备搜索补上 IP 匹配**（唯一服务端改动） |
+| **P8** ✅ | 中页三张：AuditLogPage / ComparePage / DeviceRecipePage。顺带补台组件三个缺口：`Panel` 升成带标题栏、`DataTable` 加 `flat`、`CimTree` 加 `labelNode`/`searchText` | 真页面 + 8084 接口桩 + 4 个场景 12 项断言，见 §10.10。**筛选拆 `draft`/`applied`**、**抽屉详情按 `id` 取消竞态** |
+| **P9** ✅ | 特型两页：DashboardPage（七路请求合成一个 `useResource` + 失败路数上报）/ EcSvPage（假 tab → `CimTabs` + 每 tab 绑 `enabled`） | 真页面 + 8084 接口桩 + 2 个场景 7 项断言，见 §10.11。**首屏只发 2 个请求**（懒挂载生效） |
+| **P10** ✅ | RecipeLibraryPage + `RecipeDetailDrawer`（含 `DiffTable` 联动）：四处 `modal-backdrop` → `CimModal`，版本抽屉 → `CimDrawer` | 真页面 + 8084 接口桩 + 9 项断言，见 §10.12。**解析/校验并发取数**，修「A 的校验画到 B 上」 |
+| **P11** ✅ | SignoffPage：受控多选 + 批量条 + 四个弹窗 + 详情抽屉 | 真页面 + 8084 接口桩 + 6 项断言，见 §10.13。时间线**刻意不换 `CimSteps`**（语义会失真） |
+| **P12** ✅ | IntegrationPage（七面板）+ `BatchOpsModal`：基础字典顶层一次下发、`window.prompt` → 原因弹窗 | 真页面 + 8084 接口桩 + 14 项断言，见 §10.14。**字典请求 15 → 10 条** |
+| **P13** ✅ | 两个页面级取数组件：`ChamberPanel` / `DeviceDetailDrawer`（这是本轮唯一减行的一批） | 真页面 + 8084 接口桩 + 8 项断言，见 §10.15。顺带修掉「请先选择机台」的误导文案 |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -909,6 +915,154 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 **产物**：三应用 `tsc + vite build` 全过。RMS `index` 95.34 KB（gzip 31.86）不变——四页各自在懒加载块里（`DevicePage` 15.43、`BodyTemplatePage` 7.82、`SpecTemplatePage` 7.56、`DeviceAreaPage` 3.73 KB）；IAM 与 approval 源码未动，产物不变；无循环 chunk 警告。
 
 **⚠️ 未做的（别当成已做）**：RMS 仍剩 12 个页面文件没迁，其中 `RecipeLibraryPage`(809) / `SignoffPage`(778) / `IntegrationPage`(1061) 三个大页交互形态各不相同（抽屉套抽屉、签核轨迹、集成配置树），`EcSvPage`(359) 有 tab + KPI + 双表结构，都需要单独排期；`DashboardPage` 是看板不是列表。IAM 21 页、approval 9 页未动。铁律不变：**新页面一律用 `@cim/*`**。
+
+---
+
+### 10.10 P8 实施记录：中页三张（AuditLog / Compare / DeviceRecipe）（2026-11-11）
+
+**为什么这三张一起做**：它们各自代表一种此前没覆盖过的取数形态——`AuditLogPage` 是**「汇总 + 列表」双资源且筛选要显式确认**，`ComparePage` 是**同一份数据的三个列表（左/右/批量目标）各自独立取数**，`DeviceRecipePage` 是**左树右表的主从动线**。三种形态都能用同一套 `useResource` + `DataTable` 写出来，才算这套口径在「中页」站得住。
+
+| 文件 | 改前 | 改后 | 消失的写法 |
+| --- | --- | --- | --- |
+| `AuditLogPage` | 327 | 451 | 汇总与列表共用一个 `refresh()` + 筛选值直接参与请求 + 手写历史表 |
+| `ComparePage` | 426 | 517 | 三份版本列表共用 `leftVersions/rightVersions/targetVersions` 三套 state + 手写日志表 + 抽屉自带 `loading` state |
+| `DeviceRecipePage` | 404 | 413 | 手写递归渲染区域树（含展开态数组、路径拼接、无匹配时整棵树消失） |
+
+**顺带补上台组件的三个缺口**（这是本轮唯一动平台包的地方，其余批次只动页面）：
+
+1. **`Panel` 从纯容器升成「带标题栏的面板」**。各 ap 自己那份 `components/Panel.tsx` 薄壳（标题 + 副标题 + 动作区 + flush）在三个应用里各写一遍，写法还略有差别。现在 `Panel` 接 `titleKey/subKey/title/sub/actions/flush` 六个属性，应用层薄壳可以直接删。
+2. **`DataTable` 加 `flat`**。嵌在 `Panel` 里的第二张表（原各页私有的 `.table-wrap`）以前会出现「框套框」——外层 `Panel` 有边框和圆角，内层表又画一层。`flat` 去掉内层边框/圆角/背景，只保留表体。
+3. **`CimTree` 节点加 `labelNode` 与 `searchText`**。设备树每行要显示「编码 · 名称」两段、还要挂状态徽标，纯 `label` 字符串拼不出来；但 `ReactNode` 又无法被搜索提取文案，故另给 `searchText` 作为**搜索用的纯文本**（`labelNode` 负责好看，`searchText` 负责搜得到）。
+
+**这一批改掉的两处行为缺陷**：
+
+1. **`AuditLogPage` 改了下拉不点「搜索」就点「刷新」，会带错条件。** 旧实现筛选值与请求条件同一个 state：`limit` 一改立刻重查，而动作/结果/时间要等「搜索」才生效——于是「改了结果=失败，又顺手点了刷新」刷新的是**旧的**结果条件，列表看起来没反应。现在拆成 `draft`（界面上的值）与 `applied`（真正发出去的条件），`useResource` 的 `deps` 只依赖 `applied`；`limit` 属于「即时生效」的控件，改它时同步 `apply()`。
+2. **`ComparePage` 快速切日志时详情会串。** 旧 `LogDetailDrawer` 自己管 `loading` 与数据，`id` 变了但旧请求没取消，慢回的旧详情会盖住新打开的。现在 `useResource(..., { deps:[id], enabled: !!id })`——抽屉没打开就不发请求，`id` 变了旧的回包被丢弃。
+
+**验证 12 项**（真页面 + 8084 契约桩 + 无头 Chrome `--dump-dom`）：
+
+| 场景 | 项数 | 代表断言 |
+| --- | --- | --- |
+| `audit` | 3 | 3 行；`/audit/summary` 与 `/audit?limit=200` 各一次；动作分布 3 条（`编辑配方 40 / 签核通过 22 / 运行比对 18`，动作码经 `rms.audit.t.*` 翻译，**页面上不出现裸 `RECIPE_UPDATED`**） |
+| `compare` | 3 | 日志 2 行；`一致/差异` 两档语义色不同；KPI 4 项（总数 20 / 一致 17 / 差异 3 / 差异项 9） |
+| `devrecipe` | 3 | 树渲染出「一区 → 一区-东」两级；首屏自动选中 `ETCH-01` 并展开路径；右侧 KPI 4 项 + 配方表 2 行（孤儿行带 `err` 徽标） |
+| 抽屉 | 3 | 审计详情抽屉、比对差异抽屉、配方详情抽屉各 1 个，内部表均为 `is-flat` |
+
+**产物**：RMS `index` 95.34 → 95.96 KB（gzip 31.86 → 32.14），涨的是 `Panel`/`DataTable`/`CimTree` 的新属性进了 `cim-ui` 块；三页各自懒加载（AuditLog 7.86 / Compare 9.12 / DeviceRecipe 7.22 KB）。
+
+---
+
+### 10.11 P9 实施记录：特型两页（Dashboard / EcSv）（2026-11-11）
+
+**这两页「特」在哪**：`DashboardPage` 不是列表，是**七路请求的看板**；`EcSvPage` 是**两个 tab 共用一套 KPI，且两个 tab 的数据互不相干**（规格 vs 校验记录）。前面的批次都是「一张表 + 一个弹窗」，这两页验证的是 `useResource` 在**多资源聚合**与**懒挂载**两种形态下是否够用。
+
+| 文件 | 改前 | 改后 | 关键改造 |
+| --- | --- | --- | --- |
+| `DashboardPage` | 244 | 305 | 七路请求合成一个 `useResource`（`Promise.allSettled` 语义保留，但**统计失败路数**并在页头提示「部分数据未取到」）；三张清单 `DataTable flat` |
+| `EcSvPage` | 359 | 559 | 「两个按钮当 tab 用」→ `CimTabs`；两个 tab 各绑 `enabled`（切到校验记录才去查值）；两个弹窗 → `CimModal` + `FormGrid`；删除走 `useConfirm` |
+
+**为什么看板要合并成一个 `useResource`**：旧实现七路各自 `useEffect`，每一路都能单独失败、单独重试，页面上却只有一个「刷新」。合并之后 `loading` 只有一档（首屏一次骨架，而不是七块各自闪），`refresh()` 一次重取全部；代价是**一路挂等于整屏进入错误态**——所以用 `allSettled` 保留部分成功，并额外把失败路数报出来，让「8 项待处理」这种数字不至于静默少算一路还看着正常。
+
+**`EcSvPage` 的 `enabled` 是这一批的重点**：规格 tab 的 `listEcSvValues` 与校验 tab 的 `listEcSvSpecs` 互不依赖，以前一进页面两个都发。现在每个 tab 的 `useResource` 绑 `enabled: tab === 'xxx'`，实测进页面只发 2 个请求，点「校验记录」后才发第 3 个（`/ecsv/values?limit=100`）——这同时验证了 `CimTabs` 的懒挂载语义。
+
+**一处顺带修掉的表单缺陷**：`SpecModal` 的字段以前是「按 `specType` 隐藏」，state 不清——`RANGE` 填了上下限再切到 `TARGET`，提交时 `rangeMin/rangeMax` **仍随 payload 发出**，后端照收，于是同一行规格同时带着目标值和范围。现在字段数组按当前 `specType` **重建**，提交只取仍存在的键（与 P6 的 `SpecEditModal` 同一处理）。
+
+**验证 7 项**：
+
+| 场景 | 项数 | 代表断言 |
+| --- | --- | --- |
+| `dashboard` | 4 | 7 个请求全发出；`/tool-inventory?result=DRIFT` 与 `?result=ORPHAN` **各返回各的**（契约桩必须按参数过滤，否则「两路重复同一批行」会被误判成页面画重了）；三张清单共 5 行；KPI「8 项待处理」= 各路之和 |
+| `ecsv` | 3 | 首屏只发 2 个请求（`/ecsv/values` **未发**）；规格表 2 行、KPI 4 项；tab 文案「规格 / 校验记录」 |
+
+---
+
+### 10.12 P10 实施记录：`RecipeLibraryPage` + `RecipeDetailDrawer`（2026-11-11）
+
+**这两处是「同一个业务对象的列表与详情」**，必须一起改：抽屉的 `versions` 由列表页传入，两边对「版本从哪来」的理解不一致，就会出现「列表已刷新、抽屉还是旧版本」。
+
+| 文件 | 改前 | 改后 | 消失的写法 |
+| --- | --- | --- | --- |
+| `RecipeLibraryPage` | 809 | 894 | 四处 `.modal-backdrop` 三件套 + 手写版本抽屉 + 原生 `<input type="file">` + 手写「仅 Golden」复选框 |
+| `RecipeDetailDrawer` | 1027 | 1075 | 手写 drawer + 四处 `window.confirm` + 五个区块各自的 `useEffect` 取数 + 页内常驻红条 |
+
+**这一批改掉的三个行为缺陷**：
+
+1. **快速切版本时，A 版本的校验结论会画到 B 版本上。** 旧实现 `parsed` 与 `validation` 是串行 `.then()` 链，中间还夹着一个 `setState`；快速连点版本下拉，两条链交错完成，最后落地的组合可能是「B 的参数 + A 的校验」。现在两个 `useResource` 并发、各自 `deps:[versionId]`，旧回包直接丢弃。
+2. **校验不通过的参数行看不出来。** 旧实现把 `validation.checks` 渲染在表下方一段文字里，用户要自己把参数键对回去。现在参数表用 `rowClassName` 把命中的行标 `cim-row-warn`——**结论就落在那一行上**。
+3. **页内红条把「一次性的失败」表现成「当前状态」。** 五个区块（规格/机台/变更效果/导出/签核）出错时旧实现往页顶塞一条红条，不会自己消失，下次操作前一直挂着。现在统一 `toast`。
+
+另外 `SignoffSubmitModal` 从手写弹窗换成 `CimModal` + `FormGrid`（签核路由是 `CimChoice` 的三选一），`denull()` 把 `FormGrid` 回传的 `null` 归一成 `''`——`CimSelect` 清空给的是 `null`，后端 `CreateReq` 有几个字段是 `@NotBlank`，`null` 与 `''` 在错误文案上表现不同。
+
+**验证 9 项**：列表 2 行、版本抽屉 1 个、抽屉内三张 `is-flat` 表（参数/步序/子配方）、参数表命中校验的行带 `cim-row-warn`、四处 `window.confirm` 已不存在（点删除走 `useConfirm` 的 antd 弹窗）。
+
+---
+
+### 10.13 P11 实施记录：`SignoffPage`（2026-11-11）
+
+**为什么单独一批**：签核页是「列表 + 行内多动作 + 批量决策 + 四种弹窗 + 详情抽屉」的复合体，`778` 行里大半是弹窗。它是本轮唯一需要**受控多选**的页面。
+
+| 文件 | 改前 | 改后 | 关键改造 |
+| --- | --- | --- | --- |
+| `SignoffPage` | 778 | 975 | 自维护 `selected: Set<string>` → `selectedKeys` / `onSelectionChange` / `selectable`；批量条独立成 `Panel` + `Toolbar`；四个弹窗全部 `CimModal`；详情抽屉 `useResource` + `CimDescriptions` |
+
+**`selectable` 这条约束是有业务含义的**：只有 `PENDING` 的行能勾选批量决策——旧实现勾得上但提交时后端逐条驳回，用户看到「批量结果」里一半失败还以为系统出问题。现在不可勾的行连复选框都不出现。
+
+**限时放行的时间格式**：`TempAllowModal` 用 `kind:'datetime'` + `valueFormat:'YYYY-MM-DDTHH:mm'`。后端 `Instant.parse` 只认 ISO 的 `T` 分隔，而 `FormGrid` 默认口径是空格分隔（见 §10.6 那条坑），必须显式指定，否则「填了生效时间但没生效」。
+
+**刻意没换的一处**：操作时间线仍是页内私有 `.timeline` 样式，**没有**换 `CimSteps`。`CimSteps` 的语义是「current 之前的步骤都算已完成」，而签核轨迹里的驳回、加签、限时放行是**并列发生过的事件**，不是一条单向进度；硬套会让「已驳回」显示成「已完成 3/5」。这是「组件不该为了统一而被误用」的例子。
+
+**验证 6 项**：列表 2 行；`待审批` 行有「通过/拒绝/限时放行」三个动作、`已通过` 行只剩「详情」；`none` 状态不显示限时放行徽标而 `ACTIVE` 显示「放行中」；点「详情」抽屉内参数差异 3 行 + 时间线 2 条。
+
+---
+
+### 10.14 P12 实施记录：`IntegrationPage` + `BatchOpsModal`（2026-11-11）
+
+**这是最大的一页（1061 行）且是唯一改后明显变长的一页**：七个面板（Hold / 报警 / PPID 映射 / 下发任务 / GEM 事件 / 机台清单 / 联调）+ 两个批量弹窗 + 一套下发阶段机。
+
+| 文件 | 改前 | 改后 | 关键改造 |
+| --- | --- | --- | --- |
+| `IntegrationPage` | 1061 | 1569 | 基础字典（机台/机型/配方）**顶层取一次下发给七个面板**；`holds`/`alarms` 各自 `keepPreviousData`；`window.prompt` → `ReasonModal`；七个面板全部 `Panel` + `FormGrid` + `DataTable flat` |
+| `BatchOpsModal` | 244 | 324 | 两个批量弹窗 → `CimModal`；三组勾选清单 → `CimSelect multiple`；批量结果 → `DataTable flat` |
+
+**为什么变长还要做**：1569 行里约 400 行是**列定义与字段数组**（声明式，改一个字段不用翻三处），另外约 100 行是新补的失败分支。真正减少的是「同类逻辑的份数」——七个面板以前各自 `useState` + `useEffect` + 手写 `<table>`，现在没有一处手写表。
+
+**修掉的缺陷**：**七个面板各查一次基础字典**。旧实现每个面板自己 `listDevices()` / `listDeviceTypes()` / `listRecipes()`，一次进页面同一批字典被查了 5 遍（实测请求日志确实 15 条，现在 10 条）。现在顶层一次 `useResource` 下发给面板——面板之间**共享同一份选项**，也顺带消掉了「A 面板刚新建的配方，B 面板下拉里没有」的不一致。
+
+**`window.prompt` → `ReasonModal`** 的理由与 P6 一致：prompt 阻塞主线程、不能多行、且「点取消」与「留空原因」都变成 `''`。Hold 解除与强制原因都要留痕，必须能区分**取消**（不发请求）与**空原因**（后端拒绝）。
+
+**保留的两处领域逻辑**（不属组件层职责）：下发阶段机 `nextStage` / `stageTone`（`QUEUED → GRANTED → SENT_TO_TOOL → TOOL_ACKED → VERIFIED`，`FAILED` 为终态）原样保留；`ToolRecipeMap` 的「机台级 / 腔体级」映射维度切换保留。
+
+**验证 14 项**：进页面 10 个请求（字典各 1 次而非 5 次）；七个面板标题全部渲染；Hold 1 行 + 报警 1 行 + 映射 1 行 + 下发 2 行 + 事件 1 行 + 清单 3 行；点「解除 Hold」弹出**带 textarea 的原因弹窗**（`modals=1`，不是浏览器 prompt）；`VERIFIED` 与 `FAILED` 两档阶段徽标语义色不同。
+
+---
+
+### 10.15 P13 实施记录：两个页面级取数组件（`ChamberPanel` / `DeviceDetailDrawer`）（2026-11-11）
+
+**为什么在「页面都迁完了」之后还有一批**：这两个文件不是路由页，但它们是**页面级的数据 UI**——机台详情抽屉挂在 `DevicePage` 上，腔体面板挂在抽屉里，两者都手写 `useEffect` + 手写 `<table>` + `window.confirm` + 原生 `<select>`。留着它们，「RMS 已全量迁移」这句话就是假的：从设备台账点进一台机，看到的仍是旧写法。
+
+**这是本轮唯一一批行数下降的**：
+
+| 文件 | 改前 | 改后 | 消失的写法 |
+| --- | --- | --- | --- |
+| `ChamberPanel` | 173 | 162 | 手写 `load()` + 三个 `useState` 字段 + 手写 `<table class="data">` + `window.confirm` + 页内红条 |
+| `DeviceDetailDrawer` | 319 | 295 | 手写 `.drawer-backdrop` + 三处独立 `useEffect` + 两个原生 `<select>` + 手写表 + `window.confirm` |
+
+**为什么这两个能减行而页面都是加行**：页面加行是因为「列定义摊开 + 字段数组化 + 失败分支」这三件事在旧代码里是**没有**的（旧代码要么静默失败，要么用极简写法糊过去）；而这两个组件旧的写法本身已经比较紧凑（`ChamberPanel` 里字段直接写着 `<input>`），换成 `FormGrid` 字段数组只是把同样多的信息换成声明式，同时删掉了 `busy` 之外的三个中间 state，故净减。
+
+**修掉的一处误导文案**：腔体面板必填校验失败时的提示是「**请先选择机台**并填写腔体编码与名称」——但这个面板**根本没有机台选择器**（它就是「在哪台机上点开就维护哪台机」），那句话是从更早的「独立腔体管理页」时代留下来的。现在改成「腔体编码与名称不能为空」，并且错误挂在**字段上**（`errors`），不再是一句笼统的红字。
+
+**一处实现细节**：`DataTable` 的 `rowKey` 签名是 `(row) => string`，**不收 index**。给孤儿行（`recipeId` 为空）造键时不能写 `(r, i) => ...`，要用 `orphan:${ppidOnTool}:${code}` 这种内容键——同一台机上两条孤儿记录可能共用 PPID，故把配方名也带上。
+
+**验证 8 项**：设备台账 3 行；点行打开抽屉（`drawers=1`）；抽屉内 3 个面板（机台腔体 / 绑定配方到本机台 / 装载的配方）；抽屉打开后只补发 3 个请求（设备配方 + 配方选项 + 腔体），不重复查机型/区域（由外层透传）；装载表 2 行，孤儿行带 `err` 徽标；空提交「新增腔体」出 2 条字段级必填、**0 次 POST**；解绑走 `useConfirm`。
+
+---
+
+**迁移收尾结论（P0–P13，2026-11-11）**
+
+- **RMS 页面 19/19 迁移完毕**：23 个 `pages/*.tsx` 里 19 个已用 `useResource`；剩余 4 个是 `LoginPage` / `SsoCallback` / `ForbiddenPage` / `NotFoundPage`——没有列表也没有表单骨架，本不需要迁。
+- **页面级取数组件 5/5**：`RecipeDetailDrawer` / `DeviceDetailDrawer` / `BatchOpsModal` / `ChamberPanel` / `DiffTable`。
+- **刻意没动的**：`NotificationBell`（180 行）。它是**外壳 chrome**，不用 `Panel`/`DataTable`/`CimModal` 任何一个页面原语；它的取数是「30s 轮询未读数 + SSE 事件触发回拉」，`useResource` 的 `pollInterval` 能覆盖轮询那一半，但另一半是 SSE 回调里的命令式 `poll()`，混进来会让「通知通道」与「组件层迁移」两件事互相牵扯。留待通知能力单独排期。
+- **IAM 21 页、approval 9 页仍未动**：这两个应用先享受组件层（外壳 / 消息 / 文案 / 数据层已接入），页面迁移按各自节奏推进。铁律不变：**新页面一律用 `@cim/*`**。
 
 ---
 
