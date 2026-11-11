@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { changeLanguage, currentLang, DEFAULT_LANG, loadLocales } from '@/lib/i18n';
-import type { SysLocaleDto } from '@/types';
+import type { LocaleInfo } from '@cim/i18n';
 
 /**
  * 语言切换器（顶栏与登录页共用）。
@@ -12,7 +12,7 @@ import type { SysLocaleDto } from '@/types';
  */
 export default function LanguageSwitcher({ className = '' }: { className?: string }) {
   const { t } = useTranslation();
-  const [locales, setLocales] = useState<SysLocaleDto[]>([]);
+  const [locales, setLocales] = useState<LocaleInfo[]>([]);
   const [lang, setLang] = useState(currentLang());
   const [busy, setBusy] = useState(false);
 

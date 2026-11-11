@@ -1,0 +1,19 @@
+{
+  "name": "@cim/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CIM 平台文案运行时：整包缓存防闪白、四级兜底（目标语言→默认语言→内置包→humanize）、缺键批量上报、不刷新页面切语言。认识 i18next，不认识任何业务端点——译文来源（远端 / 内置包）由应用注入。",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "i18next": "^23.15.0",
+    "react-i18next": "^15.0.0"
+  }
+}

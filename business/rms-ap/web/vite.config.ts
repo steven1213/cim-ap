@@ -13,6 +13,7 @@ export default defineConfig({
       '@cim/ui': path.resolve(__dirname, '../../../platform/web/packages/ui/src'),
       '@cim/data': path.resolve(__dirname, '../../../platform/web/packages/data/src'),
       '@cim/shell': path.resolve(__dirname, '../../../platform/web/packages/shell/src'),
+      '@cim/i18n': path.resolve(__dirname, '../../../platform/web/packages/i18n/src'),
       // antd 装在**本应用**的 node_modules：@cim/ui 是源码直引，其内部的 `import 'antd'`
       // 会从 shared 包所在目录向上查找，找不到业务的 node_modules，故显式指向本地副本。
       // 这样 antd 内部 `import 'react'` 也能解析到本应用的 React，不会出现两份 React。
@@ -21,6 +22,10 @@ export default defineConfig({
       dayjs: path.resolve(__dirname, 'node_modules/dayjs'),
       // @cim/shell 同理：它 import react-router-dom / zustand，若从 shared 包目录向上查找会落空
       'react-router-dom': path.resolve(__dirname, 'node_modules/react-router-dom'),
+      // @cim/i18n 同理：它 import i18next / react-i18next，从共享包目录向上查找会落空，
+      // 且必须指向本应用的副本，否则会出两份 i18next 实例（切语言只刷新其中一份）
+      i18next: path.resolve(__dirname, 'node_modules/i18next'),
+      'react-i18next': path.resolve(__dirname, 'node_modules/react-i18next'),
       zustand: path.resolve(__dirname, 'node_modules/zustand'),
     },
     // 共享包源码在工程根之外，其 `import 'react'` 会从 platform/web 向上解析而落空；

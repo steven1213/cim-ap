@@ -1,73 +1,29 @@
-// 多语言运行时（i18next + react-i18next）—— 本地内置包版本。
-// 与 rms-ap 同源 API：本地缓存防闪白、humanize 兜底、预留后端驱动切换。
-import i18next from 'i18next';
-import { initReactI18next } from 'react-i18next';
+// 多语言运行时 —— 应用侧薄适配层。
+//
+// 运行时骨架（整包缓存防闪白、四级兜底、切语言不刷新）都在 `@cim/i18n`；
+// 本文件只声明两件属于本应用的事：
+//   1. 译文从哪来：**内置包**（随前端发版，见 `lib/i18n/messages.ts`）；
+//   2. 本应用没有 `setAcceptLanguage`（api 层不带语言头），故不接 onLanguageChange。
+import { createI18n } from '@cim/i18n';
 import { zhCN, enUS } from '@/lib/i18n/messages';
 
 export const DEFAULT_LANG = 'zh-CN';
 
-const LANG_KEY = 'approval-lang';
-
-function humanize(key: string): string {
-  const tail = key.includes('.') ? key.slice(key.lastIndexOf('.') + 1) : key;
-  const spaced = tail
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .trim();
-  if (!spaced) return key;
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-let initialized = false;
-
-function ensureInit(): void {
-  if (initialized) return;
-  i18next.use(initReactI18next).init({
-    lng: currentLang(),
-    fallbackLng: DEFAULT_LANG,
-    defaultNS: 'translation',
-    ns: ['translation'],
-    resources: {
-      'zh-CN': { translation: zhCN },
-      'en-US': { translation: enUS },
-    },
-    initImmediate: false,
-    react: { useSuspense: false, bindI18n: 'languageChanged loaded' },
-    saveMissing: false,
-    parseMissingKeyHandler: (key: string) => humanize(key),
-    interpolation: { escapeValue: false },
-    returnNull: false,
-  });
-  initialized = true;
-}
-
-export function currentLang(): string {
-  return localStorage.getItem(LANG_KEY) || DEFAULT_LANG;
-}
-
-export async function changeLanguage(lang: string): Promise<void> {
-  ensureInit();
-  if (i18next.language !== lang) {
-    await i18next.changeLanguage(lang);
-  } else {
-    i18next.emit('languageChanged', lang);
-  }
-  localStorage.setItem(LANG_KEY, lang);
-}
-
-export async function bootstrapI18n(): Promise<string> {
-  ensureInit();
-  const lang = currentLang();
-  await i18next.changeLanguage(lang);
-  return lang;
-}
-
-export async function loadLocales(): Promise<{ code: string; name: string }[]> {
-  return [
+const cim = createI18n({
+  app: 'approval',
+  defaultLng: DEFAULT_LANG,
+  builtin: { 'zh-CN': zhCN, 'en-US': enUS },
+  locales: [
     { code: 'zh-CN', name: '简体中文' },
     { code: 'en-US', name: 'English' },
-  ];
-}
+  ],
+  dev: import.meta.env.DEV,
+});
 
-export { i18next };
-export default i18next;
+export const currentLang = (): string => cim.currentLang();
+export const changeLanguage = (lang: string): Promise<void> => cim.changeLanguage(lang);
+export const bootstrapI18n = (): Promise<string> => cim.bootstrap();
+export const loadLocales = () => cim.loadLocales();
+
+export const i18next = cim.instance;
+export default cim.instance;
