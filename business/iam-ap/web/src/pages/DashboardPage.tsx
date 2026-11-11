@@ -1,18 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useResource } from '@cim/data';
+import {
+  CimSpin,
+  CimTag,
+  DataTable,
+  EmptyState,
+  Page,
+  Panel,
+  type DataTableColumn,
+} from '@cim/ui';
+import type { StatusTone } from '@cim/theme';
 import * as api from '@/lib/api';
 import type { OverviewDto } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { hasPermission } from '@/lib/permissions';
 import { OVERVIEW_VIEW } from '@/lib/permCodes';
 import { auditLabel, auditTone, fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
-import Panel from '@/components/Panel';
 import {
   IconAlert,
   IconApps,
-  IconGauge,
-  IconInbox,
   IconList,
   IconLock,
   IconMonitor,
@@ -21,6 +29,12 @@ import {
   IconUser,
   IconUsers,
 } from '@/components/Icons';
+
+/** `auditTone` 的 4 档 → 平台 5 档（info 落 run，道理同审计页）。 */
+function toneOf(type: string, result?: string | null): StatusTone {
+  const v = auditTone(type, result);
+  return v === 'info' ? 'run' : v;
+}
 
 /**
  * 概览：
@@ -39,44 +53,87 @@ export default function DashboardPage() {
 }
 
 function AdminOverview() {
-  const [ov, setOv] = useState<OverviewDto | null>(null);
-  const [err, setErr] = useState('');
   const navigate = useNavigate();
   const { t } = useTranslation();
 
-  useEffect(() => {
-    api
-      .get<OverviewDto>('/admin/overview')
-      .then(setOv)
-      .catch((e: any) => setErr(e?.msg || t('iam.dashboard.errLoad')));
-  }, []);
+  const ovRes = useResource<OverviewDto>(({ signal }) => api.get<OverviewDto>('/admin/overview', undefined, { signal }));
 
-  if (err) {
+  const eventColumns = useMemo<Array<DataTableColumn<OverviewDto['recentEvents'][number]>>>(
+    () => [
+      {
+        key: 'createTime',
+        titleKey: 'iam.dashboard.th.time',
+        width: 150,
+        mono: true,
+        render: (e) => <span className="dim">{fmtRelative(e.createTime)}</span>,
+      },
+      {
+        key: 'type',
+        titleKey: 'iam.dashboard.th.type',
+        width: 150,
+        render: (e) => (
+          <CimTag size="small" tone={toneOf(e.type, e.result)}>
+            {auditLabel(e.type)}
+          </CimTag>
+        ),
+      },
+      {
+        key: 'actor',
+        titleKey: 'iam.dashboard.th.operator',
+        width: 130,
+        mono: true,
+        ellipsis: true,
+        render: (e) => e.actor ?? '—',
+      },
+      {
+        key: 'subject',
+        titleKey: 'iam.dashboard.th.target',
+        width: 140,
+        mono: true,
+        ellipsis: true,
+        render: (e) => e.subject ?? '—',
+      },
+      {
+        key: 'detail',
+        titleKey: 'iam.dashboard.th.detail',
+        ellipsis: true,
+        render: (e) => <span className="dim">{e.detail ?? '—'}</span>,
+      },
+    ],
+    [],
+  );
+
+  if (ovRes.error) {
     return (
-      <div className="page">
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      </div>
+      <Page>
+        <Panel title={t('iam.dashboard.platformTitle')}>
+          <div className="alert err">
+            <IconAlert width={15} height={15} />
+            <span>{ovRes.error.message || t('iam.dashboard.errLoad')}</span>
+          </div>
+          <button className="btn-sm" style={{ marginTop: 12 }} onClick={ovRes.refresh}>
+            {t('iam.common.refresh')}
+          </button>
+        </Panel>
+      </Page>
     );
   }
 
+  const ov = ovRes.data;
   if (!ov) {
     return (
-      <Panel title={t('iam.dashboard.platformTitle')}>
-        <div className="empty">
-          <IconGauge width={24} height={24} />
-          <b>{t('iam.dashboard.loadingPlatform')}</b>
-        </div>
-      </Panel>
+      <Page>
+        <Panel title={t('iam.dashboard.platformTitle')}>
+          <CimSpin block height={240} />
+        </Panel>
+      </Page>
     );
   }
 
   const failTone = ov.loginFailureCount > 0 ? 'warn' : 'ok';
 
   return (
-    <div className="page">
+    <Page>
       <div className="kpi-grid">
         <Kpi icon={<IconUsers width={16} height={16} />} label={t('iam.dashboard.kpiUser')} value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={t('iam.dashboard.kpiUserSub', { n: ov.disabledUserCount })} />
         <Kpi icon={<IconUser width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiProfile')} value={ov.profileCount} sub={t('iam.dashboard.kpiProfileSub', { n: ov.adProfileCount })} />
@@ -91,7 +148,6 @@ function AdminOverview() {
       <Panel
         title={t('iam.dashboard.recentAudit')}
         sub={t('iam.dashboard.recentAuditSub')}
-        flush
         actions={
           <button className="btn-ghost btn-sm" onClick={() => navigate('/audit')}>
             <IconList width={13} height={13} />
@@ -99,41 +155,17 @@ function AdminOverview() {
           </button>
         }
       >
-        {ov.recentEvents.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th style={{ width: 150 }}>{t('iam.dashboard.th.time')}</th>
-                  <th style={{ width: 120 }}>{t('iam.dashboard.th.type')}</th>
-                  <th style={{ width: 120 }}>{t('iam.dashboard.th.operator')}</th>
-                  <th style={{ width: 130 }}>{t('iam.dashboard.th.target')}</th>
-                  <th>{t('iam.dashboard.th.detail')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ov.recentEvents.map((e) => (
-                  <tr key={e.id}>
-                    <td className="mono dim">{fmtRelative(e.createTime)}</td>
-                    <td>
-                      <span className={'tag ' + auditTone(e.type, e.result)}>{auditLabel(e.type)}</span>
-                    </td>
-                    <td className="mono">{e.actor ?? '—'}</td>
-                    <td className="mono">{e.subject ?? '—'}</td>
-                    <td className="dim">{e.detail ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconInbox width={22} height={22} />
-            <b>{t('iam.dashboard.noAudit')}</b>
-          </div>
-        )}
+        <DataTable
+          flat
+          columns={eventColumns}
+          rows={ov.recentEvents}
+          rowKey={(e) => e.id}
+          onRefresh={ovRes.refresh}
+          emptyTitleKey="iam.dashboard.noAudit"
+          scrollX="max-content"
+        />
       </Panel>
-    </div>
+    </Page>
   );
 }
 
@@ -141,24 +173,87 @@ function PersonalOverview() {
   const user = useAuthStore((s) => s.user);
   const { t } = useTranslation();
 
+  const orgs = user?.orgs ?? [];
+  const roleEntries = Object.entries(user?.roles ?? {});
+  const roleCount = roleEntries.reduce((sum, [, roles]) => sum + roles.length, 0);
+  const apps = user?.apps ?? [];
+
+  const orgColumns = useMemo<Array<DataTableColumn<(typeof orgs)[number]>>>(
+    () => [
+      {
+        key: 'name',
+        titleKey: 'iam.dashboard.th.org',
+        render: (o) => (
+          <>
+            {o.name} <span className="cim-mono dim">{o.code}</span>
+          </>
+        ),
+      },
+      {
+        key: 'nodeType',
+        titleKey: 'iam.dashboard.th.type',
+        width: 90,
+        render: (o) => (
+          <CimTag size="small">{orgTypeLabel(o.nodeType)}</CimTag>
+        ),
+      },
+      {
+        key: 'primary',
+        titleKey: 'iam.dashboard.th.primary',
+        width: 80,
+        render: (o) => (o.primary ? <CimTag size="small" tone="ok">{t('iam.dashboard.yes')}</CimTag> : <span className="dim">—</span>),
+      },
+    ],
+    [t],
+  );
+
+  const matrixColumns = useMemo<Array<DataTableColumn<{ app: string; roles: string[] }>>>(
+    () => [
+      { key: 'app', titleKey: 'iam.dashboard.th.appCode', mono: true, width: 200, render: (r) => r.app },
+      {
+        key: 'admitted',
+        titleKey: 'iam.dashboard.th.admission',
+        width: 130,
+        render: () => (
+          <CimTag size="small" tone="ok">
+            {t('iam.dashboard.admitted')}
+          </CimTag>
+        ),
+      },
+      {
+        key: 'roles',
+        titleKey: 'iam.dashboard.th.roles',
+        render: (r) =>
+          r.roles.length ? (
+            <div className="tag-list">
+              {r.roles.map((x) => (
+                <CimTag key={x} size="small" tone="run">
+                  {x}
+                </CimTag>
+              ))}
+            </div>
+          ) : (
+            <CimTag size="small">{t('iam.dashboard.noRole')}</CimTag>
+          ),
+      },
+    ],
+    [t],
+  );
+
   if (!user) {
     return (
-      <Panel title={t('iam.dashboard.profileTitle')}>
-        <div className="empty">
-          <IconGauge width={24} height={24} />
-          <b>{t('iam.dashboard.loadingUser')}</b>
-        </div>
-      </Panel>
+      <Page>
+        <Panel title={t('iam.dashboard.profileTitle')}>
+          <EmptyState titleKey="iam.dashboard.loadingUser" />
+        </Panel>
+      </Page>
     );
   }
 
-  const apps = user.apps ?? [];
-  const roleEntries = Object.entries(user.roles ?? {});
-  const roleCount = roleEntries.reduce((sum, [, roles]) => sum + roles.length, 0);
-  const orgs = user.orgs ?? [];
+  const matrixRows = roleEntries.map(([app, roles]) => ({ app, roles }));
 
   return (
-    <div className="page">
+    <Page>
       <div className="kpi-grid">
         <Kpi icon={<IconUser width={16} height={16} />} label={t('iam.dashboard.kpiUserId')} value={user.userId} />
         <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApps')} value={apps.length} />
@@ -187,109 +282,49 @@ function PersonalOverview() {
         </Panel>
 
         <Panel title={t('iam.dashboard.myOrgsTitle')} sub={t('iam.dashboard.myOrgsSub')}>
-          {orgs.length ? (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('iam.dashboard.th.org')}</th>
-                    <th style={{ width: 84 }}>{t('iam.dashboard.th.type')}</th>
-                    <th style={{ width: 76 }}>{t('iam.dashboard.th.primary')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orgs.map((o) => (
-                    <tr key={o.orgId}>
-                      <td>
-                        {o.name} <span className="mono dim">{o.code}</span>
-                      </td>
-                      <td>
-                        <span className="tag">{orgTypeLabel(o.nodeType)}</span>
-                      </td>
-                      <td>{o.primary ? <span className="tag ok">{t('iam.dashboard.yes')}</span> : <span className="dim">—</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="empty">
-              <IconTree width={22} height={22} />
-              <b>{t('iam.dashboard.noOrgs')}</b>
-              <span>{t('iam.dashboard.noOrgsHint')}</span>
-            </div>
-          )}
+          <DataTable
+            flat
+            columns={orgColumns}
+            rows={orgs}
+            rowKey={(o) => o.orgId}
+            emptyTitleKey="iam.dashboard.noOrgs"
+            emptyHintKey="iam.dashboard.noOrgsHint"
+            showCount={false}
+          />
         </Panel>
       </div>
 
-        <Panel title={t('iam.dashboard.sessionTitle')} sub={t('iam.dashboard.sessionSub')}>
-          <dl className="meta">
-            <dt className="meta-k">{t('iam.dashboard.mk.authSrc')}</dt>
-            <dd className="meta-v">{t('iam.dashboard.v.localCred')}</dd>
-            <dt className="meta-k">{t('iam.dashboard.mk.signAlgo')}</dt>
-            <dd className="meta-v mono">RS256 / JWT</dd>
-            <dt className="meta-k">{t('iam.dashboard.mk.verify')}</dt>
-            <dd className="meta-v">{t('iam.dashboard.v.jwks')}</dd>
-            <dt className="meta-k">{t('iam.dashboard.mk.admission')}</dt>
-            <dd className="meta-v mono">{t('iam.dashboard.v.appsClaim')}</dd>
-            <dt className="meta-k">{t('iam.dashboard.mk.invalid')}</dt>
-            <dd className="meta-v">{t('iam.dashboard.v.version')}</dd>
-          </dl>
-        </Panel>
-
-        <Panel
-          title={t('iam.dashboard.matrixTitle')}
-          sub={t('iam.dashboard.matrixSub')}
-          flush
-          actions={<span className="tag">{t('iam.dashboard.matrixCount', { n: apps.length })}</span>}
-        >
-        {roleEntries.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                    <th>{t('iam.dashboard.th.appCode')}</th>
-                    <th>{t('iam.dashboard.th.admission')}</th>
-                    <th>{t('iam.dashboard.th.roles')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roleEntries.map(([app, roles]) => (
-                  <tr key={app}>
-                    <td className="mono">{app}</td>
-                    <td>
-                      <span className="status">
-                        <i className="led ok" />
-                        <b>{t('iam.dashboard.admitted')}</b>
-                      </span>
-                    </td>
-                    <td>
-                      {roles.length ? (
-                        <div className="tag-list">
-                          {roles.map((r) => (
-                            <span key={r} className="tag pri">
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="tag">{t('iam.dashboard.noRole')}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-              <IconInbox width={22} height={22} />
-              <b>{t('iam.dashboard.noApp')}</b>
-              <span>{t('iam.dashboard.noAppHint')}</span>
-          </div>
-        )}
+      <Panel title={t('iam.dashboard.sessionTitle')} sub={t('iam.dashboard.sessionSub')}>
+        <dl className="meta">
+          <dt className="meta-k">{t('iam.dashboard.mk.authSrc')}</dt>
+          <dd className="meta-v">{t('iam.dashboard.v.localCred')}</dd>
+          <dt className="meta-k">{t('iam.dashboard.mk.signAlgo')}</dt>
+          <dd className="meta-v mono">RS256 / JWT</dd>
+          <dt className="meta-k">{t('iam.dashboard.mk.verify')}</dt>
+          <dd className="meta-v">{t('iam.dashboard.v.jwks')}</dd>
+          <dt className="meta-k">{t('iam.dashboard.mk.admission')}</dt>
+          <dd className="meta-v mono">{t('iam.dashboard.v.appsClaim')}</dd>
+          <dt className="meta-k">{t('iam.dashboard.mk.invalid')}</dt>
+          <dd className="meta-v">{t('iam.dashboard.v.version')}</dd>
+        </dl>
       </Panel>
-    </div>
+
+      <Panel
+        title={t('iam.dashboard.matrixTitle')}
+        sub={t('iam.dashboard.matrixSub')}
+        actions={<CimTag>{t('iam.dashboard.matrixCount', { n: apps.length })}</CimTag>}
+      >
+        <DataTable
+          flat
+          columns={matrixColumns}
+          rows={matrixRows}
+          rowKey={(r) => r.app}
+          emptyTitleKey="iam.dashboard.noApp"
+          emptyHintKey="iam.dashboard.noAppHint"
+          showCount={false}
+        />
+      </Panel>
+    </Page>
   );
 }
 

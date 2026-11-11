@@ -1,14 +1,23 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimInput,
+  CimSelect,
+  EmptyState,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import PermTree from '@/components/PermTree';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/components/Icons';
+import { IconAlert, IconPlus, IconTrash } from '@/components/Icons';
 
 /**
  * 权限管理（`/permissions`）：权限点 CRUD（`module:res:action`）。
@@ -27,58 +36,37 @@ import { IconAlert, IconCheckCircle, IconPlus, IconRefresh, IconTrash } from '@/
  */
 export default function PermissionsAdminPage() {
   const { t } = useTranslation();
+  const toast = useToast();
+  const confirm = useConfirm();
   const canRead = useHasAllPermissions([PERM_LIST, SYS.PERM_LIST]);
   const canRemove = useHasAllPermissions([PERM_DELETE, SYS.PERM_REMOVE]);
 
-  const [rows, setRows] = useState<SysPermissionDto[]>([]);
-  const [menuTree, setMenuTree] = useState<MenuTreeNode[]>([]);
   const [keyword, setKeyword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [msg, setMsg] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const saveCodes = draft?.id ? [PERM_UPDATE, SYS.PERM_SAVE] : [PERM_CREATE, SYS.PERM_SAVE];
 
-  async function load() {
-    if (!canRead) return;
-    setLoading(true);
-    setErr('');
-    try {
-      const p = await api.rootGet<PageResultDto<SysPermissionDto>>('/sys/permissions/page', {
-        page: 1,
-        size: 500,
-        sort: 'code,asc',
-      });
-      setRows(p?.records ?? []);
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.common.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const listRes = useResource<SysPermissionDto[]>(
+    async ({ signal }) => {
+      const p = await api.rootGet<PageResultDto<SysPermissionDto>>(
+        '/sys/permissions/page',
+        { page: 1, size: 500, sort: 'code,asc' },
+        { signal },
+      );
+      return p?.records ?? [];
+    },
+    { enabled: canRead },
+  );
 
-  /** 页面归属目录（可失败：无 sys:menu:list 时回退 module 分组，不拖垮主功能）。 */
-  async function loadMenuTree() {
-    try {
-      const tree = await api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true });
-      setMenuTree(tree ?? []);
-    } catch {
-      setMenuTree([]);
-    }
-  }
+  // 菜单树只用于「页面归属目录」：取不到（无 sys:menu:list）就回退 module 分组，故吞掉 error
+  const treeRes = useResource<MenuTreeNode[]>(
+    ({ signal }) => api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal }),
+    { enabled: canRead },
+  );
 
-  useEffect(() => {
-    load();
-    loadMenuTree();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRead]);
-
-  function flash(text: string) {
-    setMsg(text);
-    setTimeout(() => setMsg(''), 3000);
-  }
+  const rows = listRes.data ?? [];
+  const menuTree = treeRes.error ? [] : treeRes.data ?? [];
 
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
@@ -117,13 +105,11 @@ export default function PermissionsAdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuTree, keyword, permByCode]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function onSubmit() {
     if (!draft) return;
-    setErr('');
     const code = draft.code.trim();
     if (code.split(':').length !== 3) {
-      setErr(t('iam.admin.perms.invalidCode'));
+      toast.error(t('iam.admin.perms.invalidCode'));
       return;
     }
     setBusy(true);
@@ -134,10 +120,10 @@ export default function PermissionsAdminPage() {
       } else {
         await api.rootPost<SysPermissionDto>('/sys/permissions', edits);
       }
-      flash(t('iam.common.saved'));
-      await load();
+      toast.success(t('iam.common.saved'));
+      listRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.common.loadFailed'));
+      toast.error(e?.msg || t('iam.common.loadFailed'));
     } finally {
       setBusy(false);
     }
@@ -145,16 +131,22 @@ export default function PermissionsAdminPage() {
 
   async function onDelete() {
     if (!draft?.id) return;
-    if (!window.confirm(`${t('iam.common.confirmDelete')}\n${draft.code}`)) return;
-    setErr('');
+    const ok = await confirm({
+      title: t('iam.common.delete'),
+      content: draft.code,
+      danger: true,
+      okKey: 'iam.common.delete',
+      cancelKey: 'iam.common.cancel',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api.rootDel<void>(`/sys/permissions/${encodeURIComponent(draft.id)}`);
-      flash(t('iam.common.deleted'));
+      toast.success(t('iam.common.deleted'));
       setDraft(null);
-      await load();
+      listRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.common.loadFailed'));
+      toast.error(e?.msg || t('iam.common.loadFailed'));
     } finally {
       setBusy(false);
     }
@@ -162,32 +154,19 @@ export default function PermissionsAdminPage() {
 
   if (!canRead) {
     return (
-      <div className="page">
+      <Page>
         <Panel>
           <div className="alert warn">
             <IconAlert width={15} height={15} />
             <span>{t('iam.common.noPlatformPerm')}</span>
           </div>
         </Panel>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="alert ok">
-          <IconCheckCircle width={15} height={15} />
-          <span>{msg}</span>
-        </div>
-      )}
-
+    <Page>
       <div className="split">
         <Panel
           className="scroll-y"
@@ -200,60 +179,57 @@ export default function PermissionsAdminPage() {
                 <button
                   className="icon-btn"
                   title={t('iam.admin.perms.new')}
-                  onClick={() => {
-                    setErr('');
-                    setDraft({ id: '', code: 'iam:', name: '', status: 'ENABLED', origin: null });
-                  }}
+                  onClick={() => setDraft({ id: '', code: 'iam:', name: '', status: 'ENABLED', origin: null })}
                 >
                   <IconPlus width={14} height={14} />
                 </button>
               </Perms>
-              <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-                <IconRefresh width={13} height={13} />
-                {loading ? t('iam.common.loading') : t('iam.common.refresh')}
+              <button className="btn-ghost btn-sm" onClick={listRes.refresh} disabled={listRes.loading}>
+                {listRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
               </button>
             </>
           }
         >
           <div style={{ padding: '10px 12px 0' }}>
-            <input
-              className="mono"
-              placeholder={t('iam.common.search')}
+            <CimInput
+              id="perm-kw"
+              mono
               value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
+              onChange={setKeyword}
+              placeholderKey="iam.common.search"
+              allowClear
             />
           </div>
-          {filtered.length || moduleGroups.length ? (
-            <>
-              <PermTree
-                nodes={filteredTree}
-                permIdByCode={permIdByCode}
-                permById={permById}
-                activePermId={draft?.id}
-                onPermClick={(p) => {
-                  setErr('');
-                  setDraft({
-                    id: p.id,
-                    code: p.code,
-                    name: p.name ?? '',
-                    status: p.status,
-                    origin: p,
-                  });
-                }}
-                groups={moduleGroups.map((g) => ({
-                  key: g.key,
-                  label: g.label,
-                  iface: true,
-                  perms: g.perms,
-                }))}
-                kw={keyword}
-              />
-            </>
-          ) : (
-            <div className="empty">
-              <IconRefresh width={22} height={22} />
-              <b>{t('iam.common.none')}</b>
+
+          {listRes.error ? (
+            <div style={{ padding: 14 }}>
+              <div className="alert err">
+                <IconAlert width={15} height={15} />
+                <span>{listRes.error.message || t('iam.common.loadFailed')}</span>
+              </div>
+              <button className="btn-sm" style={{ marginTop: 10 }} onClick={listRes.refresh}>
+                {t('iam.common.refresh')}
+              </button>
             </div>
+          ) : filtered.length || moduleGroups.length ? (
+            <PermTree
+              nodes={filteredTree}
+              permIdByCode={permIdByCode}
+              permById={permById}
+              activePermId={draft?.id}
+              onPermClick={(p) =>
+                setDraft({ id: p.id, code: p.code, name: p.name ?? '', status: p.status, origin: p })
+              }
+              groups={moduleGroups.map((g) => ({
+                key: g.key,
+                label: g.label,
+                iface: true,
+                perms: g.perms,
+              }))}
+              kw={keyword}
+            />
+          ) : (
+            <EmptyState titleKey="iam.common.none" />
           )}
         </Panel>
 
@@ -264,81 +240,77 @@ export default function PermissionsAdminPage() {
               sub={draft.id ?? t('iam.admin.perms.new')}
               actions={
                 canRemove && draft.id ? (
-                  <button className="btn-ghost btn-sm" onClick={onDelete} disabled={busy}>
+                  <button className="btn-ghost btn-sm" onClick={() => void onDelete()} disabled={busy}>
                     <IconTrash width={13} height={13} />
                     {t('iam.common.delete')}
                   </button>
                 ) : null
               }
             >
-              <form onSubmit={onSubmit}>
-                <div className="form-grid">
-                  <div className="field">
-                    <label className="field-label" htmlFor="p-code">
-                      {t('iam.field.code')}
-                      <span className="opt">{t('iam.common.required')}</span>
-                    </label>
-                    <input
-                      id="p-code"
-                      className="mono"
-                      placeholder="iam:user:create"
-                      value={draft.code}
-                      onChange={(e) => setDraft({ ...draft, code: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="field-label" htmlFor="p-name">
-                      {t('iam.field.name')}
-                    </label>
-                    <input
-                      id="p-name"
-                      value={draft.name}
-                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="field-label" htmlFor="p-status">
-                      {t('iam.common.enabled')} / {t('iam.common.disabled')}
-                    </label>
-                    <select
-                      id="p-status"
-                      value={draft.status}
-                      onChange={(e) =>
-                        setDraft({ ...draft, status: e.target.value as 'ENABLED' | 'DISABLED' })
-                      }
-                    >
-                      <option value="ENABLED">{t('iam.common.enabled')}</option>
-                      <option value="DISABLED">{t('iam.common.disabled')}</option>
-                    </select>
-                  </div>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="field-label" htmlFor="p-code">
+                    {t('iam.field.code')}
+                    <span className="opt">{t('iam.common.required')}</span>
+                  </label>
+                  <CimInput
+                    id="p-code"
+                    mono
+                    placeholder="iam:user:create"
+                    value={draft.code}
+                    onChange={(v) => setDraft({ ...draft, code: v })}
+                  />
                 </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="p-name">
+                    {t('iam.field.name')}
+                  </label>
+                  <CimInput
+                    id="p-name"
+                    value={draft.name}
+                    onChange={(v) => setDraft({ ...draft, name: v })}
+                  />
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="p-status">
+                    {t('iam.common.enabled')} / {t('iam.common.disabled')}
+                  </label>
+                  <CimSelect
+                    value={draft.status}
+                    onChange={(v) =>
+                      setDraft({ ...draft, status: (typeof v === 'string' ? v : 'ENABLED') as 'ENABLED' | 'DISABLED' })
+                    }
+                    options={[
+                      { value: 'ENABLED', labelKey: 'iam.common.enabled' },
+                      { value: 'DISABLED', labelKey: 'iam.common.disabled' },
+                    ]}
+                    allowClear={false}
+                  />
+                </div>
+              </div>
 
-                <p className="hint">{t('iam.admin.perms.codeHint')}</p>
-                <p className="hint">{t('iam.admin.perms.moduleOwner')}</p>
+              <p className="hint">{t('iam.admin.perms.codeHint')}</p>
+              <p className="hint">{t('iam.admin.perms.moduleOwner')}</p>
 
-                <div className="sub-head" style={{ marginTop: 12 }}>
-                  <Perms codes={saveCodes}>
-                    <button type="submit" className="btn" disabled={busy}>
-                      {busy ? t('iam.common.saving') : t('iam.common.save')}
-                    </button>
-                  </Perms>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => setDraft(null)}>
-                    {t('iam.common.close')}
+              <div className="sub-head" style={{ marginTop: 12 }}>
+                <Perms codes={saveCodes}>
+                  <button type="button" className="btn" disabled={busy} onClick={() => void onSubmit()}>
+                    {busy ? t('iam.common.saving') : t('iam.common.save')}
                   </button>
-                </div>
-              </form>
+                </Perms>
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setDraft(null)}>
+                  {t('iam.common.close')}
+                </button>
+              </div>
             </Panel>
           ) : (
             <Panel title={t('iam.admin.perms.count')}>
-              <div className="empty">
-                <IconPlus width={22} height={22} />
-                <b>{t('iam.admin.perms.new')}</b>
-              </div>
+              <EmptyState titleKey="iam.admin.perms.new" />
             </Panel>
           )}
         </div>
       </div>
-    </div>
+    </Page>
   );
 }
 
@@ -347,6 +319,6 @@ interface Draft {
   code: string;
   name: string;
   status: 'ENABLED' | 'DISABLED';
-  /** 编辑态保留原实体，提交时整体回填，避免丢列。 */
+  /** 编辑态保留原实体，提交时整体覆盖，避免丢列。 */
   origin: SysPermissionDto | null;
 }

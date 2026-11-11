@@ -1,67 +1,76 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import { CimSpin, CimTag, Page, Panel, useToast } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { SettingsDto, SyncResult } from '@/types';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { SYNC_RUN } from '@/lib/permCodes';
-import { IconAlert, IconSliders, IconSync } from '@/components/Icons';
+import { IconAlert, IconSync } from '@/components/Icons';
 
-/** 系统设置：只读展示当前生效的运行时策略参数（目录同步按钮按 `iam:sync:run` 显隐）。 */
+/**
+ * 系统设置：只读展示当前生效的运行时策略参数（目录同步按钮按 `iam:sync:run` 显隐）。
+ *
+ * <p>页面是纯读 + 一个动作，故只把取数换成 `useResource`（加载 / 失败 / 重试三态由它承载），
+ * 键值栅格保留 `dl.meta` —— 平台没有对应组件，`CimDescriptions` 的行高会让 6 组参数
+ * 从「一屏读完」变成要滚动，属于为统一而牺牲可读性。</p>
+ */
 export default function SettingsPage() {
   const { t } = useTranslation();
-  const [s, setS] = useState<SettingsDto | null>(null);
-  const [err, setErr] = useState('');
+  const toast = useToast();
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncMsg, setSyncMsg] = useState('');
 
-  useEffect(() => {
-    api.get<SettingsDto>('/admin/settings').then(setS).catch((e: any) => setErr(e?.msg || t('iam.settings.errLoad')));
-  }, []);
+  const sRes = useResource<SettingsDto>(({ signal }) => api.get<SettingsDto>('/admin/settings', undefined, { signal }));
+  const s = sRes.data;
 
   async function onSync() {
-    setErr('');
     setSyncBusy(true);
     try {
       const r = await api.post<SyncResult>('/admin/sync/ad');
       if (r.skipped) {
-        setSyncMsg(t('iam.settings.msgSkipped', { reason: r.reason }));
+        toast.warning(t('iam.settings.msgSkipped', { reason: r.reason }));
       } else if (r.reason) {
-        setSyncMsg(r.reason);
+        toast.info(r.reason);
       } else {
-        setSyncMsg(t('iam.settings.msgDone', { orgs: r.orgCount, users: r.userCount, deactivated: r.deactivated }));
+        toast.success(
+          t('iam.settings.msgDone', { orgs: r.orgCount, users: r.userCount, deactivated: r.deactivated }),
+        );
       }
     } catch (e: any) {
-      setErr(e?.msg || t('iam.settings.errSync'));
+      toast.error(e?.msg || t('iam.settings.errSync'));
     } finally {
       setSyncBusy(false);
     }
   }
 
-  if (err) {
+  if (sRes.error) {
     return (
-      <div className="page">
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      </div>
+      <Page>
+        <Panel title={t('iam.settings.title')}>
+          <div className="alert err">
+            <IconAlert width={15} height={15} />
+            <span>{sRes.error.message || t('iam.settings.errLoad')}</span>
+          </div>
+          <button className="btn-sm" style={{ marginTop: 12 }} onClick={sRes.refresh}>
+            {t('iam.common.refresh')}
+          </button>
+        </Panel>
+      </Page>
     );
   }
 
   if (!s) {
     return (
-      <Panel title={t('iam.settings.title')}>
-        <div className="empty">
-          <IconSliders width={22} height={22} />
-          <b>{t('iam.settings.loading')}</b>
-        </div>
-      </Panel>
+      <Page>
+        <Panel title={t('iam.settings.title')}>
+          <CimSpin block height={240} />
+        </Panel>
+      </Page>
     );
   }
 
   return (
-    <div className="page">
+    <Page>
       <div className="grid-2">
         <Panel title={t('iam.settings.authTitle')} sub={t('iam.settings.authSub')}>
           <dl className="meta">
@@ -72,14 +81,18 @@ export default function SettingsPage() {
             <dt className="meta-k">{t('iam.settings.mk.pepper')}</dt>
             <dd className="meta-v">
               {s.pepperConfigured ? (
-                <span className="tag ok">{t('iam.settings.configured')}</span>
+                <CimTag size="small" tone="ok">{t('iam.settings.configured')}</CimTag>
               ) : (
-                <span className="tag err">{t('iam.settings.pepperMissing')}</span>
+                <CimTag size="small" tone="err">{t('iam.settings.pepperMissing')}</CimTag>
               )}
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.bootstrap')}</dt>
             <dd className="meta-v">
-              {s.bootstrapEnabled ? <span className="tag ok">{t('iam.settings.enabled')}</span> : <span className="tag">{t('iam.settings.disabled')}</span>}
+              {s.bootstrapEnabled ? (
+                <CimTag size="small" tone="ok">{t('iam.settings.enabled')}</CimTag>
+              ) : (
+                <CimTag size="small">{t('iam.settings.disabled')}</CimTag>
+              )}
               <span className="mono"> · {s.bootstrapAdminUsername}</span>
             </dd>
           </dl>
@@ -97,7 +110,11 @@ export default function SettingsPage() {
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.rsaSrc')}</dt>
             <dd className="meta-v">
-              {s.rsaKeyInjected ? <span className="tag ok">{t('iam.settings.kms')}</span> : <span className="tag warn">{t('iam.settings.rsaTemp')}</span>}
+              {s.rsaKeyInjected ? (
+                <CimTag size="small" tone="ok">{t('iam.settings.kms')}</CimTag>
+              ) : (
+                <CimTag size="small" tone="warn">{t('iam.settings.rsaTemp')}</CimTag>
+              )}
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.jwks')}</dt>
             <dd className="meta-v mono">{s.jwksPath}</dd>
@@ -121,9 +138,9 @@ export default function SettingsPage() {
           {s.webAllowedOrigins?.length ? (
             <div className="tag-list">
               {s.webAllowedOrigins.map((o) => (
-                <span key={o} className="tag mono">
-                  {o}
-                </span>
+                <CimTag key={o} size="small">
+                  <span className="mono">{o}</span>
+                </CimTag>
               ))}
             </div>
           ) : (
@@ -138,9 +155,9 @@ export default function SettingsPage() {
             <dt className="meta-k">{t('iam.settings.mk.dirApi')}</dt>
             <dd className="meta-v">
               {s.directoryApiEnabled ? (
-                <span className="tag ok">{t('iam.settings.dirEnabled')}</span>
+                <CimTag size="small" tone="ok">{t('iam.settings.dirEnabled')}</CimTag>
               ) : (
-                <span className="tag err">{t('iam.settings.dirDisabled')}</span>
+                <CimTag size="small" tone="err">{t('iam.settings.dirDisabled')}</CimTag>
               )}
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.authMethod')}</dt>
@@ -156,14 +173,18 @@ export default function SettingsPage() {
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.syncSwitch')}</dt>
             <dd className="meta-v">
-              {s.adSyncEnabled ? <span className="tag ok">{t('iam.settings.on')}</span> : <span className="tag">{t('iam.common.close')}</span>}
+              {s.adSyncEnabled ? (
+                <CimTag size="small" tone="ok">{t('iam.settings.on')}</CimTag>
+              ) : (
+                <CimTag size="small">{t('iam.common.close')}</CimTag>
+              )}
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.connCfg')}</dt>
             <dd className="meta-v">
               {s.adSyncConfigured ? (
-                <span className="tag ok">{t('iam.settings.ready')}</span>
+                <CimTag size="small" tone="ok">{t('iam.settings.ready')}</CimTag>
               ) : (
-                <span className="tag warn">{t('iam.settings.syncNotCfg')}</span>
+                <CimTag size="small" tone="warn">{t('iam.settings.syncNotCfg')}</CimTag>
               )}
             </dd>
             <dt className="meta-k">{t('iam.settings.mk.baseDn')}</dt>
@@ -175,23 +196,24 @@ export default function SettingsPage() {
           </dl>
           <div className="row" style={{ marginTop: 12 }}>
             <Perms code={SYNC_RUN}>
-              <button type="button" className="btn-sm" onClick={onSync} disabled={syncBusy}>
+              <button type="button" className="btn-sm" onClick={() => void onSync()} disabled={syncBusy}>
                 <IconSync width={13} height={13} />
                 {syncBusy ? t('iam.settings.syncing') : t('iam.settings.sync')}
               </button>
             </Perms>
-            {syncMsg && <span className="hint" style={{ margin: 0 }}>{syncMsg}</span>}
           </div>
         </Panel>
       </div>
 
       <Panel title={t('iam.settings.noteTitle')} sub={t('iam.settings.noteSub')}>
         <ul className="note-list">
-          <li><b>{t('iam.settings.note1')}</b></li>
+          <li>
+            <b>{t('iam.settings.note1')}</b>
+          </li>
           <li>{t('iam.settings.note2')}</li>
           <li>{t('iam.settings.note3')}</li>
         </ul>
       </Panel>
-    </div>
+    </Page>
   );
 }

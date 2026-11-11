@@ -1,20 +1,30 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimInput,
+  CimSelect,
+  CimSwitch,
+  CimTag,
+  DataTable,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, OrgGrantRow, OrgNode } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { GRANT_GRANT, GRANT_REVOKE } from '@/lib/permCodes';
-import {
-  IconAlert,
-  IconCheckCircle,
-  IconOrgGrant,
-  IconPlus,
-  IconRefresh,
-  IconShield,
-  IconTrash,
-} from '@/components/Icons';
+import { IconPlus, IconShield, IconTrash } from '@/components/Icons';
+
+interface Bundle {
+  grants: OrgGrantRow[];
+  nodes: OrgNode[];
+  apps: AppRegistration[];
+}
 
 /**
  * 组织授权（组织 × 应用）。
@@ -25,19 +35,36 @@ import {
  */
 export default function OrgGrantsPage() {
   const { t } = useTranslation();
-  const [grants, setGrants] = useState<OrgGrantRow[]>([]);
-  const [nodes, setNodes] = useState<OrgNode[]>([]);
-  const [apps, setApps] = useState<AppRegistration[]>([]);
-  const [err, setErr] = useState('');
-  const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [orgId, setOrgId] = useState('');
   const [appCode, setAppCode] = useState('');
   const [roles, setRoles] = useState('');
   const [includeChildren, setIncludeChildren] = useState(true);
-  const [affected, setAffected] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  // 三份基础字典一次取回：分成三个 useResource 会让「面板先画表格后出选项」闪一下
+  const bundleRes = useResource<Bundle>(async ({ signal }) => {
+    const [grants, nodes, apps] = await Promise.all([
+      api.get<OrgGrantRow[]>('/admin/org-grants', undefined, { signal }),
+      api.get<OrgNode[]>('/admin/orgs', undefined, { signal }),
+      api.get<AppRegistration[]>('/apps', undefined, { signal }),
+    ]);
+    return { grants, nodes, apps };
+  });
+
+  const grants = bundleRes.data?.grants ?? [];
+  const nodes = bundleRes.data?.nodes ?? [];
+  const apps = bundleRes.data?.apps ?? [];
+
+  /** 选中组织的在册人数（失败静默：只是个提示数，不能拖垮表单）。 */
+  const affectedRes = useResource<string[]>(
+    ({ signal }) => api.get<string[]>(`/admin/orgs/${encodeURIComponent(orgId)}/users`, undefined, { signal }),
+    { deps: [orgId], enabled: !!orgId },
+  );
+  const affected = orgId ? affectedRes.data?.length : undefined;
 
   const orgOptions = useMemo(
     () =>
@@ -45,56 +72,22 @@ export default function OrgGrantsPage() {
         .slice()
         .sort((a, b) => a.path.localeCompare(b.path))
         .map((n) => ({
-          id: n.id,
-          label: `${'·'.repeat(Math.max(0, n.path.split('/').filter(Boolean).length - 1))} ${n.name} (${n.code})`,
-          source: n.source,
-          nodeType: n.nodeType,
+          value: n.id,
+          label: `${'·'.repeat(Math.max(0, n.path.split('/').filter(Boolean).length - 1))} ${n.name} (${n.code})${
+            n.source === 'AD_SYNCED' ? ' ［AD］' : ''
+          }`,
+          hint: orgTypeLabel(n.nodeType),
         })),
     [nodes],
   );
 
-  async function load() {
-    setLoading(true);
-    setErr('');
-    try {
-      const [g, o, a] = await Promise.all([
-        api.get<OrgGrantRow[]>('/admin/org-grants'),
-        api.get<OrgNode[]>('/admin/orgs'),
-        api.get<AppRegistration[]>('/apps'),
-      ]);
-      setGrants(g);
-      setNodes(o);
-      setApps(a);
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.orgGrants.errLoad'));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const appOptions = useMemo(
+    () => apps.map((a) => ({ value: a.appCode, label: a.appCode, hint: a.appName })),
+    [apps],
+  );
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  useEffect(() => {
-    if (!orgId) {
-      setAffected(null);
-      return;
-    }
-    api
-      .get<string[]>(`/admin/orgs/${encodeURIComponent(orgId)}/users`)
-      .then((list) => setAffected(list.length))
-      .catch(() => setAffected(null));
-  }, [orgId]);
-
-  function flash(t: string) {
-    setMsg(t);
-    setTimeout(() => setMsg(''), 3000);
-  }
-
-  async function onGrant(e: FormEvent) {
-    e.preventDefault();
-    setErr('');
+  async function onGrant() {
+    if (!orgId || !appCode) return;
     setBusy(true);
     try {
       await api.post('/admin/org-grants', {
@@ -106,183 +99,175 @@ export default function OrgGrantsPage() {
           .filter(Boolean),
         includeChildren,
       });
-      flash(t('iam.orgGrants.msgGranted', { app: appCode }));
+      toast.success(t('iam.orgGrants.msgGranted', { app: appCode }));
       setRoles('');
-      await load();
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.orgGrants.errGrant'));
+      toast.error(e?.msg || t('iam.orgGrants.errGrant'));
     } finally {
       setBusy(false);
     }
   }
 
   async function onRevoke(g: OrgGrantRow) {
-    if (!window.confirm(t('iam.orgGrants.confirmRevoke', { org: g.orgName ?? g.orgId, app: g.appCode }))) return;
-    setErr('');
+    const ok = await confirm({
+      title: t('iam.orgGrants.revoke'),
+      content: t('iam.orgGrants.confirmRevoke', { org: g.orgName ?? g.orgId, app: g.appCode }),
+      danger: true,
+      okKey: 'iam.orgGrants.revoke',
+      cancelKey: 'iam.common.cancel',
+    });
+    if (!ok) return;
+    setRevoking(`${g.orgId}:${g.appCode}`);
     try {
       await api.del(`/admin/org-grants/${encodeURIComponent(g.orgId)}/${encodeURIComponent(g.appCode)}`);
-      flash(t('iam.orgGrants.msgRevoked'));
-      await load();
+      toast.success(t('iam.orgGrants.msgRevoked'));
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.orgGrants.errRevoke'));
+      toast.error(e?.msg || t('iam.orgGrants.errRevoke'));
+    } finally {
+      setRevoking(null);
     }
   }
 
-  return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="alert ok">
-          <IconCheckCircle width={15} height={15} />
-          <span>{msg}</span>
-        </div>
-      )}
+  const columns = useMemo<Array<DataTableColumn<OrgGrantRow>>>(
+    () => [
+      { key: 'orgName', titleKey: 'iam.orgGrants.th.org', render: (g) => g.orgName ?? '—' },
+      {
+        key: 'orgCode',
+        titleKey: 'iam.orgGrants.th.code',
+        mono: true,
+        width: 150,
+        render: (g) => <span className="dim">{g.orgCode ?? g.orgId}</span>,
+      },
+      {
+        key: 'appCode',
+        titleKey: 'iam.orgGrants.th.appCode',
+        width: 140,
+        render: (g) => (
+          <CimTag size="small" tone="run">
+            <span className="mono">{g.appCode}</span>
+          </CimTag>
+        ),
+      },
+      {
+        key: 'roles',
+        titleKey: 'iam.orgGrants.th.roles',
+        render: (g) =>
+          g.roles.length ? (
+            <div className="tag-list">
+              {g.roles.map((r) => (
+                <CimTag key={r} size="small">
+                  {r}
+                </CimTag>
+              ))}
+            </div>
+          ) : (
+            <span className="dim">{t('iam.orgGrants.onlyAdmission')}</span>
+          ),
+      },
+      {
+        key: 'includeChildren',
+        titleKey: 'iam.orgGrants.th.children',
+        width: 110,
+        render: (g) =>
+          g.includeChildren ? (
+            <CimTag size="small" tone="ok">{t('iam.orgGrants.yes')}</CimTag>
+          ) : (
+            <CimTag size="small">{t('iam.orgGrants.no')}</CimTag>
+          ),
+      },
+      {
+        key: 'actions',
+        titleKey: 'iam.orgGrants.th.actions',
+        width: 110,
+        render: (g) => (
+          <Perms code={GRANT_REVOKE}>
+            <button
+              className="btn-danger btn-sm"
+              disabled={revoking === `${g.orgId}:${g.appCode}`}
+              onClick={() => void onRevoke(g)}
+            >
+              <IconTrash width={13} height={13} />
+              {t('iam.orgGrants.revoke')}
+            </button>
+          </Perms>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, revoking],
+  );
 
+  return (
+    <Page>
       <Panel
         title={t('iam.orgGrants.title')}
         sub={t('iam.orgGrants.sub')}
-        flush
-        actions={
-          <>
-            <span className="tag">{t('iam.orgGrants.count', { n: grants.length })}</span>
-            <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-              <IconRefresh width={13} height={13} />
-              {loading ? t('iam.orgGrants.refreshing') : t('iam.orgGrants.refresh')}
-            </button>
-          </>
-        }
+        actions={<CimTag>{t('iam.orgGrants.count', { n: grants.length })}</CimTag>}
       >
-        {grants.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('iam.orgGrants.th.org')}</th>
-                  <th>{t('iam.orgGrants.th.code')}</th>
-                  <th>{t('iam.orgGrants.th.appCode')}</th>
-                  <th>{t('iam.orgGrants.th.roles')}</th>
-                  <th style={{ width: 120 }}>{t('iam.orgGrants.th.children')}</th>
-                  <th style={{ width: 110 }}>{t('iam.orgGrants.th.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grants.map((g) => (
-                  <tr key={`${g.orgId}:${g.appCode}`}>
-                    <td>{g.orgName ?? '—'}</td>
-                    <td className="mono dim">{g.orgCode ?? g.orgId}</td>
-                    <td>
-                      <span className="tag pri mono">{g.appCode}</span>
-                    </td>
-                    <td>
-                      <div className="tag-list">
-                        {g.roles.length ? (
-                          g.roles.map((r) => (
-                            <span key={r} className="role-chip">
-                              {r}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="dim">{t('iam.orgGrants.onlyAdmission')}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td>{g.includeChildren ? <span className="tag ok">{t('iam.orgGrants.yes')}</span> : <span className="tag">{t('iam.orgGrants.no')}</span>}</td>
-                    <td>
-                      <div className="cell-actions">
-                        <Perms code={GRANT_REVOKE}>
-                          <button className="btn-danger btn-sm" onClick={() => onRevoke(g)}>
-                            <IconTrash width={13} height={13} />
-                            {t('iam.orgGrants.revoke')}
-                          </button>
-                        </Perms>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconOrgGrant width={22} height={22} />
-            <b>{t('iam.orgGrants.emptyTitle')}</b>
-            <span>{t('iam.orgGrants.emptyHint')}</span>
-          </div>
-        )}
+        <DataTable<OrgGrantRow>
+          flat
+          columns={columns}
+          rows={grants}
+          rowKey={(g) => `${g.orgId}:${g.appCode}`}
+          loading={bundleRes.loading}
+          error={bundleRes.error?.message}
+          onRetry={bundleRes.refresh}
+          onRefresh={bundleRes.refresh}
+          settingsKey="iam.orgGrants"
+          emptyTitleKey="iam.orgGrants.emptyTitle"
+          emptyHintKey="iam.orgGrants.emptyHint"
+          scrollX="max-content"
+        />
       </Panel>
 
       <Perms code={GRANT_GRANT}>
         <Panel title={t('iam.orgGrants.grantTitle')} sub={t('iam.orgGrants.grantSub')}>
-          <form onSubmit={onGrant}>
           <div className="row">
             <div className="field">
-              <label className="field-label" htmlFor="go">
-                {t('iam.orgGrants.f.org')}
-              </label>
-              <select id="go" value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-                <option value="">{t('iam.orgGrants.selectOrg')}</option>
-                {orgOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                    {o.source === 'AD_SYNCED' ? '［AD］' : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="field-label">{t('iam.orgGrants.f.org')}</label>
+              <CimSelect
+                value={orgId}
+                onChange={(v) => setOrgId(typeof v === 'string' ? v : '')}
+                options={orgOptions}
+                placeholderKey="iam.orgGrants.selectOrg"
+                width={300}
+              />
             </div>
             <div className="field">
-              <label className="field-label" htmlFor="ga">
-                {t('iam.orgGrants.f.appCode')}
-              </label>
-              <select id="ga" value={appCode} onChange={(e) => setAppCode(e.target.value)}>
-                <option value="">{t('iam.orgGrants.selectApp')}</option>
-                {apps.map((a) => (
-                  <option key={a.appCode} value={a.appCode}>
-                    {a.appCode}
-                    {a.appName ? ` · ${a.appName}` : ''}
-                  </option>
-                ))}
-              </select>
+              <label className="field-label">{t('iam.orgGrants.f.appCode')}</label>
+              <CimSelect
+                value={appCode}
+                onChange={(v) => setAppCode(typeof v === 'string' ? v : '')}
+                options={appOptions}
+                placeholderKey="iam.orgGrants.selectApp"
+                width={220}
+              />
             </div>
             <div className="field">
-              <label className="field-label" htmlFor="gr">
-                {t('iam.orgGrants.f.roles')}
-              </label>
-              <input
-                id="gr"
-                className="mono"
-                placeholder="OPERATOR,SHIFT_LEAD"
+              <label className="field-label">{t('iam.orgGrants.f.roles')}</label>
+              <CimInput
+                mono
                 value={roles}
-                onChange={(e) => setRoles(e.target.value)}
+                onChange={setRoles}
+                placeholder="OPERATOR,SHIFT_LEAD"
+                width={240}
               />
             </div>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={includeChildren}
-                onChange={(e) => setIncludeChildren(e.target.checked)}
-              />
-              <span>{t('iam.orgGrants.includeChildren')}</span>
-            </label>
-            <button type="submit" disabled={busy || !orgId || !appCode}>
+            <div className="field">
+              <label className="field-label">{t('iam.orgGrants.includeChildren')}</label>
+              <CimSwitch checked={includeChildren} onChange={setIncludeChildren} />
+            </div>
+            <button type="button" disabled={busy || !orgId || !appCode} onClick={() => void onGrant()}>
               <IconPlus width={13} height={13} />
               {busy ? t('iam.orgGrants.granting') : t('iam.orgGrants.grant')}
             </button>
           </div>
-        </form>
-        <p className="hint">
-          {t('iam.orgGrants.hint')}
-          {affected != null && (
-            <>
-              {' '}
-              {t('iam.orgGrants.affected', { n: affected })}
-            </>
-          )}
-        </p>
+          <p className="hint">
+            {t('iam.orgGrants.hint')}
+            {affected != null ? <> {t('iam.orgGrants.affected', { n: affected })}</> : null}
+          </p>
         </Panel>
       </Perms>
 
@@ -303,12 +288,12 @@ export default function OrgGrantsPage() {
           </li>
         </ul>
         <div className="tag-list" style={{ marginTop: 8 }}>
-          <span className="tag info">
+          <CimTag size="small" tone="run">
             <IconShield width={12} height={12} />
             {t('iam.orgGrants.divIam')}
-          </span>
+          </CimTag>
         </div>
       </Panel>
-    </div>
+    </Page>
   );
 }

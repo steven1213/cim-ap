@@ -43,6 +43,13 @@ export interface CimInputProps {
   status?: 'error' | 'warning';
   width?: number | string;
   id?: string;
+  /**
+   * 浏览器自动填充提示（`current-password` / `new-password` / `username`）。
+   *
+   * <p>口令类表单必须显式给：不给的话密码管理器无法区分「登录旧口令」与「设置新口令」，
+   * 会把新口令填进旧口令框，表现为「提示旧口令错误」。</p>
+   */
+  autoComplete?: string;
 }
 
 export function CimInput({
@@ -67,6 +74,7 @@ export function CimInput({
   status,
   width,
   id,
+  autoComplete,
 }: CimInputProps) {
   const label = useUiLabel();
   const ph = placeholderKey ? label(placeholderKey, placeholder ?? '') : placeholder;
@@ -82,6 +90,7 @@ export function CimInput({
     autoFocus,
     status,
     id,
+    autoComplete,
     onBlur,
     onPressEnter: onEnter,
     style: {

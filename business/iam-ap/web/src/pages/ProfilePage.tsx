@@ -1,20 +1,20 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { CimInput, CimTag, Page, Panel } from '@cim/ui';
 import { useAuthStore } from '@/store/authStore';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import * as api from '@/lib/api';
 import type { ChangePasswordRequest, SaltResponse } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
-import Panel from '@/components/Panel';
 import { IconAlert, IconTree } from '@/components/Icons';
 
 /**
  * 自助改密：与登录一致，浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 clientHash
  * （明文口令不出浏览器）。旧口令派生需先取服务端盐，新口令由客户端生成随机盐后派生。
  *
- * 提交成功后，服务端已 bump 该用户的令牌版本，当前会话令牌随即失效（下次请求将被验证端判 401）。
- * 因此此处主动清空本地会话并跳转登录页，强制以新口令重新登录，避免停留在已失效的会话里。
+ * <p>提交成功后，服务端已 bump 该用户的令牌版本，当前会话令牌随即失效（下次请求将被验证端判 401）。
+ * 因此此处主动清空本地会话并跳转登录页，强制以新口令重新登录，避免停留在已失效的会话里。</p>
  */
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -35,8 +35,7 @@ export default function ProfilePage() {
   const clearSession = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function onSubmit() {
     setErr('');
     if (!username) {
       setErr(t('iam.profile.errSession'));
@@ -72,7 +71,7 @@ export default function ProfilePage() {
   const canSubmit = !!oldPassword && !!newPassword && !!confirmPassword && !mismatch;
 
   return (
-    <div className="page">
+    <Page>
       <div className="grid-2">
         <Panel title={t('iam.profile.infoTitle')} sub={t('iam.profile.infoSub')}>
           <dl className="meta">
@@ -99,9 +98,11 @@ export default function ProfilePage() {
             {orgs.length ? (
               <div className="tag-list">
                 {orgs.map((o) => (
-                  <span key={o.orgId} className={'tag' + (o.primary ? ' pri' : '')} title={o.code}>
-                    {o.name}
-                    <span className="dim"> · {orgTypeLabel(o.nodeType)}</span>
+                  <span key={o.orgId} title={o.code}>
+                    <CimTag size="small" tone={o.primary ? 'run' : 'idle'}>
+                      {o.name}
+                      <span className="dim mono"> · {orgTypeLabel(o.nodeType)}</span>
+                    </CimTag>
                   </span>
                 ))}
               </div>
@@ -122,60 +123,63 @@ export default function ProfilePage() {
         </Panel>
 
         <Panel title={t('iam.profile.pwdTitle')} sub={t('iam.profile.pwdSub')}>
-          <form onSubmit={onSubmit}>
-            <div className="field">
-              <label className="field-label" htmlFor="pw-old">
-                {t('iam.profile.f.old')}
-              </label>
-              <input
-                id="pw-old"
-                type="password"
-                value={oldPassword}
-                onChange={(e) => setOld(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="pw-new">
-                {t('iam.profile.f.new')}
-              </label>
-              <input
-                id="pw-new"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNew(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="pw-confirm">
-                {t('iam.profile.f.confirm')}
-              </label>
-              <input
-                id="pw-confirm"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirm(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
+          <div className="field">
+            <label className="field-label" htmlFor="pw-old">
+              {t('iam.profile.f.old')}
+            </label>
+            <CimInput
+              id="pw-old"
+              password
+              value={oldPassword}
+              onChange={setOld}
+              autoComplete="current-password"
+            />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="pw-new">
+              {t('iam.profile.f.new')}
+            </label>
+            <CimInput
+              id="pw-new"
+              password
+              value={newPassword}
+              onChange={setNew}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="pw-confirm">
+              {t('iam.profile.f.confirm')}
+            </label>
+            <CimInput
+              id="pw-confirm"
+              password
+              value={confirmPassword}
+              onChange={setConfirm}
+              autoComplete="new-password"
+              status={mismatch ? 'error' : undefined}
+            />
+          </div>
 
-            {err && (
-              <div className="alert err" style={{ marginTop: 12 }}>
-                <IconAlert width={15} height={15} />
-                <span>{err}</span>
-              </div>
-            )}
+          {err && (
+            <div className="alert err" style={{ marginTop: 12 }}>
+              <IconAlert width={15} height={15} />
+              <span>{err}</span>
+            </div>
+          )}
 
-            <button type="submit" className="btn-block" disabled={busy || !canSubmit} style={{ marginTop: 14 }}>
-              {busy ? t('iam.profile.submitting') : t('iam.profile.submit')}
-            </button>
-          </form>
-          <p className="hint">
-            {t('iam.profile.hint')}
-          </p>
+          <button
+            type="button"
+            className="btn-block"
+            disabled={busy || !canSubmit}
+            style={{ marginTop: 14 }}
+            onClick={() => void onSubmit()}
+          >
+            {busy ? t('iam.profile.submitting') : t('iam.profile.submit')}
+          </button>
+          <p className="hint">{t('iam.profile.hint')}</p>
         </Panel>
       </div>
-    </div>
+    </Page>
   );
 }
