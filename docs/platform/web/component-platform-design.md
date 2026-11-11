@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P16d 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）、P16b–P16d IAM 其余三页（菜单 / 角色 / 多语言，含台组件 `components.css` 一处开关宽度修正）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 16/16 迁移完毕**；approval 9 页按自己的节奏排期。
+> 状态：**P0–P20 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）、P16b–P16d IAM 其余三页（菜单 / 角色 / 多语言，含台组件 `components.css` 一处开关宽度修正）。P17–P20 approval 九页 + 三个共享弹窗（含 `signal` 透传、全量取回 + 本地分页、`Promise.allSettled` 合成多路、弹窗取数失败不再关窗）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 16/16 迁移完毕**；**approval 9/9 + 3 弹窗迁移完毕**——三个应用全部收敛到 `@cim/*`。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -460,6 +460,10 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | **P16b** ✅ | IAM 菜单页：`MenusAdminPage`（手写递归 `TreeRow` → `CimTree`、9 个原生控件 → 条件字段 `FormGrid`）；台组件 `components.css` 补 `.cim-field > .ant-switch` | 真页面 + 8081 契约桩 + 8 场景 22 项断言，见 §10.19。「上级」候选排除自身与后代 |
 | **P16c** ✅ | IAM 角色页：`RolesAdminPage`（列表 → `DataTable`、`.tabs` → `CimTabs`、三份资源拆开取数） | 真页面 + 8081 契约桩 + 8 场景 26 项断言，见 §10.20。授权回包 → 可编辑 Set |
 | **P16d** ✅ | IAM 多语言页：`I18nAdminPage`（三合一 `loadAll` → 三份资源、手写 table + pager → `DataTable`、内联表单 → `CimModal`） | 真页面 + 8081 契约桩 + 8 场景 24 项断言，见 §10.21。关键词走 `useDebounced` |
+| **P17** ✅ | approval 四页：`AuditPage` / `DonePage` / `InitiatedPage` / `DashboardPage`（另有 `api.ts` 补 `signal` 透传） | 真页面 + 8085 契约桩 + 13 场景，见 §10.22。已办改「全量取回 + 本地分页」，工作台 6 路 `allSettled` |
+| **P18** ✅ | approval 两页：`CallbacksPage`（三表合一取数）/ `TodoPage`（勾选交给 `DataTable`，四弹窗换 `CimModal`） | 真页面 + 8085 契约桩 + 16 场景，见 §10.23。刷新后清空勾选 |
+| **P19** ✅ | approval 两页：`DefinitionsPage`（发起弹窗动态表单行）/ `DesignerPage`（只迁页头/查看弹窗/消息，画布保留） | 真页面 + 8085 契约桩 + 10 场景，见 §10.24。修发起弹窗自激请求循环与草稿串台 |
+| **P20** ✅ | approval 三个共享弹窗 + 企微回调页：`DetailModal` / `ResubmitModal` / `CompleteModal` / `WeComCallbackPage`（并删旧 `Modal`/`ToastHost`/`toastStore`） | 真页面 + 8085 契约桩 + 8 场景，见 §10.25。详情取数失败改为窗内可重试 |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -1198,16 +1202,78 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 
 **验证 8 场景 24 项断言**：语言 3 行 / 译文 5 行 / 缺失徽标「缺失 2 条」；点 `zh-CN` 行发 `?localeCode=zh-CN` 且 3 行；搜索框输入 `menu` 后（约 350ms 防抖）发 `?keyword=menu` 且 3 行；模块下拉选项 `[common, iam]`，选 `common` 发 `?module=common` 且 1 行；编辑弹窗回填 `iam.menu.menus`、译文框 `span 2`、按钮「取 消 / 保 存」，保存发 `POST` body 带 `id:"im1"` 后重取三份；新增语言发 `POST /locales` body `{"code":"ja-JP",...}`；行内删除 `en-US` 走确认框 → `DELETE /locales/lc2`；展开缺失后两块 chip，清空发 `DELETE /admin/i18n/missing`。
 
+### 10.22 P17 实施记录：审计 / 已办 / 我发起 / 工作台（approval 首批）（2026-11-11）
+
+**approval 的契约与前两个应用不同**，所以这一批先是契约层改动：成功响应是 `Result` 信封 `{code,msg,data}`（拦截器已解包）；身份走**查询参数** `userId/tenantId/roles`；写操作的 `actor` 放 **body**，只有 urge/withdraw 放 query。
+
+**`api.ts` 补 `RequestOptions.signal`（16 个读接口 + 3 个分页接口）**：`apiGet` 原来不接 `signal`，`useResource` 的 abort 就只是「丢弃回包」而不是断连接——切筛选时旧请求仍在跑，浏览器 6 并发很快被打满。这是「用了 `useResource` 就自动有取消」的一个反例：**取数函数不透传 signal，取消就是假的**。
+
+**`AuditPage`：草稿值 / 已提交值分离**。输入框是草稿，取数只认回车或点「查询」后的值，`enabled: !!applied` 保证未查询时**一个请求都不发**。哈希链校验改 `useMemo` 派生（原实现两次 `setState` 存校验结果，回包慢时会出现「有数据但没结论」的中间态）。
+
+**`DonePage`：全量取回 + 本地分页**。原来走 `/tasks/done/page` 服务端分 10 条、再在**当前页**做关键字过滤——第 3 页的单号永远搜不到，界面显示「没有」而不是「没在这一页」。改为 `listDone()` 全量 + `DataTable` 的受控 `search`/`pagination` 作用在全集上；改关键字与改每页条数时 `setPage(1)`。
+
+**`InitiatedPage`**：`window.confirm` → `useConfirm({ danger: true, okKey: 'init.withdraw' })`；`toast(msg, kind)` → `toast.success/error`；逐行 `busyId` 锁避免连点重复撤回。
+
+**`DashboardPage`：六路合成一个资源 + `Promise.allSettled`**。原来 `Promise.all` + `try/catch` 把「没取到」和「真没有」混成 0，接口挂一项就整块 KPI 全 0。现在单路失败只让那一格显示 `—` 并提示「其中 n / 6 项数据未取到」，全挂才抛错。KPI 卡与纯 CSS 趋势图**刻意保留**（它们是这一页的视觉主体，不是通用组件）。
+
+**语义色只有 5 档**：`info` 是第 6 色，`ACTIVE`/`CALLBACK_SENT` 等一律映射到 `run`（`@cim/theme/status.ts` 只有那一套键）。
+
 ---
 
-**迁移收尾结论（P0–P16d，2026-11-11）**
+### 10.23 P18 实施记录：回调页 + 待办页（三表合一 / 勾选交给 `DataTable`）（2026-11-11）
+
+**`CallbacksPage`：一份 `Bundle{regs,outbox,stats}` 一个资源**。三份数据同一屏、同一刷新时机，拆三个 `useResource` 只会让「刷新」变成三次点击；`stats` 是锦上添花，用 `.catch(() => null)` 让它失败不影响另两块。三字段注册表单 → `FormGrid(columns={3})` + 字段级 `errors`（原实现把后端错误塞进页面顶部一条红条，用户得自己找是哪个字段）。G2 覆盖确认从手写 modal → `CimModal`；两张表 → `DataTable flat`。
+
+**`TodoPage`：手写 checkbox 列 → `DataTable` 的 `selectedKeys`/`onSelectionChange`/`selectable`**。顺手修一个会「通过 0 条」的缺陷：**刷新后必须清空勾选**——任务可能已经不在了，留着旧 key 会让「批量通过 3 条」实际通过 0 条还报成功。
+
+**四个弹窗（委派 / 回退 / 加签 / 改派）→ `CimModal` + `FormGrid`**，`CompleteModal` 保留自有组件（它被详情弹窗复用）。`ReturnModal` 用 `useResource(({signal}) => getReturnTargets(taskId, {signal}))` 取节点候选；**字段按 `form.mode` 重建数组**，`specified` 只在「退到指定节点」时进数组——原实现是渲染后隐藏，上一分支选中的节点仍会随 payload 发出。
+
+---
+
+### 10.24 P19 实施记录：流程模板 + 设计器骨架（2026-11-11）
+
+**`DefinitionsPage`**：列表 → `DataTable flat`；「同 key 最新版本」改 `useMemo` 派生（原来每次 render 重建 Map）；`StartModal` → `CimModal width={720}` + `FormGrid` + 动态表单行（保留原 `field-row`）。
+
+**修发起弹窗的自激请求循环**：角色节点解析原来把「每个 render 都新建的 `latestByKey` Map」放进 effect 依赖 → 渲染一次发一次 XML 请求，回包 `setState` 又触发下一轮。改为只依赖稳定 id（`defId = useMemo(...)`）。**探针证据**：修复后发起弹窗的 XML 请求恰好 1 次。
+
+**修草稿串台**：`loadDraft()` 原来遍历 localStorage 取第一个 `approval.draft.v1:*` 槽——两个流程都有草稿时，打开 A 会加载到 B 的内容并把 `processKey` 也切到 B。改为按 key 精确读槽（旧单槽只在 `d.processKey === processKey` 时采用）。
+
+**`DesignerPage` 只迁骨架**：页头 → `PageHead`（key/name 输入与四个按钮进 `actions`），XML 查看弹窗 → `CimModal width={900}`，`toast(...)` → `useToast`。调色板 / SVG 画布 / 节点属性面板**刻意保留**——拖拽命中、连线路由、条件字段联动都是域内逻辑，套进通用组件只会两头别扭。同时修掉「复制成功提示先于实际复制」：原代码先 `toast('已复制')` 再 `writeText`，剪贴板被拒时也报成功。
+
+---
+
+### 10.25 P20 实施记录：三个共享弹窗 + 企微回调页（旧 toast/Modal 整体退场）（2026-11-11）
+
+**`DetailModal`（533 行）五段重排**：基本信息 → `CimDescriptions`(3 列)、审批内容 → 按 `group` 分组的 `CimDescriptions`(2 列，`textarea`/长文本 `span: 2`)、当前待办与附件 → `DataTable flat`、审批历史**保留自定义时间线**（哈希链的 `#seq hash…` 是这一块的核心信息，做成普通表格反而丢重点）。无 schema 时回退 `CimInfoTable`。
+
+**取数换 `useResource`，并改掉「失败就关窗」**：原来 `catch { toast; onClose() }` —— 关掉弹窗等于把错误一起关掉，用户既看不到原因也没有可操作的东西。现在错误留在窗内，给原因 + 「刷新」重试。
+
+**`ResubmitModal` 用 `CimField` 而不是 `FormGrid`**：schema 里的标签是**字面文案**（「合同金额」），不是 i18n 键；`FormGrid` 的 `labelKey` 缺键时回退成字段 **key**，会把「金额」渲染成 `amount`。`CimField` 支持 `label: ReactNode`，正好是「半自定义表单」那一层。
+
+**`initial` 入参去掉一次重复取数**：详情弹窗已经拿着 `ProcessDetailView` 了，重提弹窗再自己取一遍只是多一个失败点。传了 `initial` 就走 `enabled: !initial` 不发请求——**探针证据**：详情内打开重提，resubmit 之前的 detail 请求从 2 次降到 1 次（行内入口打开时仍为 1 次，行为不变）。
+
+**`CompleteModal`**：`CimChoice`(radio) + `CimInput rows={3}`，驳回时空意见给 `toast.warning`，`okDanger` 随结论切换成红色。
+
+**`WeComCallbackPage`**：`Page` + `EmptyState` + `CimButton` 收口，居中状态卡改用 `.wecom-*` 小样式块（不再内联 `style`），并清掉卸载后的跳转定时器。
+
+**删掉旧三件**：`components/Modal.tsx`、`components/ToastHost.tsx`、`store/toastStore.ts`。最后一个使用者 `NotificationBell`（SSE 通知铃）改用 `useToast`——至此 approval 前端只剩 `@cim/*` 一套消息与弹窗，`Layout` 里也不再挂 `ToastHost`。
+
+**验证 8 场景**：详情五段（描述项 8 项 / 内嵌表 2 张 / 时间线 2 条 / 页脚 5 个按钮）；详情内直达通过 → `POST /tasks/dt001/complete` body `{"outcome":"APPROVE","comment":"","actor":"alice"}` 后关窗并刷列表；详情内撤回 → 确认框 → `POST /withdraw?actor=alice`；详情内上传附件 → `POST /attachments/upload` 后附件表 1 → 2 行；详情内重提 → 改「事由」后 `POST /resubmit` body 带新值；行内重提（独立弹窗）同样核对；企微回调页合法令牌 → 身份落 `bob`，非法令牌 → 失败态 + 返回出口。
+
+**探针两坑（本轮新增）**：① 同名按钮可能同时存在于列表行与弹窗里（「修改并重新提交」行内有一个、详情页脚有一个），按文案全局找会点到行内那个，**必须限定 `root`**；② 弹窗叠弹窗时 `.ant-modal` 有多个，取「最后一层」用 `querySelectorAll` 的末元素，`querySelector` 只会拿到详情那层。
+
+---
+
+**迁移收尾结论（P0–P20，2026-11-11）**
 
 - **RMS 页面 19/19 迁移完毕**：23 个 `pages/*.tsx` 里 19 个已用 `useResource`；剩余 4 个是 `LoginPage` / `SsoCallback` / `ForbiddenPage` / `NotFoundPage`——没有列表也没有表单骨架，本不需要迁。
 - **页面级取数组件 5/5**：`RecipeDetailDrawer` / `DeviceDetailDrawer` / `BatchOpsModal` / `ChamberPanel` / `DiffTable`。
 - **刻意没动的**：`NotificationBell`（180 行）。它是**外壳 chrome**，不用 `Panel`/`DataTable`/`CimModal` 任何一个页面原语；它的取数是「30s 轮询未读数 + SSE 事件触发回拉」，`useResource` 的 `pollInterval` 能覆盖轮询那一半，但另一半是 SSE 回调里的命令式 `poll()`，混进来会让「通知通道」与「组件层迁移」两件事互相牵扯。留待通知能力单独排期。
 - **IAM 16/16 页迁移完毕（P14–P16d）**：`Audit` / `Lockouts` / `Sessions` / `Roles` / `Admissions` / `Dashboard` / `Settings` / `AppMgmt` / `OrgGrants` / `PermissionsAdmin` / `Profile` / `Users` / `Org` / `MenusAdmin` / `RolesAdmin` / `I18nAdmin`。后三页（配置型重页）各带一棵树或一张可编辑表格：菜单页换掉手写递归树与 9 个原生控件，角色页把列表换成 `DataTable` 并把三份数据拆开取数，多语言页把手写 table + pager 换成 `DataTable`、两张内联表单换成弹窗。**IAM 合计 55 个探针场景**（11+13+7+8+8+8），0 未捕获异常。
 - **台组件累计三处修正**（都不是页面能自己解决的）：`CimInput.autoComplete`（P15）、`.cim-field > .ant-switch` 的宽度（P16b）、`DataTable` 的 `flat`/`onRowClick`/`pagination` 在 P16c–d 首次被跨页复用（能力本身 P8 已有）。
-- **approval 9 页仍未动**：它已享受组件层（外壳 / 消息 / 文案 / 数据层已接入），页面迁移按自己的节奏推进。铁律不变：**新页面一律用 `@cim/*`**。
+- **approval 9/9 + 3 弹窗迁移完毕（P17–P20）**：`Audit` / `Done` / `Initiated` / `Dashboard` / `Callbacks` / `Todo` / `Definitions` / `Designer`（骨架）/ `WeComCallback` + `DetailModal` / `ResubmitModal` / `CompleteModal`。**approval 合计 47 个探针场景**（13+16+10+8），0 未捕获异常。三个应用至此全部收敛到 `@cim/*`，且 approval 是唯一「旧消息层整体删除」的应用（`Modal` / `ToastHost` / `toastStore` 三件退场）。
+- **approval 这一轮修掉的缺陷比前两批都多，且多与「取数姿势」有关**：已办的关键字只过滤当前页、工作台吞掉全部错误导致 KPI 全 0、发起弹窗的自激请求循环、草稿按「第一个槽」加载导致串台、待办刷新后旧勾选残留、复制提示先于实际复制、回调事件类型只登记 1/5（其余 humanize 成半截英文）。共性：**页面自己管 `loading`/`error`/分页/勾选时，错都错在「状态与数据不同步」**——这也是把这三件事交给 `useResource` / `DataTable` 的直接理由。
+- **铁律不变**：**新页面一律用 `@cim/*`**。
 
 ---
 
