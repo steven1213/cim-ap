@@ -12,7 +12,7 @@
 - [1. Maven 多模块](#1-maven-多模块)
 - [2. 分层架构](#2-分层架构)
 - [3. 多数据库支持（Oracle/MySQL/PostgreSQL/达梦DM）](#3-多数据库支持oraclemysqlpostgresql达梦dm)
-- [4. 统一响应与全局异常](#4-统一响应与全局异常)
+- [4. 统一响应与全局异常](#4-统一响应与全局异常)（**规约见 [api-convention.md](./api-convention.md)**）
 - [5. 安全认证（JWT + Spring Security）](#5-安全认证jwt--spring-security)
 - [6. 基础能力矩阵](#6-基础能力矩阵)
 - [7. 国际化（全量数据库驱动 · 系统级 / 用户级）](#7-国际化全量数据库驱动-系统级-用户级)

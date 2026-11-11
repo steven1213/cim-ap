@@ -617,6 +617,8 @@ src/main/resources/
 
 ### 4.1 统一响应与错误码
 
+> **规约见 [api-convention.md](./api-convention.md)**：返回类型必须是 `Result<T>`，例外仅限四类（下载 / HTML / 标准协议 / 流式）且须标 `@RawResponse` 说明理由，由 `ApiContractVerifier` 在启动期强制；同文还定义了可选的「消息分发模式」（`cim.api.dispatch.enabled`，默认关闭）。
+
 ```java
 public record Result<T>(int code, String msg, T data,
                         Map<String,String> errors, String traceId, long timestamp) { }

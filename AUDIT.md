@@ -375,6 +375,31 @@
   - 详情弹窗取数失败 `catch { toast; onClose() }` → 关掉弹窗等于把错误一起关掉；改为错误留窗内 + 可重试。
 - **风险 / 待办**：§12 待定项 #2（HTTP 传输层是否合并）、#3（字典 i18n 化）、#5（列定义后端下发）、#8（基础令牌加 `--cim-` 前缀）、#9（译文灌入 `sys_i18n`）**仍开放**，均有明确触发条件；`useDict`/`EnumTag` 已实现但**三应用未注入 `UiDictProvider`**（当前仅内置兜底形态）；a11y 按 WCAG 2.1 AA 基线设计，**尚未做自动断言**（前端目前无单元测试设施，验证靠 tsc + build + 探针）。
 
+## 2026-11-12 统一响应契约（Result 强制 + 例外标注）与消息分发模式
+
+### 29. feat(spring-support)：`ApiContractVerifier` / `@RawResponse` / `CimMessageDispatcher` 落地，9 个非 Result 端点整改
+
+- **范围**（5 提交 + 本文档）：`cim-spring-support`（`web/RawResponse`、`web/ApiResponseProperties`、`web/ApiContractVerifier`、`dispatch/` 5 类、`config/CimDispatchAutoConfiguration`、自动装配 imports）、`cim-auth-starter`（两个 IAM 校验器的信封兼容）、`iam-ap`（4 端点改 Result + 2 处例外标注 + 2 集成测试）、`rms-ap` / `approval-ap` / `cim-notify-starter`（各 1 处例外标注）、`iam-ap/web` + `rms-ap/web`（删 `postRaw` 旁路）、`docs/platform/server/api-convention.md`（新规约）。
+- **动因**：参考外部工程 `CustomAutoProcessorController` 的通配分发实现。取其「约定优于逐个 `@PostMapping`」的意图，但补齐它的三处结构性弱点（信封靠处理器自己 `return`、处理器泛型与 DTO 不绑定校验、通配 URL 把内部类名写进对外契约），并把「返回必须是 `Result`」从口头约定变成启动即失败的机制。
+- **验证（已跑通）**：
+  - 平台 `mvn -o test` **13/13 SUCCESS**；`cim-spring-support` **22/22**（新增 `ApiContractVerifierTest` 6 例 + `CimMessageDispatchTest` 7 例，钉住：全 Result 通过 / 裸类型严格模式失败且清单含 `BadController#bad()` / 非严格只告警 / 类级与方法级 `@RawResponse` 均放行 / `@ExceptionHandler` 不参与 / `verify=false` 跳过；路径派生与归一化 / 重复路径失败并含双方类名 / 泛型错绑失败 / 成功包信封 / 未知路径 `PARAM_INVALID` / 坏报文指明类型 / 空报文给空实例）。
+  - `cim-bootstrap` **5/5**（证明分发入口不再被宿主 `scanBasePackages="com.cim"` 误扫——首版用 `@RestController` 时 5/5 全红于 `No qualifying bean of type CimMessageDispatcher`）。
+  - iam-ap **72/72**、rms-ap **90/90**、approval-ap **10/10**（后两者 `-Dcim.notify.cluster.enabled=false`，本机无 Redis）、auth-starter **29/29**（含信封新旧双形态用例）。
+  - 前端：iam-web `tsc` + `vite build` 通过；rms-web `tsc --noEmit` 零错 + `vite build` 通过（10.11s）。
+- **整改清单（9 个非 `Result` 端点 → 4 改信封 / 5 标例外）**：
+  - 改 `Result<T>`：`token-version.current`（原 `ResponseEntity<String>` + `TEXT_PLAIN`）、`token-version.bump`（原 `Map`）、`blacklist.isRevoked`（原 `String`）、`issue.issue`（原裸 `IssuedToken`）。
+  - 标 `@RawResponse`：`jwks`（`STANDARD_PROTOCOL`）、`/login`（`HTML`）、recipe `export`（`DOWNLOAD`）、approval `attachment download`（`DOWNLOAD`）、notify SSE（`STREAM`）。全表见 `api-convention.md` §4。
+- **关键修复 / 设计决策**：
+  - **`@RestController` 是 `@Component`**：库里的分发控制器若标 `@RestController`，宿主 `scanBasePackages="com.cim"` 会把它扫进容器，而自动装配关闭时依赖 Bean 不存在 → 启动失败。改 `@RequestMapping`(type) + `@ResponseBody`：MVC 认得、组件扫描不认。
+  - **校验器必须能排除框架出口**：首版把 `BasicErrorController#error() -> ResponseEntity` 也判违规（cim-jpa-starter 17 个测试全红），加 `cim.api.response.include-packages`（默认 `[com.cim]`）收口。
+  - **静态解析不可靠，靠启动期校验兜底**：我按正则扫 150 个映射方法得出「7 个非 Result」，实跑校验器抓出第 8 个 `AttachmentController#download`（签名跨行 + 文件名不匹配 `*Controller`），复核后为 9 个。这条本身就是「规约要长牙」的证据。
+  - **滚动发布**：内部 S2S 端点改形态时消费侧必须双兼容，否则先升级任一侧都会让版本/黑名单校验**静默 fail-open**——`IamTokenVersionChecker`/`IamTokenBlacklistChecker` 按响应首字符分流，`code != 0` 视为失败而非放行。
+  - **测试夹具不套例外**：`cim-auth-starter` 的 `TestApi` 六个端点故意裸返回以验证安全过滤链，给它们写 `@RawResponse` 理由不成立 → 改在该测试 `application.yml` 关 `verify`。同文件原已有一个顶层 `cim:` 块，追加会造成 SnakeYAML 重复键报错，已并块重写。
+- **风险 / 待办**：
+  - `cim.api.response` / `cim.api.dispatch` 未写入各 ap 的 `application.yml.example`（默认值即推荐值）。
+  - IAM 前端渲染契约（33 断言）在页面迁到 `@cim/*` 后长期「打包即失败」：本次补 `@cim/*` + `antd` 别名与 `nodePaths` 恢复可运行，随即暴露 **12 条既有失败**（`.empty` 类名、写死的 `placeholder="⟪iam.common.search⟧"`、多页中文残留）——属组件层迁移遗留，需单独按现状重置断言。
+  - 消息分发默认关闭、**三应用均未启用**：待出现「一类报文 N 个近似端点」的真实场景再开，避免为模式而模式。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
