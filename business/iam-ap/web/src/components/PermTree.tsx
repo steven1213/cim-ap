@@ -261,7 +261,7 @@ export default function PermTree({
           <div className={'ptree-row is-page' + (active ? ' on' : '')}>
             {btns.length ? (
               <CimButton
-                type="primary"
+                bare
                 htmlType="button"
                 className={'tree-toggle' + (open ? ' open' : '')}
                 aria-expanded={open}

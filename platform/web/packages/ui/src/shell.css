@@ -316,6 +316,104 @@ button.side-cap.page-cap {
   opacity: 0.6;
 }
 
+/* ---------- 顶栏通知铃（NotificationBell）----------
+   原在 RMS 与 approval 各留一份，两段**逐字节相同**（2026-11-12 实测）；
+   approval 那份还是死代码（页面早改用 .tab-ctx 菜单），说明这套才是本意。
+   组件在 @cim/shell（NotificationBell），本文件只负责外观。 */
+.bell-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.bell-dot {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--err, #d64545);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.bell-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg, var(--bg-panel, var(--panel, #fff)));
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  z-index: 60;
+  overflow: hidden;
+}
+.bell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.2));
+}
+.bell-list {
+  overflow-y: auto;
+}
+.bell-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.15));
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.bell-item:hover {
+  background: var(--hover-bg, rgba(127, 127, 127, 0.08));
+}
+.bell-item.unread .bell-item-title {
+  font-weight: 600;
+}
+.bell-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.bell-item-sub {
+  color: var(--text-muted, rgba(127, 127, 127, 0.9));
+  font-size: 11.5px;
+}
+.bell-item-time {
+  color: var(--text-muted, rgba(127, 127, 127, 0.7));
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+.bell-unread-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--err, #d64545);
+  flex: none;
+}
+.bell-empty {
+  padding: 26px 12px;
+  text-align: center;
+  color: var(--text-muted, rgba(127, 127, 127, 0.8));
+  font-size: 12px;
+}
 .env-chip {
   display: inline-flex;
   align-items: center;

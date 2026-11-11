@@ -1,61 +1,32 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { changeLanguage, currentLang, DEFAULT_LANG, loadLocales } from '@/lib/i18n';
-import type { LocaleInfo } from '@cim/i18n';
+import { LocaleSwitcher, useLocaleSwitcher } from '@cim/shell';
+import { changeLanguage, currentLang, loadLocales } from '@/lib/i18n';
 
 /**
  * 语言切换器（顶栏与登录页共用）。
  *
+ * <p>界面与「拉目录 / 切语言」的通用逻辑都在 `@cim/shell`，本文件只声明属于
+ * IAM 的两件事：语言目录来自后端（`/api/i18n/locales`，语种入库后新增不需改前端，
+ * 拉不到时适配层回退内置 zh-CN / en-US，登录页永远可用）、tooltip 用哪个文案键。</p>
+ *
  * <p>切换**不刷新页面**：写 localStorage + 更新 `Accept-Language` + 重拉译文包
- * （见 `lib/i18n.ts`）。语言列表来自公开端点 `/api/i18n/locales`——语言目录入库后
- * 新增语种无需改前端（拉不到时回退内置 zh-CN / en-US，保证登录页永远可用）。</p>
+ * （见 `lib/i18n.ts`）。</p>
  */
 export default function LanguageSwitcher({ className = '' }: { className?: string }) {
   const { t } = useTranslation();
-  const [locales, setLocales] = useState<LocaleInfo[]>([]);
-  const [lang, setLang] = useState(currentLang());
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    loadLocales().then((list) => {
-      if (alive) setLocales(list);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  async function onChange(next: string) {
-    if (next === lang) return;
-    setBusy(true);
-    try {
-      await changeLanguage(next);
-      setLang(next);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 已选语言不在目录里（例如目录被改过）时补一个占位项，避免下拉显示空白
-  const options = locales.length > 0 ? locales : [];
-  const known = options.some((l) => l.code === lang);
-
+  const { locales, lang, busy, change } = useLocaleSwitcher({
+    currentLang,
+    changeLanguage,
+    loadLocales,
+  });
   return (
-    <select
-      className={'lang-select ' + className}
+    <LocaleSwitcher
+      locales={locales}
       value={lang}
-      disabled={busy}
-      onChange={(e) => onChange(e.target.value)}
-      title={t('iam.shell.language')}
-      aria-label={t('iam.shell.language')}
-    >
-      {!known && <option value={lang}>{lang || DEFAULT_LANG}</option>}
-      {options.map((l) => (
-        <option key={l.code} value={l.code}>
-          {l.name || l.code}
-        </option>
-      ))}
-    </select>
+      onChange={change}
+      busy={busy}
+      className={className}
+      label={t('iam.shell.language')}
+    />
   );
 }

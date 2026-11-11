@@ -1,51 +1,28 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LocaleSwitcher, useLocaleSwitcher } from '@cim/shell';
 import { changeLanguage, currentLang, loadLocales } from '@/lib/i18n';
 
-/** 语言切换器（顶栏共用）。切换不刷新页面，写 localStorage + 重灌译文包。 */
+/**
+ * 语言切换器（顶栏共用）。
+ *
+ * <p>界面与通用逻辑在 `@cim/shell`；RMS 的差别只有一处：语言目录是**内置两种**
+ * （`lib/i18n.ts` 的 `locales`），不走后端。切换不刷新页面，写 localStorage + 重灌译文包。</p>
+ */
 export default function LanguageSwitcher({ className = '' }: { className?: string }) {
   const { t } = useTranslation();
-  const [locales, setLocales] = useState<{ code: string; name: string }[]>([]);
-  const [lang, setLang] = useState(currentLang());
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    loadLocales().then((list) => {
-      if (alive) setLocales(list);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  async function onChange(next: string) {
-    if (next === lang) return;
-    setBusy(true);
-    try {
-      await changeLanguage(next);
-      setLang(next);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const known = locales.some((l) => l.code === lang);
+  const { locales, lang, busy, change } = useLocaleSwitcher({
+    currentLang,
+    changeLanguage,
+    loadLocales,
+  });
   return (
-    <select
-      className={'lang-select ' + className}
+    <LocaleSwitcher
+      locales={locales}
       value={lang}
-      disabled={busy}
-      onChange={(e) => onChange(e.target.value)}
-      title={t('rms.shell.language')}
-      aria-label={t('rms.shell.language')}
-    >
-      {!known && <option value={lang}>{lang}</option>}
-      {locales.map((l) => (
-        <option key={l.code} value={l.code}>
-          {l.name || l.code}
-        </option>
-      ))}
-    </select>
+      onChange={change}
+      busy={busy}
+      className={className}
+      label={t('rms.shell.language')}
+    />
   );
 }

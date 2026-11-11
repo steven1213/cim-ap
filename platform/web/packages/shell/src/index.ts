@@ -7,6 +7,21 @@ export { TabStrip, type TabStripProps } from './TabStrip';
 export { createTabStore, type TabItem, type TabState } from './createTabStore';
 export { useShellTabs, type UseShellTabsOptions } from './useShellTabs';
 export {
+  LocaleSwitcher,
+  useLocaleSwitcher,
+  type LocaleSwitcherProps,
+  type ShellLocale,
+  type ShellLocaleRuntime,
+  type UseLocaleSwitcherResult,
+} from './LocaleSwitcher';
+export {
+  NotificationBell,
+  type NotificationBellLabels,
+  type NotificationBellProps,
+  type ShellNotifyItem,
+} from './NotificationBell';
+
+export {
   IconChevron,
   IconLogout,
   IconMoon,

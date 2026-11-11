@@ -16,6 +16,7 @@ export {
   IconAlert,
   IconCheckCircle,
   IconInbox,
+  IconBell,
   IconRefresh,
   IconEye,
   IconEyeOff,
@@ -54,16 +55,6 @@ const base: IconProps = {
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
 };
-
-/** 通知铃（RMS 顶栏） */
-export function IconBell(p: IconProps) {
-  return (
-    <svg {...base} {...p}>
-      <path d="M6 16.5v-5.2a6 6 0 0 1 12 0v5.2l1.6 2.5H4.4L6 16.5z" />
-      <path d="M10 21a2.2 2.2 0 0 0 4 0" />
-    </svg>
-  );
-}
 
 /** 配方（锥形瓶） */
 export function IconFlask(p: IconProps) {
