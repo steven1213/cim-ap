@@ -416,14 +416,12 @@ export default function DesignerPage() {
         subtitleKey="designer.sub"
         actions={
           <div className="designer-meta">
-            <label className="field field-inline">
-              <span className="field-label">{t('def.colKey')}</span>
+            <CimField compact label={t('def.colKey')}>
               <CimInput width={180} value={processKey} onChange={setProcessKey} placeholder="customApproval" disabled={readonly} />
-            </label>
-            <label className="field field-inline">
-              <span className="field-label">{t('def.colName')}</span>
+            </CimField>
+            <CimField compact label={t('def.colName')}>
               <CimInput width={200} value={processName} onChange={setProcessName} placeholder="自定义审批" disabled={readonly} />
-            </label>
+            </CimField>
             <div className="designer-actions">
               {!readonly && (
                 <>

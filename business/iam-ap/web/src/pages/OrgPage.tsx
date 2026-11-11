@@ -428,7 +428,7 @@ export default function OrgPage() {
                   <CimTag>{t('iam.orgs.membersCount', { n: members.length })}</CimTag>
                 </div>
                 <div className="row">
-                  <div className="field">
+                  <CimField>
                     <CimSelect
                       value={addUser}
                       onChange={(v) => setAddUser(typeof v === 'string' ? v : '')}
@@ -437,7 +437,7 @@ export default function OrgPage() {
                       placeholderKey="iam.orgs.memberPH"
                       width={260}
                     />
-                  </div>
+                  </CimField>
                   <Can perm={ORG_MEMBER}>
                     <CimButton
                       type="primary"

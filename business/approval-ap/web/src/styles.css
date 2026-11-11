@@ -105,34 +105,11 @@ table.data .cell-actions {
   gap: 6px;
 }
 
-/* ---------- 表单 ---------- */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.field + .field {
-  margin-top: 11px;
-}
-/* 网格内的 .field 由 gap 控距：禁用纵向堆叠的相邻 margin，否则第 2/3 列会整体下移错位。 */
-.grid-2 > .field + .field,
-.grid-3 > .field + .field {
-  margin-top: 0;
-}
-.field-label {
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.field-label .opt {
-  margin-left: 5px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--muted);
-}
+/* ---------- 表单 ----------
+   `.field / .field-label / .field-inline`（设计器元数据字段的紧凑档）已上提到
+   `@cim/ui`，分别由 `CimField` 与 `CimField compact` 承载。
+   `.field-row` 保留在本地：它是「一行控件」的布局工具（不是带标签的字段），
+   与 `CimField` 的语义不同，别混。 */
 
 input,
 select,
@@ -760,17 +737,6 @@ input.mono {
   align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-}
-.field-inline {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.field-inline .field-label {
-  font-size: 10.5px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .designer-hint,
 .designer-errors {

@@ -72,22 +72,9 @@ table.data .cell-actions {
   gap: 6px;
 }
 
-/* ---------- 表单 ---------- */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.field + .field {
-  margin-top: 11px;
-}
-.field-label .opt {
-  margin-left: 5px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--muted);
-}
+/* ---------- 表单 ----------
+   `.field*` 已上提到 `@cim/ui`（`.cim-field*`，由 `CimField` 组件承载）。
+   页面侧不再允许手写 `.field`，否则同一套排版会出现两份定义、改一边不生效。 */
 
 input,
 select,
