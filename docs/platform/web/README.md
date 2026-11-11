@@ -3,7 +3,8 @@
 > 本文档为 `cim-ap` 前端设计与实现说明，涵盖技术栈与目录、请求层全链路、认证与路由守卫、权限体系、状态管理、国际化热切换、主题规范、组件与表单、性能与工程化、前端安全、可观测、测试与部署。
 > 章节编号自 §1 起，与总文档、后端文档相互独立；跨文档引用已标注来源（如「后端文档 §5」）。
 > 全文采用统一方法论：**先列常见做法利弊、指出不足，再给本框架优化设计**，与后端文档口径一致。
-> ⚠️ 本文为**设计文档**，不代表代码已实现；当前仓库尚无前端工程代码，实现状态见[总文档 §8](../../README.md#8-实现状态与落地路线)。
+> ⚠️ 本文为**单应用视图**的设计文档。多 ap 共享组件（`@cim/theme` / `@cim/ui` / `@cim/data` / `@cim/i18n` / `@cim/shell`）的包边界、依赖方向与跨应用契约见 [`component-platform-design.md`](./component-platform-design.md)，两文冲突时以该文为准。
+> 实现状态：仓库已有 5 个独立前端工程（iam-ap / mds-ap / mes-ap / rms-ap / approval-ap，其中 mds/mes 为脚手架），`platform/web` 仅空壳（102 行）。本文 §1–§13 描述的是各应用**内部**应遵循的做法，尚未全部落地；落地进度见[总文档 §8](../../README.md#8-实现状态与落地路线)。
 
 ## 目录
 
@@ -803,7 +804,7 @@ server {
 | 能力 | 状态 | 优先级 | 建议方向 |
 | --- | --- | --- | --- |
 | 微前端（qiankun / Module Federation，未来 `apps/` 多应用） | `✗` | P-Prod-C | 出现第三个前端应用时启动（目录约定见总文档），与后端服务发现对齐 |
-| 设计系统 / 组件库 + 可访问性（a11y） | `✗` | P-Prod-C | 沉淀 `cim-ui` 组件库，WCAG 2.1 AA 基线 |
+| 设计系统 / 组件库 + 可访问性（a11y） | `△` 已设计 | P-Prod-C | 见 [`component-platform-design.md`](./component-platform-design.md)：P0（tokens + 同构文件）→ P1（`useResource` + `DataTable`）→ P2（i18n + 字典）→ P3（组件全集 + 外壳）；a11y 按 WCAG 2.1 AA 基线 |
 | 前端契约测试（consumer-driven，对齐后端 OpenAPI） | `✗` | P-Prod-B | 用 Pact/OpenAPI 生成 mock，与后端 §17 双向校验 |
 | 前端可观测（RUM / Sentry / 性能预算） | `✗` | P-Prod-B | 对齐后端 §14：错误、首屏、长任务、Core Web Vitals 入统一监控 |
 
