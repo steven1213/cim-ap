@@ -250,12 +250,13 @@ IAM 的 `lib/i18n.ts`（230 行）是三个实现里唯一完整的，直接上�
 | 注入器 | `UiPermissionProvider` / `useCan` / `Can` | `perm.tsx` | 权限判定注入 | 不读各 ap 的 store |
 | 注入器 | `UiDictProvider` / `useDict` / `EnumTag` | `dict.tsx` | 字典缓存（按 `code` 拉一次），`EnumTag` 值→标签 | 不直连后端（由调用方给 fetcher） |
 | basic | `CimButton` | `basic/Button.tsx` | 按钮（primary/ghost/danger/尺寸/加载） | 不做权限包装（用 `Can`） |
+| basic | `CimSpin` | `basic/Spin.tsx` | 加载指示（纯 CSS；`block` 用于路由兜底，保持内容区高度） | 不包裹内容、不做骨架屏 |
 | basic | `CimTag` / `CimCheckTag` | `basic/Tag.tsx` | 标签 / 可选中标签（筛选条） | 不做颜色自选 |
 | content | `Page` / `PageHead` / `Panel` / `Toolbar` / `EmptyState` | `content/Page.tsx` | 页面骨架（等价 `.page`/`.page-head`/`.panel`/`.toolbar`） | 不做布局系统，不接管路由 |
 | content | `CimDivider` | `content/Divider.tsx` | 分隔线（水平/垂直/带文字） | — |
 | content | `CimDrawer` | `content/Drawer.tsx` | 侧滑面板 | 不内置表单 |
 | content | `CimScrollArea` | `content/ScrollArea.tsx` | 定高滚动容器（统一滚动条样式） | 不做虚拟滚动 |
-| data | `DataTable` | `data/DataTable.tsx` | 渲染 + 工具栏 + 列设置 + 服务端分页 + 选择 + 三态 | **不取数、不导出、不做单元格编辑** |
+| data | `DataTable` | `data/DataTable.tsx` | 渲染 + 工具栏 + 列设置 + 服务端分页 + 选择 + 三态 + 可选虚拟滚动 | **不取数、不导出、不做单元格编辑** |
 | data | `useColumns` | `data/useColumns.ts` | 列显示/顺序 + localStorage 持久化 | 不碰服务端列定义（见 §12-4） |
 | data | `StatusTag` / `ToneTag` | `data/StatusTag.tsx` | 枚举值 → 5 档语义色 | 调用方不能自选颜色 |
 | data | `CimDescriptions` | `data/Descriptions.tsx` | 详情栅格（列数/跨列/空值占位） | 不做可编辑详情 |
@@ -274,6 +275,7 @@ IAM 的 `lib/i18n.ts`（230 行）是三个实现里唯一完整的，直接上�
 | form | `CimChoice` | `form/Choice.tsx` | 单选/多选组（按钮式/卡片式） | 不做联动 |
 | form | `CimUpload` | `form/Upload.tsx` | 上传（手动/自动、大小与类型限制、进度） | 不决定存储位置，由调用方给 action |
 | feedback | `CimModal` | `feedback/CimModal.tsx` | 弹窗（焦点/Esc/滚动锁由 antd 保证） | 不内置表单 |
+| feedback | `UiToastProvider` / `useToast` / `useConfirm` | `feedback/message.tsx` | 全局消息与二次确认（`App.useApp()` 上下文版，继承主题） | 不用 antd 静态 message、不用 `window.confirm` |
 | feedback | `CimTooltip` | `feedback/Tooltip.tsx` | 文字提示（超长省略号场景） | — |
 | feedback | `CimPopconfirm` | `feedback/Popconfirm.tsx` | 气泡确认（危险动作） | 不做异步 loading 编排 |
 | feedback | `CimPopover` | `feedback/Popover.tsx` | 气泡卡片 | — |
@@ -314,8 +316,7 @@ interface DataTableProps<T> {
 
 | 批次 | 组件 | 说明 |
 | --- | --- | --- |
-| P2 | `DataTable` 虚拟滚动 | antd `virtual` + 固定行高；千行以上再开 |
-| P2 | `Toast` / `Confirm` | 现各 ap 用 `useState` 自管提示条；统一到注入式 message/notification |
+| P2 | 骨架屏 / 空态插图 | 现在只有文字空态；大屏与弱网现场反馈后再做 |
 | P3 | `Layout`、`TabBar`、`MenuTree`、`LanguageSwitcher`、`NotificationBell` | 见 §8，最后做 |
 
 ---
@@ -472,7 +473,7 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 
 **遗留**
 
-1. 产物体积：RMS 1.3 MB，需路由级 `lazy()`（P2）。
+1. 产物体积：RMS 1.3 MB，需路由级 `lazy()`（P2）。—— **已在 §10.4 解决**（拆为 19 个页面 chunk，首屏 index 103 KB）。
 2. `FormGrid` 暂缺 `date` 字段（需 dayjs 值转换口径，避免与后端 ISO 字符串语义打架）—— **已在 §10.3 补齐**（对外只进出 ISO 字符串）。
 3. 其余 22 个 RMS 页面、21 个 IAM 页面未迁移，仍用旧的手写结构（两套并存期需明确"新页面一律用组件"）。
 
@@ -541,6 +542,68 @@ RMS 因新增 `DatePicker` 把 dayjs 全量 locale 拉进来涨了约 170 KB。�
 
 approval 侧 `tsconfig.json` 漏了 `dayjs` 的 `paths`（`vite.config.ts` 已加 alias），表现为 `tsc` 报 `Cannot find module 'dayjs'` 而 `vite build` 与 dev 均正常 —— 说明 **tsc 的 `paths` 与 vite `alias` 是两套配置，必须同时改**。
 
+### 10.4 P2 实施记录：消息层 · 虚拟滚动 · 路由级拆包（2026-11-11）
+
+三件事的共同点：都不是"加组件"，而是**收掉一种各页面重复的写法**。判断标准仍是"能不能让页面少写代码、且写错的空间变小"。
+
+**1. 消息层 `UiToastProvider` / `useToast` / `useConfirm`（`feedback/message.tsx`）**
+
+改造前四种写法并存：RMS/approval 页面用 `useState('')` 在页顶挂提示条（不自动消失、成功失败同色、切页即丢）；确认用 `window.confirm()`（阻塞主线程、不可主题化）；少数地方手写 `.modal` 三件套。
+
+| 取舍 | 决定 | 理由 |
+| --- | --- | --- |
+| antd 静态 `message.success()` | ❌ 不用 | 拿不到 `ConfigProvider` 主题，暗色下弹出来仍是浅色，z-index 也不与其它浮层共享 |
+| `App.useApp()` 的上下文版 | ✅ 采用 | 与主色/密度/语言同源；`UiToastProvider` 放在 `CimProvider` **内部**、业务 `<App/>` **外部** |
+| 容器 DOM | `component={false}` | antd 的 `<App>` 默认渲染 `<div class="ant-app">`，套在最外层会多一层块级容器，破坏 `.app` 的 100vh 布局；关掉后只留上下文，DOM 零变化 |
+| 确认返回值 | `Promise<boolean>` | 调用方 `const ok = await confirm({...}); if (!ok) return;` —— 比回调更难过写成"点了取消还继续执行" |
+
+内置按钮文案走 `useUiLabel`；业务消息（`已删除`）由调用方 `t()` 后传入 —— 那是数据，不是组件文案。
+
+**2. `DataTable` 虚拟滚动（`virtual?: number`）**
+
+传视口高度即启用 antd 的 `virtual`。适用「一次给全量」的长列表（日志/审计/参数明细），不适用服务端分页（一页 20 行没有收益还丢分页语义）。
+
+antd 虚拟表格的两个硬约束已内建处理：`scroll.x` 必须是数字（`'max-content'` 不可用）→ 未给时按列宽求和兜底；每列必须有 `width` → 缺失时按 160 兜底并 `console.warn` 点名缺哪几列（不静默降级）。
+
+**3. 路由级拆包（三应用）**
+
+| 应用 | 改法 |
+| --- | --- |
+| RMS | 19 个业务页 `lazy()` + `lazyRoute(Page, permCode)` 辅助函数（把 `Suspense`+`RequirePerm`+页面合成一个 element）；登录/回调/403/404 保持同步加载 |
+| IAM | 路由由后端菜单下发，故改在 `PAGE_REGISTRY`：值由组件改为 `lazy(() => import(...))`，`RoutePage` 内套 `Suspense` |
+| approval | 9 个页面 `lazy()`；404 同步 |
+
+`Suspense` 一律放在 Layout 的 `<Outlet/>` **内部**（路由 element 上），不是 `Routes` 外层 —— 放外层的话切页时侧边栏和顶栏会一起被兜底替换，闪一下再回来。
+
+**⚠️ 拆包后的第二个坑：共享依赖要有归属。** 只加 `lazy()` 时，rollup 会把"第一个用到 antd Table 的页面"当成它的家 —— 实测 `DeviceAreaPage` 的 chunk 达 **613 KB**（表、弹窗、表单全在里面），首屏反而没小多少。补 `build.rollupOptions.output.manualChunks` 按 `vendor-react` / `vendor-antd` / `cim-ui` / `vendor` 分组后才正常。
+
+| 应用 | 改前（单 chunk） | 改后首屏 index | 改后 vendor 三块 | 页面 chunk |
+| --- | --- | --- | --- | --- |
+| RMS | 1472 KB / gzip 437 | **103 KB** / 34 | 1158 KB / 370 | 19 个，最大 35 KB |
+| IAM | 538 KB / gzip 164 | **33 KB** / 11 | 559 KB / 185 | 15 个，最大 15 KB |
+| approval | 543 KB / gzip 176 | **62 KB** / 23 | 559 KB / 185 | 9 个，最大 32 KB |
+
+**注意别把这张表读成"首屏变小了"**：antd 在根上被 `CimProvider` 用到，注定属于首屏，所以三块 vendor 加起来才是首屏真实成本。IAM 甚至从 538 涨到 595（+11%）—— 拆开后跨 chunk 无法共享 gzip 压缩冗余，同样的代码分文件后压缩率略降。**收益是另外两条**：① 首屏只解析必要的业务代码（RMS 的解析量从 1.47 MB 降到约 1.28 MB）；② 缓存粒度——业务发版只改页面 chunk，vendor 三块命中浏览器缓存，用户重下的量从"整个应用"变成"几十 KB"。
+
+**验证（11 项运行时断言，全过）**
+
+临时探针页（已删除）自驱动断言，结果写回 DOM，无头 Chrome `--dump-dom` 读取：
+
+| 断言 | 结果 |
+| --- | --- |
+| 虚拟滚动 DOM 行数 | **11 行** / 数据 5000 行 ✓ |
+| 虚拟视口高度 | `320px`（传入值）✓ |
+| `toast.success` 出现且文案正确 | ✓ |
+| confirm 弹出、确定按钮为危险态 | `ant-btn-dangerous` ✓ |
+| confirm 点确定 → `resolve(true)` | ✓ |
+| confirm 点取消 → `resolve(false)` | ✓ |
+| `CimSpin` 环形取 `--primary` | `rgb(31,95,224)` = `#1f5fe0` ✓ |
+| 真动态 `import()` + `Suspense` 落地 | 内容出现 `LAZY_OK` ✓ |
+| 拆包后表头仍取 `--panel-2` | `rgb(246,248,251)` ✓ |
+| 三应用 `tsc + vite build` | 全过 ✓ |
+
+断言演进留痕：第一次 5/7（虚拟行选择器用了 `tr`，而 antd 虚拟表格的行是 `div`；`confirm.cancel` 的 promise 永远不 resolve）→ 定位到"上一个弹窗在离场动画期间仍在 DOM 里，点到了旧按钮"→ 改成按弹窗正文文案认领 → **11/11**。这类"点到了不可见的旧节点"在 E2E 里很常见，selector 必须带语义锚点而不是只靠类名。
+
 ---
 
 
@@ -562,6 +625,6 @@ approval 侧 `tsconfig.json` 漏了 `dayjs` 的 `paths`（`vite.config.ts` 已�
 | 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
 | 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
 | 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
-| 5 | 路由级拆包以抵消 antd 体积 | RMS 单 chunk 1.47 MB，未拆 | P2 |
-| 6 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | 固定行高可满足产线表格 | P1 实现时 |
+| 5 | 路由级拆包以抵消 antd 体积 | **已完成（§10.4）**：三应用均按路由 `lazy()` + `manualChunks` 分组；RMS 首屏 index 103 KB | 已定稿 |
+| 6 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | **已定稿**：沿用 antd 默认行高（按 `size` 档），不自己测量 | 已定稿 |
 | 7 | `--bg/--panel/--primary` 等基础变量无 `--cim-` 前缀 | 改名要动约 4000 处引用（各 ap styles.css 全在引用） | 暂缓，等外壳层统一时一并改 |
