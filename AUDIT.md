@@ -400,6 +400,33 @@
   - **IAM 渲染契约恢复 33/33**：两条结构性断言随组件层迁移失效（空态类名 `.empty` → `.cim-empty`、树 `.tree` → `.cim-tree`）；12 条"含中文残留"其实是**测试装配缺陷**——未挂 `UiLocaleProvider` 时 `useUiLabel` 全部回落到 `@cim/ui` 内置中文兜底，产品代码并无泄漏。修法：按 `main.tsx` 同构挂 Provider、`t` 走缺键处理器（`⟪key⟫` 标记）+ `hasKey` 恒为 `true`（本测试断言的是"请求了哪些键"，不是"键有没有译文"）；失败信息也从"含中文：共"升级为带上下文片段，便于定位是哪个组件漏键。`api-convention.md §5.4` 记录三个坑。
 - **风险 / 待办**：消息分发三应用均未启用（等真实场景再开）；内部 S2S 端点的双兼容分支待旧客户端下线后清理；MDS/MES 两 ap 前端仍是空脚手架，暂无渲染契约闸门。
 
+## 2026-11-12（续）前端组件采用度审计与上提
+
+### 30. refactor(web)：组件采用度实测、权限门静默失效修复、图标与提示块上提
+
+- **范围**（5 提交 + 审计文档）：`platform/web/packages/ui`（`icons.tsx` 34 图标、`data/KpiCard.tsx`、`feedback/InlineAlert.tsx`、`ui.css` 收 `.alert` 段）、`business/{iam,rms}-ap/web`（`main.tsx` 挂 `UiPermissionProvider`、30 处 `Perms`→`Can`、`Icons` 改薄壳、看板改 `KpiCard`）、`business/approval-ap/web`（`styles.css` 清理）、`docs/platform/web/component-adoption-audit.md`（新）。
+- **采用度实测（脚本口径，非估算）**：
+
+  | 应用 | 页面 | 用 `@cim/*` | 裸 `<button>` | `.kpi` | `.alert` | `.field` | `.split` | `styles.css` |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | iam-ap | 21 | 16 | 74 | 0（已迁） | 11 | 65 | 5 | 593 |
+  | rms-ap | 23 | 19 | 92 | 131 | 9 | 0 | 1 | 1175 |
+  | approval-ap | 10 | 9 | 5 | 40 | 1 | 36 | 0 | 1994 |
+
+  结论：数据层与容器层（`Page`/`Panel`/`DataTable`/`useResource`/`FormGrid`/`CimModal`）已收敛；控件层没收敛——`CimButton` 仅 11 文件，`StatusTag`/`ToneTag`/`CimTooltip`/`CimSplitter`/`useColumns` **0 采用**。
+- **关键修复（静默失效，本轮最重要的一条）**：`@cim/ui` 的 `<Can>` 与 `<CimButton perm>` 读 `UiPermissionProvider` 注入的上下文，而**三个应用一个都没挂这个 Provider**——未挂时走「一律放行」兜底，界面完全正常、权限门却不起作用，也不会有任何报错。已在 `iam`/`rms` 的 `main.tsx` 补挂（`has` ← `usePermissions`，`ready` ← `permissionsLoaded`），30 处 `<Perms code|codes>` 全量并入 `<Can perm>`（含 9 处字符串字面量写法），删两份逐字节相同的 `Perms.tsx`。
+- **上提与去重**：
+  - 通用图标 34 个 → `@cim/ui/icons.tsx`：证据是 IAM 34 个是 RMS 37 个的**子集**且 `<svg>` 子节点**逐字节相同**（md5），两份 723 行重复；两应用文件改薄壳（44 / 86 行），页面 `from '@/components/Icons'` 零改动。approval 的 30 个是另一套画法（`IconCheck` vs `IconCheckCircle`），**不强合并**。
+  - `.alert` 段 7 条规则 → `ui.css`（三份 `styles.css` 该段逐字节相同），应用侧删 31/36/36 行；`approval` 独有的 `.login-card .alert` 保留。产物 CSS 已核对：7 个选择器均来自 `cim-ui` 包。
+  - 新增 `KpiCard`/`KpiGrid`（`.kpi` 手写 178 处，IAM 还自带同款局部组件）与 `InlineAlert`（`.alert` 手写 22 处，刻意不含重试按钮——按钮位置各页现状不同）。
+  - 删 4 个**零引用**组件：`components/Panel.tsx` ×3、`rms/components/Drawer.tsx`。（页面是 `pageRegistry` 里 `lazy()` 的，按「谁 import 了它」扫会把全部页面误判成死代码——审计文档已记录这个坑。）
+- **验证（已跑通）**：三应用 `tsc -p tsconfig.json --noEmit` 零错 + `vite build` 通过（9.35s / 9.79s / 9.65s）；IAM 渲染契约 **33/33**（该测试同步补挂 `UiPermissionProvider`——否则 `<Can>` 走放行兜底，「无权限不挂载」的断言会**反转成通过**）；产物 CSS 中 `.alert` 7 选择器来自 `cim-ui-*.css`、`.login-card .alert` 覆盖仍在。
+- **风险 / 待办**：
+  - **171 个裸 `<button>` 未动**，因为存在两套视觉：`CimButton` 基于 antd `Button`，页面用的是手写 `.btn`（样式仍在各应用 `styles.css`）。批量替换等于全站按钮改版。审计文档给了 A（视觉向 antd 收）/ B（`CimButton` 内部改渲染 `.btn`，保留 `perm`/`tooltip`/`labelKey` 三个增量）两条路，**倾向 B，但属产品决策，未单方面执行**。
+  - `KpiCard` 尚未推广到 RMS（131 处，卡外层是 `<Link className="kpi">`）与 approval（40 处，`<Link>` 包 `<span>`）：需要先给组件加「外层是链接」的形态（不引 router，收 `render` 回调）。
+  - `InlineAlert` 余 21 处待逐页替换；`LanguageSwitcher`（三份语义不同）/ `NotificationBell`（两份，依赖各 ap 通知 API）/ 状态页（403/404/ComingSoon/登录中继，三遍手写）见审计文档 §4 的 ROI 排序。
+  - 负向清单（明确**不**上提）：`RecipeDetailDrawer` / `SpecEditModal` / `DiffTable` / `DetailModal` / `FlowProgress` / `IdentitySwitcher` / `PermTree` —— 均绑领域模型，避免后来者重复评估。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

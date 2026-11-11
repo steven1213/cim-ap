@@ -1,6 +1,7 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
 > 状态：**P0–P20 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）、P16b–P16d IAM 其余三页（菜单 / 角色 / 多语言，含台组件 `components.css` 一处开关宽度修正）。P17–P20 approval 九页 + 三个共享弹窗（含 `signal` 透传、全量取回 + 本地分页、`Promise.allSettled` 合成多路、弹窗取数失败不再关窗）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 16/16 迁移完毕**；**approval 9/9 + 3 弹窗迁移完毕**——三个应用全部收敛到 `@cim/*`。
+> 采用度审计：[`component-adoption-audit.md`](./component-adoption-audit.md)（2026-11-12）——页面到底有没有用组件、还有哪些该上提，含实测数字与待办清单。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -281,6 +282,8 @@ const cim = createI18n({
 
 **已落地（P1 + 补齐批次，2026-11-11）**
 
+图标：`icons.tsx` 收**跨应用通用**的内联 SVG（34 个，2026-11-12 由 IAM/RMS 的重复实现合并而来）；领域图标留在各自应用。
+
 命名：组件一律 `Cim` 前缀（参考项目用 `Goat`，本项目不沿用）；已占用语义名的领域组件直接用领域名（`Page` / `Panel` / `DataTable` / `StatusTag` / `FormGrid`），不加前缀以免读起来像第三方。
 
 | 类目 | 组件 | 文件 | 职责 | 明确不做 |
@@ -305,6 +308,7 @@ const cim = createI18n({
 | data | `CimTabs` | `data/Tabs.tsx` | 页签（受控/非受控） | 不做路由联动 |
 | data | `CimTree` | `data/Tree.tsx` | 组织树/菜单树（展开、勾选、拖拽排序） | 不加载数据 |
 | data | `CimCollapse` | `data/Collapse.tsx` | 折叠面板（分组表单/日志段） | — |
+| data | `KpiCard` / `KpiGrid` | `data/KpiCard.tsx` | 指标卡（图标+标签+值+副标题+左侧色条）/ 自适应网格 | 不依赖路由；要跳转由调用方包 `<Link>` |
 | form | `FormGrid` | `form/FormGrid.tsx` | 配置驱动表单，判别联合 `kind`：text/password/textarea/number/select/switch/date/custom | 不做校验规则 DSL |
 | form | `CimField` | `form/Field.tsx` | 单字段外壳（标签/必填/错误/提示/单位） | 不做布局 |
 | form | `CimInput` | `form/Input.tsx` | 输入框（前后缀、单位、清除） | — |
@@ -316,6 +320,7 @@ const cim = createI18n({
 | form | `CimUpload` | `form/Upload.tsx` | 上传（手动/自动、大小与类型限制、进度） | 不决定存储位置，由调用方给 action |
 | feedback | `CimModal` | `feedback/CimModal.tsx` | 弹窗（焦点/Esc/滚动锁由 antd 保证） | 不内置表单 |
 | feedback | `UiToastProvider` / `useToast` / `useConfirm` | `feedback/message.tsx` | 全局消息与二次确认（`App.useApp()` 上下文版，继承主题） | 不用 antd 静态 message、不用 `window.confirm` |
+| feedback | `InlineAlert` | `feedback/InlineAlert.tsx` | 行内提示块（`err`/`ok`/`warn`/`info` 四色调） | 不含重试按钮（由调用方放在块后） |
 | feedback | `CimTooltip` | `feedback/Tooltip.tsx` | 文字提示（超长省略号场景） | — |
 | feedback | `CimPopconfirm` | `feedback/Popconfirm.tsx` | 气泡确认（危险动作） | 不做异步 loading 编排 |
 | feedback | `CimPopover` | `feedback/Popover.tsx` | 气泡卡片 | — |
