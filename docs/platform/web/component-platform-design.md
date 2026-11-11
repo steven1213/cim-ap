@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P3 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）。
+> 状态：**P0–P4 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -107,12 +107,14 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 ```
 @cim/theme   ← 无依赖，纯 CSS 变量 + 状态映射表
 @cim/ui      ← 依赖 theme + antd(peer)（严禁依赖 data / i18n）
-@cim/data    ← 依赖 axios + zustand（读 token）
-@cim/i18n    ← 依赖 i18next + @cim/data（拉译文/字典）+ theme（EnumTag 用色）
+@cim/data    ← 只依赖 react（useResource / useDebounced / ApiError）
+@cim/i18n    ← 依赖 i18next + @cim/data（拉译文/字典）+ theme（EnumTag 用色）   [未建]
 @cim/shell   ← 依赖 theme + ui + react-router-dom(peer) + zustand(peer)
 ```
 
-> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 落地组件层；P2 消息层 + 虚拟滚动 + 路由拆包；**P3 建了 `@cim/shell`**（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`），三个应用的外壳改为薄适配层，`shell.css` 仍留在 `@cim/ui`（样式与组件同源，见 §10.1 偏差表）。`@cim/data` / `@cim/i18n` 仍未建——现状是各 ap 的请求层与 i18n 各自保留（见 §11 非目标）。
+> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 落地组件层；P2 消息层 + 虚拟滚动 + 路由拆包；**P3 建了 `@cim/shell`**（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`），三个应用的外壳改为薄适配层，`shell.css` 仍留在 `@cim/ui`（样式与组件同源，见 §10.1 偏差表）；**P4 建了 `@cim/data`**（`useResource` / `useDebounced` / `ApiError`，见 §10.6），RMS 首批 3 页迁到组件层。
+>
+> `@cim/i18n` 仍未建，**`@cim/data` 也不含 HTTP 传输层**：原设计写的「依赖 axios + zustand（读 token）」没有落地，因为 RMS/IAM 的 `lib/api.ts` 逐行相同、approval 的契约却不同（裸数据 + 操作人放 body），合并要么逼 approval 改契约、要么让公共层长开关。现状是各 ap 的请求层与 i18n 各自保留（见 §11 非目标、§12-2），`@cim/data` 只提供与传输无关的取数原语。
 
 **依赖规则（CI 可校验）**：
 
@@ -176,7 +178,7 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 
 > ⚠️ 踩坑记录：axios 的 `buildFullPath` 只在 url 为**绝对 URL**（带 scheme）时才跳过 baseURL 拼接，光写 `/sys/x` 仍会被拼成 `/api/v1/sys/x`——所以必须用独立实例，不能靠改调用写法。
 
-### 5.2 `useResource` 语义
+### 5.2 `useResource` 语义（2026-11-11 已落地，见 §10.6）
 
 ```ts
 function useResource<T>(
@@ -403,7 +405,7 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | 批次 | 内容 | 验收 |
 | --- | --- | --- |
 | **P0** ✅ | `@cim/theme`（tokens + 密度 + 明暗 + 状态映射）+ 抽取设计系统 CSS | **已完成**：三个 ap 删除本地副本后构建通过；样式等价性 + 运行时 CSSOM 双重验证，见 §10.1 |
-| **P1** ◐ | `DataTable` + 页面骨架 + `FormGrid` + `CimModal` + `StatusTag` ✅（组件层已落地，见 §10.2）；`@cim/data`（双实例 + `useResource`）待做 | 已用 `DeviceAreaPage` 单页验证；`useResource` 未落地前页面自行管理 `loading/error` |
+| **P1** ✅ | `DataTable` + 页面骨架 + `FormGrid` + `CimModal` + `StatusTag` ✅（§10.2/§10.3）；`@cim/data`（`useResource` + `useDebounced`）✅（§10.6） | 组件层用 `DeviceAreaPage` 单页验证；`useResource` 用 3 个真实页面 + 20 项断言验证（§10.6）。**双实例传输层未合并**（决策见 §12-2） |
 | **P2** | `@cim/i18n`（IAM 版上提）+ 字典 `useDict`/`EnumTag` | RMS 与 approval 切到后端驱动；切语言表头同步变；缺键上报可见 |
 | **P3** | `@cim/ui` 其余组件 + `@cim/shell` | 外壳模型定稿后实施；三端菜单与权限表现一致 |
 
@@ -684,6 +686,63 @@ antd 虚拟表格的两个硬约束已内建处理：`scroll.x` 必须是数字�
 
 
 
+### 10.6 P4 实施记录：`@cim/data` 数据层 + 三个页面迁移（2026-11-11）
+
+**为什么先做这个**：改造前 20 多个页面各写一遍同一段取数配方——
+
+```ts
+const [list, setList] = useState([]); const [loading, setLoading] = useState(true);
+async function refresh() { setLoading(true); try { setList(await api.x()) } finally { setLoading(false) } }
+useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout(id) }, [keyword]);
+```
+
+缺的不是行数，而是四个会真出事的语义：**竞态**（快筛时旧回包覆盖新数据，表格显示上一次筛选结果，数据看着都合法、极难发现）、**取消**（每切一次筛选留一个在途请求）、**轮询暂停**（产线大屏常年后台空转）、**错误态**（`try/finally` 里没有 `catch`，失败后 `loading` 关了但列表是空的，界面表现为「无数据」而不是「加载失败」）。
+
+**落地形态**（`platform/web/packages/data`，4 文件 ≈ 300 行，只依赖 react）：
+
+| 导出 | 职责 |
+| --- | --- |
+| `useResource(fetcher, opts)` | 竞态只认最新、deps 变化 abort 旧请求、同时最多一个在途、`hidden` 时暂停轮询且恢复即补、`keepPreviousData`、`enabled` 条件取数；**`error` 交页面决定界面，不在 hook 里弹 Toast** |
+| `useDebounced(value, ms)` | 只返回滞后值。取数与渲染用**同一个**滞后值——旧实现「后端按滞后值过滤、前端按即时值再滤一遍」会闪一行空态 |
+| `ApiError` / `toApiError` / `isAbortError` | 错误契约。**刻意不定义成闭合的类**：各 ap 的错误体不同（RMS/IAM 读 `{code,msg,errors}`，approval 还要兼容裸数据与 Spring 默认体），定成类就等于把业务 API 层统一了 |
+| — | **不做**：请求缓存（SWR 式，hook 不认识 URL）、重试（与幂等性相关，POST 不能盲重试）、分页（`DataTable` 的受控属性，把 page/size 放进 `deps` 即可） |
+
+**页面迁移**（RMS 首批 3 页，均为「列表 + 弹窗 CRUD」同形）：
+
+| 页面 | 改前 | 改后 | 消失的写法 |
+| --- | --- | --- | --- |
+| `DeviceTypePage` | 222 行 | 264 行 | 手写 `table.data` + `modal-backdrop` 三件套 + `confirm()` + 手写防抖 |
+| `BypassPage` | 178 行 | 311 行 | 同上 + `className="tag ok"` 手写状态色 |
+| `GoldenPage` | 174 行 | 301 行 | 同上 + `<td>` 里的条件分支 |
+
+行数没降反升，**这是预期内的**：多出来的是字段级错误提示、删除失败只弹提示不毁列表、语义色档、模态框的焦点/Esc/滚动锁、列显示与顺序持久化——旧实现这些**根本不存在**。真正减少的是「同类逻辑的份数」：这三页里 `loading / error / 防抖 / 确认框 / 表格空态` 从各写一遍变成各调一次。
+
+**顺带修掉的三个缺陷**（都不是新功能）：
+
+1. **组件内置文案的中文兜底是死的** —— 探针在真实页面里打出 `t('ui.confirm.cancel') === 'Cancel'`：RMS 的 i18n 对缺键做 humanize（取末段、首字母大写），于是 `useUiLabel` 里「返回值是否等于 key」这个判据永远不成立，`label(key, '取消')` 永远拿不到中文。表现是确认框「确定 = 删除 / 取消 = Cancel」中英混排——**读代码看不出来，只有跑起来才看得见**。
+   修法：`UiLocaleProvider` 增加 `hasKey`（应用注入 `i18n.exists`），`useUiLabel` 优先用它判断是否命中；未注入时退回旧判据（向后兼容）。三个应用的 `main.tsx` 各加一行。
+2. **循环 chunk 警告** —— `vendor → vendor-react → vendor`。react-router 6.4+ 把核心挪到 `@remix-run/router`，它被分到 `vendor`，而 `vendor-react` 又依赖它。把 `/@remix-run/` 并入 react 分组后警告消失（三应用同步改）。
+3. **`FormGrid` 的日期按「看起来对」的格式发出去会被后端静默丢弃** —— `BypassController` 用 `Instant.parse` / `LocalDateTime.parse` 解析，两者都只认 ISO 的 `T` 分隔；而 `FormGrid` 默认口径是 `YYYY-MM-DD HH:mm:ss`（空格）。解析失败被 `catch` 成 `null`，即「生效时间填了但没生效」。为此 `FormGrid` 的 `date`/`datetime` 增加 `valueFormat`（发给后端的格式）与 `displayFormat`（给人看的格式）两个独立参数；`text` 增加字面 `placeholder`（`CHAMBER.TEMP` 这类不翻译的格式示例）。**教训：日期格式必须显式对齐后端解析器，不能靠默认值猜。**
+
+**验证 20/20**（探针页 + 本机 8084 接口桩 + 无头 Chrome `--dump-dom`）：
+
+| 组 | 项数 | 覆盖 |
+| --- | --- | --- |
+| 确认框基线 | 1 | 直接 `useConfirm()` 弹窗点确定 → `resolve(true)`（先证明机制本身可用，后面的失败才不是环境问题） |
+| 机型页（真实页面） | 12 | 3 行渲染、表头取 `--panel-2`（`rgb(246,248,251)`）、搜索「D2」后 1 行**且请求真的带 `keyword=D2`**（`useDebounced`→`deps`→服务端整条链通）、弹窗 5 个字段、空提交 2 个字段错误、新建 POST body 正确 + toast、确认框危险态、取消不删（0 次 DELETE）、确定删除（`DELETE /api/v1/rms/device-types/dt2`）、取消按钮中文兜底 |
+| Bypass 页 | 2 | 2 行渲染、状态标签取 `--cim-status-ok`（`rgb(13,138,85)`） |
+| Golden 页 | 5 | 首次请求 500 → 错误块出现 → 点「重试」→ 2 行出现；待审行 3 个动作 / 已审行 1 个；批准 POST 落地 |
+
+**本次「失败」全是探针写错，产品是对的**（与 P3 同样的教训）：
+- `dt.deleteConfirmed` 连续失败 3 轮。加轨迹后才看清：**在无头 Chrome 的 `--virtual-time-budget` 下，antd 弹窗的离场动画不推进**，关闭后的弹窗一直留在 DOM 里且 `offsetParent !== null`，「可见性过滤」失效——第二次点到的仍是上一个已 resolve 的弹窗按钮，点了等于没点（P2 踩过同源问题）。改为**先测确定分支、再测取消分支**（同一时刻只有一个弹窗），并保留 XHR 记录来区分「没点中」与「请求失败」。这条坑对后续所有弹窗 E2E 都适用。
+- `gp.errorShown` 的文案从 `Retry` 变成 `重 试`，正是缺陷 1 修好后的副产物。
+
+**产物**：RMS `index` 96.18 KB（gzip 32.21）、IAM 24.07 KB、approval 55.18 KB；新增 `@cim/data` 后三端体积无可见变化（该包只依赖 react，被并入 `cim-ui` 块）。三应用 `tsc + vite build` 全过。
+
+**⚠️ 一条要说清的边界**：`useResource` 的 abort 目前只做到「丢弃迟到回包」，**没有真正断掉连接**——各 ap 的 API 层（`rmsApi` 等 900 行调用）还没把 `ctx.signal` 转给 axios。要真取消，需在 API 层给取数函数加可选 `signal` 参数并逐层透传，属 API 层收敛时的事（§12-2）。
+
+---
+
 ## 11. 非目标
 
 - 不做微前端（qiankun / Module Federation）——五个应用独立部署，无运行时集成需求
@@ -698,6 +757,7 @@ antd 虚拟表格的两个硬约束已内建处理：`scroll.x` 必须是数字�
 | # | 事项 | 现状 | 定稿时点 |
 | --- | --- | --- | --- |
 | 1 | 外壳模型（配置驱动 vs 组合件） | **已定稿（§8.1）**：配置驱动（`ShellNavGroup[]`）+ 两个插槽（`roleBadge` / `topbarExtra`）；`@cim/shell` 已落地，§10.5 | 已定稿 |
+| 2 | HTTP 传输层是否合并到 `@cim/data`（双实例 + 拦截器 + `Result` 解包） | **暂不合并**。事实：RMS 与 IAM 的 `lib/api.ts` 除 `downloadBlob` 外逐行相同；但 approval 的契约不同（成功返回**裸数据**而非 `Result`，操作人放 body 不走 Bearer）。合并要么逼 approval 改契约，要么让公共层长出开关，两头都不划算。附带代价：`useResource` 的 abort 只能丢弃回包、不能断连接 | API 层收敛时重估 |
 | 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
 | 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
 | 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
