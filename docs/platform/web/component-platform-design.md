@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P4 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移。
+> 状态：**P0–P5 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -108,13 +108,15 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 @cim/theme   ← 无依赖，纯 CSS 变量 + 状态映射表
 @cim/ui      ← 依赖 theme + antd(peer)（严禁依赖 data / i18n）
 @cim/data    ← 只依赖 react（useResource / useDebounced / ApiError）
-@cim/i18n    ← 依赖 i18next + @cim/data（拉译文/字典）+ theme（EnumTag 用色）   [未建]
+@cim/i18n    ← 只依赖 i18next + react-i18next(peer)（文案运行时：缓存 / 兜底 / 缺键 / 切语言）
 @cim/shell   ← 依赖 theme + ui + react-router-dom(peer) + zustand(peer)
 ```
 
-> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 落地组件层；P2 消息层 + 虚拟滚动 + 路由拆包；**P3 建了 `@cim/shell`**（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`），三个应用的外壳改为薄适配层，`shell.css` 仍留在 `@cim/ui`（样式与组件同源，见 §10.1 偏差表）；**P4 建了 `@cim/data`**（`useResource` / `useDebounced` / `ApiError`，见 §10.6），RMS 首批 3 页迁到组件层。
+> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 落地组件层；P2 消息层 + 虚拟滚动 + 路由拆包；**P3 建了 `@cim/shell`**（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`），三个应用的外壳改为薄适配层，`shell.css` 仍留在 `@cim/ui`（样式与组件同源，见 §10.1 偏差表）；**P4 建了 `@cim/data`**（`useResource` / `useDebounced` / `ApiError`，见 §10.6），RMS 首批 3 页迁到组件层；**P5 建了 `@cim/i18n`**（`createI18n`，见 §10.7），三应用 `lib/i18n.ts` 从 230/127/73 行收成 63/34/29 行的声明式适配。
 >
-> `@cim/i18n` 仍未建，**`@cim/data` 也不含 HTTP 传输层**：原设计写的「依赖 axios + zustand（读 token）」没有落地，因为 RMS/IAM 的 `lib/api.ts` 逐行相同、approval 的契约却不同（裸数据 + 操作人放 body），合并要么逼 approval 改契约、要么让公共层长开关。现状是各 ap 的请求层与 i18n 各自保留（见 §11 非目标、§12-2），`@cim/data` 只提供与传输无关的取数原语。
+> `@cim/i18n` 的依赖也被实测推翻了一版：原设计写「依赖 `@cim/data`（拉译文/字典）+ `theme`（EnumTag 用色）」，但字典 `useDict` / `EnumTag` 最终落在 `@cim/ui`（它要按主题上色），文案运行时只需要 i18next 本身 → 现在 `@cim/i18n` 谁都不依赖，与 `@cim/ui` 平级、互不知情。
+>
+> `@cim/data` **不含 HTTP 传输层**：原设计写的「依赖 axios + zustand（读 token）」没有落地，因为 RMS/IAM 的 `lib/api.ts` 逐行相同、approval 的契约却不同（裸数据 + 操作人放 body），合并要么逼 approval 改契约、要么让公共层长开关。现状是各 ap 的请求层各自保留（见 §11 非目标、§12-2），`@cim/data` 只提供与传输无关的取数原语。
 
 **依赖规则（CI 可校验）**：
 
@@ -124,6 +126,7 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 | `ui` 可依赖 antd，**业务代码不得直接 import antd** | antd 是组件的内部实现细节：换掉它只需改 `@cim/ui`，页面不动 |
 | `theme` 不得 import 任何包 | tokens 是最底层，反向依赖会造成循环 |
 | `data` / `i18n` 不得 import `ui` | 数据/翻译层不应感知组件 |
+| `i18n` 不横向依赖 `data` / `theme` | 文案运行时只认 i18next。组件里的文案靠反向注入（应用把 `t` 交给 `@cim/ui` 的 `UiLocaleProvider`，见 §10.6 缺陷 1），而不是 i18n 去 import 组件库 |
 | `shell` 只依赖 `ui` + `theme`，**不依赖 data / i18n** | 外壳的菜单是数据模型、文案是注入字符串（见 §8），不需要请求层与翻译层 |
 | `shell` **不 re-export `@cim/ui`** | 原计划「业务只 import shell」已放弃：re-export 会让「只要外壳」的入口被迫静态加载全部组件（含 antd）。现在两个入口各司其职：结构用 `@cim/shell`，控件用 `@cim/ui` |
 | 业务 ap 不 import `TabStrip` 之外的外壳内部文件 | 单点入口，避免绕过 `ConsoleShell` 自己拼 DOM 造成二次分叉 |
@@ -218,16 +221,49 @@ function useResource<T>(
 
 **关键区分**：UI 文案走 i18n，**枚举值不走 i18n**。把 `DRAFT → 草稿` 塞进 i18n 包会导致：新增枚举值要发翻译包、字典的启用/停用无法表达、后端枚举与前端键无法校验。字典的 `itemValue` 已经是当前语言的展示值，前端只负责按 `itemKey` 匹配 + 长文本截断。
 
-### 6.2 运行时就绪：以 IAM 实现为基座
+### 6.2 运行时：`@cim/i18n`（2026-11-11 已落地，见 §10.7）
 
-IAM 的 `lib/i18n.ts`（230 行）是三个实现里唯一完整的，直接上提为 `@cim/i18n`：
+改造前三个应用各有一份 `lib/i18n.ts`（IAM 230 行 / RMS 127 行 / approval 73 行），其中约三分之二是同一段骨架——初始化选项、整包缓存、`humanize`、`bootstrap`、`changeLanguage`；**真正的差异只有一处：译文从哪来**（IAM 后端拉取，另两个是内置包）。
 
-- 启动：先读 `localStorage` 整包同步渲染（防闪白）→ 再按版本比对拉取
-- 四级兜底：目标语言 → `zh-CN`（服务端已合并进目标包）→ 内置最小包 → `humanize(key)`，**绝不渲染裸 key**
-- 缺键：3s 批量去重上报
-- 切换：写偏好 + 改 `Accept-Language` + 重拉包，**不刷新页面**
+骨架收进 `createI18n(options)` 后，应用只剩声明：
+
+```ts
+const cim = createI18n({
+  app: 'iam',                                           // localStorage 前缀，各 ap 必须唯一
+  builtin: { 'zh-CN': zhCN, 'en-US': enUS },            // 内置包；可留空（IAM 即留空）
+  remote: { loadBundle, loadLocales, reportMissing },   // 有后端 i18n 库就给，没有就不给
+  onLanguageChange: setAcceptLanguage,                  // 本包不认识 axios
+});
+```
+
+| 选项 | 作用 | 缺省 |
+| --- | --- | --- |
+| `app` | `{app}-lang` / `{app}-i18n-bundle:{lang}` 的命名空间。**必须各 ap 唯一**——同一域名不同 path 部署时，共用前缀会让 A 应用的语言偏好串到 B | 必填 |
+| `builtin` | 内置包；同时是「远端只回覆盖项」时的基线。远端包**逐键覆盖**、不抹掉内置包 | `{}` |
+| `remote.loadBundle` | 拉整包，返回 `{version,lang,messages}`；抛错则退回本地缓存 | 不给 = 纯内置包应用 |
+| `remote.loadLocales` | 语言目录；抛错或空则回退 `locales` | 可选 |
+| `remote.reportMissing` | 缺键上报；**不给就完全不装 `missingKeyHandler`**（连 `saveMissing` 都不开） | 可选 |
+| `onLanguageChange` | 切语言时同步 `Accept-Language` 等应用侧副作用 | 可选 |
+| `missingDebounceMs` | 上报去抖窗口 | `3000` |
+
+**四级兜底**（顺序即优先级）：目标语言（远端叠在内置包之上）→ `defaultLng` → 内置包 → `humanize(key)`。最后一级只做「取末段 + 驼峰拆词 + 首字母大写」，唯一目的是**绝不把裸 key 渲染到界面上**。
 
 > ⚠️ 本地必须缓存**整包**而非仅版本号：端点约定「版本一致则只回版本、消息体为空」，只存版本号会在刷新后拿到空包导致界面全空。
+
+**从 IAM 原实现上提时改掉的两个缺陷**（都是「读代码看不出来，跑起来才看见」的那类）：
+
+1. **缓存写的是远端增量，不是合并后的整包。** 原实现 `writeCachedBundle(lang, messages)` 直接把手头这段落盘。纯远端应用（IAM 无内置包、服务端又把中文并进了目标包）看不出问题；但一旦内置包与远端并存（本包支持，也是 RMS/approval 的演进方向），下次启动就会丢掉「只在内置包/上一版缓存里的键」，表现为**升级后一批文案突然退回 humanize**。改为写 `i18next.getResourceBundle()` 的合并结果。
+2. **版本号乱带，一次性把整站打成 key。** 服务端 `I18nCache.version()` 是**整表快照算一个号**、与语言无关；前端原来只要本地有版本号就带上。于是「首次切到一个从没加载过的语言」→ 服务端判定「版本一致」→ 回空包 → 该语言一个键都没有。现在**只有该语言的整包已在本地时才带 `v`**。这条在应用级探针里是可见的（`log.enNoVersion`：切 en-US 的请求不带 `v`，回包才是全量）。
+
+**三应用现状**（差异全部落在配置里，代码同构）：
+
+| 应用 | 译文来源 | 语言目录 | 缺键上报 | 适配层 |
+| --- | --- | --- | --- | --- |
+| IAM | 后端 `GET /api/i18n/messages`（无内置包） | `GET /api/i18n/locales`，回退内置两种 | `POST /api/i18n/missing`，3s 攒批 | 63 行 |
+| RMS | 内置包 `lib/i18n/messages.ts`（1698 行） | 内置两种 | 无（`dev` 下打控制台） | 34 行 |
+| approval | 内置包（876 行） | 内置两种 | 无 | 29 行 |
+
+> **RMS / approval 为什么还没切后端驱动**：RMS 服务端已引 `cim-i18n-starter`（`sys_i18n` 表随 V2000 建好、端点也在），但**库里没有本 ap 的译文行**——真切过去只会拿到平台内置键，1698 行译文全丢。缺的是「把译文灌进 `sys_i18n`」这一步数据动作，不是组件能力；approval 服务端则还没引 starter。两者的适配层已预留 `remote`，种子上库后各加三行即可切换，内置包永远兜底。
 
 ### 6.3 键命名规范
 
@@ -404,10 +440,12 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 
 | 批次 | 内容 | 验收 |
 | --- | --- | --- |
-| **P0** ✅ | `@cim/theme`（tokens + 密度 + 明暗 + 状态映射）+ 抽取设计系统 CSS | **已完成**：三个 ap 删除本地副本后构建通过；样式等价性 + 运行时 CSSOM 双重验证，见 §10.1 |
-| **P1** ✅ | `DataTable` + 页面骨架 + `FormGrid` + `CimModal` + `StatusTag` ✅（§10.2/§10.3）；`@cim/data`（`useResource` + `useDebounced`）✅（§10.6） | 组件层用 `DeviceAreaPage` 单页验证；`useResource` 用 3 个真实页面 + 20 项断言验证（§10.6）。**双实例传输层未合并**（决策见 §12-2） |
-| **P2** | `@cim/i18n`（IAM 版上提）+ 字典 `useDict`/`EnumTag` | RMS 与 approval 切到后端驱动；切语言表头同步变；缺键上报可见 |
-| **P3** | `@cim/ui` 其余组件 + `@cim/shell` | 外壳模型定稿后实施；三端菜单与权限表现一致 |
+| **P0** ✅ | `@cim/theme`（tokens + 密度 + 明暗 + 状态映射）+ 抽取设计系统 CSS | 三个 ap 删除本地副本后构建通过；样式等价性 + 运行时 CSSOM 双重验证，见 §10.1 |
+| **P1** ✅ | `DataTable` + 页面骨架 + `FormGrid` + `CimModal` + `StatusTag`，补齐 6 类目组件 | 组件层用 `DeviceAreaPage` 单页验证，见 §10.2 / §10.3 |
+| **P2** ✅ | 消息层（`useToast` / `useConfirm`）+ `DataTable` 虚拟滚动 + 三应用路由级拆包 | 三端消息与首屏体积对比，见 §10.4 |
+| **P3** ✅ | `@cim/shell`（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`） | 外壳模型定稿后实施；三端菜单与权限表现一致，见 §10.5 |
+| **P4** ✅ | `@cim/data`（`useResource` + `useDebounced`）+ RMS 首批 3 页迁到组件层 | 3 个真实页面 + 20 项断言，见 §10.6。**双实例传输层未合并**（决策见 §12-2） |
+| **P5** ✅ | `@cim/i18n`（`createI18n`）+ 三应用 `lib/i18n.ts` 收成声明式适配 | 包级 25 项 + 应用级 15 项断言，见 §10.7。**RMS/approval 仍走内置包**（原因见 §6.2） |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -743,6 +781,51 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 
 ---
 
+### 10.7 P5 实施记录：`@cim/i18n` 文案层 + 三应用适配层收薄（2026-11-11）
+
+**为什么做这个**：三份 `lib/i18n.ts`（230 / 127 / 73 行）里约三分之二是同一段骨架——初始化选项（`useSuspense:false` / `initImmediate:false` / `parseMissingKeyHandler` / `bindI18nStore`）、整包缓存读写、`humanize`、`bootstrap`（先灌缓存再比版本）、`changeLanguage`（写偏好 + 改 `Accept-Language` + 同语言时手动 `emit` 重渲染）。三份各自演化意味着：改一条兜底规则要改三处，且只有 IAM 那份是对的。差异其实只有一处——**译文从哪来**。
+
+**落地形态**（`platform/web/packages/i18n`，6 文件 ≈ 490 行，其中注释 ≈150 行）：
+
+| 文件 | 职责 |
+| --- | --- |
+| `createI18n.ts` | 工厂：`ensureInit` / `applyBundle` / `pullRemote` / `bootstrap` / `changeLanguage` / `loadLocales` |
+| `cache.ts` | 整包缓存 + 语言偏好（两套 API 用途不同，分开两个工厂；所有 `localStorage` 调用都包 `try/catch`，隐私模式与配额超限不能让界面挂掉） |
+| `missing.ts` | 缺键上报：会话级去重 + 攒批 + **有界重试**（端点不存在时不能每 3s 空打一枪） |
+| `humanize.ts` | 四级兜底的最后一级 |
+| `types.ts` / `index.ts` | `CreateI18nOptions` / `RemoteSource` / `CimI18n` 契约与再导出 |
+
+**适配层前后**（同构代码，差异全在配置）：
+
+| 应用 | 改前 | 改后 | 改后长什么样 |
+| --- | --- | --- | --- |
+| IAM | 230 行 | 63 行 | `remote` 三个函数 + `FALLBACK_LOCALES` |
+| RMS | 127 行 | 34 行 | `builtin` 两个包 + `locales` + `setAcceptLanguage` |
+| approval | 73 行 | 29 行 | 同 RMS，无 `onLanguageChange`（该应用 api 层不带语言头） |
+
+行数总量基本持平（430 → 126 + 包），**收益不在行数**：一是骨架从「三份、只有一份对」变成「一份、有断言」；二是新增了原来根本没有的能力——`builtin` 与 `remote` 可并存（远端逐键覆盖内置包），为 RMS/approval 后续接后端驱动留好了口子。
+
+**顺带修掉的两个缺陷**（都不是新功能，且读代码看不出来）：
+
+1. **缓存写的是远端增量，不是合并后的整包。** 原实现把服务端那段落盘。IAM 是纯远端、服务端又把中文并进了目标包，所以看不出问题；但内置包与远端一旦并存，下次启动就会丢掉「只在内置包/上一版缓存里的键」→ 一批文案退回 humanize。改为写 `i18next.getResourceBundle()` 的合并结果。**这正是「缓存必须整包」那条警告的另一半**：存整包还不够，得存**合并后**的整包。
+2. **版本号乱带，一次性把整站打成 key。** 服务端 `I18nCache.version()` 是整表快照算一个号、与语言无关；前端原来只要本地有版本号就带上。于是首次切到「从没加载过的语言」→ 服务端判「版本一致」→ 回空包 → 该语言一个键都没有 → 整站 humanize。改为**只在目标语言已有本地整包时才带 `v`**。这条是写应用级探针、按真实契约（版本一致就回空包）造桩时才暴露的。
+
+**验证 40 项**（两组探针，均无头 Chrome `--dump-dom`）：
+
+| 组 | 项数 | 覆盖 |
+| --- | --- | --- |
+| 包级语义（远端源用内存桩，不需要后端） | 25 | 缓存优先（首帧就是上次语言，含内置包没有的键）、叠加顺序（远端 > 缓存 > 内置，内置不被抹掉）、首次不带 `v`、有缓存才带 `v`、空包不清内存也不清磁盘、整包落盘含三层键、humanize 兜底、缺键攒批去重且裸词不入队、目录过滤 `DISABLED`、`hasKey`/`loadedLanguages` |
+| 应用级接线（真实 `LanguageSwitcher` + 真实 `lib/api` + 8081 桩） | 15 | 远端包经 api 层落到界面（`ZH-远端包`）、语言目录来自服务端且过滤了 `fr-FR`、切 en-US 后**界面文案跟着变**且不刷新页面（`boots=1`）、偏好与整包落盘、切新语言**不带 `v`**（这是缺陷 2 的回归断言）、缺键批次真的 POST 到 `/api/i18n/missing` |
+
+**产物**：三应用 `tsc + vite build` 全过，`index` 体积均小幅下降（RMS 96.18 → 95.03 KB / gzip 31.75，IAM 24.07 → 22.46 KB，approval 55.18 → 54.53 KB），骨架进入共享 `cim-ui` 块；无循环 chunk 警告。
+
+**⚠️ 两条要说清的边界**：
+
+- **字典没有并入本包**。`useDict` / `EnumTag` 落在 `@cim/ui`（它要按主题上色，而 `ui` 不得反向依赖 `i18n`），数据来源是 `sys_dict` 的 `itemValue`，与 i18n 包无关——见 §6.1 的区分。三应用尚未注入字典 loader（`UiDictProvider`），字典目前只在内置兜底形态下工作。
+- **RMS / approval 仍是内置包**，没切后端驱动：RMS 服务端虽已引 `cim-i18n-starter`（`sys_i18n` 表随 V2000 建好、端点也在），但库里没有本 ap 的译文行，真切过去会丢掉 1698 行译文；approval 服务端未引 starter。缺的是「译文入库」这一步数据动作（见 §6.2 表下注）。
+
+---
+
 ## 11. 非目标
 
 - 不做微前端（qiankun / Module Federation）——五个应用独立部署，无运行时集成需求
@@ -758,9 +841,10 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 | --- | --- | --- | --- |
 | 1 | 外壳模型（配置驱动 vs 组合件） | **已定稿（§8.1）**：配置驱动（`ShellNavGroup[]`）+ 两个插槽（`roleBadge` / `topbarExtra`）；`@cim/shell` 已落地，§10.5 | 已定稿 |
 | 2 | HTTP 传输层是否合并到 `@cim/data`（双实例 + 拦截器 + `Result` 解包） | **暂不合并**。事实：RMS 与 IAM 的 `lib/api.ts` 除 `downloadBlob` 外逐行相同；但 approval 的契约不同（成功返回**裸数据**而非 `Result`，操作人放 body 不走 Bearer）。合并要么逼 approval 改契约，要么让公共层长出开关，两头都不划算。附带代价：`useResource` 的 abort 只能丢弃回包、不能断连接 | API 层收敛时重估 |
-| 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
-| 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
-| 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
-| 5 | 路由级拆包以抵消 antd 体积 | **已完成（§10.4）**：三应用均按路由 `lazy()` + `manualChunks` 分组；RMS 首屏 index 103 KB | 已定稿 |
-| 6 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | **已定稿**：沿用 antd 默认行高（按 `size` 档），不自己测量 | 已定稿 |
-| 7 | `--bg/--panel/--primary` 等基础变量无 `--cim-` 前缀 | 改名要动约 4000 处引用（各 ap styles.css 全在引用） | 暂缓，等外壳层统一时一并改 |
+| 3 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` 一列；`useDict` 已按「`itemValue` 就是当前语言的展示值」落地在 `@cim/ui`，P5 **未**并入 `@cim/i18n`（§6.1 的区分） | 字典接入 CMS 时 |
+| 4 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
+| 5 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
+| 6 | 路由级拆包以抵消 antd 体积 | **已完成（§10.4）**：三应用均按路由 `lazy()` + `manualChunks` 分组；RMS 首屏 index 95 KB | 已定稿 |
+| 7 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | **已定稿**：沿用 antd 默认行高（按 `size` 档），不自己测量 | 已定稿 |
+| 8 | `--bg/--panel/--primary` 等基础变量无 `--cim-` 前缀 | 改名要动约 4000 处引用（各 ap styles.css 全在引用） | 暂缓，等外壳层统一时一并改 |
+| 9 | 把 RMS（1698 行）/ approval（876 行）的译文灌进 `sys_i18n`，以切到后端驱动 | RMS 库**有表无行**（starter 的 V2000 随库建好，端点可用）；approval 服务端未引 starter。两者适配层已预留 `remote`，种子上库后各加三行即可切；在此之前内置包是唯一来源 | 出现「运营要改文案但不发版」的需求时 |

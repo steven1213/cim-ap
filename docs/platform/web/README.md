@@ -804,7 +804,7 @@ server {
 | 能力 | 状态 | 优先级 | 建议方向 |
 | --- | --- | --- | --- |
 | 微前端（qiankun / Module Federation，未来 `apps/` 多应用） | `✗` | P-Prod-C | 出现第三个前端应用时启动（目录约定见总文档），与后端服务发现对齐 |
-| 设计系统 / 组件库 + 可访问性（a11y） | `△` 已落地（组件层 + 消息层 + 外壳 + 数据层） | P-Prod-C | 见 [`component-platform-design.md`](./component-platform-design.md)：P0 tokens → P1 组件层（37 个导出 / 6 类目 + 消息层 + 虚拟滚动）→ P2 路由级拆包（RMS 首屏 index 95.8 KB）→ P3 `@cim/shell` 外壳（三应用 Layout 622→443 行、TabBar 848→0）→ **P4 `@cim/data`（`useResource`：竞态/取消/轮询暂停/错误态）+ RMS 3 页迁移（20/20 断言）**；页面迁移按节奏推进，**新页面一律用 `@cim/*`**；a11y 按 WCAG 2.1 AA 基线，尚未做自动断言 |
+| 设计系统 / 组件库 + 可访问性（a11y） | `△` 已落地（组件层 + 消息层 + 外壳 + 数据层 + 文案层） | P-Prod-C | 见 [`component-platform-design.md`](./component-platform-design.md)：P0 tokens → P1 组件层（37 个导出 / 6 类目 + 消息层 + 虚拟滚动）→ P2 路由级拆包（RMS 首屏 index 95.8 KB）→ P3 `@cim/shell` 外壳（三应用 Layout 622→443 行、TabBar 848→0）→ P4 `@cim/data`（`useResource`：竞态/取消/轮询暂停/错误态）+ RMS 3 页迁移（20/20 断言）→ **P5 `@cim/i18n`（`createI18n`：整包缓存防闪白 / 四级兜底 / 缺键上报 / 切语言不刷新）+ 三应用 `lib/i18n.ts` 230·127·73 → 63·34·29 行（40/40 断言）**；页面迁移按节奏推进，**新页面一律用 `@cim/*`**；a11y 按 WCAG 2.1 AA 基线，尚未做自动断言 |
 | 前端契约测试（consumer-driven，对齐后端 OpenAPI） | `✗` | P-Prod-B | 用 Pact/OpenAPI 生成 mock，与后端 §17 双向校验 |
 | 前端可观测（RUM / Sentry / 性能预算） | `✗` | P-Prod-B | 对齐后端 §14：错误、首屏、长任务、Core Web Vitals 入统一监控 |
 
