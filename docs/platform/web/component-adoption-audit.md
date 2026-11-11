@@ -112,10 +112,11 @@
 | 1 | `.btn` 系列按钮 | 见 §3，171 处 | 视觉路线未定 | 先定 A/B，再机械替换 | ✅ 按 B 落地，裸 `<button>` 清零 |
 | 2 | `KpiCard` 推广（RMS 131 / approval 40） | 组件已就绪；RMS 用 `<Link className="kpi">`、approval 用 `<Link>` 包 `<span>` | 带跳转的卡需要"外层是链接"的形态 | 给 `KpiCard` 加 `as`/`href` 或提供 `KpiCardLink`（不引 router，收 `render` 回调） | ✅ 改为 `KpiCard bare` 只吐内层 body，链接仍由 `<Link>` 承担（比引 router 更轻） |
 | 3 | `InlineAlert` 推广（余 21 处） | 组件已就绪 | 无 | 逐页替换，顺带把「错误 + 重试」组合统一到 `useResource` 的 `refresh` | ✅ `.alert` 清零 |
-| 4 | `LanguageSwitcher` × 3 | IAM 61 / RMS 51 / approval 31 行，**语义不同**：IAM 走 `/api/i18n/locales` 远端目录 + `LocaleInfo`，另两个用内置两语种 | 三份行为不一致 | 上提 `@cim/shell`，语言目录由应用注入（props 传 `locales` / `onChange`） | ⏳ 仍待办 |
-| 5 | `NotificationBell` × 2（RMS 180 / approval 123） | 重复的"轮询未读 + 下拉列表"逻辑，取数接口不同 | 依赖各 ap 通知 API | 上提为受控组件：`fetch` 与 `onOpenItem` 由 props 注入 | ⏳ 仍待办 |
+| 3.5 | `StatusTag` 落地（0 采用） | 组件已就绪，但 `@cim/theme` 的 `STATUS_TONES` 只登记了 3 个域，页面各自写 `statusTone()` / `STATUS_TONE` 映射 | 登记的域与后端枚举不一致 | 按后端枚举把域补全（`signoffState`/`approvalState`/`bypassState`/`overrideState`/`tempReleaseState`），页面删掉本地映射改 `StatusTag` | ✅ 已落地，业务侧引用 0 → **17**；顺带修出两处语义错（见下） |
+| 4 | `LanguageSwitcher` × 3 | IAM 61 / RMS 51 / approval 31 行，**语义不同**：IAM 走 `/api/i18n/locales` 远端目录 + `LocaleInfo`，另两个用内置两语种 | 三份行为不一致 | 上提 `@cim/shell`，语言目录由应用注入（props 传 `locales` / `onChange`） | ✅ 上提为 `LocaleSwitcher` + `useLocaleSwitcher`，三应用各剩 10 行薄壳 |
+| 5 | `NotificationBell` × 2（RMS 180 / approval 123） | 重复的"轮询未读 + 下拉列表"逻辑，取数接口不同 | 依赖各 ap 通知 API | 上提为受控组件：`fetch` 与 `onOpenItem` 由 props 注入 | ✅ 展示层上提 `@cim/shell`，数据/SSE/导航留在应用（approval 无通知表，语义本就不同） |
 | 6 | 状态页（403 / 404 / ComingSoon / 登录中继） | 6 个文件 ~350 行，同一套 `.panel` + `<h1>` + 裸按钮手写三遍 | 无 | 上提 `StatusPage`（`code` / `titleKey` / `descKey` / `action`），三应用替换 | ✅ 未新增 `StatusPage`，而是把 `EmptyState` 扩到 `icon`/`children`/`large` 后统一为 `Panel + EmptyState`（少一个组件、少一层概念） |
-| 7 | `.split` 双栏 | 6 处 5 文件；`ui.css` 已有 `.split` 样式但**无组件** | 无 | 加 `SplitPane`（`left` / `right` / `ratio`），顺带把 `CimSplitter` 的用途讲清 | ⏳ 仍待办 |
+| 7 | `.split` 双栏 | 6 处 5 文件；`ui.css` 已有 `.split` 样式但**无组件** | 无 | 加 `SplitPane`（`left` / `right` / `ratio`），顺带把 `CimSplitter` 的用途讲清 | ✅ 新增 `CimSplitPane`，6 处替换；与 `CimSplitter` 的分工写进两个 header |
 | 8 | `.field` 表单块 | 101 处（IAM 65 / approval 36）；`FormGrid` 已存在但只 4/4 文件使用 | 与 `FormGrid` 职责重叠 | **不建议**新增组件，按页把 `.field` 手写块并进 `FormGrid` | ✅ 结论修正：容器口径实为 49 处，`CimField` 已存在但**没有 CSS**（空壳）→ 补样式后全部替换，`FormGrid` 只在"整表配置驱动"时用 |
 | 9 | `PermTree`（IAM 335 行） | 单应用 | 领域组件 | 不上提 | — |
 | 10 | `th`/`td` 手写表 | 仅 RMS `Dashboard` / `DeviceArea` 各 1 处 | 无 | 换 `DataTable`（`scrollX` 已支持） | ⏳ 仍待办 |
@@ -133,6 +134,22 @@
 | `IdentitySwitcher` | approval-ap | 审批暂无 RBAC，用"切身份"联调，与 IAM/RMS 的权限模型不同 |
 | `PermTree` | iam-ap | 菜单树 + 平台码双闸门，IAM 域专用 |
 | `NotificationBell` 的通知 DTO | rms/approval | 见 §4-5，**组件可上提、DTO 不提** |
+
+### 5.1 0 采用但**保留**的（边界已写清，别再来一遍）
+
+这几个在审计表里是「0 采用」，但结论不是「删」也不是「必须用」——它们各自有明确的适用面，
+只是当前页面恰好没走到那条路上。判断依据是**看它被谁消费**，而不是数业务侧的引用：
+
+| 组件 | 业务侧引用 | 实际情况与边界 |
+| --- | --- | --- |
+| `useColumns` | 0 | **不是没用**：`DataTable` 内部就是靠它做列显隐/排序持久化（`DataTable.tsx` 第 18 行 import、第 167 行调用）。它是「表格的实现细节」，不该被页面直接调——页面用 `DataTable` 就等于用了它。审计时按「业务侧引用数」统计会把它误报成死代码。 |
+| `CimTooltip` | 0 | 站内 124 处提示走原生 `title=`，都是**一行短文案**（图标按钮说明、`.dim` 小字注解）。原生 `title` 在这些场景更好：无延迟、不抢焦点、不产生额外 DOM。`CimTooltip` 的适用面是**多行/富内容/需要 `placement` 控制**（如长哈希、多字段说明）。边界写在这里，避免下个人把 124 处全换掉再回滚。 |
+| `CimSplitter` | 0 | 可**拖拽**分栏（antd `Splitter`，尺寸可上报）。管理页的主从形态用 `CimSplitPane`——定宽左列、窄屏自动堆叠。只有「两栏都是主工作区」时才用 `CimSplitter`。两个组件的 header 都写了这段。 |
+| `CimPopconfirm` | 0 | 页面统一用 `useConfirm()`（`CimModal` 承载），因为破坏性操作大多要**填理由**（驳回意见、结束原因），气泡确认框放不下 textarea。`CimPopconfirm` 保留给「一键即生效、无需说明」的场景。 |
+| `CimPopover` | 0 | 与 `CimTooltip` 同源但可交互（内含按钮/链接）。当前没有被点开的浮层需求。 |
+
+> 教训：**「0 采用」要先分清是被页面用还是被组件用。** `useColumns` 这类内部基元按业务侧计数必然为 0，
+> 把它当死代码删掉会直接打断 `DataTable`。
 
 ---
 

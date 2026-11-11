@@ -465,6 +465,55 @@
 - **提交**：`d00227f`（ui 层补齐）→ `dc5d6a1`（iam）→ `72f69fd`（rms）→ `35ed2b3`（approval）→ `05482da`（渲染契约）→ `d793fe5`（网格 margin + compact）→ `5158e2f`（最后 3 处 `.field` 与三份 CSS 段删除）。
 - **待办**：`StatusTag`/`ToneTag`/`CimTooltip`/`CimSplitter`/`useColumns` 仍 0 采用（`ToneTag`/`StatusTag` 与 `Tone` 语义重叠，需先合并 API）；`LanguageSwitcher` 三份语义不同；`NotificationBell` 两份依赖各 ap 通知 API。
 
+### 32. refactor(web)：待办清单清账——顶栏控件上提、SplitPane、状态标签收口
+
+§31 收尾时留了 5 项待办，本轮逐项处理（3 项落地、2 项给出「不做」的边界）。
+
+**32.1 三份 `LanguageSwitcher` → `@cim/shell` 的 `LocaleSwitcher` + `useLocaleSwitcher`**
+
+- 三份实测差异：IAM / RMS 结构几乎逐字节相同（只差 tooltip 的键前缀），approval 那份**缺三项通用能力**——切换中不禁用（连点会让译文包与 UI 语言错位）、不支持 `className`、`title` 硬编码 `"Language"`（切中文后仍是英文）。
+- 拆成「受控组件 + hook」而不是整块搬：三家的差别全在**数据来源**（IAM 走 `/api/i18n/locales` 远端目录，另两个是内置两语种），把取数也塞进组件就得为一个尚不存在的通用接口建模。`useLocaleSwitcher` 收 `{ currentLang, changeLanguage, loadLocales }` 三个注入函数——三个 ap 的 `lib/i18n.ts` 恰好导出同名函数，无需再写适配器。
+- ⚠️ **`runtime` 是调用点内联的对象字面量，每次 render 都是新引用**：直接挂进 `useEffect` 依赖会「拉目录 → setState → 重 render → 再拉」自激，故用 ref 跟进最新引用、effect 只跑一次。
+- 结果：1945B / 1455B / 865B → 三个 ~900B 的同构薄壳（各 10 行有效代码）。approval 顺带补上 busy 态与 `shell.language` 键。
+
+**32.2 两份 `NotificationBell` → `@cim/shell`（展示层）**
+
+- ⚠️ **这两份不是同一个东西**：RMS 有持久表 `rms_notification` + 未读数轮询 + 标记已读 + 点击直达；approval **没有通知表**，只有 SSE 收到即入内存的会话级列表（后端注释亦写明「后续按各 AP 自管原则补通知表」）。所以只上提界面与交互，数据语义留在应用。
+- 边界画在 props：`unread` / `items` / `labels` / `onRefresh` / `onOpenItem` / `onReadAll` / `connected` / `onOpenChange`。`onOpenChange` 是为 RMS 的 SSE 回调加的——「面板开着才顺手刷新列表」需要知道开合状态，而状态在组件内；把状态提给应用等于让三个应用各写一遍点外关闭。
+- 样式同批上提：`.bell-*` 在 RMS 与 approval 各一份、**逐字节相同**（实测），且 approval 那份是**死代码**（页面早改用 `.tab-ctx` 菜单）——这说明这套才是本意。收进 `@cim/ui/shell.css`，两处副本删除（RMS -93 行、approval -93 行）。
+- `IconBell` 补进 `@cim/ui/icons.tsx`（取 RMS 画法）。approval 自己的图标集仍保留，因为它还在页内按钮上用（「催办」）——**外壳 chrome 用共享集、页内图标用各自集**是既定规则，不是漏改。
+
+**32.3 `.split` × 6 → `CimSplitPane`**
+
+- `.split` 不只是两列 grid：`.split > .panel { min-height: 0 }`、`.split .panel-body` 要弹性填充并内部滚动、左列 `.panel.scroll-y` 吸顶。这些约束写在 CSS 里看不见，页面手写 div 时少一层 / 多一层包裹，就变成「表格把面板撑破、整页双滚动条」。收进组件后约束随组件走，并在开发态对「子元素不是 2 个」发提醒（不抛错——能正常渲染的页面不该被拦住）。
+- **不是为了用而用**：`CimSplitter`（可拖拽、尺寸可上报）一直是 0 采用，`.split`（固定定宽）有 6 处在用。给 6 处真实用法一个组件，比让它们继续手写 div 更有意义；两个组件的分工写进了各自 header（管理页主从 = `CimSplitPane`；两栏都是主工作区 = `CimSplitter`）。
+
+**32.4 `ToneTag` 删除 + `StatusTag` 落地（含两处语义错的修正）**
+
+- `ToneTag` 是 `CimTag tone` 少了 `outline`/`size` 的子集，纯重复 → 删除。真正在用它的只有 ui 内部的 `dict.tsx`（字典驱动的标签），改 `<CimTag tone>`，并**显式补回 `cim-status-tag` 类**（那个类带圆角/字号/内边距，原来由 `ToneTag` 自带，不补就是静默的观感变化）。
+- `StatusTag` 一直 0 采用，根因不是「页面不知道有它」，而是 `@cim/theme` 的 `STATUS_TONES` **只登记了 3 个域**，页面要的枚举不在表里，只能各自写 `statusTone()` / `STATUS_TONE`。按后端枚举把域补全后，页面删掉本地映射改 `StatusTag`：业务侧引用 0 → **17**。
+- **修出两处真错**：
+  1. `approvalState` 原登记 `RUNNING / APPROVED / REJECTED / RETURNED` —— 那是 Flowable 的结束事件语义。服务端实际产出是 `running ? "ACTIVE" : (deleteReason != null ? "WITHDRAWN" : "COMPLETED")`，即 **ACTIVE / COMPLETED / WITHDRAWN**，原表的值全错、还多两个不存在的值。
+  2. `RecipeDetailDrawer` 自写 `DRAFT → run`，与表的 `DRAFT → idle`（设计稿 §2.3：idle = 草稿）分叉 —— 注释却写着「与 @cim/theme 的 recipeState 口径一致」。
+  另有一处**按语义纠正**：`IntegrationPage.stageTone` 把所有非终态阶段一律给 `warn`（橙），而设计原则是「进行中用 run（蓝）」；改为查表后 `GRANTED / SENT_TO_TOOL / TOOL_ACKED` 变蓝。这是有意的视觉变更——橙在产线语境里等于「需人处理」，给进行中的阶段是误读。
+- 新增域：`signoffState`（RMS `SignoffStatus`）、`bypassState`（`Bypass['status']`）、`overrideState`（资格矩阵 / 黄金覆盖共用的审批结论）、`tempReleaseState`（限时放行窗口）。
+- **没动的**：RMS `toneOfAction`、IAM `toneOf(type, result)` —— 它们按**动作码模式**判定（`endsWith('_DELETED')`、`startsWith('SIGNOFF_')`），不是枚举字典，塞进 `dict → value → tone` 的表里反而表达不了。这是「模式 vs 枚举」的界线，不是漏改。
+
+**32.5 顺带修掉两处 `bare` 漏改（上一批的回归）**
+
+批处理脚本只认字符串字面量的 `className`，漏了两处**表达式类名**的按钮，被误加了 `type="primary"` → 套上 `.btn` 基类（主色底 + 14px 内边距 + 白字）：
+- `rms/NotificationBell` 的通知条目 `className={'bell-item' + …}`；
+- `iam/PermTree` 的树展开箭头 `className={'tree-toggle' + …}`。
+
+两处都改 `bare`。**这轮之所以能抓到，是因为回头按「`<CimButton` 有 className 但不是 btn 家族且没有 `bare`」重新扫了一遍**——脚本的盲区不能只靠一次运行就认为清干净了。
+
+**32.6 「0 采用」的两项给出边界、不再反复评估**
+
+- `useColumns`：**不是没用**，是 `DataTable` 内部在用（`DataTable.tsx:18` import、`:167` 调用）。按业务侧引用数统计必然为 0，把它当死代码删掉会直接打断 `DataTable`。
+- `CimTooltip`：站内 124 处提示走原生 `title=`，都是一行短文案（图标按钮说明、`.dim` 小字）。原生属性在这些场景更合适（无延迟、不抢焦点、无额外 DOM）；`CimTooltip` 的适用面是**多行/富内容/需要 `placement`**。把 124 处全换掉是净负担，边界写进审计文档 §5.1。
+
+- **验证**：三应用 `tsc --noEmit` 零错 + `vite build` 通过（9.49 / 9.71 / 9.50s）；IAM 渲染契约 **33/33**；`StatusTag` 业务引用 0→17、`LocaleSwitcher` 3→1 份、`NotificationBell` 2→1 份、`.split` 6→0 处手写、`ToneTag` 删除。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
