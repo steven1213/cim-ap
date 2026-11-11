@@ -143,14 +143,22 @@ function check(name: string, fn: () => void): void {
   }
 }
 
-/** 断言 HTML 含某段文本。 */
-function has(html: string, needle: string): void {
-  assert.ok(html.includes(needle), `期望渲染结果包含 ${needle}`);
+/** 断言 HTML 含某段文本（或匹配某个正则；正则用于「跨属性顺序」的标记）。 */
+function has(html: string, needle: string | RegExp): void {
+  const ok = typeof needle === 'string' ? html.includes(needle) : needle.test(html);
+  if (ok) return;
+  // 按钮类断言失败时把实际渲染出来的 <button> 打出来，否则只能猜属性顺序
+  const dump =
+    needle instanceof RegExp && needle.source.startsWith('<button')
+      ? `\n实际按钮：\n${(html.match(/<button[^>]*>/g) ?? []).slice(0, 8).join('\n')}`
+      : '';
+  assert.fail(`期望渲染结果包含 ${needle}${dump}`);
 }
 
 /** 断言 HTML 不含某段文本（用于「无权限时**不挂载**」）。 */
-function hasNot(html: string, needle: string): void {
-  assert.ok(!html.includes(needle), `期望渲染结果**不**包含 ${needle}`);
+function hasNot(html: string, needle: string | RegExp): void {
+  const ok = typeof needle === 'string' ? !html.includes(needle) : !needle.test(html);
+  assert.ok(ok, `期望渲染结果**不**包含 ${needle}`);
 }
 
 /** 断言渲染的是「无权限提示」而非页面主体。 */
@@ -171,13 +179,22 @@ function assertNoChinese(html: string, page: string): void {
 }
 
 /**
- * 面板头「＋」按钮的精确标记。
+ * 面板头「＋」按钮的标记（跨属性顺序匹配）。
  *
  * <p>必须精确到 `title` 属性：同一文案键往往还被空态提示复用
  * （如权限页右侧空态 `<b>新增权限</b>` 与面板头 ＋ 按钮同为 `iam.admin.perms.new`），
  * 只按文案断言会把「按钮已挂载」误判成「按钮不存在」。</p>
+ *
+ * <p>用正则而非字面量串：按钮已改由 `CimButton` 渲染，属性顺序变成
+ * `title → type → class`（`{...rest}` 先展开，title 因此排在最前），写死相邻属性的
+ * 断言会因为一个正确的新增属性而失败。断言的是「这个图标按钮带着这个说明」，
+ * 不是属性顺序，所以两个条件都用 lookahead 匹配同一个标签内。</p>
  */
-const iconButton = (titleKey: string) => `<button class="icon-btn" title="${missing(titleKey)}"`;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const iconButton = (titleKey: string) =>
+  new RegExp(
+    `<button(?=[^>]*\\bclass="icon-btn")(?=[^>]*\\btitle="${escapeRe(missing(titleKey))}")`,
+  );
 
 // ---------------------------------------------------------------- 测试主体
 
