@@ -15,7 +15,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { SPEC_MANAGE } from '@/lib/permCodes';
 import type { SpecTemplate, SpecTemplateItem, SpecType } from '@/types';
@@ -115,16 +117,16 @@ export default function SpecTemplatePage() {
         width: 220,
         render: (r) => (
           <span className="cell-actions">
-            <button className="btn btn-ghost btn-sm" onClick={() => setViewId(r.id)}>
+            <CimButton size="small" onClick={() => setViewId(r.id)}>
               {t('rms.specTpl.items')}
-            </button>
+            </CimButton>
             <Can perm={SPEC_MANAGE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
+              <CimButton size="small" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
-              </button>
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -166,9 +168,9 @@ export default function SpecTemplatePage() {
         subtitleKey="rms.specTpl.sub"
         actions={
           <Can perm={SPEC_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.specTpl.add')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -366,12 +368,12 @@ function TemplateModal({
       <div className="cim-field" style={{ marginTop: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <label className="cim-field-label">{t('rms.specTpl.items')}</label>
-          <button
-            className="btn btn-ghost btn-sm"
+          <CimButton
+            size="small"
             onClick={() => setItems((prev) => [...prev, emptyItem()])}
           >
             + {t('rms.specTpl.addItem')}
-          </button>
+          </CimButton>
         </div>
 
         {loadingItems ? <p className="muted" style={{ marginTop: 6 }}>{t('rms.common.loading')}</p> : null}
@@ -410,12 +412,12 @@ function TemplateModal({
                 <CimInput value={it.targetValue} mono onChange={(v) => upd(i, { targetValue: v })} />
               )}
               <CimInput value={it.unit} onChange={(v) => upd(i, { unit: v })} />
-              <button
-                className="btn btn-ghost btn-sm danger"
+              <CimButton
+                size="small"
                 onClick={() => setItems((prev) => prev.filter((_, idx) => idx !== i))}
               >
                 ✕
-              </button>
+              </CimButton>
             </div>
           ))}
         </div>

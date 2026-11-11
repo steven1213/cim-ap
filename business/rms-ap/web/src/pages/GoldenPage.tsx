@@ -12,7 +12,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { GOLDEN_MANAGE } from '@/lib/permCodes';
 import type { GoldenOverride } from '@/types';
@@ -117,17 +119,17 @@ export default function GoldenPage() {
             <Can perm={GOLDEN_MANAGE}>
               {r.status === 'PENDING' ? (
                 <>
-                  <button className="btn btn-ghost btn-sm" onClick={() => void decide(r, true)}>
+                  <CimButton size="small" onClick={() => void decide(r, true)}>
                     {t('rms.common.approve')}
-                  </button>
-                  <button className="btn btn-ghost btn-sm danger" onClick={() => void decide(r, false)}>
+                  </CimButton>
+                  <CimButton size="small" onClick={() => void decide(r, false)}>
                     {t('rms.common.reject')}
-                  </button>
+                  </CimButton>
                 </>
               ) : null}
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -144,9 +146,9 @@ export default function GoldenPage() {
         subtitleKey="rms.golden.sub"
         actions={
           <Can perm={GOLDEN_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.golden.submit')}
-            </button>
+            </CimButton>
           </Can>
         }
       />

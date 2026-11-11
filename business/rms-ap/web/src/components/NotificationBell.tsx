@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import { IconBell } from '@/components/Icons';
 import type { AppNotification } from '@/types';
 
+import { CimButton } from '@cim/ui';
 /**
  * 顶栏通知铃铛（W9 审批实时通知）：轮询未读数（红点真相在持久表 rms_notification）+ SSE 实时刷新（cim-notify-starter）。
  * SSE 仅做在线即时提醒；刷新/重连必然丢消息，故 onOpen（重连）与收到消息都回拉 /unread-count 自愈。
@@ -140,17 +141,17 @@ export default function NotificationBell() {
 
   return (
     <div className="bell-wrap" ref={wrapRef}>
-      <button className="icon-btn" onClick={toggle} title={t('rms.bell.title')} aria-label={t('rms.bell.title')}>
+      <CimButton bare className="icon-btn" onClick={toggle} title={t('rms.bell.title')} aria-label={t('rms.bell.title')}>
         <IconBell width={17} height={17} />
         {unread > 0 && <span className="bell-dot">{unread > 99 ? '99+' : unread}</span>}
-      </button>
+      </CimButton>
       {open && (
         <div className="bell-panel">
           <div className="bell-head">
             <b>{t('rms.bell.title')}</b>
-            <button className="btn btn-ghost btn-sm" onClick={readAll} disabled={unread === 0}>
+            <CimButton size="small" onClick={readAll} disabled={unread === 0}>
               {t('rms.bell.readAll')}
-            </button>
+            </CimButton>
           </div>
           <div className="bell-list">
             {loading && <div className="bell-empty">{t('rms.common.loading')}</div>}
@@ -159,7 +160,8 @@ export default function NotificationBell() {
             )}
             {!loading &&
               items.map((n) => (
-                <button
+                <CimButton
+                  type="primary"
                   key={n.id}
                   className={'bell-item' + (n.read ? '' : ' unread')}
                   onClick={() => openItem(n)}
@@ -170,7 +172,7 @@ export default function NotificationBell() {
                   </span>
                   {n.content && <span className="bell-item-sub">{n.content}</span>}
                   <span className="bell-item-time">{n.occurredAt}</span>
-                </button>
+                </CimButton>
               ))}
           </div>
         </div>

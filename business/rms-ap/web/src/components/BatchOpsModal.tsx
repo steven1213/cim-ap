@@ -7,6 +7,9 @@ import {
   DataTable,
   useToast,
   type DataTableColumn,
+  CimButton,
+  CimInput,
+  CimField,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { BatchDownloadItem, BatchOpResult, DeviceType } from '@/types';
@@ -80,9 +83,9 @@ export function BatchHoldModal({
       footer={
         report ? (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={onClose}>
+            <CimButton type="primary" onClick={onClose}>
               {t('rms.common.close')}
-            </button>
+            </CimButton>
           </div>
         ) : undefined
       }
@@ -92,8 +95,7 @@ export function BatchHoldModal({
       cancelKey="rms.common.close"
       maskClosable={false}
     >
-      <div className="cim-field">
-        <label className="cim-field-label">{t('rms.batch.action')}</label>
+      <CimField label={t('rms.batch.action')}>
         <CimSelect
           value={action}
           onChange={(v) => setAction((typeof v === 'string' ? v : 'APPLY') as 'APPLY' | 'RELEASE')}
@@ -101,11 +103,10 @@ export function BatchHoldModal({
           allowClear={false}
           width="100%"
         />
-      </div>
+      </CimField>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.batch.devices')}</label>
+        <CimField label={t('rms.batch.devices')}>
           <CimSelect
             multiple
             value={form.deviceIds}
@@ -113,9 +114,8 @@ export function BatchHoldModal({
             options={devices.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
             width="100%"
           />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.batch.byTypes')}</label>
+        </CimField>
+        <CimField label={t('rms.batch.byTypes')}>
           <CimSelect
             multiple
             value={form.typeIds}
@@ -123,14 +123,18 @@ export function BatchHoldModal({
             options={types.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
             width="100%"
           />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">
-            {t('rms.batch.recipes')}
-            <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
-              {t('rms.batch.emptyMeansDeviceLevel')}
-            </span>
-          </label>
+        </CimField>
+        <CimField
+          label={
+            <>
+              {t('rms.batch.recipes')}{' '}
+              <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
+                {' '}
+                {t('rms.batch.emptyMeansDeviceLevel')}{' '}
+              </span>
+            </>
+          }
+        >
           <CimSelect
             multiple
             value={form.recipeIds}
@@ -138,18 +142,10 @@ export function BatchHoldModal({
             options={recipes.map((r) => ({ value: r.id, label: r.code, hint: r.name }))}
             width="100%"
           />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">
-            {t('rms.batch.reason')}
-            <span className="cim-req">*</span>
-          </label>
-          <input
-            className="text-input"
-            value={form.reason}
-            onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
-          />
-        </div>
+        </CimField>
+        <CimField label={t('rms.batch.reason')} required>
+          <CimInput value={form.reason} onChange={(v) => setForm((prev) => ({ ...prev, reason: v }))} />
+        </CimField>
       </div>
 
       {report ? <BatchReport report={report} /> : null}
@@ -209,9 +205,9 @@ export function BatchDownloadModal({
       footer={
         report ? (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={onClose}>
+            <CimButton type="primary" onClick={onClose}>
               {t('rms.common.close')}
-            </button>
+            </CimButton>
           </div>
         ) : undefined
       }
@@ -221,47 +217,40 @@ export function BatchDownloadModal({
       cancelKey="rms.common.close"
       maskClosable={false}
     >
-      <div className="cim-field" style={{ marginBottom: 10 }}>
-        <label className="cim-field-label">{t('rms.batch.requestor')}</label>
-        <input className="text-input" value={requestor} onChange={(e) => setRequestor(e.target.value)} />
-      </div>
+      <CimField label={t('rms.batch.requestor')} style={{ marginBottom: 10 }}>
+        <CimInput value={requestor} onChange={setRequestor} />
+      </CimField>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rows.map((row, i) => (
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div className="cim-field">
-              <label className="cim-field-label">
-                {t('rms.batch.device')} {i + 1}
-              </label>
+            <CimField label={<>{t('rms.batch.device')} {i + 1}</>}>
               <CimSelect
                 value={row.toolId || null}
                 onChange={(v) => setRow(i, { toolId: typeof v === 'string' ? v : '' })}
                 options={devices.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
                 width="100%"
               />
-            </div>
-            <div className="cim-field">
-              <label className="cim-field-label">
-                {t('rms.batch.recipe')} {i + 1}
-              </label>
+            </CimField>
+            <CimField label={<>{t('rms.batch.recipe')} {i + 1}</>}>
               <CimSelect
                 value={row.recipeUid || null}
                 onChange={(v) => setRow(i, { recipeUid: typeof v === 'string' ? v : '' })}
                 options={recipes.map((r) => ({ value: r.id, label: r.code, hint: r.name }))}
                 width="100%"
               />
-            </div>
+            </CimField>
           </div>
         ))}
       </div>
 
       <div style={{ marginTop: 8 }}>
-        <button
-          className="btn btn-ghost btn-sm"
+        <CimButton
+          size="small"
           onClick={() => setRows((l) => [...l, { toolId: '', recipeUid: '' }])}
         >
           + {t('rms.batch.addRow')}
-        </button>
+        </CimButton>
       </div>
 
       {report ? <BatchReport report={report} /> : null}

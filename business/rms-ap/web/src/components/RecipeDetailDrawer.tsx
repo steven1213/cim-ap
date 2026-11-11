@@ -16,7 +16,12 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  InlineAlert,
+  CimField,
+  CimInput,
+} from '@cim/ui';
 import SpecEditModal from '@/components/SpecEditModal';
 import * as api from '@/lib/rmsApi';
 import type {
@@ -367,9 +372,9 @@ export default function RecipeDetailDrawer({
       width={920}
       extra={
         <Can perm="rms:body:export">
-          <button className="btn btn-ghost btn-sm" disabled={busyExport} onClick={() => void doExport()}>
+          <CimButton size="small" disabled={busyExport} onClick={() => void doExport()}>
             {t('rms.recipe.exportOne')}
-          </button>
+          </CimButton>
         </Can>
       }
     >
@@ -395,34 +400,35 @@ export default function RecipeDetailDrawer({
             />
           </div>
           <div className="cell-actions" style={{ flex: 1 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => void loadRaw()}>
+            <CimButton size="small" onClick={() => void loadRaw()}>
               {showRaw ? t('rms.recipe.detail.hideRaw') : t('rms.recipe.detail.showRaw')}
-            </button>
+            </CimButton>
             <Can perm="rms:recipe:version">
-              <button
-                className="btn btn-ghost btn-sm"
+              <CimButton
+                size="small"
                 disabled={!editable || editing}
                 title={!editable ? t('rms.recipe.detail.editBlocked') : ''}
                 onClick={() => void startEdit()}
               >
                 {t('rms.common.edit')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm="rms:recipe:update">
-              <button
-                className="btn btn-primary btn-sm"
+              <CimButton
+                type="primary"
+                size="small"
                 disabled={!editable || busy}
                 title={!editable ? t('rms.recipe.detail.signoffBlocked') : t('rms.recipe.detail.signoffGo')}
                 onClick={() => setShowSignoff(true)}
               >
                 {t('rms.recipe.detail.signoffGo')}
-              </button>
+              </CimButton>
             </Can>
             {!editable && (
               <Can perm="rms:recipe:version">
-                <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void saveAsNewVersion()}>
+                <CimButton size="small" disabled={busy} onClick={() => void saveAsNewVersion()}>
                   {t('rms.recipe.detail.saveAsNew')}
-                </button>
+                </CimButton>
               </Can>
             )}
           </div>
@@ -432,26 +438,18 @@ export default function RecipeDetailDrawer({
 
         {/* 良构 / 可执行 */}
         {validation ? (
-          <div className={'alert ' + (validation.executable ? 'ok' : 'err')}>
-            <span>
-              {validation.wellFormed
+          <InlineAlert tone={(validation.executable ? 'ok' : 'err')}>{validation.wellFormed
                 ? t('rms.recipe.detail.wellFormed')
                 : t('rms.recipe.detail.notWellFormed')}
               {' · '}
               {validation.executable
                 ? t('rms.recipe.detail.executable')
                 : t('rms.recipe.detail.notExecutable')}
-              {validation.errors.length > 0 ? ` · ${validation.errors.join(' | ')}` : ''}
-            </span>
-          </div>
+              {validation.errors.length > 0 ? ` · ${validation.errors.join(' | ')}` : ''}</InlineAlert>
         ) : null}
 
         {parsed && !parsed.ok ? (
-          <div className="alert warn">
-            <span>
-              {t('rms.recipe.detail.parseFail')}: {parsed.error}
-            </span>
-          </div>
+          <InlineAlert tone="warn">{t('rms.recipe.detail.parseFail')}: {parsed.error}</InlineAlert>
         ) : null}
 
         {/* Body 编辑 */}
@@ -459,12 +457,12 @@ export default function RecipeDetailDrawer({
           <Panel titleKey="rms.recipe.detail.editBody" subKey="rms.recipe.detail.editHint">
             <CimInputArea value={draft} onChange={setDraft} />
             <div className="cell-actions" style={{ marginTop: 10 }}>
-              <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void save()}>
+              <CimButton type="primary" size="small" disabled={busy} onClick={() => void save()}>
                 {t('rms.common.save')}
-              </button>
-              <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(false)}>
+              </CimButton>
+              <CimButton size="small" disabled={busy} onClick={() => setEditing(false)}>
                 {t('rms.common.cancel')}
-              </button>
+              </CimButton>
             </div>
           </Panel>
         ) : null}
@@ -521,9 +519,7 @@ export default function RecipeDetailDrawer({
         ) : null}
 
         {p && p.warnings && p.warnings.length > 0 ? (
-          <div className="alert warn">
-            <span>{p.warnings.join(' | ')}</span>
-          </div>
+          <InlineAlert tone="warn">{p.warnings.join(' | ')}</InlineAlert>
         ) : null}
 
         {/* Body 原文 */}
@@ -559,17 +555,9 @@ export default function RecipeDetailDrawer({
   );
 }
 
-/** 等宽文本框（Body 编辑用）。FormGrid 的 textarea 不带等宽样式，这里单独包一层。 */
+/** 等宽文本框（Body 编辑用）。`CimInput` 自带 `mono` 与 `width`，这里只固定行数。 */
 function CimInputArea({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <textarea
-      className="text-input"
-      rows={12}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{ fontFamily: 'var(--font-mono)', width: '100%' }}
-    />
-  );
+  return <CimInput rows={12} mono width="100%" value={value} onChange={onChange} />;
 }
 
 /**
@@ -750,15 +738,15 @@ function SpecsSection({ recipeId }: { recipeId: string }) {
         render: (x) => (
           <Can perm="rms:spec:manage">
             <span className="cell-actions">
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(x)}>
+              <CimButton size="small" onClick={() => setEditing(x)}>
                 {t('rms.common.edit')}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => void toggle(x)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => void toggle(x)}>
                 {x.enabled ? t('rms.spec.disable') : t('rms.spec.enable')}
-              </button>
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void remove(x)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => void remove(x)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </span>
           </Can>
         ),
@@ -775,9 +763,9 @@ function SpecsSection({ recipeId }: { recipeId: string }) {
         flush
         actions={
           <Can perm="rms:spec:manage">
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowCreate(true)}>
+            <CimButton size="small" onClick={() => setShowCreate(true)}>
               {t('rms.spec.add')}
-            </button>
+            </CimButton>
           </Can>
         }
       >
@@ -927,9 +915,9 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
         width: 100,
         render: (u) => (
           <Can perm="rms:recipe:update">
-            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void unbind(u)}>
+            <CimButton size="small" disabled={busy} onClick={() => void unbind(u)}>
               {t('rms.tools.unbind')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -945,8 +933,7 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
   return (
     <Panel titleKey="rms.tools.title" flush actions={<span className="muted">{usages.length}</span>}>
       <div className="cim-form-grid" style={{ padding: '12px 14px 4px', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.tools.device')}</label>
+        <CimField label={t('rms.tools.device')}>
           <CimSelect
             value={deviceId || null}
             onChange={(v) => {
@@ -957,18 +944,11 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
             placeholderKey="rms.tools.pickDevice"
             width="100%"
           />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.tools.ppid')}</label>
-          <input
-            className="text-input"
-            value={ppid}
-            placeholder="PPID-001"
-            onChange={(e) => setPpid(e.target.value)}
-          />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.tools.chamber')}</label>
+        </CimField>
+        <CimField label={t('rms.tools.ppid')}>
+          <CimInput value={ppid} placeholder="PPID-001" onChange={setPpid} />
+        </CimField>
+        <CimField label={t('rms.tools.chamber')}>
           <CimSelect
             value={chamberId || null}
             onChange={(v) => setChamberId(typeof v === 'string' ? v : '')}
@@ -977,15 +957,14 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
             disabled={!deviceId}
             width="100%"
           />
-        </div>
-        <div className="cim-field">
-          <label className="cim-field-label">&nbsp;</label>
+        </CimField>
+        <CimField label={'\u00A0'}>
           <Can perm="rms:recipe:update">
-            <button className="btn btn-primary" disabled={busy} onClick={() => void bind()}>
+            <CimButton type="primary" disabled={busy} onClick={() => void bind()}>
               {t('rms.tools.bind')}
-            </button>
+            </CimButton>
           </Can>
-        </div>
+        </CimField>
       </div>
 
       <DataTable<RecipeToolUsage>

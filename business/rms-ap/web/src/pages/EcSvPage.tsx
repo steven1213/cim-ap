@@ -16,7 +16,10 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  KpiCard,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { ECSV_MANAGE } from '@/lib/permCodes';
 import type { Device, EcSvSpec, EcSvValue, Recipe } from '@/types';
@@ -151,9 +154,9 @@ export default function EcSvPage() {
         width: 90,
         render: (x) => (
           <Can perm={ECSV_MANAGE}>
-            <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(x)}>
+            <CimButton size="small" onClick={() => void doDelete(x)}>
               {t('rms.common.delete')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -204,42 +207,22 @@ export default function EcSvPage() {
         subtitleKey="rms.ecsv.sub"
         actions={
           <Can perm={ECSV_MANAGE}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowUpload(true)}>
+            <CimButton size="small" onClick={() => setShowUpload(true)}>
               {t('rms.ecsv.upload')}
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowSpec(true)}>
+            </CimButton>
+            <CimButton type="primary" size="small" onClick={() => setShowSpec(true)}>
               + {t('rms.ecsv.addSpec')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
 
       {summary && (
         <div className="kpi-grid">
-          <div className="kpi">
-            <div className="kpi-main">
-              <div className="kpi-label">{t('rms.ecsv.kpi.specs')}</div>
-              <div className="kpi-val">{summary.specs}</div>
-            </div>
-          </div>
-          <div className="kpi ok">
-            <div className="kpi-main">
-              <div className="kpi-label">{t('rms.ecsv.kpi.pass')}</div>
-              <div className="kpi-val">{summary.pass}</div>
-            </div>
-          </div>
-          <div className="kpi warn">
-            <div className="kpi-main">
-              <div className="kpi-label">{t('rms.ecsv.kpi.fail')}</div>
-              <div className="kpi-val">{summary.fail}</div>
-            </div>
-          </div>
-          <div className="kpi info">
-            <div className="kpi-main">
-              <div className="kpi-label">{t('rms.ecsv.kpi.noSpec')}</div>
-              <div className="kpi-val">{summary.noSpec}</div>
-            </div>
-          </div>
+          <KpiCard label={t('rms.ecsv.kpi.specs')} value={summary.specs} />
+          <KpiCard tone="ok" label={t('rms.ecsv.kpi.pass')} value={summary.pass} />
+          <KpiCard tone="warn" label={t('rms.ecsv.kpi.fail')} value={summary.fail} />
+          <KpiCard tone="info" label={t('rms.ecsv.kpi.noSpec')} value={summary.noSpec} />
         </div>
       )}
 
@@ -264,9 +247,9 @@ export default function EcSvPage() {
             </>
           }
           right={
-            <button className="btn btn-ghost btn-sm" onClick={refreshAll}>
+            <CimButton size="small" onClick={refreshAll}>
               {t('rms.common.refresh')}
-            </button>
+            </CimButton>
           }
         />
       )}

@@ -20,7 +20,12 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  InlineAlert,
+  KpiCard,
+  CimField,
+} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import DiffTable from '@/components/DiffTable';
 import * as api from '@/lib/rmsApi';
@@ -246,31 +251,31 @@ export default function SignoffPage() {
         width: 300,
         render: (r) => (
           <span className="cell-actions">
-            <button className="btn btn-ghost btn-sm" onClick={() => setDetailId(r.id)}>
+            <CimButton size="small" onClick={() => setDetailId(r.id)}>
               {t('rms.signoff.detail')}
-            </button>
+            </CimButton>
             {r.status === 'PENDING' ? (
               <Can perm="rms:signoff:approve">
-                <button
-                  className="btn btn-ghost btn-sm"
+                <CimButton
+                  size="small"
                   onClick={() => setDecision({ row: r, kind: 'APPROVE' })}
                 >
                   {t('rms.signoff.approve')}
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm danger"
+                </CimButton>
+                <CimButton
+                  size="small"
                   onClick={() => setDecision({ row: r, kind: 'REJECT' })}
                 >
                   {t('rms.signoff.reject')}
-                </button>
+                </CimButton>
                 {r.tempAllowStatus === 'NONE' || r.tempAllowStatus === 'EXPIRED' ? (
-                  <button className="btn btn-ghost btn-sm" onClick={() => setTempRow(r)}>
+                  <CimButton size="small" onClick={() => setTempRow(r)}>
                     {t('rms.signoff.temp')}
-                  </button>
+                  </CimButton>
                 ) : (
-                  <button className="btn btn-ghost btn-sm" onClick={() => void cancelTemp(r)}>
+                  <CimButton size="small" onClick={() => void cancelTemp(r)}>
                     {t('rms.signoff.cancelTemp')}
-                  </button>
+                  </CimButton>
                 )}
               </Can>
             ) : null}
@@ -289,45 +294,20 @@ export default function SignoffPage() {
         subtitleKey="rms.signoff.sub"
         actions={
           <Can perm="rms:signoff:approve">
-            <button className="btn btn-primary btn-sm" onClick={() => setShowSubmit(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShowSubmit(true)}>
               + {t('rms.signoff.submit')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
 
       {/* KPI 指标块 */}
       <div className="kpi-grid">
-        <div className="kpi">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.kpi.pending')}</div>
-            <div className="kpi-val">{summary?.pending ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi ok">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.kpi.approvedToday')}</div>
-            <div className="kpi-val">{summary?.approvedToday ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.kpi.rejectedToday')}</div>
-            <div className="kpi-val">{summary?.rejectedToday ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi info">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.kpi.tempActive')}</div>
-            <div className="kpi-val">{summary?.tempActive ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi warn">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.kpi.expiringSoon')}</div>
-            <div className="kpi-val">{summary?.expiringSoon ?? '—'}</div>
-          </div>
-        </div>
+        <KpiCard label={t('rms.signoff.kpi.pending')} value={summary?.pending ?? '—'} />
+        <KpiCard tone="ok" label={t('rms.signoff.kpi.approvedToday')} value={summary?.approvedToday ?? '—'} />
+        <KpiCard label={t('rms.signoff.kpi.rejectedToday')} value={summary?.rejectedToday ?? '—'} />
+        <KpiCard tone="info" label={t('rms.signoff.kpi.tempActive')} value={summary?.tempActive ?? '—'} />
+        <KpiCard tone="warn" label={t('rms.signoff.kpi.expiringSoon')} value={summary?.expiringSoon ?? '—'} />
       </div>
 
       {/* 批量操作条：只在有选中时出现 */}
@@ -338,16 +318,16 @@ export default function SignoffPage() {
               <>
                 <CimTag tone="run">{t('rms.signoff.selectedN', { n: selected.length })}</CimTag>
                 <Can perm="rms:signoff:approve">
-                  <button className="btn btn-primary btn-sm" onClick={() => void doBatch('APPROVE')}>
+                  <CimButton type="primary" size="small" onClick={() => void doBatch('APPROVE')}>
                     {t('rms.signoff.batchApprove')}
-                  </button>
-                  <button className="btn btn-ghost btn-sm danger" onClick={() => void doBatch('REJECT')}>
+                  </CimButton>
+                  <CimButton size="small" onClick={() => void doBatch('REJECT')}>
                     {t('rms.signoff.batchReject')}
-                  </button>
+                  </CimButton>
                 </Can>
-                <button className="btn btn-ghost btn-sm" onClick={() => setSelected([])}>
+                <CimButton size="small" onClick={() => setSelected([])}>
                   {t('rms.signoff.clearSelection')}
-                </button>
+                </CimButton>
               </>
             }
           />
@@ -552,9 +532,7 @@ function SubmitModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         columns={2}
         disabled={busy}
       />
-      <div className="alert info" style={{ marginTop: 10 }}>
-        <span>{t('rms.signoff.diffWillGenerate')}</span>
-      </div>
+      <InlineAlert tone="info" style={{ marginTop: 10 }}>{t('rms.signoff.diffWillGenerate')}</InlineAlert>
     </CimModal>
   );
 }
@@ -604,18 +582,14 @@ function DecisionModal({
       maskClosable={false}
     >
       {row.reason ? (
-        <div className="cim-field">
-          <label className="cim-field-label">{t('rms.signoff.reason')}</label>
+        <CimField label={t('rms.signoff.reason')}>
           <div className="dim">{row.reason}</div>
-        </div>
+        </CimField>
       ) : null}
-      <div className="cim-field" style={{ marginTop: 10 }}>
-        <label className="cim-field-label">{t('rms.signoff.comment')}</label>
-        <textarea className="text-input" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} />
-      </div>
-      <div className="alert warn" style={{ marginTop: 10 }}>
-        <span>{kind === 'APPROVE' ? t('rms.signoff.approveHint') : t('rms.signoff.decisionHint')}</span>
-      </div>
+      <CimField label={t('rms.signoff.comment')} style={{ marginTop: 10 }}>
+        <CimInput rows={3} value={comment} onChange={setComment} />
+      </CimField>
+      <InlineAlert tone="warn" style={{ marginTop: 10 }}>{kind === 'APPROVE' ? t('rms.signoff.approveHint') : t('rms.signoff.decisionHint')}</InlineAlert>
     </CimModal>
   );
 }
@@ -719,9 +693,7 @@ function TempAllowModal({ row, onClose, onDone }: { row: Signoff; onClose: () =>
       cancelKey="rms.common.cancel"
       maskClosable={false}
     >
-      <div className="alert info" style={{ marginBottom: 10 }}>
-        <span>{t('rms.signoff.tempDialog.hint')}</span>
-      </div>
+      <InlineAlert tone="info" style={{ marginBottom: 10 }}>{t('rms.signoff.tempDialog.hint')}</InlineAlert>
       <FormGrid<TempForm>
         fields={fields}
         value={form}
@@ -768,25 +740,15 @@ function BatchResultModal({ results, onClose }: { results: BatchResult[]; onClos
       width={680}
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="btn btn-primary" onClick={onClose}>
+          <CimButton type="primary" onClick={onClose}>
             {t('rms.common.close')}
-          </button>
+          </CimButton>
         </div>
       }
     >
       <div className="kpi-grid" style={{ marginBottom: 10 }}>
-        <div className="kpi ok">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.batchOk')}</div>
-            <div className="kpi-val">{ok}</div>
-          </div>
-        </div>
-        <div className="kpi warn">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.signoff.batchFail')}</div>
-            <div className="kpi-val">{fail}</div>
-          </div>
-        </div>
+        <KpiCard tone="ok" label={t('rms.signoff.batchOk')} value={ok} />
+        <KpiCard tone="warn" label={t('rms.signoff.batchFail')} value={fail} />
       </div>
       <DataTable<BatchResult>
         flat
@@ -912,9 +874,7 @@ function DetailDrawer({ id, onClose }: { id: string | null; onClose: () => void 
   return (
     <CimDrawer open={!!id} onClose={onClose} titleKey="rms.signoff.detail.title" width={860}>
       {error ? (
-        <div className="alert err">
-          <span>{error.message}</span>
-        </div>
+        <InlineAlert tone="err">{error.message}</InlineAlert>
       ) : null}
       {loading && !detail ? <div className="dim">{t('rms.common.loading')}</div> : null}
       {detail ? (

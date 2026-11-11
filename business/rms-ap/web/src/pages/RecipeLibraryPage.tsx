@@ -17,7 +17,12 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  InlineAlert,
+  KpiCard,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type {
   BodyFormat,
@@ -195,13 +200,13 @@ export default function RecipeLibraryPage() {
         width: 150,
         render: (r) => (
           <span className="cell-actions">
-            <button className="btn btn-ghost btn-sm" onClick={() => setActive(r)}>
+            <CimButton size="small" onClick={() => setActive(r)}>
               {t('rms.recipe.version')}
-            </button>
+            </CimButton>
             <Can perm="rms:recipe:delete">
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -218,19 +223,19 @@ export default function RecipeLibraryPage() {
         actions={
           <>
             <Can perm="rms:recipe:create">
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(true)}>
+              <CimButton size="small" onClick={() => setShowImport(true)}>
                 {t('rms.recipe.importBtn')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm="rms:body:export">
-              <button className="btn btn-ghost btn-sm" disabled={busyExport} onClick={() => void doExport()}>
+              <CimButton size="small" disabled={busyExport} onClick={() => void doExport()}>
                 {busyExport ? t('rms.common.loading') : t('rms.recipe.exportAll')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm="rms:recipe:create">
-              <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+              <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
                 + {t('rms.recipe.createNew')}
-              </button>
+              </CimButton>
             </Can>
           </>
         }
@@ -348,14 +353,14 @@ function VersionsPanel({
         width: 100,
         render: (v) => (
           <Can perm="rms:recipe:activate">
-            <button
-              className="btn btn-ghost btn-sm"
+            <CimButton
+              size="small"
               disabled={v.status !== 'DRAFT'}
               title={v.status !== 'DRAFT' ? t('rms.recipe.activateBlocked') : ''}
               onClick={() => onActivate(v)}
             >
               {t('rms.recipe.activate')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -368,14 +373,14 @@ function VersionsPanel({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="cell-actions">
         <Can perm="rms:recipe:version">
-          <button className="btn btn-primary btn-sm" onClick={() => setShowNewVer(true)}>
+          <CimButton type="primary" size="small" onClick={() => setShowNewVer(true)}>
             + {t('rms.recipe.newVersion')}
-          </button>
+          </CimButton>
         </Can>
         <Can perm="rms:recipe:create">
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowSaveAs(true)}>
+          <CimButton size="small" onClick={() => setShowSaveAs(true)}>
             {t('rms.recipe.saveAs')}
-          </button>
+          </CimButton>
         </Can>
       </div>
 
@@ -582,13 +587,13 @@ function CreateModal({
       <FormGrid<CreateForm> fields={fields} value={form} onChange={onChange} columns={2} disabled={busy} />
 
       <div className="cell-actions" style={{ marginTop: 10 }}>
-        <button className="btn btn-ghost btn-sm" disabled={previewing || !form.body.trim()} onClick={() => void runPreview()}>
+        <CimButton size="small" disabled={previewing || !form.body.trim()} onClick={() => void runPreview()}>
           {previewing ? t('rms.common.loading') : t('rms.recipe.previewValidate')}
-        </button>
+        </CimButton>
       </div>
 
       {preview ? (
-        <div className={'alert ' + (preview.ok ? 'ok' : 'err')} style={{ marginTop: 10 }}>
+        <InlineAlert tone={(preview.ok ? 'ok' : 'err')} style={{ marginTop: 10 }}>
           {preview.ok ? (
             <span>{t('rms.recipe.previewOk')}</span>
           ) : (
@@ -603,7 +608,7 @@ function CreateModal({
               ) : null}
             </span>
           )}
-        </div>
+        </InlineAlert>
       ) : null}
     </CimModal>
   );
@@ -810,9 +815,9 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       footer={
         report ? (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" onClick={onClose}>
+            <CimButton type="primary" onClick={onClose}>
               {t('rms.common.close')}
-            </button>
+            </CimButton>
           </div>
         ) : undefined
       }
@@ -825,11 +830,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     >
       {!report ? (
         <>
-          <div className="cim-field">
-            <label className="cim-field-label">
-              {t('rms.recipe.importFile')}
-              <span className="cim-req">*</span>
-            </label>
+          <CimField label={t('rms.recipe.importFile')} required>
             <CimUpload
               files={[]}
               onChange={pickFile}
@@ -840,9 +841,8 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               buttonKey="rms.recipe.importFile"
             />
             {fileName ? <div className="muted" style={{ marginTop: 4 }}>{fileName}</div> : null}
-          </div>
-          <div className="cim-field" style={{ marginTop: 12 }}>
-            <label className="cim-field-label">{t('rms.recipe.importStrategy')}</label>
+          </CimField>
+          <CimField label={t('rms.recipe.importStrategy')} style={{ marginTop: 12 }}>
             <CimChoice
               mode="radio"
               value={strategy}
@@ -850,7 +850,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               options={STRATEGY_OPTIONS}
               direction="vertical"
             />
-          </div>
+          </CimField>
           <div className="muted" style={{ marginTop: 10 }}>
             {t('rms.recipe.importHint')}
           </div>
@@ -858,24 +858,9 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       ) : (
         <div>
           <div className="kpi-grid">
-            <div className="kpi">
-              <div className="kpi-main">
-                <div className="kpi-label">{t('rms.recipe.importCreated')}</div>
-                <div className="kpi-val">{report.created}</div>
-              </div>
-            </div>
-            <div className="kpi info">
-              <div className="kpi-main">
-                <div className="kpi-label">{t('rms.recipe.importUpdated')}</div>
-                <div className="kpi-val">{report.updated}</div>
-              </div>
-            </div>
-            <div className="kpi warn">
-              <div className="kpi-main">
-                <div className="kpi-label">{t('rms.recipe.importSkipped')}</div>
-                <div className="kpi-val">{report.skipped}</div>
-              </div>
-            </div>
+            <KpiCard label={t('rms.recipe.importCreated')} value={report.created} />
+            <KpiCard tone="info" label={t('rms.recipe.importUpdated')} value={report.updated} />
+            <KpiCard tone="warn" label={t('rms.recipe.importSkipped')} value={report.skipped} />
           </div>
           {report.errors.length > 0 ? (
             <Panel titleKey="rms.recipe.importErrors" style={{ marginTop: 12 }}>

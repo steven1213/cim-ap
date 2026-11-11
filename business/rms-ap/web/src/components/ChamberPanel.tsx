@@ -9,7 +9,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { DeviceChamber } from '@/types';
 
@@ -124,9 +126,9 @@ export default function ChamberSection({
       width: 110,
       render: (x) => (
         <Can perm="rms:device:delete">
-          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => remove(x)}>
+          <CimButton size="small" disabled={busy} onClick={() => remove(x)}>
             {t('rms.common.delete')}
-          </button>
+          </CimButton>
         </Can>
       ),
     },
@@ -138,9 +140,9 @@ export default function ChamberSection({
       subKey="rms.chamber.sub"
       actions={
         <Can perm="rms:device:create">
-          <button className="btn btn-primary" disabled={busy} onClick={add}>
+          <CimButton type="primary" disabled={busy} onClick={add}>
             {t('rms.chamber.add')}
-          </button>
+          </CimButton>
         </Can>
       }
     >

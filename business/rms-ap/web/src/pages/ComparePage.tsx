@@ -15,6 +15,9 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
+  CimButton,
+  InlineAlert,
+  KpiCard,
 } from '@cim/ui';
 import DiffTable from '@/components/DiffTable';
 import * as api from '@/lib/rmsApi';
@@ -186,9 +189,9 @@ export default function ComparePage() {
         titleKey: 'rms.common.actions',
         width: 110,
         render: (l) => (
-          <button className="btn btn-ghost btn-sm" onClick={() => setLogDetailId(l.id)}>
+          <CimButton size="small" onClick={() => setLogDetailId(l.id)}>
             {t('rms.compare.logView')}
-          </button>
+          </CimButton>
         ),
       },
     ],
@@ -231,30 +234,10 @@ export default function ComparePage() {
 
       {/* 校验日志 KPI */}
       <div className="kpi-grid">
-        <div className="kpi">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.compare.summary.total')}</div>
-            <div className="kpi-val">{logSummary?.total ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi ok">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.compare.summary.pass')}</div>
-            <div className="kpi-val">{logSummary?.pass ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi warn">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.compare.summary.fail')}</div>
-            <div className="kpi-val">{logSummary?.fail ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi info">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.compare.summary.diffTotal')}</div>
-            <div className="kpi-val">{logSummary?.diffTotal ?? '—'}</div>
-          </div>
-        </div>
+        <KpiCard label={t('rms.compare.summary.total')} value={logSummary?.total ?? '—'} />
+        <KpiCard tone="ok" label={t('rms.compare.summary.pass')} value={logSummary?.pass ?? '—'} />
+        <KpiCard tone="warn" label={t('rms.compare.summary.fail')} value={logSummary?.fail ?? '—'} />
+        <KpiCard tone="info" label={t('rms.compare.summary.diffTotal')} value={logSummary?.diffTotal ?? '—'} />
       </div>
 
       {/* 版本比对 */}
@@ -270,9 +253,9 @@ export default function ComparePage() {
               allowClear={false}
               width={150}
             />
-            <button className="btn btn-primary btn-sm" onClick={runOnce} disabled={busy}>
+            <CimButton type="primary" size="small" onClick={runOnce} disabled={busy}>
               {busy ? t('rms.common.loading') : t('rms.compare.run')}
-            </button>
+            </CimButton>
           </>
         }
       >
@@ -330,16 +313,12 @@ export default function ComparePage() {
         <div style={{ marginTop: 12 }}>
           {result ? (
             <>
-              <div className={'alert ' + (result.identical ? 'ok' : 'warn')} style={{ marginBottom: 10 }}>
-                <span>
-                  {result.identical ? t('rms.compare.identical') : t('rms.compare.diff')}
+              <InlineAlert tone={(result.identical ? 'ok' : 'warn')} style={{ marginBottom: 10 }}>{result.identical ? t('rms.compare.identical') : t('rms.compare.diff')}
                   {' · '}
                   {result.left.recipeCode} v{result.left.versionNo} ↔ {result.right.recipeCode} v
                   {result.right.versionNo}
                   {!result.identical &&
-                    ' · ' + result.items.filter((i) => i.changed).length + ' / ' + result.items.length}
-                </span>
-              </div>
+                    ' · ' + result.items.filter((i) => i.changed).length + ' / ' + result.items.length}</InlineAlert>
               <DiffTable items={result.items} />
             </>
           ) : (
@@ -353,9 +332,9 @@ export default function ComparePage() {
         titleKey="rms.compare.batch.title"
         subKey="rms.compare.batch.sub"
         actions={
-          <button className="btn btn-primary btn-sm" onClick={runBatch} disabled={bBusy}>
+          <CimButton type="primary" size="small" onClick={runBatch} disabled={bBusy}>
             {bBusy ? t('rms.common.loading') : t('rms.compare.batchRun')}
-          </button>
+          </CimButton>
         }
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
@@ -499,9 +478,7 @@ function LogDetailDrawer({ id, onClose }: { id: string | null; onClose: () => vo
       width={820}
     >
       {error ? (
-        <div className="alert err">
-          <span>{error.message}</span>
-        </div>
+        <InlineAlert tone="err">{error.message}</InlineAlert>
       ) : null}
       {loading && !data ? <div className="dim">{t('rms.common.loading')}</div> : null}
       {data ? (

@@ -11,6 +11,9 @@ import {
   useToast,
   type CimTreeNode,
   type DataTableColumn,
+  CimButton,
+  InlineAlert,
+  KpiCard,
 } from '@cim/ui';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
 import * as api from '@/lib/rmsApi';
@@ -306,9 +309,7 @@ export default function DeviceRecipePage() {
           className="scroll-y"
         >
           {baseRes.error ? (
-            <div className="alert err" style={{ margin: 14 }}>
-              <span>{baseRes.error.message}</span>
-            </div>
+            <InlineAlert tone="err" style={{ margin: 14 }}>{baseRes.error.message}</InlineAlert>
           ) : null}
           {nodes.length === 0 && baseRes.loaded ? (
             <div className="empty">{t('rms.deviceRecipes.noAreas')}</div>
@@ -335,14 +336,14 @@ export default function DeviceRecipePage() {
               {currentPath.map((a, i) => (
                 <Fragment key={a.id}>
                   {i > 0 && <span className="dcrumb-sep">/</span>}
-                  <button className="dcrumb-link" onClick={() => expandToArea(a.id)}>
+                  <CimButton bare className="dcrumb-link" onClick={() => expandToArea(a.id)}>
                     {a.name}
                     {i === 0 && (
                       <CimTag size="small" tone="run">
                         {t('rms.deviceRecipes.factoryTag')}
                       </CimTag>
                     )}
-                  </button>
+                  </CimButton>
                 </Fragment>
               ))}
               <span className="dcrumb-sep">/</span>
@@ -354,30 +355,10 @@ export default function DeviceRecipePage() {
 
           {view && (
             <div className="kpi-grid" style={{ margin: '10px 14px 0' }}>
-              <div className="kpi">
-                <div className="kpi-main">
-                  <div className="kpi-label">{t('rms.deviceRecipes.total')}</div>
-                  <div className="kpi-val">{view.total}</div>
-                </div>
-              </div>
-              <div className="kpi warn">
-                <div className="kpi-main">
-                  <div className="kpi-label">{t('rms.deviceRecipes.orphan')}</div>
-                  <div className="kpi-val">{view.orphan}</div>
-                </div>
-              </div>
-              <div className="kpi info">
-                <div className="kpi-main">
-                  <div className="kpi-label">{t('rms.deviceRecipes.drift')}</div>
-                  <div className="kpi-val">{view.drift}</div>
-                </div>
-              </div>
-              <div className="kpi">
-                <div className="kpi-main">
-                  <div className="kpi-label">{t('rms.deviceRecipes.unqualified')}</div>
-                  <div className="kpi-val">{view.unqualified}</div>
-                </div>
-              </div>
+              <KpiCard label={t('rms.deviceRecipes.total')} value={view.total} />
+              <KpiCard tone="warn" label={t('rms.deviceRecipes.orphan')} value={view.orphan} />
+              <KpiCard tone="info" label={t('rms.deviceRecipes.drift')} value={view.drift} />
+              <KpiCard label={t('rms.deviceRecipes.unqualified')} value={view.unqualified} />
             </div>
           )}
 

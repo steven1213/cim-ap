@@ -15,6 +15,9 @@ import {
   Toolbar,
   type DataTableColumn,
   type DescItem,
+  CimButton,
+  InlineAlert,
+  KpiCard,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import * as api from '@/lib/rmsApi';
@@ -179,9 +182,9 @@ export default function AuditLogPage() {
         titleKey: 'rms.common.actions',
         width: 90,
         render: (r) => (
-          <button className="btn btn-ghost btn-sm" onClick={() => setDetail(r)}>
+          <CimButton size="small" onClick={() => setDetail(r)}>
             {t('rms.audit.detail')}
-          </button>
+          </CimButton>
         ),
       },
     ],
@@ -263,30 +266,10 @@ export default function AuditLogPage() {
 
       {/* KPI */}
       <div className="kpi-grid">
-        <div className="kpi">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.audit.kpi.total')}</div>
-            <div className="kpi-val">{summary?.total ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi ok">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.audit.kpi.success')}</div>
-            <div className="kpi-val">{summary?.success ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi warn">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.audit.kpi.failure')}</div>
-            <div className="kpi-val">{summary?.failure ?? '—'}</div>
-          </div>
-        </div>
-        <div className="kpi info">
-          <div className="kpi-main">
-            <div className="kpi-label">{t('rms.audit.kpi.today')}</div>
-            <div className="kpi-val">{summary?.today ?? '—'}</div>
-          </div>
-        </div>
+        <KpiCard label={t('rms.audit.kpi.total')} value={summary?.total ?? '—'} />
+        <KpiCard tone="ok" label={t('rms.audit.kpi.success')} value={summary?.success ?? '—'} />
+        <KpiCard tone="warn" label={t('rms.audit.kpi.failure')} value={summary?.failure ?? '—'} />
+        <KpiCard tone="info" label={t('rms.audit.kpi.today')} value={summary?.today ?? '—'} />
       </div>
 
       {/* 动作分布 */}
@@ -361,9 +344,9 @@ export default function AuditLogPage() {
               allowClear={false}
               width={130}
             />
-            <button className="btn btn-primary btn-sm" onClick={() => apply(draft)}>
+            <CimButton type="primary" size="small" onClick={() => apply(draft)}>
               {t('rms.common.search')}
-            </button>
+            </CimButton>
           </>
         }
       />
@@ -410,17 +393,15 @@ export default function AuditLogPage() {
                 placeholderKey="rms.audit.filterTo"
                 width={145}
               />
-              <button className="btn btn-primary btn-sm" onClick={queryHistory}>
+              <CimButton type="primary" size="small" onClick={queryHistory}>
                 {t('rms.audit.history.query')}
-              </button>
+              </CimButton>
             </>
           }
         />
 
         {hError ? (
-          <div className="alert err" style={{ margin: '0 14px 12px' }}>
-            <span>{hError}</span>
-          </div>
+          <InlineAlert tone="err" style={{ margin: '0 14px 12px' }}>{hError}</InlineAlert>
         ) : null}
 
         {hQuery ? (

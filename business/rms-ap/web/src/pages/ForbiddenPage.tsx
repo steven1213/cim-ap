@@ -1,12 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { EmptyState, Panel } from '@cim/ui';
 
 export default function ForbiddenPage() {
   const { t } = useTranslation();
   return (
-    <div className="empty-state">
-      <div className="empty-icon">🔒</div>
-      <h2>403</h2>
-      <p>{t('rms.forbidden')}</p>
-    </div>
+    <Panel>
+      <EmptyState large title="403" hint={t('rms.forbidden')} />
+    </Panel>
   );
 }

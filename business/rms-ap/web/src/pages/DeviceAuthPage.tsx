@@ -11,7 +11,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { DEVICE_AUTH_MANAGE } from '@/lib/permCodes';
 import type { Device, DeviceAuth, DeviceArea, DeviceType } from '@/types';
@@ -102,9 +104,9 @@ export default function DeviceAuthPage() {
         render: (r) => (
           <span className="cell-actions">
             <Can perm={DEVICE_AUTH_MANAGE}>
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void revoke(r)}>
+              <CimButton size="small" onClick={() => void revoke(r)}>
                 {t('rms.common.revoke')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -121,9 +123,9 @@ export default function DeviceAuthPage() {
         subtitleKey="rms.deviceAuth.sub"
         actions={
           <Can perm={DEVICE_AUTH_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.deviceAuth.grant')}
-            </button>
+            </CimButton>
           </Can>
         }
       />

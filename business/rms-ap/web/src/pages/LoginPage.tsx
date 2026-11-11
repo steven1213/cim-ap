@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { ssoLoginRedirect } from '@/lib/sso';
 
+import { CimInput, InlineAlert, CimButton } from '@cim/ui';
 /**
  * 统一登录入口（SSO 中继页）。
  *
@@ -74,36 +75,28 @@ export default function LoginPage() {
         <h1>{t('rms.login.title')}</h1>
 
         {error && (
-          <div className="alert err">
-            <span>{error === 'admission' ? t('rms.login.admissionDenied') : t('rms.login.ssoFailed')}</span>
-          </div>
+          <InlineAlert tone="err">{error === 'admission' ? t('rms.login.admissionDenied') : t('rms.login.ssoFailed')}</InlineAlert>
         )}
 
         {AUTO_REDIRECT && !error ? (
           <p className="login-hint-text">{t('rms.login.redirecting')}</p>
         ) : (
-          <button className="btn btn-primary btn-block" onClick={goSso}>
+          <CimButton type="primary" block onClick={goSso}>
             {t('rms.login.redirecting')}
-          </button>
+          </CimButton>
         )}
 
         {isDev && (
           <div className="login-dev">
             <div className="login-dev-cap">DEV 预览（粘贴 IAM 签发的 JWT）</div>
-            <textarea
-              className="text-input"
-              rows={3}
-              placeholder="eyJ..."
-              value={devToken}
-              onChange={(e) => setDevToken(e.target.value)}
-            />
-            <button className="btn btn-ghost btn-block" onClick={applyDevToken}>
+            <CimInput rows={3} placeholder="eyJ..." value={devToken} onChange={setDevToken} />
+            <CimButton block onClick={applyDevToken}>
               以本地令牌进入
-            </button>
+            </CimButton>
             {!AUTO_REDIRECT && (
-              <button className="btn btn-ghost btn-block" onClick={goSso}>
+              <CimButton block onClick={goSso}>
                 改用 IAM 登录
-              </button>
+              </CimButton>
             )}
           </div>
         )}

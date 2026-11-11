@@ -15,7 +15,13 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  InlineAlert,
+  KpiCard,
+  CimField,
+  CimInput,
+} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { BatchDownloadModal, BatchHoldModal } from '@/components/BatchOpsModal';
 import * as api from '@/lib/rmsApi';
@@ -207,9 +213,9 @@ export default function IntegrationPage() {
         render: (x) =>
           x.active ? (
             <Can perm={INTEGRATION_OPERATE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setReleaseRow(x)}>
+              <CimButton size="small" onClick={() => setReleaseRow(x)}>
                 {t('rms.integration.release')}
-              </button>
+              </CimButton>
             </Can>
           ) : null,
       },
@@ -271,9 +277,9 @@ export default function IntegrationPage() {
             </CimTag>
           ) : (
             <Can perm={INTEGRATION_OPERATE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => void ack(x)}>
+              <CimButton size="small" onClick={() => void ack(x)}>
                 {t('rms.integration.ack')}
-              </button>
+              </CimButton>
             </Can>
           ),
       },
@@ -290,16 +296,16 @@ export default function IntegrationPage() {
         actions={
           <>
             <Can perm={INTEGRATION_OPERATE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowBatchHold(true)}>
+              <CimButton size="small" onClick={() => setShowBatchHold(true)}>
                 {t('rms.batch.holdBtn')}
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowBatchDownload(true)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => setShowBatchDownload(true)}>
                 {t('rms.batch.downloadBtn')}
-              </button>
+              </CimButton>
             </Can>
-            <button className="btn btn-ghost btn-sm" onClick={refreshAll}>
+            <CimButton size="small" onClick={refreshAll}>
               {t('rms.common.refresh')}
-            </button>
+            </CimButton>
           </>
         }
       />
@@ -553,9 +559,9 @@ function PpidPanel({
         width: 90,
         render: (m) => (
           <Can perm={INTEGRATION_OPERATE}>
-            <button className="btn btn-ghost btn-sm danger" onClick={() => void remove(m.id)}>
+            <CimButton size="small" onClick={() => void remove(m.id)}>
               {t('rms.common.delete')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -576,9 +582,9 @@ function PpidPanel({
       <Toolbar
         left={
           <Can perm={INTEGRATION_OPERATE}>
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void add()}>
+            <CimButton type="primary" size="small" disabled={busy} onClick={() => void add()}>
               {t('rms.integration.ppid.register')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -741,34 +747,31 @@ function SimPanel({
       <Toolbar
         left={
           <>
-            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void doCheck()}>
+            <CimButton size="small" disabled={busy} onClick={() => void doCheck()}>
               {t('rms.integration.sim.runCheck')}
-            </button>
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void doCompare()}>
+            </CimButton>
+            <CimButton type="primary" size="small" disabled={busy} onClick={() => void doCompare()}>
               {busy ? t('rms.common.loading') : t('rms.integration.sim.onlineCompare')}
-            </button>
+            </CimButton>
           </>
         }
       />
 
       {chk ? (
         <div className="cim-form-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-          <div className="cim-field">
-            <label className="cim-field-label">{t('rms.integration.sim.checkResult')}</label>
+          <CimField label={t('rms.integration.sim.checkResult')}>
             <div>
               <CimTag size="small" tone={chk.checkResult === 'QUALIFIED' ? 'ok' : 'err'}>
                 {chk.checkResult}
               </CimTag>
             </div>
-          </div>
-          <div className="cim-field">
-            <label className="cim-field-label">{t('rms.integration.sim.activeVersion')}</label>
+          </CimField>
+          <CimField label={t('rms.integration.sim.activeVersion')}>
             <div className="cim-mono">{chk.activeVersion ?? '—'}</div>
-          </div>
-          <div className="cim-field">
-            <label className="cim-field-label">{t('rms.integration.reason')}</label>
+          </CimField>
+          <CimField label={t('rms.integration.reason')}>
             <div className="muted">{chk.reason ?? '—'}</div>
-          </div>
+          </CimField>
         </div>
       ) : null}
 
@@ -803,9 +806,7 @@ function SimPanel({
             ) : null}
           </div>
           {cmp.detail ? (
-            <div className="alert warn" style={{ marginTop: 8 }}>
-              <span>{cmp.detail}</span>
-            </div>
+            <InlineAlert tone="warn" style={{ marginTop: 8 }}>{cmp.detail}</InlineAlert>
           ) : null}
           {cmp.diffSummary.length > 0 ? (
             <div style={{ marginTop: 8 }}>
@@ -986,23 +987,23 @@ function DownloadPanel({
             <Can perm={INTEGRATION_OPERATE}>
               <span className="cell-actions">
                 {next ? (
-                  <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void advance(x)}>
+                  <CimButton size="small" disabled={busy} onClick={() => void advance(x)}>
                     {x.stage === 'FAILED' ? t('rms.integration.dl.retry') : `→ ${next}`}
-                  </button>
+                  </CimButton>
                 ) : null}
                 {x.stage === 'TOOL_ACKED' ? (
-                  <button
-                    className="btn btn-ghost btn-sm"
+                  <CimButton
+                    size="small"
                     disabled={busy}
                     onClick={() => void advance(x, true)}
                   >
                     {t('rms.integration.dl.readbackMismatch')}
-                  </button>
+                  </CimButton>
                 ) : null}
                 {!x.terminal ? (
-                  <button className="btn btn-ghost btn-sm danger" disabled={busy} onClick={() => setFailJob(x)}>
+                  <CimButton size="small" disabled={busy} onClick={() => setFailJob(x)}>
                     {t('rms.integration.dl.fail')}
-                  </button>
+                  </CimButton>
                 ) : null}
               </span>
             </Can>
@@ -1017,12 +1018,8 @@ function DownloadPanel({
   return (
     <Panel titleKey="rms.integration.dl.title" subKey="rms.integration.dl.sub">
       {receipt ? (
-        <div className={'alert ' + (receipt.result === 'ACCEPTED' ? 'ok' : 'err')} style={{ marginBottom: 10 }}>
-          <span>
-            {receipt.result} · {t('rms.integration.dl.stage')} {receipt.stage}
-            {receipt.errorDesc ? ` · ${receipt.errorDesc}` : ''}
-          </span>
-        </div>
+        <InlineAlert tone={(receipt.result === 'ACCEPTED' ? 'ok' : 'err')} style={{ marginBottom: 10 }}>{receipt.result} · {t('rms.integration.dl.stage')} {receipt.stage}
+            {receipt.errorDesc ? ` · ${receipt.errorDesc}` : ''}</InlineAlert>
       ) : null}
 
       <FormGrid<DownloadForm>
@@ -1036,13 +1033,14 @@ function DownloadPanel({
       <Toolbar
         left={
           <Can perm={INTEGRATION_OPERATE}>
-            <button
-              className="btn btn-primary btn-sm"
+            <CimButton
+              type="primary"
+              size="small"
               disabled={busy || !toolId || !recipeUid}
               onClick={() => void issue()}
             >
               {t('rms.integration.dl.issue')}
-            </button>
+            </CimButton>
           </Can>
         }
         right={
@@ -1244,13 +1242,9 @@ function GemEventPanel({ devices }: { devices: Device[] }) {
   return (
     <Panel titleKey="rms.integration.evt.title" subKey="rms.integration.evt.sub">
       {last ? (
-        <div className={'alert ' + (last.alarmRaised ? 'err' : 'ok')} style={{ marginBottom: 10 }}>
-          <span>
-            {last.eventType} · {last.ppid ?? t('rms.common.dash')} · {last.handlingResult}
+        <InlineAlert tone={(last.alarmRaised ? 'err' : 'ok')} style={{ marginBottom: 10 }}>{last.eventType} · {last.ppid ?? t('rms.common.dash')} · {last.handlingResult}
             {last.driftDetected ? ` · ${t('rms.integration.evt.drift')}` : ''}
-            {last.holdApplied ? ` · ${t('rms.integration.evt.held')}` : ''}
-          </span>
-        </div>
+            {last.holdApplied ? ` · ${t('rms.integration.evt.held')}` : ''}</InlineAlert>
       ) : null}
 
       <FormGrid<GemForm>
@@ -1264,9 +1258,9 @@ function GemEventPanel({ devices }: { devices: Device[] }) {
       <Toolbar
         left={
           <Can perm={INTEGRATION_OPERATE}>
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void post()}>
+            <CimButton type="primary" size="small" disabled={busy} onClick={() => void post()}>
               {t('rms.integration.evt.report')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -1415,11 +1409,11 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
   return (
     <Panel titleKey="rms.integration.inv.title" subKey="rms.integration.inv.sub">
       {report ? (
-        <div
-          className={'alert ' + (report.orphan > 0 || report.drift > 0 ? 'err' : 'ok')}
+        <InlineAlert
+          tone={report.orphan > 0 || report.drift > 0 ? 'err' : 'ok'}
           style={{ marginBottom: 10 }}
         >
-          <span>
+          <>
             {t('rms.integration.inv.report')}: {t('rms.integration.inv.total')} {report.total}
             {' · OK '}
             {report.ok}
@@ -1430,36 +1424,16 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
             {report.missing.length > 0
               ? ` · ${t('rms.integration.inv.missing')}: ${report.missing.join(', ')}`
               : ''}
-          </span>
-        </div>
+          </>
+        </InlineAlert>
       ) : null}
 
       {summary ? (
         <div className="kpi-grid" style={{ marginBottom: 10 }}>
-          <div className="kpi">
-            <div className="kpi-main">
-              <div className="kpi-label">{t('rms.integration.inv.total')}</div>
-              <div className="kpi-val">{summary.total}</div>
-            </div>
-          </div>
-          <div className="kpi ok">
-            <div className="kpi-main">
-              <div className="kpi-label">OK</div>
-              <div className="kpi-val">{summary.ok}</div>
-            </div>
-          </div>
-          <div className="kpi warn">
-            <div className="kpi-main">
-              <div className="kpi-label">DRIFT</div>
-              <div className="kpi-val">{summary.drift}</div>
-            </div>
-          </div>
-          <div className="kpi warn">
-            <div className="kpi-main">
-              <div className="kpi-label">ORPHAN</div>
-              <div className="kpi-val">{summary.orphan}</div>
-            </div>
-          </div>
+          <KpiCard label={t('rms.integration.inv.total')} value={summary.total} />
+          <KpiCard tone="ok" label={'OK'} value={summary.ok} />
+          <KpiCard tone="warn" label={'DRIFT'} value={summary.drift} />
+          <KpiCard tone="warn" label={'ORPHAN'} value={summary.orphan} />
         </div>
       ) : null}
 
@@ -1474,9 +1448,9 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
       <Toolbar
         left={
           <Can perm={INTEGRATION_OPERATE}>
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void submit()}>
+            <CimButton type="primary" size="small" disabled={busy} onClick={() => void submit()}>
               {t('rms.integration.inv.reportAction')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -1551,18 +1525,9 @@ function ReasonModal({
       cancelKey="rms.common.cancel"
       maskClosable={false}
     >
-      <div className="cim-field">
-        <label className="cim-field-label">
-          {t(labelKey)}
-          <span className="cim-req">*</span>
-        </label>
-        <textarea
-          className="text-input"
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-      </div>
+      <CimField label={t(labelKey)} required>
+        <CimInput rows={3} value={reason} onChange={setReason} />
+      </CimField>
     </CimModal>
   );
 }

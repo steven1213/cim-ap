@@ -14,7 +14,9 @@ import {
   Toolbar,
   useConfirm,
   useToast,
-  type DataTableColumn,} from '@cim/ui';
+  type DataTableColumn,
+  CimButton,
+} from '@cim/ui';
 import SpecEditModal from '@/components/SpecEditModal';
 import * as api from '@/lib/rmsApi';
 import { SPEC_MANAGE } from '@/lib/permCodes';
@@ -179,12 +181,12 @@ export default function SpecPage() {
         render: (r) => (
           <span className="cell-actions">
             <Can perm={SPEC_MANAGE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
+              <CimButton size="small" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
-              </button>
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -203,13 +205,14 @@ export default function SpecPage() {
         subtitleKey="rms.spec.sub"
         actions={
           <Can perm={SPEC_MANAGE}>
-            <button
-              className="btn btn-primary btn-sm"
+            <CimButton
+              type="primary"
+              size="small"
               disabled={!recipeId}
               onClick={() => setShowCreate(true)}
             >
               + {t('rms.spec.add')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -237,9 +240,9 @@ export default function SpecPage() {
                 mono
               />
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => void applyTpl()}>
+            <CimButton size="small" onClick={() => void applyTpl()}>
               {t('rms.spec.applyTemplate')}
-            </button>
+            </CimButton>
             <div style={toolbarInput}>
               <CimInput
                 value={srcId}
@@ -248,9 +251,9 @@ export default function SpecPage() {
                 mono
               />
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => void inherit()}>
+            <CimButton size="small" onClick={() => void inherit()}>
               {t('rms.spec.inherit')}
-            </button>
+            </CimButton>
           </Can>
         }
       />

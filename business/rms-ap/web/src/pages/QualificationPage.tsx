@@ -13,7 +13,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { QUALIFICATION_MANAGE } from '@/lib/permCodes';
 import type { Device, DeviceArea, DeviceType, Qualification, Recipe } from '@/types';
@@ -155,13 +157,13 @@ export default function QualificationPage() {
           <span className="cell-actions">
             <Can perm={QUALIFICATION_MANAGE}>
               {r.status === 'GRANTED' && (
-                <button className="btn btn-ghost btn-sm danger" onClick={() => void revoke(r)}>
+                <CimButton size="small" onClick={() => void revoke(r)}>
                   {t('rms.common.revoke')}
-                </button>
+                </CimButton>
               )}
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -178,9 +180,9 @@ export default function QualificationPage() {
         subtitleKey="rms.qual.sub"
         actions={
           <Can perm={QUALIFICATION_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.qual.grant')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -211,13 +213,13 @@ export default function QualificationPage() {
               width={180}
               placeholderKey="rms.qual.device"
             />
-            <button
-              className="btn btn-ghost btn-sm"
+            <CimButton
+              size="small"
               disabled={!checkRecipe || !checkDevice}
               onClick={() => void runCheck()}
             >
               {t('rms.qual.check')}
-            </button>
+            </CimButton>
             {checkResult && (
               <CimTag tone={checkResult.startsWith('QUALIFIED') ? 'ok' : 'err'}>{checkResult}</CimTag>
             )}

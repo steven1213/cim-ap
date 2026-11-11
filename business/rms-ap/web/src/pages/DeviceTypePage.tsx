@@ -11,7 +11,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { DeviceType } from '@/types';
 
@@ -99,14 +101,14 @@ export default function DeviceTypePage() {
         render: (r) => (
           <span className="cell-actions">
             <Can perm="rms:device-type:update">
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
+              <CimButton size="small" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm="rms:device-type:delete">
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -122,9 +124,9 @@ export default function DeviceTypePage() {
         titleKey="rms.deviceType.title"
         actions={
           <Can perm="rms:device-type:create">
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.deviceType.createNew')}
-            </button>
+            </CimButton>
           </Can>
         }
       />

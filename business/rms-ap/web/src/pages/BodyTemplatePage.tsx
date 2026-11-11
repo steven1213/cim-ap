@@ -15,7 +15,10 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { BODY_TEMPLATE_MANAGE, BODY_TEMPLATE_VIEW } from '@/lib/permCodes';
 import type { BodyTemplate, BodyTemplateDetail, DeviceType, TemplateUpsertItem } from '@/types';
@@ -132,17 +135,17 @@ export default function BodyTemplatePage() {
         render: (r) => (
           <span className="cell-actions">
             <Can perm={BODY_TEMPLATE_VIEW}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setViewId(r.id)}>
+              <CimButton size="small" onClick={() => setViewId(r.id)}>
                 {t('rms.common.view')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm={BODY_TEMPLATE_MANAGE}>
-              <button className="btn btn-ghost btn-sm" onClick={() => void openEdit(r)}>
+              <CimButton size="small" onClick={() => void openEdit(r)}>
                 {t('rms.common.edit')}
-              </button>
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              </CimButton>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -159,9 +162,9 @@ export default function BodyTemplatePage() {
         subtitleKey="rms.btpl.sub"
         actions={
           <Can perm={BODY_TEMPLATE_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
+            <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
               + {t('rms.btpl.create')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
@@ -414,8 +417,7 @@ function TemplateModal({
       />
 
       {/* 强制键清单是「不定行数的子表」，不是单个字段，故不进 FormGrid，仍手写这一块 */}
-      <div className="cim-field" style={{ marginTop: 14 }}>
-        <label className="cim-field-label">{t('rms.btpl.keys')}</label>
+      <CimField label={t('rms.btpl.keys')} style={{ marginTop: 14 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
           {items.map((it, i) => (
             <div
@@ -441,23 +443,23 @@ function TemplateModal({
                 />
                 {t('rms.btpl.required')}
               </label>
-              <button
-                className="btn btn-ghost btn-sm danger"
+              <CimButton
+                size="small"
                 onClick={() => setItems((l) => l.filter((_, idx) => idx !== i))}
               >
                 ✕
-              </button>
+              </CimButton>
             </div>
           ))}
         </div>
-        <button
-          className="btn btn-ghost btn-sm"
+        <CimButton
+          size="small"
           style={{ marginTop: 8 }}
           onClick={() => setItems((l) => [...l, { paramKey: '', required: true }])}
         >
           + {t('rms.btpl.addKey')}
-        </button>
-      </div>
+        </CimButton>
+      </CimField>
 
       {err ? (
         <p className="cim-field-error" style={{ marginTop: 10 }}>

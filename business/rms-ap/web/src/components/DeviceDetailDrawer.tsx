@@ -13,7 +13,9 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import ChamberSection from '@/components/ChamberPanel';
 import * as api from '@/lib/rmsApi';
@@ -168,9 +170,9 @@ export default function DeviceDetailDrawer({
       render: (r) =>
         r.mapId ? (
           <Can perm="rms:device:update">
-            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => unbind(r)}>
+            <CimButton size="small" disabled={busy} onClick={() => unbind(r)}>
               {t('rms.tools.unbind')}
-            </button>
+            </CimButton>
           </Can>
         ) : null,
     },
@@ -222,9 +224,9 @@ export default function DeviceDetailDrawer({
 
   const editButton = onEdit ? (
     <Can perm="rms:device:update">
-      <button className="btn btn-ghost btn-sm" onClick={onEdit}>
+      <CimButton size="small" onClick={onEdit}>
         {t('rms.common.edit')}
-      </button>
+      </CimButton>
     </Can>
   ) : undefined;
 
@@ -253,9 +255,9 @@ export default function DeviceDetailDrawer({
         subKey="rms.deviceDetail.bindHint"
         actions={
           <Can perm="rms:device:update">
-            <button className="btn btn-primary" disabled={busy} onClick={bind}>
+            <CimButton type="primary" disabled={busy} onClick={bind}>
               {t('rms.tools.bind')}
-            </button>
+            </CimButton>
           </Can>
         }
       >

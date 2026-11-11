@@ -13,7 +13,9 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
-  type FormOption,} from '@cim/ui';
+  type FormOption,
+  CimButton,
+} from '@cim/ui';
 import DeviceDetailDrawer from '@/components/DeviceDetailDrawer';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
 import * as api from '@/lib/rmsApi';
@@ -223,14 +225,14 @@ export default function DevicePage() {
         render: (r) => (
           <span className="cell-actions">
             <Can perm="rms:device:update">
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
+              <CimButton size="small" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm="rms:device:delete">
-              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+              <CimButton size="small" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -246,9 +248,9 @@ export default function DevicePage() {
         titleKey="rms.device.title"
         actions={
           <Can perm="rms:device:create">
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.device.createNew')}
-            </button>
+            </CimButton>
           </Can>
         }
       />

@@ -12,7 +12,9 @@ import {
   PageHead,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { EXPERIMENT_MANAGE } from '@/lib/permCodes';
 import type { Device, Experiment, Recipe, RecipeVersion } from '@/types';
@@ -136,27 +138,27 @@ export default function ExperimentPage() {
             <Can perm={EXPERIMENT_MANAGE}>
               {r.status === 'REQUESTED' && (
                 <>
-                  <button
-                    className="btn btn-ghost btn-sm"
+                  <CimButton
+                    size="small"
                     onClick={() => setPending({ kind: 'approve', row: r })}
                   >
                     {t('rms.exp.approve')}
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm danger"
+                  </CimButton>
+                  <CimButton
+                    size="small"
                     onClick={() => setPending({ kind: 'reject', row: r })}
                   >
                     {t('rms.exp.reject')}
-                  </button>
+                  </CimButton>
                 </>
               )}
               {r.status === 'APPROVED' && !r.expired && (
-                <button
-                  className="btn btn-ghost btn-sm"
+                <CimButton
+                  size="small"
                   onClick={() => setPending({ kind: 'close', row: r })}
                 >
                   {t('rms.exp.close')}
-                </button>
+                </CimButton>
               )}
             </Can>
           </span>
@@ -174,9 +176,9 @@ export default function ExperimentPage() {
         subtitleKey="rms.exp.sub"
         actions={
           <Can perm={EXPERIMENT_MANAGE}>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.exp.create')}
-            </button>
+            </CimButton>
           </Can>
         }
       />
