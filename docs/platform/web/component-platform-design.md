@@ -106,19 +106,20 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 
 ```
 @cim/theme   ← 无依赖，纯 CSS 变量 + 状态映射表
-@cim/ui      ← 只依赖 theme（严禁依赖 data / i18n）
+@cim/ui      ← 依赖 theme + antd(peer)（严禁依赖 data / i18n）
 @cim/data    ← 依赖 axios + zustand（读 token）
 @cim/i18n    ← 依赖 i18next + @cim/data（拉译文/字典）+ theme（EnumTag 用色）
 @cim/shell   ← 依赖以上全部
 ```
 
-> **落地进度**：P0 只建了 `@cim/theme` 与 `@cim/ui` 两个包（其余待 P1/P2/P3）。其中 `shell.css` 暂放在 `@cim/ui` 内（原因见 §10.1 偏差表），P3 建 `@cim/shell` 时按段迁移。
+> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 在 `@cim/ui` 内落地组件层（DataTable / FormGrid / CimModal / Page 骨架 / StatusTag），交互原语基于 **antd 5**（决策见 §10.2）。其余包待 P2/P3。`shell.css` 暂放在 `@cim/ui` 内（原因见 §10.1 偏差表），P3 建 `@cim/shell` 时按段迁移。
 
 **依赖规则（CI 可校验）**：
 
 | 规则 | 理由 |
 | --- | --- |
 | `ui` 不得 import `data` / `i18n` | 组件保持纯展示，否则又回到「组件内置请求」 |
+| `ui` 可依赖 antd，**业务代码不得直接 import antd** | antd 是组件的内部实现细节：换掉它只需改 `@cim/ui`，页面不动 |
 | `theme` 不得 import 任何包 | tokens 是最底层，反向依赖会造成循环 |
 | `data` / `i18n` 不得 import `ui` | 数据/翻译层不应感知组件 |
 | 业务 ap 只 import `shell`（其已 re-export 其余四包） | 单点入口，减少各 ap 的 import 噪音 |
@@ -238,35 +239,56 @@ IAM 的 `lib/i18n.ts`（230 行）是三个实现里唯一完整的，直接上�
 
 ## 7. @cim/ui：组件清单与分批
 
-| 批次 | 组件 | 说明 |
-| --- | --- | --- |
-| P0 | `Panel`、`EnumTag`、`Kpi`、`Empty`、`Tag`、`Icons` | 纯展示，5 个同构文件直接上提 |
-| P1 | `DataTable`（虚拟滚动 + 服务端分页 + 列固定 + 空/错/载三态） | 承载千行表，最关键的单个组件 |
-| P1 | `Form`（zod schema + 后端 `errors` 回填到字段） | 与 README §8 一致 |
-| P2 | `Modal`、`Drawer`、`Toast`、`Confirm` | 行为统一，焦点管理到位 |
-| P3 | `Layout`、`TabBar`、`MenuTree`、`LanguageSwitcher`、`NotificationBell` | 见 §8，最后做 |
+**已落地（P1，2026-11-11）**
 
-`DataTable` 的 props 契约（不含任何请求能力）：
+| 组件 | 文件 | 职责 | 明确不做 |
+| --- | --- | --- | --- |
+| `Page` / `PageHead` / `Panel` / `Toolbar` / `EmptyState` | `content/Page.tsx` | 页面骨架（等价现有 `.page` / `.page-head` / `.panel` / `.toolbar`） | 不做布局系统，不接管路由 |
+| `DataTable` | `data/DataTable.tsx` | 渲染 + 工具栏 + 列设置 + 服务端分页 + 选择 + 三态 | **不取数、不导出、不做单元格编辑** |
+| `useColumns` | `data/useColumns.ts` | 列显示/顺序 + localStorage 持久化 | 不碰服务端列定义（见 §12 待定 4） |
+| `StatusTag` / `ToneTag` | `data/StatusTag.tsx` | 枚举值 → 5 档语义色 | 调用方不能自选颜色 |
+| `FormGrid` | `form/FormGrid.tsx` | 配置驱动表单（判别联合 `kind`） | 不做校验规则 DSL |
+| `CimModal` | `feedback/CimModal.tsx` | 弹窗（焦点/Esc/滚动锁由 antd 保证） | 不做抽屉/气泡确认（P2） |
+| `CimProvider` / `UiLocaleProvider` | `provider.tsx` / `locale.tsx` | antd 主题映射 + 语言注入 | 组件不感知 i18n 实例 |
+
+`DataTable` 的实际契约：
 
 ```ts
 interface DataTableProps<T> {
   columns: Array<{
     key: string;
-    titleKey: string;                       // 必填，禁止直接传 ReactNode 文案
-    width?: number | string;
-    align?: 'left' | 'right' | 'center';
-    render?: (row: T) => ReactNode;         // 例外：自定义单元格，内部自行决定
+    titleKey: string;                 // 必填：不给 `title: ReactNode` 的口子
+    width?: number; align?: 'left' | 'center' | 'right';
+    mono?: boolean;                   // 编码/时间戳等宽
+    hiddenByDefault?: boolean;
+    render?: (row: T) => ReactNode;
+    sortable?: boolean;               // 必须配合 onSortChange，否则不生效
   }>;
   rows: T[];
-  rowKey: keyof T | ((row: T) => string);
+  rowKey: (row: T) => string;
   loading?: boolean;
-  error?: Error;
-  emptyKey?: string;                        // 空态文案键，默认 common.empty
+  error?: string | null;              // 非空 → 整块替换为可重试错误态
+  onRetry?: () => void;
+  actions?: ReactNode;                // 工具栏左侧
+  search?: { value: string; onChange: (v: string) => void; placeholderKey?: string };
   onRefresh?: () => void;
-  virtual?: boolean | { rowHeight: number };
-  rowClassName?: (row: T) => string;        // 供状态行着色，仍走 tokens
+  settingsKey?: string;               // 传了才启用列设置（含持久化）
+  selectedKeys?: string[];
+  onSelectionChange?: (keys: string[]) => void;
+  pagination?: { page: number; size: number; total: number; onChange: (p, s) => void };
+  sort?: { key: string; dir: 'asc' | 'desc' };
+  onSortChange?: (key: string, dir: 'asc' | 'desc' | null) => void;
+  rowClassName?: (row: T) => string;  // 行语义色仍走 tokens
 }
 ```
+
+**后续批次**
+
+| 批次 | 组件 | 说明 |
+| --- | --- | --- |
+| P2 | `useDict` / `EnumTag`（字典驱动）、`Toast`、`Confirm`、`Drawer` | 依赖 `@cim/i18n` 的字典能力 |
+| P2 | `DataTable` 虚拟滚动 | antd `virtual` + 固定行高；千行以上再开 |
+| P3 | `Layout`、`TabBar`、`MenuTree`、`LanguageSwitcher`、`NotificationBell` | 见 §8，最后做 |
 
 ---
 
@@ -314,7 +336,7 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | 批次 | 内容 | 验收 |
 | --- | --- | --- |
 | **P0** ✅ | `@cim/theme`（tokens + 密度 + 明暗 + 状态映射）+ 抽取设计系统 CSS | **已完成**：三个 ap 删除本地副本后构建通过；样式等价性 + 运行时 CSSOM 双重验证，见 §10.1 |
-| **P1** | `@cim/data`（双实例 + `useResource`）+ `DataTable` | 先只替换 1 个页面（建议 RMS 配方列表）；快速切页无串数据、轮询在 `hidden` 时暂停 |
+| **P1** ◐ | `DataTable` + 页面骨架 + `FormGrid` + `CimModal` + `StatusTag` ✅（组件层已落地，见 §10.2）；`@cim/data`（双实例 + `useResource`）待做 | 已用 `DeviceAreaPage` 单页验证；`useResource` 未落地前页面自行管理 `loading/error` |
 | **P2** | `@cim/i18n`（IAM 版上提）+ 字典 `useDict`/`EnumTag` | RMS 与 approval 切到后端驱动；切语言表头同步变；缺键上报可见 |
 | **P3** | `@cim/ui` 其余组件 + `@cim/shell` | 外壳模型定稿后实施；三端菜单与权限表现一致 |
 
@@ -352,11 +374,90 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 
 ---
 
+### 10.2 P1 实施记录：组件层落地（2026-11-11）
+
+**参考实现审计（`chengdu_jt` MES 前端，Vue 3 + Element Plus）**
+
+| 项 | 事实 |
+| --- | --- |
+| 体量 | 75 个组件 / 16 725 行，分 11 个类目（basic·chart·content·custom·data·feedback·form·navigation·others·search·diyIcon），统一 `Goat*` 前缀 |
+| 单体 | `GoatViewTable` 1927 行、`GoatTable` 1057 行、`GoatContentBottom` 862 行 |
+| 接口 | 全部为 `props: ['options']` 单对象（`<goat-table :options="{...}" />`），无类型约束 |
+| 数据 | `GoatTable` 自己分页（客户端）、自己导出 Excel、自己挂右键菜单、自己编单元格 |
+| 文案 | **无 i18n**（`package.json` 无 i18n 依赖，标签硬编码中文/韩文） |
+| 高度 | `utils/height.js` 用 50+ 个近乎相同的函数算高度（`getTableHeightByTwoLineSearchTwoThirdsInHalf` 之类），靠 `minus` 硬编码补偿 |
+
+**借鉴 / 不借鉴**
+
+| 参考做法 | 我们的取舍 | 理由 |
+| --- | --- | --- |
+| 按类目分目录 + 统一前缀 | ✅ 采纳（`content/data/form/feedback` + `Cim*`/领域名） | 一眼知道组件归哪类 |
+| 表格工具栏（动作 + 搜索 + 计数 + 列设置 + 刷新） | ✅ 采纳 | 现仓 22 处 `.toolbar` 各写一遍 |
+| 列显示/隐藏 + 顺序可调 | ✅ 采纳并**加持久化**（`settingsKey` → localStorage） | 原实现刷新即回默认 |
+| 行语义色由后端字段驱动（`rowColor`/`styleCode`） | ⚠️ 改造采纳：只暴露 `rowClassName`，语义档来自 `@cim/theme/status` | 原做法让后端能直接指定颜色，等于把配色决策外泄 |
+| 服务端视图模型下发列定义（`useViewColumn(viewId)` → `/ViewModelDefAp/...`） | ❌ 本期不做，列入 §12 待定 | 我们后端无对应表；先做成 `useColumns(settingsKey)`，将来接后端只需换数据源 |
+| 单 `options` 对象传参 | ❌ 不采纳，改判别联合 + 泛型 | 无类型提示、无跳转定义；TS 下等于放弃重构安全性 |
+| 组件内自带分页/导出/编辑 | ❌ 不采纳，只做渲染层 | 1057→1927 行的膨胀就是这么来的；页面需要时自行组合 |
+| `utils/height.js` 高度计算 | ❌ 不采纳 | 50+ 个魔法 `minus` 无法维护；用 antd Table 的 `scroll` + flex 布局，由 CSS 决定高度 |
+| 无 i18n | ❌ 明确反向：`titleKey` + `UiLocaleProvider` 注入 | 切语言时表头必须重算 |
+
+**决策变更（重要，覆盖先前结论）**
+
+先前 §11 写「antd 不进入业务侧」。实际需求是把组件做成**业务可直接用的一套**，而 React 生态里表格的虚拟滚动、日期区间、树选择、上传等自研成本远高于收益。故调整为：
+
+> **antd 作为 `@cim/ui` 的内部交互层，业务代码不直接 import antd。**
+
+- 主题不另立色板：`provider.tsx` 运行时读 `tokens.css` 的 CSS 变量喂给 antd `ConfigProvider`，明暗/密度切换经 `MutationObserver` 跟随（§2.2 仍然成立）。
+- 代价：产物体积上涨（RMS 由约 0.6 MB 升至 **1.3 MB / gzip 388 KB**，IAM 与 approval 因只用到 Provider 为 520/530 KB / 156/168 KB）。后续用路由级 `lazy()` 拆分，不引入新依赖解决。
+- 前置事实修正：动工前核查发现"我们系统用的 react+antd"并不成立 —— 4 个前端均**未安装** antd，源码 0 处引用，仅 `platform/web/package.json` 有一条声明。为避免"两套技术栈并存"，本次统一在三个应用安装 `antd@5.21.4`；`platform/web` 的既有声明（`^5.21.0`）与之兼容，保留不动（该包暂不参与构建）。
+
+**工程接线（坑在依赖解析）**
+
+| 问题 | 处理 |
+| --- | --- |
+| `@cim/ui` 源码在工程根之外，其 `import 'antd'` 从 `platform/web` 上溯找不到业务 `node_modules` | 各应用 vite `resolve.alias.antd` 指向本应用副本 |
+| 同上，`import 'react'` 也落空 → 两份 React 风险 | 各应用 `resolve.dedupe: ['react','react-dom']` |
+| tsc 报 `Cannot find module 'react'`（共享包内） | 各应用 tsconfig `paths` 映射 `react`/`react-dom` → `node_modules/@types/*` |
+| antd 的样式改为 CSS-in-JS，无 CSS 引入 | 无需改 `main.tsx` 的样式顺序；`components.css` 只做少量对齐 |
+
+**页面迁移样板**：`business/rms-ap/web/src/pages/DeviceAreaPage.tsx` 全量改写。
+旧实现里的手写结构对照：`<table className="data">` + 手工 thead/tbody + `colSpan` 空态 → `DataTable`；`useState(loading)` 三态 → `loading/error`；`.modal-backdrop/.modal-head/.modal-body/.modal-foot` → `CimModal`；`.form-grid` + 4 个 `.field` → `FormGrid`；`.page-head` → `PageHead`。页面只剩取数与业务动作。
+
+**验证（17 项运行时断言，全过）**
+
+用临时探针页（已删除）渲染真实组件 + 假数据，CDP 读计算样式与 DOM：
+
+| 断言 | 结果 |
+| --- | --- |
+| 表头背景取自 `--panel-2` | `rgb(246,248,251)` ✓ |
+| 单元格字号 `--fs-sm` | `12.5px` ✓ |
+| 暗色切换后表头 | `rgb(18,28,47)`（`#121c2f`）✓ |
+| `ACTIVE`/`PENDING_SIGN` 语义色 | `rgb(13,138,85)` ok / `rgb(168,106,18)` warn ✓ |
+| 工具栏计数 | 「共 3」✓ |
+| 搜索受控过滤 | 3 行 → 2 行 ✓ |
+| 列设置 | 弹层 4 行 → 取消一列后表头 3 列 ✓ |
+| 列偏好持久化 | `cim.columns.probe` 写入正确 JSON ✓ |
+| 列顺序调整 | 首列由「编码」变「名称」✓ |
+| `CimModal` + `FormGrid` | 弹窗打开、3 字段、标签 uppercase、标题走注入翻译「新建」✓ |
+
+三个应用 `tsc + vite build` 均通过（RMS 3198 模块 / 10.9s）。
+
+**遗留**
+
+1. 产物体积：RMS 1.3 MB，需路由级 `lazy()`（P2）。
+2. `FormGrid` 暂缺 `date` 字段（需 dayjs 值转换口径，避免与后端 ISO 字符串语义打架）。
+3. 其余 22 个 RMS 页面、21 个 IAM 页面未迁移，仍用旧的手写结构（两套并存期需明确"新页面一律用组件"）。
+
+---
+
+
+
 ## 11. 非目标
 
 - 不做微前端（qiankun / Module Federation）——五个应用独立部署，无运行时集成需求
 - 不做 SSR
-- 不封装第三方 UI 库（antd 不进入业务侧；`platform/web` 里的 antd 依赖在 P0 一并移除）
+- **不把 antd 暴露给业务代码**：antd 只在 `@cim/ui` 内部使用（页面只 import `@cim/ui`）。
+  这不是"不封装第三方库"，而是"只在一处封装"——换实现只改一个包，页面零改动。
 - 不接管业务状态管理：各 ap 的 zustand store 各自持有，`@cim/*` 只提供会话（token/权限/语言/密度）
 - 不统一业务 API 层：`rmsApi.ts`、`approvalApi.ts` 这类域 API 留在各 ap
 
@@ -367,4 +468,6 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | 1 | 外壳模型（配置驱动 vs 组合件） | 倾向配置驱动 + 插槽兜底 | P3 动手前 |
 | 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
 | 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
+| 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
+| 5 | 路由级拆包以抵消 antd 体积 | RMS 单 chunk 1.3 MB，未拆 | P2 |
 | 4 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | 固定行高可满足产线表格 | P1 实现时 |
