@@ -13,7 +13,7 @@
 
 import { Button, Checkbox, Input, Popover, Table } from 'antd';
 import type { TableProps } from 'antd';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useUiLabel } from '../locale';
 import { useColumns } from './useColumns';
 import { EmptyState } from '../content/Page';
@@ -91,6 +91,16 @@ export interface DataTableProps<T> {
   size?: 'small' | 'middle';
   /** 横向滚动；列多且固定宽度时传 'max-content'。 */
   scrollX?: number | 'max-content';
+  /**
+   * 虚拟滚动：传视口高度（px）启用，只渲染视口内的行。
+   *
+   * 适用：日志、审计、参数明细这类**一次给全量**的长列表（数千行）。
+   * 不适用：服务端分页的列表 —— 一页才 20/50 行，虚拟滚动没有收益却丢失分页语义。
+   *
+   * 前置条件：每列都要有 `width`。antd 的虚拟表格按列宽定位列，任一列缺宽会塌成 0
+   * （开发态会打印告警，不静默降级）。
+   */
+  virtual?: number;
   /** 计数展示：默认显示「已选 n / 共 m」。 */
   showCount?: boolean;
 }
@@ -139,6 +149,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
     sticky = false,
     size = 'small',
     scrollX,
+    virtual,
     showCount = true,
   } = props;
 
@@ -157,6 +168,29 @@ export function DataTable<T>(props: DataTableProps<T>) {
       .map((o) => byKey.get(o.key))
       .filter((c): c is DataTableColumn<T> => !!c);
   }, [columns, colPrefs.order]);
+
+  const virtualEnabled = typeof virtual === 'number' && virtual > 0;
+
+  // antd 虚拟表格要求 scroll.x 是数字，且每列都有 width（缺宽会塌成 0 宽列）。
+  // 'max-content' 在虚拟模式下不可用，故按列宽求和兜底（缺宽的列按 160 计）。
+  const virtualScroll = useMemo(() => {
+    if (!virtualEnabled) return undefined;
+    const width =
+      typeof scrollX === 'number'
+        ? scrollX
+        : visibleColumns.reduce((sum, c) => sum + (c.width ?? 160), 0);
+    return { x: width, y: virtual };
+  }, [virtualEnabled, scrollX, virtual, visibleColumns]);
+
+  useEffect(() => {
+    if (!virtualEnabled) return;
+    const missing = visibleColumns.filter((c) => !c.width).map((c) => c.key);
+    if (missing.length) {
+      console.warn(
+        `[DataTable] 虚拟滚动要求每列都有 width，以下列缺失（已按 160 兜底）：${missing.join(', ')}`,
+      );
+    }
+  }, [virtualEnabled, visibleColumns]);
 
   const antdColumns = useMemo<TableProps<T>['columns']>(() => {
     return visibleColumns.map((c) => ({
@@ -314,7 +348,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
             rowKey={(row) => rowKey(row)}
             loading={loading}
             sticky={sticky ? { offsetHeader: 0 } : undefined}
-            scroll={scrollX ? { x: scrollX } : undefined}
+            scroll={virtualScroll ?? (scrollX ? { x: scrollX } : undefined)}
+            virtual={virtualEnabled || undefined}
             locale={{ emptyText: emptyNode }}
             rowClassName={(row) => (rowClassName ? rowClassName(row) : '')}
             rowSelection={

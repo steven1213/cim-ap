@@ -1,32 +1,62 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { CimSpin } from '@cim/ui';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import RequirePerm from '@/components/RequirePerm';
+
+// 登录/回调/403/404 保持同步加载：未登录用户首屏就落在这几条上，
+// 再拆一个 chunk 只是把「白屏」换成「多一次往返」。
 import LoginPage from '@/pages/LoginPage';
 import SsoCallback from '@/pages/SsoCallback';
-import DashboardPage from '@/pages/DashboardPage';
-import RecipeLibraryPage from '@/pages/RecipeLibraryPage';
-import DeviceRecipePage from '@/pages/DeviceRecipePage';
-import DeviceTypePage from '@/pages/DeviceTypePage';
-import DeviceAreaPage from '@/pages/DeviceAreaPage';
-import DevicePage from '@/pages/DevicePage';
-import SignoffPage from '@/pages/SignoffPage';
-import ComparePage from '@/pages/ComparePage';
-import AuditLogPage from '@/pages/AuditLogPage';
-import SpecPage from '@/pages/SpecPage';
-import SpecTemplatePage from '@/pages/SpecTemplatePage';
-import EcSvPage from '@/pages/EcSvPage';
-import DeviceAuthPage from '@/pages/DeviceAuthPage';
-import BypassPage from '@/pages/BypassPage';
-import QualificationPage from '@/pages/QualificationPage';
-import GoldenPage from '@/pages/GoldenPage';
-import IntegrationPage from '@/pages/IntegrationPage';
-import BodyTemplatePage from '@/pages/BodyTemplatePage';
-import ExperimentPage from '@/pages/ExperimentPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import ForbiddenPage from '@/pages/ForbiddenPage';
+
+/**
+ * 业务页面一律按路由拆包。
+ *
+ * <p>不拆的话整个应用（含 antd、22 个页面、xlsx 之类的工具）打成一个 1.47 MB 的 chunk，
+ * 用户打开「设备区域」也要先下载「配方比对」的代码。拆开后首屏只拉布局与登录态，
+ * 页面各自成 chunk，按需加载。</p>
+ *
+ * <p>{@link lazyRoute} 把「Suspense + 权限守卫 + 页面」包成一个路由 element：
+ * Suspense 层级在 Layout 的 `<Outlet/>` **内部**，切页时外壳不卸载，
+ * 只有内容区显示加载态（放在 Routes 外层写会连侧边栏一起闪掉）。</p>
+ */
+function lazyRoute(Page: ComponentType, permCode?: string) {
+  return (
+    <Suspense fallback={<CimSpin block height={320} />}>
+      {permCode ? (
+        <RequirePerm code={permCode}>
+          <Page />
+        </RequirePerm>
+      ) : (
+        <Page />
+      )}
+    </Suspense>
+  );
+}
+
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const RecipeLibraryPage = lazy(() => import('@/pages/RecipeLibraryPage'));
+const DeviceRecipePage = lazy(() => import('@/pages/DeviceRecipePage'));
+const DeviceTypePage = lazy(() => import('@/pages/DeviceTypePage'));
+const DeviceAreaPage = lazy(() => import('@/pages/DeviceAreaPage'));
+const DevicePage = lazy(() => import('@/pages/DevicePage'));
+const SignoffPage = lazy(() => import('@/pages/SignoffPage'));
+const ComparePage = lazy(() => import('@/pages/ComparePage'));
+const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
+const SpecPage = lazy(() => import('@/pages/SpecPage'));
+const SpecTemplatePage = lazy(() => import('@/pages/SpecTemplatePage'));
+const EcSvPage = lazy(() => import('@/pages/EcSvPage'));
+const DeviceAuthPage = lazy(() => import('@/pages/DeviceAuthPage'));
+const BypassPage = lazy(() => import('@/pages/BypassPage'));
+const QualificationPage = lazy(() => import('@/pages/QualificationPage'));
+const GoldenPage = lazy(() => import('@/pages/GoldenPage'));
+const IntegrationPage = lazy(() => import('@/pages/IntegrationPage'));
+const BodyTemplatePage = lazy(() => import('@/pages/BodyTemplatePage'));
+const ExperimentPage = lazy(() => import('@/pages/ExperimentPage'));
 
 /**
  * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），
@@ -100,151 +130,25 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<DashboardPage />} />
-          <Route
-            path="/recipes"
-            element={
-              <RequirePerm code="rms:recipe:view">
-                <RecipeLibraryPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/device-types"
-            element={
-              <RequirePerm code="rms:device-type:view">
-                <DeviceTypePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/device-areas"
-            element={
-              <RequirePerm code="rms:device-area:view">
-                <DeviceAreaPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/device-recipes"
-            element={
-              <RequirePerm code="rms:recipe:view">
-                <DeviceRecipePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/devices"
-            element={
-              <RequirePerm code="rms:device:view">
-                <DevicePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/signoff"
-            element={
-              <RequirePerm code="rms:signoff:view">
-                <SignoffPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/compare"
-            element={
-              <RequirePerm code="rms:compare:view">
-                <ComparePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/audit"
-            element={
-              <RequirePerm code="rms:audit:view">
-                <AuditLogPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/specs"
-            element={
-              <RequirePerm code="rms:spec:view">
-                <SpecPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/spec-templates"
-            element={
-              <RequirePerm code="rms:spec:view">
-                <SpecTemplatePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/ecsv"
-            element={
-              <RequirePerm code="rms:ecsv:view">
-                <EcSvPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/device-auth"
-            element={
-              <RequirePerm code="rms:device-auth:view">
-                <DeviceAuthPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/bypasses"
-            element={
-              <RequirePerm code="rms:bypass:view">
-                <BypassPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/qualifications"
-            element={
-              <RequirePerm code="rms:qualification:view">
-                <QualificationPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/golden"
-            element={
-              <RequirePerm code="rms:golden:view">
-                <GoldenPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/integration"
-            element={
-              <RequirePerm code="rms:integration:view">
-                <IntegrationPage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/body-templates"
-            element={
-              <RequirePerm code="rms:btemplate:view">
-                <BodyTemplatePage />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/experiments"
-            element={
-              <RequirePerm code="rms:experiment:view">
-                <ExperimentPage />
-              </RequirePerm>
-            }
-          />
+          <Route path="/" element={lazyRoute(DashboardPage)} />
+          <Route path="/recipes" element={lazyRoute(RecipeLibraryPage, 'rms:recipe:view')} />
+          <Route path="/device-types" element={lazyRoute(DeviceTypePage, 'rms:device-type:view')} />
+          <Route path="/device-areas" element={lazyRoute(DeviceAreaPage, 'rms:device-area:view')} />
+          <Route path="/device-recipes" element={lazyRoute(DeviceRecipePage, 'rms:recipe:view')} />
+          <Route path="/devices" element={lazyRoute(DevicePage, 'rms:device:view')} />
+          <Route path="/signoff" element={lazyRoute(SignoffPage, 'rms:signoff:view')} />
+          <Route path="/compare" element={lazyRoute(ComparePage, 'rms:compare:view')} />
+          <Route path="/audit" element={lazyRoute(AuditLogPage, 'rms:audit:view')} />
+          <Route path="/specs" element={lazyRoute(SpecPage, 'rms:spec:view')} />
+          <Route path="/spec-templates" element={lazyRoute(SpecTemplatePage, 'rms:spec:view')} />
+          <Route path="/ecsv" element={lazyRoute(EcSvPage, 'rms:ecsv:view')} />
+          <Route path="/device-auth" element={lazyRoute(DeviceAuthPage, 'rms:device-auth:view')} />
+          <Route path="/bypasses" element={lazyRoute(BypassPage, 'rms:bypass:view')} />
+          <Route path="/qualifications" element={lazyRoute(QualificationPage, 'rms:qualification:view')} />
+          <Route path="/golden" element={lazyRoute(GoldenPage, 'rms:golden:view')} />
+          <Route path="/integration" element={lazyRoute(IntegrationPage, 'rms:integration:view')} />
+          <Route path="/body-templates" element={lazyRoute(BodyTemplatePage, 'rms:btemplate:view')} />
+          <Route path="/experiments" element={lazyRoute(ExperimentPage, 'rms:experiment:view')} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

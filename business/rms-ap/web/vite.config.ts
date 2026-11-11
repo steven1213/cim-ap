@@ -35,4 +35,41 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 路由级 code-split（App.tsx 的 lazy()）会把页面切成小 chunk，但**共享依赖**要有归属：
+        // 不显式分组时，rollup 会把「第一个用到某依赖的页面」当成它的家
+        // （实测 antd 的 Table/Modal/Form 全被塞进 DeviceAreaPage 的 chunk，613 KB）。
+        // 分组后：react / antd / 平台组件 各成一块，页面 chunk 只剩自己的业务代码。
+        //
+        // 注意：这不是"让首屏更小"——antd 在根上被 CimProvider 用到，注定属于首屏；
+        // 收益是**缓存粒度**：业务发版只改页面 chunk，vendor 三块命中浏览器缓存。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            // 平台共享包（源码直引，不经 node_modules）单独成块，避免被首个页面「占有」
+            return id.includes('platform/web/packages') ? 'cim-ui' : undefined;
+          }
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
+          if (
+            id.includes('/antd/') ||
+            id.includes('/@ant-design/') ||
+            id.includes('/@rc-component/') ||
+            id.includes('/rc-') ||
+            id.includes('/dayjs/')
+          ) {
+            return 'vendor-antd';
+          }
+          return 'vendor';
+        },
+      },
+    },
+  },
 });

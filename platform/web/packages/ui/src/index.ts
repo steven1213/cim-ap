@@ -35,6 +35,7 @@ export {
 
 // ── basic 基础 ──────────────────────────────────────────────────
 export { CimButton, type CimButtonProps } from './basic/Button';
+export { CimSpin, type CimSpinProps } from './basic/Spin';
 export { CimTag, CimCheckTag, type CimTagProps, type CimCheckTagProps } from './basic/Tag';
 
 // ── content 容器 ────────────────────────────────────────────────
@@ -73,6 +74,14 @@ export { CimUpload, type CimUploadProps } from './form/Upload';
 
 // ── feedback 反馈 ──────────────────────────────────────────────
 export { CimModal, type CimModalProps } from './feedback/CimModal';
+export {
+  UiToastProvider,
+  useToast,
+  useConfirm,
+  type CimToast,
+  type CimConfirm,
+  type CimConfirmOptions,
+} from './feedback/message';
 export { CimTooltip, type CimTooltipProps } from './feedback/Tooltip';
 export { CimPopconfirm, type CimPopconfirmProps } from './feedback/Popconfirm';
 export { CimPopover, type CimPopoverProps } from './feedback/Popover';

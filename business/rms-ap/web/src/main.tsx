@@ -2,7 +2,7 @@ import ReactDOM from 'react-dom/client';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import App from './App';
-import { CimProvider, UiLocaleProvider } from '@cim/ui';
+import { CimProvider, UiLocaleProvider, UiToastProvider } from '@cim/ui';
 import { bootstrapI18n } from '@/lib/i18n';
 import '@cim/ui/index.css';
 import './styles.css';
@@ -10,6 +10,8 @@ import './styles.css';
 /**
  * 平台组件的文案由应用注入，@cim/ui 本身不依赖 i18n（见 packages/ui/src/locale.tsx）。
  * locale 变化时 useTranslation 触发重渲染 → 表头、空态、按钮等组件文案随语言切换。
+ *
+ * UiToastProvider 必须在 CimProvider 内部：message/modal 要读 ConfigProvider 的主题。
  */
 function Root() {
   const { t, i18n } = useTranslation();
@@ -17,7 +19,9 @@ function Root() {
   return (
     <UiLocaleProvider t={uiT} locale={i18n.language}>
       <CimProvider>
-        <App />
+        <UiToastProvider>
+          <App />
+        </UiToastProvider>
       </CimProvider>
     </UiLocaleProvider>
   );

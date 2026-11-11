@@ -406,3 +406,51 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 加载指示 ---------- */
+/* 环形用 border 画：left 透明 + 其余取 --primary，旋转即可。
+   不用 SVG 是为了让 theme 切换时颜色自然跟随（currentColor / var 都行，border-color 也走令牌）。 */
+.cim-spin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.cim-spin-ring {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  /* 前置一行纯令牌兜底：color-mix 在旧内核上整条声明会被丢弃，
+     没有这行 ring 会变成没有边框的透明圆（看不见）。 */
+  border: 2px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border-left-color: var(--primary);
+  animation: cim-spin-rotate 0.8s linear infinite;
+}
+.cim-spin-sm .cim-spin-ring {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+}
+.cim-spin-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 48px 0;
+}
+
+@keyframes cim-spin-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 尊重系统偏好：减少动效时不转圈，只留文字 */
+@media (prefers-reduced-motion: reduce) {
+  .cim-spin-ring {
+    animation: none;
+  }
+}

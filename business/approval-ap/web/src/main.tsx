@@ -2,7 +2,7 @@ import ReactDOM from 'react-dom/client';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import App from './App';
-import { CimProvider, UiLocaleProvider } from '@cim/ui';
+import { CimProvider, UiLocaleProvider, UiToastProvider } from '@cim/ui';
 import { bootstrapI18n } from '@/lib/i18n';
 import '@cim/ui/index.css';
 import './styles.css';
@@ -14,7 +14,9 @@ function Root() {
   return (
     <UiLocaleProvider t={uiT} locale={i18n.language}>
       <CimProvider>
-        <App />
+        <UiToastProvider>
+          <App />
+        </UiToastProvider>
       </CimProvider>
     </UiLocaleProvider>
   );

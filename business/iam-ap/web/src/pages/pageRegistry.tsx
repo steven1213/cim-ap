@@ -5,44 +5,33 @@
 //
 // <p>未知标识回退到 {@link NotFoundPage} 而不是抛错：管理端新增一个前端还没有实现的菜单时，
 // 应当「路由可达但提示未实现」，而不是整页崩溃。</p>
-import type { ComponentType } from 'react';
-import DashboardPage from './DashboardPage';
-import OrgPage from './OrgPage';
-import UsersPage from './UsersPage';
-import LockoutsPage from './LockoutsPage';
-import AppMgmtPage from './AppMgmtPage';
-import AdmissionsPage from './AdmissionsPage';
-import OrgGrantsPage from './OrgGrantsPage';
-import RolesPage from './RolesPage';
-import SessionsPage from './SessionsPage';
-import AuditPage from './AuditPage';
-import SettingsPage from './SettingsPage';
-import ProfilePage from './ProfilePage';
-import MenusAdminPage from './MenusAdminPage';
-import PermissionsAdminPage from './PermissionsAdminPage';
-import RolesAdminPage from './RolesAdminPage';
-import I18nAdminPage from './I18nAdminPage';
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
+
+// 页面一律动态 import：控制台路由由后端菜单下发，登录后先到 Dashboard，
+// 其余 15 个管理页在首次进入时才拉代码（静态 import 会把它们全塞进首屏 chunk）。
+
+/** 未知标识的回退页保持同步加载：它出现的场景（菜单里有、前端没实现）不需要为它多等一次往返。 */
 import ComingSoon from './ComingSoon';
 import NotFoundPage from './NotFoundPage';
 
 /** `component` 标识 → 页面组件。键与 `IamConsoleCatalog` 里 `MenuDef.component` 一一对应。 */
-export const PAGE_REGISTRY: Record<string, ComponentType> = {
-  Overview: DashboardPage,
-  Orgs: OrgPage,
-  Users: UsersPage,
-  Lockouts: LockoutsPage,
-  Apps: AppMgmtPage,
-  Admissions: AdmissionsPage,
-  OrgGrants: OrgGrantsPage,
-  Roles: RolesPage,
-  Sessions: SessionsPage,
-  Audit: AuditPage,
-  Settings: SettingsPage,
-  Profile: ProfilePage,
-  MenusAdmin: MenusAdminPage,
-  PermissionsAdmin: PermissionsAdminPage,
-  RolesAdmin: RolesAdminPage,
-  I18nAdmin: I18nAdminPage,
+export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType>> = {
+  Overview: lazy(() => import('./DashboardPage')),
+  Orgs: lazy(() => import('./OrgPage')),
+  Users: lazy(() => import('./UsersPage')),
+  Lockouts: lazy(() => import('./LockoutsPage')),
+  Apps: lazy(() => import('./AppMgmtPage')),
+  Admissions: lazy(() => import('./AdmissionsPage')),
+  OrgGrants: lazy(() => import('./OrgGrantsPage')),
+  Roles: lazy(() => import('./RolesPage')),
+  Sessions: lazy(() => import('./SessionsPage')),
+  Audit: lazy(() => import('./AuditPage')),
+  Settings: lazy(() => import('./SettingsPage')),
+  Profile: lazy(() => import('./ProfilePage')),
+  MenusAdmin: lazy(() => import('./MenusAdminPage')),
+  PermissionsAdmin: lazy(() => import('./PermissionsAdminPage')),
+  RolesAdmin: lazy(() => import('./RolesAdminPage')),
+  I18nAdmin: lazy(() => import('./I18nAdminPage')),
 };
 
 /** 解析页面组件；标识缺失/未知时回退（缺失路径的提示页）。 */

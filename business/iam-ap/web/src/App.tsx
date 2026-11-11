@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
+import { CimSpin } from '@cim/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -17,13 +18,18 @@ import type { SysMenuDto } from '@/types';
  *
  * <p>「菜单可见性」与「接口/按钮权限」是两套授权（`sys_role_menu` / `sys_role_perm`），
  * 允许交叉配置，故此处两层都要过。</p>
+ *
+ * <p>Suspense 放在本组件内（而不是 Routes 外层）：页面组件是 `lazy()` 的，
+ * 兜底只应替换内容区，外层 `<Layout/>` 侧边栏与顶栏必须保持不动。</p>
  */
 function RoutePage({ menu }: { menu: SysMenuDto }) {
   const Page = resolvePage(menu.component);
   return (
-    <RequirePerm code={menu.permCode}>
-      <Page />
-    </RequirePerm>
+    <Suspense fallback={<CimSpin block height={320} />}>
+      <RequirePerm code={menu.permCode}>
+        <Page />
+      </RequirePerm>
+    </Suspense>
   );
 }
 

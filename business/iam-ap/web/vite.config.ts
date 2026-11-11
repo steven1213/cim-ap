@@ -46,4 +46,35 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 分组理由与 RMS 一致（见 business/rms-ap/web/vite.config.ts 注释）：
+        // 页面已按路由 lazy 拆开，这里给共享依赖指定归属，避免它们被「首个用到它们的页面」占有。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return id.includes('platform/web/packages') ? 'cim-ui' : undefined;
+          }
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
+          if (
+            id.includes('/antd/') ||
+            id.includes('/@ant-design/') ||
+            id.includes('/@rc-component/') ||
+            id.includes('/rc-') ||
+            id.includes('/dayjs/')
+          ) {
+            return 'vendor-antd';
+          }
+          return 'vendor';
+        },
+      },
+    },
+  },
 });

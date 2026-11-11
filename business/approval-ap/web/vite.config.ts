@@ -37,4 +37,34 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // 分组理由与 RMS 一致（见 business/rms-ap/web/vite.config.ts 注释）。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return id.includes('platform/web/packages') ? 'cim-ui' : undefined;
+          }
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
+          if (
+            id.includes('/antd/') ||
+            id.includes('/@ant-design/') ||
+            id.includes('/@rc-component/') ||
+            id.includes('/rc-') ||
+            id.includes('/dayjs/')
+          ) {
+            return 'vendor-antd';
+          }
+          return 'vendor';
+        },
+      },
+    },
+  },
 });

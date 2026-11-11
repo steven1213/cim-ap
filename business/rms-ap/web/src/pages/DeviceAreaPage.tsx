@@ -6,6 +6,8 @@ import {
   FormGrid,
   Page,
   PageHead,
+  useConfirm,
+  useToast,
   type DataTableColumn,
   type FormField,
 } from '@cim/ui';
@@ -23,10 +25,13 @@ import type { DeviceArea } from '@/types';
  *   - 手写 `.modal-backdrop/.modal-head/.modal-body/.modal-foot`        → CimModal
  *   - 手写 `.form-grid` + 5 个 `.field`/`.field-label`                   → FormGrid 字段数组
  *   - 手写 `.page-head`/`.toolbar`                                       → PageHead / DataTable 工具栏
+ *   - `window.confirm()` 阻塞式确认 + 页顶 `useState` 提示条            → useConfirm / useToast
  * 页面里只剩「取数 + 业务动作」。
  */
 export default function DeviceAreaPage() {
   const { t } = useTranslation();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState<DeviceArea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,16 +61,24 @@ export default function DeviceAreaPage() {
 
   const doDelete = useCallback(
     async (x: DeviceArea) => {
-      if (!confirm(t('rms.common.confirmDelete'))) return;
+      const ok = await confirm({
+        title: t('rms.common.delete'),
+        contentKey: 'rms.common.confirmDelete',
+        danger: true,
+        okKey: 'rms.common.delete',
+      });
+      if (!ok) return;
       try {
         await api.deleteDeviceArea(x.id);
+        toast.success(t('rms.common.deleted'));
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        // 删除失败用 toast 而不占 error 态：列表本身仍是可用的，整块替换成错误页反而更糟
+        toast.error(e instanceof Error ? e.message : String(e));
         return;
       }
       await refresh();
     },
-    [t, refresh],
+    [t, refresh, confirm, toast],
   );
 
   // 后端已按 keyword 过滤；前端再滤一遍兜底（后端忽略参数时仍可用），与旧行为一致
@@ -147,8 +160,10 @@ export default function DeviceAreaPage() {
             setEditing(null);
           }}
           onDone={async () => {
+            const wasEdit = !!editing;
             setShowCreate(false);
             setEditing(null);
+            toast.success(t(wasEdit ? 'rms.common.updated' : 'rms.common.created'));
             await refresh();
           }}
         />
