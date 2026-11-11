@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P16a 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 13/16**（余 3 页为配置型重页）；approval 9 页按自己的节奏排期。
+> 状态：**P0–P16d 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）、P16b–P16d IAM 其余三页（菜单 / 角色 / 多语言，含台组件 `components.css` 一处开关宽度修正）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 16/16 迁移完毕**；approval 9 页按自己的节奏排期。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -457,6 +457,9 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | **P14** ✅ | IAM 首批五页：AuditLog / Lockouts / Sessions / Roles / Admissions（另有 `api.get` 补 `signal` 透传） | 真页面 + 8081 契约桩 + 11 场景，见 §10.16。修「表格显示 A、写操作发给 B」 |
 | **P15** ✅ | IAM 第二批六页：Dashboard / Settings / AppMgmt / OrgGrants / PermissionsAdmin / Profile（另有 `CimInput.autoComplete`） | 真页面 + 8081 契约桩 + 13 场景（累计 24），见 §10.17。字典请求合成一次 |
 | **P16a** ✅ | IAM 用户页与组织页：`UsersPage`（归属面板按需取数）/ `OrgPage`（手写递归树 → `CimTree`） | 真页面 + 8081 契约桩 + 7 场景，见 §10.18。`labelNode` + `searchText` 成对使用 |
+| **P16b** ✅ | IAM 菜单页：`MenusAdminPage`（手写递归 `TreeRow` → `CimTree`、9 个原生控件 → 条件字段 `FormGrid`）；台组件 `components.css` 补 `.cim-field > .ant-switch` | 真页面 + 8081 契约桩 + 8 场景 22 项断言，见 §10.19。「上级」候选排除自身与后代 |
+| **P16c** ✅ | IAM 角色页：`RolesAdminPage`（列表 → `DataTable`、`.tabs` → `CimTabs`、三份资源拆开取数） | 真页面 + 8081 契约桩 + 8 场景 26 项断言，见 §10.20。授权回包 → 可编辑 Set |
+| **P16d** ✅ | IAM 多语言页：`I18nAdminPage`（三合一 `loadAll` → 三份资源、手写 table + pager → `DataTable`、内联表单 → `CimModal`） | 真页面 + 8081 契约桩 + 8 场景 24 项断言，见 §10.21。关键词走 `useDebounced` |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -1135,12 +1138,75 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 
 ---
 
-**迁移收尾结论（P0–P13，2026-11-11）**
+### 10.19 P16b 实施记录：菜单页（手写树 → `CimTree`、条件字段 `FormGrid`）（2026-11-11）
+
+**`MenusAdminPage`（571 → 约 500）**：三个迁移点，每个都有具体理由。
+
+1. **手写 `TreeRow` → `CimTree`**：原来的递归组件自带 `expanded: Set<string>`、`paddingLeft: 12 + depth * 16` 和 `tree-toggle` 三段样式；换掉后展开态交给 `expandedKeys`/`onExpand`，层级缩进与连线交给 `showLine`。节点标题是「名称 + 类型/停用徽标」，用 `labelNode`；同时**必须**给 `searchText`（`名称 + i18n 码 + 路由`），否则 `CimTree` 的过滤函数读不到 ReactNode 里的文字，会漏整棵子树。
+2. **9 个原生控件 → `FormGrid` 条件字段数组**：字段随 `type` 变——目录/菜单有路由，菜单独有组件/图标/可见，按钮必填权限码。写法是按 `type` **重建字段数组**，而不是「把所有字段渲染出来再隐藏」：后者会把上一个类型残留的值一起提交（`SpecEditModal` 踩过同一个坑，见 §10.8）。
+3. **校验下沉到字段**：原来整页一条 `err` 字符串（文案键为空时甚至把「文案键」这个标签本身当错误提示）。现在用 `errors={{ i18nCode, permCode }}`，错在哪个字段就红在哪一行。
+
+**「上级」候选必须排除自身与全部后代**：把节点挂到自己的子孙下会成环，服务端建树时会死循环。原实现只排除了自己，没有排除后代。前端比后端更容易知道该排除谁（树就在手上），这里用 `findNode` + `collectIds` 求差集。
+
+**`selected` 随树刷新同步**：更新走「原节点 + 本次编辑」整体提交（保留租户/审计列）。若 `selected` 停留在选中那一刻的旧对象，重取回来后提交会把 `updatedAt` 等列写回旧值——加一条 `setSelected(prev => flat.find(...)?.menu ?? prev)` 即可。
+
+**台组件一处修正**：`FormGrid` 的 `switch` 分支直接把 `<Switch>` 放进 `.cim-field`。`.cim-field` 是竖向 flex，子项默认 `align-items: stretch`，开关（inline-flex、宽度靠内容）被拉成整行，看起来像一条蓝色横条。在 `components.css` 补 `.cim-field > .ant-switch { align-self: flex-start }` —— 这是组件层的问题，不该由每个页面自己包一层。
+
+**验证 8 场景 22 项断言**：树 3 个可见节点（`m4` 按钮挂在未展开的 `m3` 下）；点「菜单管理」后表单回填 `i18nCode=iam.menu.menus` / `path=/menus` / `permCode=iam:menu:list`，可见开关为开；切「类型 = 目录」后组件/可见消失、路由保留（切前 `{path:true,component:true,visible:true}` → 切后 `{path:true,component:false,visible:false}`）；「上级」下拉只有 2 项且不含自身与子节点；保存发 `PUT /sys/menus` body 带 `id:"m3"` 全字段；新建根节点发 `POST` body `parentId:null`；空文案键点保存**不发请求**且出现「必填」；删除走确认框后 `DELETE /sys/menus/m3` 并重新拉树。
+
+---
+
+### 10.20 P16c 实施记录：角色页（列表 → `DataTable`、三份资源拆开）（2026-11-11）
+
+**`RolesAdminPage`（653 → 约 560）**。
+
+**角色列表 → `DataTable(flat)`**：原来是 `.tree-row` 手写行。换表后 `loading` / `error` / `onRetry` / 空态都来自表格，行点击选中用 `onRowClick`，选中高亮**直接用 antd 的 `ant-table-row-selected` 类名**（`rowClassName` 返回它）——不为一个高亮色新增全局样式。
+
+**三份数据拆三个 `useResource`**：
+
+| 资源 | deps / enabled | 理由 |
+| --- | --- | --- |
+| 角色分页 | `enabled: canRead` | 页面主体 |
+| 授权目录（权限点 + 菜单树） | `enabled: canRead`，两请求 `Promise.all` 合成一个 `Bundle` | 树画好了按钮码没到会渲染成「未注册」，必须同批到达 |
+| 该角色的两张授权表 | `deps: [selectedId]`、`enabled: !!selectedId` | 没选角色就不该发；换角色立刻重取 |
+
+授权目录与角色列表**分开取**是原有设计（只读角色可能没有 `sys:permission:list`），迁移后进一步收紧：目录 403 只在授权区显示内联提示，角色列表照常可用——区域降级，不是整页失败。
+
+**回包 → 可编辑 Set**：勾选态是本地可改的 `Set<string>`，服务端只给初值，用一条 `useEffect([grantsRes.data, selectedId])` 落地。保存时**顺序写两张表**（`sys_role_perm` 与 `sys_role_menu` 无跨表事务），失败的那张写进提示、成功的那个不回滚——覆盖写可重试，重按一次即可补齐。
+
+**`.tabs` → `CimTabs`**：原 tab 上挂着「已授权权限数/总数 · 已授权菜单数/总数」两段比例，而 `CimTabs` 的 `badge` 只吃数字。折中：tab 上只留权限数徽标，完整比例移到面板副标题（读得更清楚，也不用给组件加 `labelNode`）。
+
+**验证 8 场景 26 项断言**：3 行角色 + 超管/停用徽标；点「审计员」后编码 `IAM_AUDITOR` 且只读、tab 出现「授权 1」、行高亮、发 `GET /sys/roles/r2/{permissions,menus}`；新建只有「基本信息」一个 tab；改名保存发 `PUT /sys/roles` body 带 `id:"r2"`；空编码点保存不发请求且字段报「必填」；「保存授权」连发 `PUT .../permissions body ["p3"]` 与 `PUT .../menus body ["m1"]`；授权区搜索 `sys:` 后行数 9 → 2；删除走确认框 → `DELETE /sys/roles/r2` → 回空态。
+
+---
+
+### 10.21 P16d 实施记录：多语言页（手写 table + pager → `DataTable`、内联表单 → `CimModal`）（2026-11-11）
+
+**`I18nAdminPage`（762 → 约 650）**，本批最大的一页。
+
+**`loadAll()` 三合一 → 三个 `useResource`**：原来每次改筛选（语言/模块）都要把语言目录、译文、缺失键一起重取。拆开后改筛选只重取译文，语言目录与缺失键不跟着刷——三者的变化频率本来就不一样。
+
+**关键词改 `useDebounced(350ms)` 进 deps**：原实现只在回车时生效，且取数用的是「已提交的 keyword」而输入框显示「即时 keyword」，两套值。现在取数与渲染用同一个滞后值（`useDebounced` 的存在理由，见 `@cim/data` 文件头）。
+
+**模块候选只增不减**：`modules` 原由「当前 `messages`」推导，选中某模块后结果里只剩那一个模块，下拉就自我坍缩成单项。改成 `useRef` 累积见过的模块名（不额外发请求）。
+
+**两张表 → `DataTable`**：语言目录（行点击筛选、`ant-table-row-selected` 高亮）与译文表。译文表的客户端分页交给 `DataTable` 的受控 `pagination`（`rows` 传当前页切片、`total` 传真总数），手写的 `.pager` 与「第 n / m 页」拼接删除。载入失败走表格自带的 `error` + `onRetry`，不再整页一条红条。
+
+**两张内联表单 → `CimModal` + `FormGrid`**：译文表 50 行时，页面底部的内联编辑表单要滚很久才看得见；语言目录的内联表单则夹在表格下面。两者都是「编辑一个实体」，弹窗更合适，也顺手统一了「取消/保存」的位置。译文内容用 `span: 2` 占满整行。
+
+**修一处重复 id**：工具栏的模块下拉与弹窗里「模块」字段的 `id` 都是 `f-module`（`FormGrid` 按 `f-<key>` 生成）。重复 id 只在不缺元素时才暴露——`document.getElementById` 会拿到先出现的那个。工具栏那个改成 `i18n-module`。
+
+**验证 8 场景 24 项断言**：语言 3 行 / 译文 5 行 / 缺失徽标「缺失 2 条」；点 `zh-CN` 行发 `?localeCode=zh-CN` 且 3 行；搜索框输入 `menu` 后（约 350ms 防抖）发 `?keyword=menu` 且 3 行；模块下拉选项 `[common, iam]`，选 `common` 发 `?module=common` 且 1 行；编辑弹窗回填 `iam.menu.menus`、译文框 `span 2`、按钮「取 消 / 保 存」，保存发 `POST` body 带 `id:"im1"` 后重取三份；新增语言发 `POST /locales` body `{"code":"ja-JP",...}`；行内删除 `en-US` 走确认框 → `DELETE /locales/lc2`；展开缺失后两块 chip，清空发 `DELETE /admin/i18n/missing`。
+
+---
+
+**迁移收尾结论（P0–P16d，2026-11-11）**
 
 - **RMS 页面 19/19 迁移完毕**：23 个 `pages/*.tsx` 里 19 个已用 `useResource`；剩余 4 个是 `LoginPage` / `SsoCallback` / `ForbiddenPage` / `NotFoundPage`——没有列表也没有表单骨架，本不需要迁。
 - **页面级取数组件 5/5**：`RecipeDetailDrawer` / `DeviceDetailDrawer` / `BatchOpsModal` / `ChamberPanel` / `DiffTable`。
 - **刻意没动的**：`NotificationBell`（180 行）。它是**外壳 chrome**，不用 `Panel`/`DataTable`/`CimModal` 任何一个页面原语；它的取数是「30s 轮询未读数 + SSE 事件触发回拉」，`useResource` 的 `pollInterval` 能覆盖轮询那一半，但另一半是 SSE 回调里的命令式 `poll()`，混进来会让「通知通道」与「组件层迁移」两件事互相牵扯。留待通知能力单独排期。
-- **IAM 13/16 页迁移完毕（P14–P16a）**：`Audit` / `Lockouts` / `Sessions` / `Roles` / `Admissions` / `Dashboard` / `Settings` / `AppMgmt` / `OrgGrants` / `PermissionsAdmin` / `Profile` / `Users` / `Org`。剩 3 页（`RolesAdmin` / `MenusAdmin` / `I18nAdmin`）是**配置型重页**，各自带一棵树或一张可编辑表格，单独排期。
+- **IAM 16/16 页迁移完毕（P14–P16d）**：`Audit` / `Lockouts` / `Sessions` / `Roles` / `Admissions` / `Dashboard` / `Settings` / `AppMgmt` / `OrgGrants` / `PermissionsAdmin` / `Profile` / `Users` / `Org` / `MenusAdmin` / `RolesAdmin` / `I18nAdmin`。后三页（配置型重页）各带一棵树或一张可编辑表格：菜单页换掉手写递归树与 9 个原生控件，角色页把列表换成 `DataTable` 并把三份数据拆开取数，多语言页把手写 table + pager 换成 `DataTable`、两张内联表单换成弹窗。**IAM 合计 55 个探针场景**（11+13+7+8+8+8），0 未捕获异常。
+- **台组件累计三处修正**（都不是页面能自己解决的）：`CimInput.autoComplete`（P15）、`.cim-field > .ant-switch` 的宽度（P16b）、`DataTable` 的 `flat`/`onRowClick`/`pagination` 在 P16c–d 首次被跨页复用（能力本身 P8 已有）。
 - **approval 9 页仍未动**：它已享受组件层（外壳 / 消息 / 文案 / 数据层已接入），页面迁移按自己的节奏推进。铁律不变：**新页面一律用 `@cim/*`**。
 
 ---
