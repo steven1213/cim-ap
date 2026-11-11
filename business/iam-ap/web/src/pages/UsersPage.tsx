@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimSelect,
   CimTag,
@@ -10,13 +11,11 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,
-} from '@cim/ui';
+  type DataTableColumn,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode } from '@/types';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import { fmtDateTime, orgTypeLabel, originLabel } from '@/lib/format';
-import Perms from '@/components/Perms';
 import {
   USER_CREATE,
   USER_DELETE,
@@ -376,19 +375,19 @@ export default function UsersPage() {
         width: 330,
         render: (r) => (
           <div className="cell-actions">
-            <Perms code={USER_UPDATE}>
+            <Can perm={USER_UPDATE}>
               <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
                 <IconEdit width={13} height={13} />
                 {t('iam.users.btnProfile')}
               </button>
-            </Perms>
-            <Perms code={USER_ORGS}>
+            </Can>
+            <Can perm={USER_ORGS}>
               <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
                 <IconTree width={13} height={13} />
                 {t('iam.users.btnOrgs')}
               </button>
-            </Perms>
-            <Perms code={USER_STATUS}>
+            </Can>
+            <Can perm={USER_STATUS}>
               <button
                 className="btn-ghost btn-sm"
                 disabled={toggling === r.userId}
@@ -397,9 +396,9 @@ export default function UsersPage() {
                 {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
                 {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
               </button>
-            </Perms>
+            </Can>
             {r.hasCredential && (
-              <Perms code={USER_RESET_PWD}>
+              <Can perm={USER_RESET_PWD}>
                 <button
                   className="btn-ghost btn-sm"
                   onClick={() => {
@@ -411,17 +410,17 @@ export default function UsersPage() {
                   <IconKey width={13} height={13} />
                   {t('iam.users.btnReset')}
                 </button>
-              </Perms>
+              </Can>
             )}
             {r.locked && (
-              <Perms code={USER_UNLOCK}>
+              <Can perm={USER_UNLOCK}>
                 <button className="btn-ghost btn-sm" onClick={() => void onUnlock(r)}>
                   <IconKey width={13} height={13} />
                   {t('iam.users.btnUnlock')}
                 </button>
-              </Perms>
+              </Can>
             )}
-            <Perms code={USER_DELETE}>
+            <Can perm={USER_DELETE}>
               <button
                 className="btn-danger btn-sm"
                 onClick={() => void onDelete(r)}
@@ -429,7 +428,7 @@ export default function UsersPage() {
               >
                 <IconTrash width={13} height={13} />
               </button>
-            </Perms>
+            </Can>
           </div>
         ),
       },
@@ -449,7 +448,7 @@ export default function UsersPage() {
             <CimTag tone="ok">{t('iam.users.enabled', { n: enabled })}</CimTag>
             {adCount > 0 && <CimTag tone="run">{t('iam.users.adSynced', { n: adCount })}</CimTag>}
             {locked > 0 && <CimTag tone="err">{t('iam.users.locked', { n: locked })}</CimTag>}
-            <Perms code={USER_CREATE}>
+            <Can perm={USER_CREATE}>
               <button
                 className="btn-sm"
                 onClick={() => {
@@ -460,7 +459,7 @@ export default function UsersPage() {
                 <IconPlus width={13} height={13} />
                 {t('iam.users.newAccount')}
               </button>
-            </Perms>
+            </Can>
           </>
         }
       >

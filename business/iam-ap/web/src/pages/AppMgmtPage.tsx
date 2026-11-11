@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimTag,
   DataTable,
   FormGrid,
@@ -10,11 +11,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, AppStatus } from '@/types';
-import Perms from '@/components/Perms';
 import { APP_CREATE, APP_UPDATE } from '@/lib/permCodes';
 import { IconPlus } from '@/components/Icons';
 
@@ -125,7 +124,7 @@ export default function AppMgmtPage() {
         titleKey: 'iam.appMgmt.th.actions',
         width: 120,
         render: (a) => (
-          <Perms code={APP_UPDATE}>
+          <Can perm={APP_UPDATE}>
             <button
               className="btn-ghost btn-sm"
               disabled={toggling === a.appCode}
@@ -133,7 +132,7 @@ export default function AppMgmtPage() {
             >
               {a.status === 'ENABLED' ? t('iam.appMgmt.disable') : t('iam.appMgmt.enable')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -168,7 +167,7 @@ export default function AppMgmtPage() {
         />
       </Panel>
 
-      <Perms code={APP_CREATE}>
+      <Can perm={APP_CREATE}>
         <Panel title={t('iam.appMgmt.registerTitle')} sub={t('iam.appMgmt.registerSub')}>
           <FormGrid<RegisterForm>
             fields={fields}
@@ -188,7 +187,7 @@ export default function AppMgmtPage() {
             {t('iam.appMgmt.register')}
           </button>
         </Panel>
-      </Perms>
+      </Can>
 
       <Panel title={t('iam.appMgmt.guideTitle')} sub={t('iam.appMgmt.guideSub')}>
         <ul className="note-list">

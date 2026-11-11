@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimTag,
   DataTable,
@@ -11,9 +12,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { GOLDEN_MANAGE } from '@/lib/permCodes';
 import type { GoldenOverride } from '@/types';
@@ -115,7 +114,7 @@ export default function GoldenPage() {
         width: 200,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={GOLDEN_MANAGE}>
+            <Can perm={GOLDEN_MANAGE}>
               {r.status === 'PENDING' ? (
                 <>
                   <button className="btn btn-ghost btn-sm" onClick={() => void decide(r, true)}>
@@ -129,7 +128,7 @@ export default function GoldenPage() {
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -144,11 +143,11 @@ export default function GoldenPage() {
         titleKey="rms.golden.title"
         subtitleKey="rms.golden.sub"
         actions={
-          <Perms code={GOLDEN_MANAGE}>
+          <Can perm={GOLDEN_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
               + {t('rms.golden.submit')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

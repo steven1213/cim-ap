@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimDescriptions,
   CimDrawer,
   CimModal,
@@ -15,10 +16,8 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import SpecEditModal from '@/components/SpecEditModal';
-import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import type {
   BodyFormat,
@@ -367,11 +366,11 @@ export default function RecipeDetailDrawer({
       title={`${recipeCode ?? '—'}${recipeName ? ` · ${recipeName}` : ''}`}
       width={920}
       extra={
-        <Perms code="rms:body:export">
+        <Can perm="rms:body:export">
           <button className="btn btn-ghost btn-sm" disabled={busyExport} onClick={() => void doExport()}>
             {t('rms.recipe.exportOne')}
           </button>
-        </Perms>
+        </Can>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -399,7 +398,7 @@ export default function RecipeDetailDrawer({
             <button className="btn btn-ghost btn-sm" onClick={() => void loadRaw()}>
               {showRaw ? t('rms.recipe.detail.hideRaw') : t('rms.recipe.detail.showRaw')}
             </button>
-            <Perms code="rms:recipe:version">
+            <Can perm="rms:recipe:version">
               <button
                 className="btn btn-ghost btn-sm"
                 disabled={!editable || editing}
@@ -408,8 +407,8 @@ export default function RecipeDetailDrawer({
               >
                 {t('rms.common.edit')}
               </button>
-            </Perms>
-            <Perms code="rms:recipe:update">
+            </Can>
+            <Can perm="rms:recipe:update">
               <button
                 className="btn btn-primary btn-sm"
                 disabled={!editable || busy}
@@ -418,13 +417,13 @@ export default function RecipeDetailDrawer({
               >
                 {t('rms.recipe.detail.signoffGo')}
               </button>
-            </Perms>
+            </Can>
             {!editable && (
-              <Perms code="rms:recipe:version">
+              <Can perm="rms:recipe:version">
                 <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void saveAsNewVersion()}>
                   {t('rms.recipe.detail.saveAsNew')}
                 </button>
-              </Perms>
+              </Can>
             )}
           </div>
         </div>
@@ -749,7 +748,7 @@ function SpecsSection({ recipeId }: { recipeId: string }) {
         titleKey: 'rms.common.actions',
         width: 190,
         render: (x) => (
-          <Perms code="rms:spec:manage">
+          <Can perm="rms:spec:manage">
             <span className="cell-actions">
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(x)}>
                 {t('rms.common.edit')}
@@ -761,7 +760,7 @@ function SpecsSection({ recipeId }: { recipeId: string }) {
                 {t('rms.common.delete')}
               </button>
             </span>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -775,11 +774,11 @@ function SpecsSection({ recipeId }: { recipeId: string }) {
         titleKey="rms.recipe.detail.specs"
         flush
         actions={
-          <Perms code="rms:spec:manage">
+          <Can perm="rms:spec:manage">
             <button className="btn btn-ghost btn-sm" onClick={() => setShowCreate(true)}>
               {t('rms.spec.add')}
             </button>
-          </Perms>
+          </Can>
         }
       >
         <DataTable<ParamSpec>
@@ -927,11 +926,11 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
         titleKey: 'rms.common.actions',
         width: 100,
         render: (u) => (
-          <Perms code="rms:recipe:update">
+          <Can perm="rms:recipe:update">
             <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void unbind(u)}>
               {t('rms.tools.unbind')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -981,11 +980,11 @@ function ToolsSection({ recipeId, onChanged }: { recipeId: string; onChanged?: (
         </div>
         <div className="cim-field">
           <label className="cim-field-label">&nbsp;</label>
-          <Perms code="rms:recipe:update">
+          <Can perm="rms:recipe:update">
             <button className="btn btn-primary" disabled={busy} onClick={() => void bind()}>
               {t('rms.tools.bind')}
             </button>
-          </Perms>
+          </Can>
         </div>
       </div>
 

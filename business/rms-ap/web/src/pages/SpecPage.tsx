@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimSelect,
   CimSwitch,
@@ -13,9 +14,7 @@ import {
   Toolbar,
   useConfirm,
   useToast,
-  type DataTableColumn,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type DataTableColumn,} from '@cim/ui';
 import SpecEditModal from '@/components/SpecEditModal';
 import * as api from '@/lib/rmsApi';
 import { SPEC_MANAGE } from '@/lib/permCodes';
@@ -160,12 +159,11 @@ export default function SpecPage() {
         width: 96,
         align: 'center',
         render: (r) => (
-          <Perms
-            code={SPEC_MANAGE}
+          <Can perm={SPEC_MANAGE}
             fallback={<span className="muted">{r.enabled ? t('rms.common.yes') : t('rms.common.no')}</span>}
           >
             <CimSwitch size="small" checked={r.enabled} onChange={() => void toggle(r)} />
-          </Perms>
+          </Can>
         ),
       },
       {
@@ -180,14 +178,14 @@ export default function SpecPage() {
         width: 140,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={SPEC_MANAGE}>
+            <Can perm={SPEC_MANAGE}>
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
               </button>
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -204,7 +202,7 @@ export default function SpecPage() {
         titleKey="rms.spec.title"
         subtitleKey="rms.spec.sub"
         actions={
-          <Perms code={SPEC_MANAGE}>
+          <Can perm={SPEC_MANAGE}>
             <button
               className="btn btn-primary btn-sm"
               disabled={!recipeId}
@@ -212,7 +210,7 @@ export default function SpecPage() {
             >
               + {t('rms.spec.add')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 
@@ -230,7 +228,7 @@ export default function SpecPage() {
           </>
         }
         right={
-          <Perms code={SPEC_MANAGE}>
+          <Can perm={SPEC_MANAGE}>
             <div style={toolbarInput}>
               <CimInput
                 value={tplCode}
@@ -253,7 +251,7 @@ export default function SpecPage() {
             <button className="btn btn-ghost btn-sm" onClick={() => void inherit()}>
               {t('rms.spec.inherit')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

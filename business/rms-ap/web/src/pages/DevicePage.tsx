@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimTag,
   DataTable,
@@ -12,9 +13,7 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
-  type FormOption,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormOption,} from '@cim/ui';
 import DeviceDetailDrawer from '@/components/DeviceDetailDrawer';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
 import * as api from '@/lib/rmsApi';
@@ -223,16 +222,16 @@ export default function DevicePage() {
         width: 150,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code="rms:device:update">
+            <Can perm="rms:device:update">
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
               </button>
-            </Perms>
-            <Perms code="rms:device:delete">
+            </Can>
+            <Can perm="rms:device:delete">
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -246,11 +245,11 @@ export default function DevicePage() {
       <PageHead
         titleKey="rms.device.title"
         actions={
-          <Perms code="rms:device:create">
+          <Can perm="rms:device:create">
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
               + {t('rms.device.createNew')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

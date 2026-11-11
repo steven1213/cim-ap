@@ -22,7 +22,7 @@ import { createElement, type ComponentType, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { UiLocaleProvider } from '@cim/ui';
+import { UiLocaleProvider, UiPermissionProvider } from '@cim/ui';
 
 import { useAuthStore } from '@/store/authStore';
 import { MemoryRouter } from 'react-router-dom';
@@ -105,9 +105,15 @@ function withPermissions(permissions: string[]): void {
 function Providers({ children }: { children: ReactNode }) {
   const uiT = (key: string) => String(i18n.t(key));
   const hasKey = () => true;
+  // 权限同样要与 main.tsx 同构注入：`<Can>` 在未挂 Provider 时走「一律放行」兜底，
+  // 那样「无权限时不挂载按钮」的断言会全部反转成通过——闸门看似在、实际测不到东西。
+  const perms = useAuthStore((s) => s.permissions);
+  const ready = useAuthStore((s) => s.permissionsLoaded);
   return (
     <UiLocaleProvider t={uiT} locale="zh-CN" hasKey={hasKey}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <UiPermissionProvider has={(code) => perms.includes(code)} ready={ready}>
+        <MemoryRouter>{children}</MemoryRouter>
+      </UiPermissionProvider>
     </UiLocaleProvider>
   );
 }

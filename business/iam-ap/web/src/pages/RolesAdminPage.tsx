@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimTag,
   CimTabs,
@@ -14,11 +15,9 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
-  type TabItem,
-} from '@cim/ui';
+  type TabItem,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '@/types';
-import Perms from '@/components/Perms';
 import PermTree from '@/components/PermTree';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
@@ -461,11 +460,11 @@ export default function RolesAdminPage() {
                 disabled={busy}
               />
               <div className="sub-head" style={{ marginTop: 12 }}>
-                <Perms codes={draft.id ? [ROLE_ADMIN_UPDATE, SYS.ROLE_SAVE] : [ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
+                <Can perm={draft.id ? [ROLE_ADMIN_UPDATE, SYS.ROLE_SAVE] : [ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
                   <button type="button" className="btn" onClick={onSave} disabled={busy}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
                   </button>
-                </Perms>
+                </Can>
                 <button type="button" className="btn-ghost btn-sm" onClick={closeDraft}>
                   {t('iam.common.close')}
                 </button>
@@ -486,12 +485,12 @@ export default function RolesAdminPage() {
           title={t('iam.admin.roles.tabGrant')}
           sub={`${grantedPerms.size} / ${allPerms.length} · ${grantedMenus.size} / ${allMenus.length}`}
           actions={
-            <Perms codes={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
+            <Can perm={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
               <button className="btn-ghost btn-sm" onClick={saveGrant} disabled={busy}>
                 <IconSave width={13} height={13} />
                 {t('iam.admin.roles.grantSave')}
               </button>
-            </Perms>
+            </Can>
           }
         >
           <p className="hint">{t('iam.admin.roles.grantNote')}</p>
@@ -545,11 +544,11 @@ export default function RolesAdminPage() {
           flush
           actions={
             <>
-              <Perms codes={[ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
+              <Can perm={[ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
                 <button className="icon-btn" title={t('iam.admin.roles.new')} onClick={startCreate}>
                   <IconPlus width={14} height={14} />
                 </button>
-              </Perms>
+              </Can>
               <button className="btn-ghost btn-sm" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {rolesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}

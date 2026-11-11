@@ -2,17 +2,16 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimSelect,
   EmptyState,
   Page,
   Panel,
   useConfirm,
-  useToast,
-} from '@cim/ui';
+  useToast,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
-import Perms from '@/components/Perms';
 import PermTree from '@/components/PermTree';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
@@ -175,7 +174,7 @@ export default function PermissionsAdminPage() {
           flush
           actions={
             <>
-              <Perms codes={[PERM_CREATE, SYS.PERM_SAVE]}>
+              <Can perm={[PERM_CREATE, SYS.PERM_SAVE]}>
                 <button
                   className="icon-btn"
                   title={t('iam.admin.perms.new')}
@@ -183,7 +182,7 @@ export default function PermissionsAdminPage() {
                 >
                   <IconPlus width={14} height={14} />
                 </button>
-              </Perms>
+              </Can>
               <button className="btn-ghost btn-sm" onClick={listRes.refresh} disabled={listRes.loading}>
                 {listRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
               </button>
@@ -293,11 +292,11 @@ export default function PermissionsAdminPage() {
               <p className="hint">{t('iam.admin.perms.moduleOwner')}</p>
 
               <div className="sub-head" style={{ marginTop: 12 }}>
-                <Perms codes={saveCodes}>
+                <Can perm={saveCodes}>
                   <button type="button" className="btn" disabled={busy} onClick={() => void onSubmit()}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
                   </button>
-                </Perms>
+                </Can>
                 <button type="button" className="btn-ghost btn-sm" onClick={() => setDraft(null)}>
                   {t('iam.common.close')}
                 </button>

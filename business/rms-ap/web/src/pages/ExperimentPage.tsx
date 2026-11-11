@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimSelect,
   CimTag,
@@ -11,9 +12,7 @@ import {
   PageHead,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { EXPERIMENT_MANAGE } from '@/lib/permCodes';
 import type { Device, Experiment, Recipe, RecipeVersion } from '@/types';
@@ -134,7 +133,7 @@ export default function ExperimentPage() {
         width: 190,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={EXPERIMENT_MANAGE}>
+            <Can perm={EXPERIMENT_MANAGE}>
               {r.status === 'REQUESTED' && (
                 <>
                   <button
@@ -159,7 +158,7 @@ export default function ExperimentPage() {
                   {t('rms.exp.close')}
                 </button>
               )}
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -174,11 +173,11 @@ export default function ExperimentPage() {
         titleKey="rms.exp.title"
         subtitleKey="rms.exp.sub"
         actions={
-          <Perms code={EXPERIMENT_MANAGE}>
+          <Can perm={EXPERIMENT_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
               + {t('rms.exp.create')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

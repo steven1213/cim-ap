@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
-import { CimTag, DataTable, Page, Panel, useToast, type DataTableColumn } from '@cim/ui';
+import { Can, CimTag, DataTable, Page, Panel, useToast, type DataTableColumn } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { LockRow } from '@/types';
 import { fmtDateTime } from '@/lib/format';
-import Perms from '@/components/Perms';
 import { USER_UNLOCK } from '@/lib/permCodes';
 import { IconKey } from '@/components/Icons';
 
@@ -72,7 +71,7 @@ export default function LockoutsPage() {
         titleKey: 'iam.lockouts.th.actions',
         width: 120,
         render: (r) => (
-          <Perms code={USER_UNLOCK}>
+          <Can perm={USER_UNLOCK}>
             <button
               className="btn-ghost btn-sm"
               onClick={() => void onUnlock(r.username)}
@@ -81,7 +80,7 @@ export default function LockoutsPage() {
               <IconKey width={13} height={13} />
               {t('iam.lockouts.unlock')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],

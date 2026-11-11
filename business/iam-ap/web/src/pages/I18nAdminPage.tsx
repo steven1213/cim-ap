@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimSelect,
   CimTag,
@@ -12,12 +13,10 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/api';
 import { changeLanguage, currentLang } from '@/lib/i18n';
 import type { SysI18nDto, SysLocaleDto } from '@/types';
-import Perms from '@/components/Perms';
 import { useHasPermission } from '@/lib/usePermission';
 import { I18N_LIST, I18N_CREATE, I18N_DELETE, I18N_LOCALE } from '@/lib/permCodes';
 import { IconChevron, IconEdit, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
@@ -264,7 +263,7 @@ export default function I18nAdminPage() {
         width: 76,
         render: (l) => (
           <span className="cell-actions" onClick={(e) => e.stopPropagation()}>
-            <Perms code={I18N_LOCALE}>
+            <Can perm={I18N_LOCALE}>
               <button
                 className="icon-btn"
                 title={t('iam.common.edit')}
@@ -281,9 +280,9 @@ export default function I18nAdminPage() {
               >
                 <IconEdit width={13} height={13} />
               </button>
-            </Perms>
+            </Can>
             {!l.isDefault && (
-              <Perms code={I18N_LOCALE}>
+              <Can perm={I18N_LOCALE}>
                 <button
                   className="icon-btn danger"
                   title={t('iam.common.delete')}
@@ -291,7 +290,7 @@ export default function I18nAdminPage() {
                 >
                   <IconTrash width={13} height={13} />
                 </button>
-              </Perms>
+              </Can>
             )}
           </span>
         ),
@@ -339,7 +338,7 @@ export default function I18nAdminPage() {
         width: 108,
         render: (m) => (
           <span className="cell-actions">
-            <Perms code={I18N_CREATE}>
+            <Can perm={I18N_CREATE}>
               <button
                 className="btn-ghost btn-sm"
                 onClick={() =>
@@ -355,12 +354,12 @@ export default function I18nAdminPage() {
               >
                 {t('iam.common.edit')}
               </button>
-            </Perms>
-            <Perms code={I18N_DELETE}>
+            </Can>
+            <Can perm={I18N_DELETE}>
               <button className="icon-btn danger" title={t('iam.common.delete')} onClick={() => onDeleteMessage(m)}>
                 <IconTrash width={13} height={13} />
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -473,7 +472,7 @@ export default function I18nAdminPage() {
           flush
           actions={
             <>
-              <Perms code={I18N_LOCALE}>
+              <Can perm={I18N_LOCALE}>
                 <button
                   className="icon-btn"
                   title={t('iam.admin.i18n.newLocale')}
@@ -484,7 +483,7 @@ export default function I18nAdminPage() {
                 >
                   <IconPlus width={14} height={14} />
                 </button>
-              </Perms>
+              </Can>
               <button className="btn-ghost btn-sm" onClick={localesRes.refresh} disabled={localesRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {localesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
@@ -516,7 +515,7 @@ export default function I18nAdminPage() {
             flush
             actions={
               <>
-                <Perms code={I18N_CREATE}>
+                <Can perm={I18N_CREATE}>
                   <button
                     className="icon-btn"
                     title={t('iam.admin.i18n.newMessage')}
@@ -534,7 +533,7 @@ export default function I18nAdminPage() {
                   >
                     <IconPlus width={14} height={14} />
                   </button>
-                </Perms>
+                </Can>
                 {currentLang() && (
                   <button
                     className="btn-ghost btn-sm"

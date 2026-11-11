@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   DataTable,
   FormGrid,
   Panel,
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { DeviceChamber } from '@/types';
 
@@ -124,11 +123,11 @@ export default function ChamberSection({
       titleKey: 'rms.common.actions',
       width: 110,
       render: (x) => (
-        <Perms code="rms:device:delete">
+        <Can perm="rms:device:delete">
           <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => remove(x)}>
             {t('rms.common.delete')}
           </button>
-        </Perms>
+        </Can>
       ),
     },
   ];
@@ -138,11 +137,11 @@ export default function ChamberSection({
       titleKey="rms.chamber.title"
       subKey="rms.chamber.sub"
       actions={
-        <Perms code="rms:device:create">
+        <Can perm="rms:device:create">
           <button className="btn btn-primary" disabled={busy} onClick={add}>
             {t('rms.chamber.add')}
           </button>
-        </Perms>
+        </Can>
       }
     >
       <FormGrid fields={fields} value={draft} onChange={(p) => setDraft({ ...draft, ...p })} errors={errors} columns={3} />

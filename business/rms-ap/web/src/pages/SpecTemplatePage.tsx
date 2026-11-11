@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimDrawer,
   CimInput,
   CimModal,
@@ -14,9 +15,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { SPEC_MANAGE } from '@/lib/permCodes';
 import type { SpecTemplate, SpecTemplateItem, SpecType } from '@/types';
@@ -119,14 +118,14 @@ export default function SpecTemplatePage() {
             <button className="btn btn-ghost btn-sm" onClick={() => setViewId(r.id)}>
               {t('rms.specTpl.items')}
             </button>
-            <Perms code={SPEC_MANAGE}>
+            <Can perm={SPEC_MANAGE}>
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
               </button>
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -166,11 +165,11 @@ export default function SpecTemplatePage() {
         titleKey="rms.specTpl.title"
         subtitleKey="rms.specTpl.sub"
         actions={
-          <Perms code={SPEC_MANAGE}>
+          <Can perm={SPEC_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
               + {t('rms.specTpl.add')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

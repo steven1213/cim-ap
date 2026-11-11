@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimTag,
   DataTable,
@@ -9,12 +10,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,
-} from '@cim/ui';
+  type DataTableColumn,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { KickResult, SessionRow, TokenVersionBump } from '@/types';
 import { fmtDateTime } from '@/lib/format';
-import Perms from '@/components/Perms';
 import { SESSION_KICK } from '@/lib/permCodes';
 
 /** 在线会话：活跃会话列表 + 强制下线（bump 令牌版本）。下线按钮按 `iam:session:kick` 显隐。 */
@@ -98,7 +97,7 @@ export default function SessionsPage() {
         titleKey: 'iam.sessions.th.actions',
         width: 130,
         render: (r) => (
-          <Perms code={SESSION_KICK}>
+          <Can perm={SESSION_KICK}>
             <button
               className="btn-danger btn-sm"
               onClick={() => void kick(r.userId, r.username)}
@@ -106,7 +105,7 @@ export default function SessionsPage() {
             >
               {t('iam.sessions.kick')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -136,7 +135,7 @@ export default function SessionsPage() {
         />
       </Panel>
 
-      <Perms code={SESSION_KICK}>
+      <Can perm={SESSION_KICK}>
         <Panel
           title={t('iam.sessions.kickTitle')}
           sub={t('iam.sessions.kickSub')}
@@ -178,7 +177,7 @@ export default function SessionsPage() {
             <li>{t('iam.sessions.note3')}</li>
           </ul>
         </Panel>
-      </Perms>
+      </Can>
     </Page>
   );
 }

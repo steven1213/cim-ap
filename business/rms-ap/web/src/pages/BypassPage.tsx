@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimTag,
   DataTable,
@@ -11,9 +12,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { BYPASS_MANAGE } from '@/lib/permCodes';
 import type { Bypass, Device, Recipe } from '@/types';
@@ -114,14 +113,14 @@ export default function BypassPage() {
         width: 160,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={BYPASS_MANAGE}>
+            <Can perm={BYPASS_MANAGE}>
               <button className="btn btn-ghost btn-sm" onClick={() => void doToggle(r)}>
                 {r.active ? t('rms.common.disable') : t('rms.common.enable')}
               </button>
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -136,11 +135,11 @@ export default function BypassPage() {
         titleKey="rms.bypass.title"
         subtitleKey="rms.bypass.sub"
         actions={
-          <Perms code={BYPASS_MANAGE}>
+          <Can perm={BYPASS_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
               + {t('rms.bypass.create')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

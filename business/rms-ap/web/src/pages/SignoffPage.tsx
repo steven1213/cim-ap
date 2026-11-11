@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimDescriptions,
   CimDrawer,
   CimInput,
@@ -19,11 +20,9 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import DiffTable from '@/components/DiffTable';
-import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import type {
   BatchResult,
@@ -251,7 +250,7 @@ export default function SignoffPage() {
               {t('rms.signoff.detail')}
             </button>
             {r.status === 'PENDING' ? (
-              <Perms code="rms:signoff:approve">
+              <Can perm="rms:signoff:approve">
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => setDecision({ row: r, kind: 'APPROVE' })}
@@ -273,7 +272,7 @@ export default function SignoffPage() {
                     {t('rms.signoff.cancelTemp')}
                   </button>
                 )}
-              </Perms>
+              </Can>
             ) : null}
           </span>
         ),
@@ -289,11 +288,11 @@ export default function SignoffPage() {
         titleKey="rms.signoff.title"
         subtitleKey="rms.signoff.sub"
         actions={
-          <Perms code="rms:signoff:approve">
+          <Can perm="rms:signoff:approve">
             <button className="btn btn-primary btn-sm" onClick={() => setShowSubmit(true)}>
               + {t('rms.signoff.submit')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 
@@ -338,14 +337,14 @@ export default function SignoffPage() {
             left={
               <>
                 <CimTag tone="run">{t('rms.signoff.selectedN', { n: selected.length })}</CimTag>
-                <Perms code="rms:signoff:approve">
+                <Can perm="rms:signoff:approve">
                   <button className="btn btn-primary btn-sm" onClick={() => void doBatch('APPROVE')}>
                     {t('rms.signoff.batchApprove')}
                   </button>
                   <button className="btn btn-ghost btn-sm danger" onClick={() => void doBatch('REJECT')}>
                     {t('rms.signoff.batchReject')}
                   </button>
-                </Perms>
+                </Can>
                 <button className="btn btn-ghost btn-sm" onClick={() => setSelected([])}>
                   {t('rms.signoff.clearSelection')}
                 </button>

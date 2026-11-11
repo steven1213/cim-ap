@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimTag,
   DataTable,
@@ -9,11 +10,9 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,
-} from '@cim/ui';
+  type DataTableColumn,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, AssignmentDto } from '@/types';
-import Perms from '@/components/Perms';
 import { ADMISSION_GRANT, ADMISSION_REVOKE } from '@/lib/permCodes';
 
 /**
@@ -146,17 +145,17 @@ export default function AdmissionsPage() {
           const admitted = !!roleOf(a.appCode);
           return (
             <div className="cell-actions">
-              <Perms code={ADMISSION_GRANT}>
+              <Can perm={ADMISSION_GRANT}>
                 <button className="btn-sm" disabled={busy === a.appCode} onClick={() => void grant(a.appCode)}>
                   {admitted ? t('iam.admissions.update') : t('iam.admissions.grant')}
                 </button>
-              </Perms>
+              </Can>
               {admitted && (
-                <Perms code={ADMISSION_REVOKE}>
+                <Can perm={ADMISSION_REVOKE}>
                   <button className="btn-danger btn-sm" disabled={busy === a.appCode} onClick={() => void revoke(a.appCode)}>
                     {t('iam.admissions.revoke')}
                   </button>
-                </Perms>
+                </Can>
               )}
             </div>
           );

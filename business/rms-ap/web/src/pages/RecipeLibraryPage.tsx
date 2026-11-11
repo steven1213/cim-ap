@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimChoice,
   CimDrawer,
   CimModal,
@@ -16,9 +17,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type {
   BodyFormat,
@@ -199,11 +198,11 @@ export default function RecipeLibraryPage() {
             <button className="btn btn-ghost btn-sm" onClick={() => setActive(r)}>
               {t('rms.recipe.version')}
             </button>
-            <Perms code="rms:recipe:delete">
+            <Can perm="rms:recipe:delete">
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -218,21 +217,21 @@ export default function RecipeLibraryPage() {
         titleKey="rms.recipe.title"
         actions={
           <>
-            <Perms code="rms:recipe:create">
+            <Can perm="rms:recipe:create">
               <button className="btn btn-ghost btn-sm" onClick={() => setShowImport(true)}>
                 {t('rms.recipe.importBtn')}
               </button>
-            </Perms>
-            <Perms code="rms:body:export">
+            </Can>
+            <Can perm="rms:body:export">
               <button className="btn btn-ghost btn-sm" disabled={busyExport} onClick={() => void doExport()}>
                 {busyExport ? t('rms.common.loading') : t('rms.recipe.exportAll')}
               </button>
-            </Perms>
-            <Perms code="rms:recipe:create">
+            </Can>
+            <Can perm="rms:recipe:create">
               <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
                 + {t('rms.recipe.createNew')}
               </button>
-            </Perms>
+            </Can>
           </>
         }
       />
@@ -348,7 +347,7 @@ function VersionsPanel({
         titleKey: 'rms.common.actions',
         width: 100,
         render: (v) => (
-          <Perms code="rms:recipe:activate">
+          <Can perm="rms:recipe:activate">
             <button
               className="btn btn-ghost btn-sm"
               disabled={v.status !== 'DRAFT'}
@@ -357,7 +356,7 @@ function VersionsPanel({
             >
               {t('rms.recipe.activate')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -368,16 +367,16 @@ function VersionsPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="cell-actions">
-        <Perms code="rms:recipe:version">
+        <Can perm="rms:recipe:version">
           <button className="btn btn-primary btn-sm" onClick={() => setShowNewVer(true)}>
             + {t('rms.recipe.newVersion')}
           </button>
-        </Perms>
-        <Perms code="rms:recipe:create">
+        </Can>
+        <Can perm="rms:recipe:create">
           <button className="btn btn-ghost btn-sm" onClick={() => setShowSaveAs(true)}>
             {t('rms.recipe.saveAs')}
           </button>
-        </Perms>
+        </Can>
       </div>
 
       <DataTable<RecipeVersion>

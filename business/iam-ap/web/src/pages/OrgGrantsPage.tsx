@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimSelect,
   CimSwitch,
@@ -11,12 +12,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,
-} from '@cim/ui';
+  type DataTableColumn,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, OrgGrantRow, OrgNode } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
-import Perms from '@/components/Perms';
 import { GRANT_GRANT, GRANT_REVOKE } from '@/lib/permCodes';
 import { IconPlus, IconShield, IconTrash } from '@/components/Icons';
 
@@ -182,7 +181,7 @@ export default function OrgGrantsPage() {
         titleKey: 'iam.orgGrants.th.actions',
         width: 110,
         render: (g) => (
-          <Perms code={GRANT_REVOKE}>
+          <Can perm={GRANT_REVOKE}>
             <button
               className="btn-danger btn-sm"
               disabled={revoking === `${g.orgId}:${g.appCode}`}
@@ -191,7 +190,7 @@ export default function OrgGrantsPage() {
               <IconTrash width={13} height={13} />
               {t('iam.orgGrants.revoke')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -222,7 +221,7 @@ export default function OrgGrantsPage() {
         />
       </Panel>
 
-      <Perms code={GRANT_GRANT}>
+      <Can perm={GRANT_GRANT}>
         <Panel title={t('iam.orgGrants.grantTitle')} sub={t('iam.orgGrants.grantSub')}>
           <div className="row">
             <div className="field">
@@ -269,7 +268,7 @@ export default function OrgGrantsPage() {
             {affected != null ? <> {t('iam.orgGrants.affected', { n: affected })}</> : null}
           </p>
         </Panel>
-      </Perms>
+      </Can>
 
       <Panel title={t('iam.orgGrants.divTitle')} sub={t('iam.orgGrants.divSub')}>
         <ul className="note-list">

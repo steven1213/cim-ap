@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
-import { CimSpin, CimTag, Page, Panel, useToast } from '@cim/ui';
+import { Can, CimSpin, CimTag, Page, Panel, useToast } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { SettingsDto, SyncResult } from '@/types';
-import Perms from '@/components/Perms';
 import { SYNC_RUN } from '@/lib/permCodes';
 import { IconAlert, IconSync } from '@/components/Icons';
 
@@ -195,12 +194,12 @@ export default function SettingsPage() {
             <dd className="meta-v">{t('iam.settings.v.crossSrc')}</dd>
           </dl>
           <div className="row" style={{ marginTop: 12 }}>
-            <Perms code={SYNC_RUN}>
+            <Can perm={SYNC_RUN}>
               <button type="button" className="btn-sm" onClick={() => void onSync()} disabled={syncBusy}>
                 <IconSync width={13} height={13} />
                 {syncBusy ? t('iam.settings.syncing') : t('iam.settings.sync')}
               </button>
-            </Perms>
+            </Can>
           </div>
         </Panel>
       </div>

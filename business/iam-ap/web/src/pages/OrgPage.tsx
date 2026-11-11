@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimSelect,
   CimTag,
@@ -11,12 +12,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type CimTreeNode,
-} from '@cim/ui';
+  type CimTreeNode,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
 import { fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
-import Perms from '@/components/Perms';
 import { ORG_CREATE, ORG_DELETE, ORG_MEMBER, ORG_MOVE, ORG_UPDATE } from '@/lib/permCodes';
 import { IconEdit, IconPlus, IconTrash } from '@/components/Icons';
 
@@ -276,12 +275,12 @@ export default function OrgPage() {
           actions={
             <>
               <CimTag>{t('iam.orgs.count', { n: nodes.length })}</CimTag>
-              <Perms code={ORG_CREATE}>
+              <Can perm={ORG_CREATE}>
                 <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
                   <IconPlus width={13} height={13} />
                   {t('iam.orgs.newNode')}
                 </button>
-              </Perms>
+              </Can>
             </>
           }
         >
@@ -387,12 +386,12 @@ export default function OrgPage() {
                         width={140}
                       />
                     </div>
-                    <Perms code={ORG_UPDATE}>
+                    <Can perm={ORG_UPDATE}>
                       <button type="button" className="btn-sm" disabled={busy} onClick={() => void onUpdate()}>
                         <IconEdit width={13} height={13} />
                         {t('iam.orgs.save')}
                       </button>
-                    </Perms>
+                    </Can>
                   </div>
 
                   <div className="row" style={{ marginTop: 12 }}>
@@ -414,17 +413,17 @@ export default function OrgPage() {
                         width={300}
                       />
                     </div>
-                    <Perms code={ORG_MOVE}>
+                    <Can perm={ORG_MOVE}>
                       <button type="button" className="btn-ghost btn-sm" onClick={() => void onMove()}>
                         {t('iam.orgs.move')}
                       </button>
-                    </Perms>
-                    <Perms code={ORG_DELETE}>
+                    </Can>
+                    <Can perm={ORG_DELETE}>
                       <button type="button" className="btn-danger btn-sm" onClick={() => void onDelete()}>
                         <IconTrash width={13} height={13} />
                         {t('iam.orgs.delete')}
                       </button>
-                    </Perms>
+                    </Can>
                   </div>
                 </>
               ) : (
@@ -449,7 +448,7 @@ export default function OrgPage() {
                       width={260}
                     />
                   </div>
-                  <Perms code={ORG_MEMBER}>
+                  <Can perm={ORG_MEMBER}>
                     <button
                       type="button"
                       className="btn-sm"
@@ -459,13 +458,13 @@ export default function OrgPage() {
                       <IconPlus width={13} height={13} />
                       {t('iam.orgs.addMember')}
                     </button>
-                  </Perms>
+                  </Can>
                 </div>
                 <div className="tag-list" style={{ marginTop: 10 }}>
                   {members.map((m) => (
                     <span key={m} className="role-chip">
                       <span className="mono">{m}</span>
-                      <Perms code={ORG_MEMBER}>
+                      <Can perm={ORG_MEMBER}>
                         <button
                           type="button"
                           className="chip-x"
@@ -474,7 +473,7 @@ export default function OrgPage() {
                         >
                           ×
                         </button>
-                      </Perms>
+                      </Can>
                     </span>
                   ))}
                   {!members.length && <span className="dim">{t('iam.orgs.noMembers')}</span>}
@@ -549,7 +548,7 @@ export default function OrgPage() {
                 width={90}
               />
             </div>
-            <Perms code={ORG_CREATE}>
+            <Can perm={ORG_CREATE}>
               <button
                 type="button"
                 disabled={busy || !code.trim() || !name.trim()}
@@ -557,7 +556,7 @@ export default function OrgPage() {
               >
                 {busy ? t('iam.orgs.creating') : t('iam.orgs.create')}
               </button>
-            </Perms>
+            </Can>
           </div>
           <p className="hint">{t('iam.orgs.hint')}</p>
         </Panel>

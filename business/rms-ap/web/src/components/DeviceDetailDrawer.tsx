@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimDescriptions,
   CimDrawer,
   CimTag,
@@ -12,10 +13,8 @@ import {
   useToast,
   type DataTableColumn,
   type DescItem,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
-import Perms from '@/components/Perms';
 import ChamberSection from '@/components/ChamberPanel';
 import * as api from '@/lib/rmsApi';
 import type { Device, DeviceChamber, DeviceRecipeRow, Recipe } from '@/types';
@@ -168,11 +167,11 @@ export default function DeviceDetailDrawer({
       width: 110,
       render: (r) =>
         r.mapId ? (
-          <Perms code="rms:device:update">
+          <Can perm="rms:device:update">
             <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => unbind(r)}>
               {t('rms.tools.unbind')}
             </button>
-          </Perms>
+          </Can>
         ) : null,
     },
   ];
@@ -222,11 +221,11 @@ export default function DeviceDetailDrawer({
   }
 
   const editButton = onEdit ? (
-    <Perms code="rms:device:update">
+    <Can perm="rms:device:update">
       <button className="btn btn-ghost btn-sm" onClick={onEdit}>
         {t('rms.common.edit')}
       </button>
-    </Perms>
+    </Can>
   ) : undefined;
 
   return (
@@ -253,11 +252,11 @@ export default function DeviceDetailDrawer({
         titleKey="rms.deviceDetail.bind"
         subKey="rms.deviceDetail.bindHint"
         actions={
-          <Perms code="rms:device:update">
+          <Can perm="rms:device:update">
             <button className="btn btn-primary" disabled={busy} onClick={bind}>
               {t('rms.tools.bind')}
             </button>
-          </Perms>
+          </Can>
         }
       >
         <FormGrid

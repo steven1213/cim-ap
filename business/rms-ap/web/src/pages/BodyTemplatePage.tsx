@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimDescriptions,
   CimDrawer,
   CimInput,
@@ -14,9 +15,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { BODY_TEMPLATE_MANAGE, BODY_TEMPLATE_VIEW } from '@/lib/permCodes';
 import type { BodyTemplate, BodyTemplateDetail, DeviceType, TemplateUpsertItem } from '@/types';
@@ -132,19 +131,19 @@ export default function BodyTemplatePage() {
         width: 190,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={BODY_TEMPLATE_VIEW}>
+            <Can perm={BODY_TEMPLATE_VIEW}>
               <button className="btn btn-ghost btn-sm" onClick={() => setViewId(r.id)}>
                 {t('rms.common.view')}
               </button>
-            </Perms>
-            <Perms code={BODY_TEMPLATE_MANAGE}>
+            </Can>
+            <Can perm={BODY_TEMPLATE_MANAGE}>
               <button className="btn btn-ghost btn-sm" onClick={() => void openEdit(r)}>
                 {t('rms.common.edit')}
               </button>
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -159,11 +158,11 @@ export default function BodyTemplatePage() {
         titleKey="rms.btpl.title"
         subtitleKey="rms.btpl.sub"
         actions={
-          <Perms code={BODY_TEMPLATE_MANAGE}>
+          <Can perm={BODY_TEMPLATE_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
               + {t('rms.btpl.create')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

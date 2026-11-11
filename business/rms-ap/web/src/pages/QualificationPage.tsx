@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimSelect,
   CimTag,
@@ -12,9 +13,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { QUALIFICATION_MANAGE } from '@/lib/permCodes';
 import type { Device, DeviceArea, DeviceType, Qualification, Recipe } from '@/types';
@@ -154,7 +153,7 @@ export default function QualificationPage() {
         width: 160,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={QUALIFICATION_MANAGE}>
+            <Can perm={QUALIFICATION_MANAGE}>
               {r.status === 'GRANTED' && (
                 <button className="btn btn-ghost btn-sm danger" onClick={() => void revoke(r)}>
                   {t('rms.common.revoke')}
@@ -163,7 +162,7 @@ export default function QualificationPage() {
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -178,11 +177,11 @@ export default function QualificationPage() {
         titleKey="rms.qual.title"
         subtitleKey="rms.qual.sub"
         actions={
-          <Perms code={QUALIFICATION_MANAGE}>
+          <Can perm={QUALIFICATION_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
               + {t('rms.qual.grant')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

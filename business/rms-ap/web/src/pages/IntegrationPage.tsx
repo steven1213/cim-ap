@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   CimSwitch,
   CimTag,
@@ -14,11 +15,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
+  type FormField,} from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { BatchDownloadModal, BatchHoldModal } from '@/components/BatchOpsModal';
-import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import { INTEGRATION_OPERATE } from '@/lib/permCodes';
 import type {
@@ -207,11 +206,11 @@ export default function IntegrationPage() {
         width: 110,
         render: (x) =>
           x.active ? (
-            <Perms code={INTEGRATION_OPERATE}>
+            <Can perm={INTEGRATION_OPERATE}>
               <button className="btn btn-ghost btn-sm" onClick={() => setReleaseRow(x)}>
                 {t('rms.integration.release')}
               </button>
-            </Perms>
+            </Can>
           ) : null,
       },
     ],
@@ -271,11 +270,11 @@ export default function IntegrationPage() {
               {t('rms.integration.acknowledged')}
             </CimTag>
           ) : (
-            <Perms code={INTEGRATION_OPERATE}>
+            <Can perm={INTEGRATION_OPERATE}>
               <button className="btn btn-ghost btn-sm" onClick={() => void ack(x)}>
                 {t('rms.integration.ack')}
               </button>
-            </Perms>
+            </Can>
           ),
       },
     ],
@@ -290,14 +289,14 @@ export default function IntegrationPage() {
         subtitleKey="rms.integration.sub"
         actions={
           <>
-            <Perms code={INTEGRATION_OPERATE}>
+            <Can perm={INTEGRATION_OPERATE}>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowBatchHold(true)}>
                 {t('rms.batch.holdBtn')}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => setShowBatchDownload(true)}>
                 {t('rms.batch.downloadBtn')}
               </button>
-            </Perms>
+            </Can>
             <button className="btn btn-ghost btn-sm" onClick={refreshAll}>
               {t('rms.common.refresh')}
             </button>
@@ -553,11 +552,11 @@ function PpidPanel({
         titleKey: 'rms.common.actions',
         width: 90,
         render: (m) => (
-          <Perms code={INTEGRATION_OPERATE}>
+          <Can perm={INTEGRATION_OPERATE}>
             <button className="btn btn-ghost btn-sm danger" onClick={() => void remove(m.id)}>
               {t('rms.common.delete')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -576,11 +575,11 @@ function PpidPanel({
       />
       <Toolbar
         left={
-          <Perms code={INTEGRATION_OPERATE}>
+          <Can perm={INTEGRATION_OPERATE}>
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void add()}>
               {t('rms.integration.ppid.register')}
             </button>
-          </Perms>
+          </Can>
         }
       />
       <DataTable<ToolRecipeMap>
@@ -984,7 +983,7 @@ function DownloadPanel({
         render: (x) => {
           const next = nextStage(x.stage);
           return (
-            <Perms code={INTEGRATION_OPERATE}>
+            <Can perm={INTEGRATION_OPERATE}>
               <span className="cell-actions">
                 {next ? (
                   <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void advance(x)}>
@@ -1006,7 +1005,7 @@ function DownloadPanel({
                   </button>
                 ) : null}
               </span>
-            </Perms>
+            </Can>
           );
         },
       },
@@ -1036,7 +1035,7 @@ function DownloadPanel({
 
       <Toolbar
         left={
-          <Perms code={INTEGRATION_OPERATE}>
+          <Can perm={INTEGRATION_OPERATE}>
             <button
               className="btn btn-primary btn-sm"
               disabled={busy || !toolId || !recipeUid}
@@ -1044,7 +1043,7 @@ function DownloadPanel({
             >
               {t('rms.integration.dl.issue')}
             </button>
-          </Perms>
+          </Can>
         }
         right={
           <label className="check">
@@ -1264,11 +1263,11 @@ function GemEventPanel({ devices }: { devices: Device[] }) {
 
       <Toolbar
         left={
-          <Perms code={INTEGRATION_OPERATE}>
+          <Can perm={INTEGRATION_OPERATE}>
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void post()}>
               {t('rms.integration.evt.report')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 
@@ -1474,11 +1473,11 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
 
       <Toolbar
         left={
-          <Perms code={INTEGRATION_OPERATE}>
+          <Can perm={INTEGRATION_OPERATE}>
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void submit()}>
               {t('rms.integration.inv.reportAction')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
+  Can,
   CimTag,
   CimTree,
   EmptyState,
@@ -12,11 +13,9 @@ import {
   useToast,
   type CimTreeNode,
   type FormField,
-  type FormOption,
-} from '@cim/ui';
+  type FormOption,} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, SysMenuDto, MenuNodeType } from '@/types';
-import Perms from '@/components/Perms';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { MENU_LIST, MENU_CREATE, MENU_UPDATE, MENU_DELETE, SYS } from '@/lib/permCodes';
 import { iconKeys, resolveIcon } from '@/lib/iconRegistry';
@@ -343,7 +342,7 @@ export default function MenusAdminPage() {
               >
                 {allExpanded ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
               </button>
-              <Perms codes={[MENU_CREATE, SYS.MENU_SAVE]}>
+              <Can perm={[MENU_CREATE, SYS.MENU_SAVE]}>
                 <button
                   className="icon-btn"
                   title={t('iam.admin.menus.newRoot')}
@@ -351,7 +350,7 @@ export default function MenusAdminPage() {
                 >
                   <IconPlus width={14} height={14} />
                 </button>
-              </Perms>
+              </Can>
               <button className="btn-ghost btn-sm" onClick={treeRes.refresh} disabled={treeRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {treeRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
@@ -413,12 +412,12 @@ export default function MenusAdminPage() {
               />
 
               <div className="sub-head" style={{ marginTop: 12 }}>
-                <Perms codes={draft.id ? [MENU_UPDATE, SYS.MENU_SAVE] : [MENU_CREATE, SYS.MENU_SAVE]}>
+                <Can perm={draft.id ? [MENU_UPDATE, SYS.MENU_SAVE] : [MENU_CREATE, SYS.MENU_SAVE]}>
                   <button type="button" className="btn" onClick={onSave} disabled={busy}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
                   </button>
-                </Perms>
-                <Perms codes={[MENU_CREATE, SYS.MENU_SAVE]}>
+                </Can>
+                <Can perm={[MENU_CREATE, SYS.MENU_SAVE]}>
                   {/* 两个「新建」是次要动作，收成一组靠右；否则 .sub-head 的 space-between
                       会把三个按钮拉成三段散点 */}
                   <span className="row">
@@ -441,7 +440,7 @@ export default function MenusAdminPage() {
                       {t('iam.type.button')}
                     </button>
                   </span>
-                </Perms>
+                </Can>
               </div>
             </Panel>
           ) : (

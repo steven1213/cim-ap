@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimInput,
   CimModal,
   CimSelect,
@@ -15,9 +16,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { ECSV_MANAGE } from '@/lib/permCodes';
 import type { Device, EcSvSpec, EcSvValue, Recipe } from '@/types';
@@ -151,11 +150,11 @@ export default function EcSvPage() {
         titleKey: 'rms.common.actions',
         width: 90,
         render: (x) => (
-          <Perms code={ECSV_MANAGE}>
+          <Can perm={ECSV_MANAGE}>
             <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(x)}>
               {t('rms.common.delete')}
             </button>
-          </Perms>
+          </Can>
         ),
       },
     ],
@@ -204,14 +203,14 @@ export default function EcSvPage() {
         titleKey="rms.ecsv.title"
         subtitleKey="rms.ecsv.sub"
         actions={
-          <Perms code={ECSV_MANAGE}>
+          <Can perm={ECSV_MANAGE}>
             <button className="btn btn-ghost btn-sm" onClick={() => setShowUpload(true)}>
               {t('rms.ecsv.upload')}
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setShowSpec(true)}>
               + {t('rms.ecsv.addSpec')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   DataTable,
   FormGrid,
@@ -10,9 +11,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { DEVICE_AUTH_MANAGE } from '@/lib/permCodes';
 import type { Device, DeviceAuth, DeviceArea, DeviceType } from '@/types';
@@ -102,11 +101,11 @@ export default function DeviceAuthPage() {
         width: 120,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code={DEVICE_AUTH_MANAGE}>
+            <Can perm={DEVICE_AUTH_MANAGE}>
               <button className="btn btn-ghost btn-sm danger" onClick={() => void revoke(r)}>
                 {t('rms.common.revoke')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -121,11 +120,11 @@ export default function DeviceAuthPage() {
         titleKey="rms.deviceAuth.title"
         subtitleKey="rms.deviceAuth.sub"
         actions={
-          <Perms code={DEVICE_AUTH_MANAGE}>
+          <Can perm={DEVICE_AUTH_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
               + {t('rms.deviceAuth.grant')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 

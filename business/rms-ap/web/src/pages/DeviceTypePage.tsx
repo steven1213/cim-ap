@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
+  Can,
   CimModal,
   DataTable,
   FormGrid,
@@ -10,9 +11,7 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,
-} from '@cim/ui';
-import Perms from '@/components/Perms';
+  type FormField,} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { DeviceType } from '@/types';
 
@@ -99,16 +98,16 @@ export default function DeviceTypePage() {
         width: 150,
         render: (r) => (
           <span className="cell-actions">
-            <Perms code="rms:device-type:update">
+            <Can perm="rms:device-type:update">
               <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
                 {t('rms.common.edit')}
               </button>
-            </Perms>
-            <Perms code="rms:device-type:delete">
+            </Can>
+            <Can perm="rms:device-type:delete">
               <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
                 {t('rms.common.delete')}
               </button>
-            </Perms>
+            </Can>
           </span>
         ),
       },
@@ -122,11 +121,11 @@ export default function DeviceTypePage() {
       <PageHead
         titleKey="rms.deviceType.title"
         actions={
-          <Perms code="rms:device-type:create">
+          <Can perm="rms:device-type:create">
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
               + {t('rms.deviceType.createNew')}
             </button>
-          </Perms>
+          </Can>
         }
       />
 
