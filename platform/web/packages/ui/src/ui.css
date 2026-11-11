@@ -302,6 +302,12 @@
 .kpi.info {
   border-left-color: var(--info);
 }
+/* `.kpi.err`：此前**没有**这条规则，而 approval 的 CallbacksPage 已经写了
+   `className={'kpi' + (stats.dead > 0 ? ' err' : '')}`——意图是死信超标标红，
+   但类名一直没落地，色条始终是主色。这里补上，让既有意图真正生效。 */
+.kpi.err {
+  border-left-color: var(--err);
+}
 .kpi-ico {
   display: grid;
   place-items: center;
@@ -610,4 +616,184 @@
   color: var(--info);
   background: var(--info-soft);
   border-color: color-mix(in srgb, var(--info) 26%, transparent);
+}
+
+/* ---------- 按钮（CimButton 的唯一视觉来源）----------
+   本段原样搬自三个应用的 styles.css（三份 62 行逐字节相同，2026-11-12 实测）。
+   CimButton 不再渲染 antd Button，而是渲染原生 <button className="btn ...">，
+   目的是让「用组件」与「视觉零变化」同时成立：站内 171 处手写按钮本来就是这套
+   视觉，改组件去迁就它们只需一处，而改 171 处去迁就 antd 是一次全站改版。
+
+   层级：.btn 主色 / .btn-ghost 次要 / .btn-danger 危险 / .btn-text 纯文字
+   尺寸：.btn-sm；另有 .btn-block 撑满。
+
+   ⚠️ 选择器是 `button, .btn` 而不是 `.btn`：这是原设计——所有原生 <button> 默认即
+   主色按钮外观，`.btn-ghost` / `.btn-sm` 等只做修饰。所以页面里常见的
+   `<button className="btn-ghost btn-sm">`（**没有** `.btn` 基类）也能正常显示。
+   拆成单独的 `.btn` 会让全部手写按钮退回浏览器默认外观（本轮已实测踩到一次，
+   连带把后续 `.row` 等规则吞成同一组选择器）。 */
+button,
+/* `.btn`：链接式按钮（`<a>`/`<Link>` 需要与 button 同观感，如 403/404 页的「返回概览」） */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.14s ease;
+  text-decoration: none;
+}
+button:hover:not(:disabled),
+.btn:hover {
+  background: var(--primary-d);
+}
+button:active:not(:disabled),
+.btn:active {
+  transform: translateY(1px);
+}
+button:focus-visible,
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: var(--panel);
+  color: var(--text-2);
+  border-color: var(--line-strong);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.btn-danger {
+  background: transparent;
+  color: var(--err);
+  border-color: var(--line-strong);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--err-soft);
+  border-color: transparent;
+}
+.btn-sm {
+  padding: 4px 9px;
+  font-size: var(--fs-xs);
+  border-radius: 4px;
+}
+.btn-block {
+  width: 100%;
+}
+
+/* 纯文字按钮（对应 antd 的 type="text" / "link"）：无底无边，hover 只变底色。 */
+.btn-text {
+  background: transparent;
+  color: var(--text-2);
+  border-color: transparent;
+}
+.btn-text:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--text);
+}
+
+/* 只有图标：压成方形，避免出现「一个图标的宽按钮」。 */
+.btn-icon-only {
+  padding: 6px 7px;
+}
+
+/* 忙碌态：.btn 体系原本用 disabled 表达，antd 用户习惯 loading 转圈，保留后者。
+   spinner 用 currentColor，因此三种层级下都自动配色。 */
+.btn[data-loading='true'] {
+  cursor: progress;
+}
+.btn-spinner {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: cim-btn-spin 0.6s linear infinite;
+}
+@keyframes cim-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* ---------- 表单项（CimField）----------
+   原 `.field / .field-label / .field-hint` 段（三份应用 styles.css 逐字节相同）
+   在此落地为 `.cim-field*`。**此前 CimField 组件已存在但 ui.css 里没有任何
+   `.cim-field` 样式**——它是个没被用过的空壳，页面只能继续手写 `.field`。
+   组件化不了的根因常常不是组件没写，而是样式没跟着上来。 */
+.cim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.cim-field + .cim-field {
+  margin-top: 11px;
+}
+.cim-field-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* 标签内的「必填/可选」小字：退回正文体、取消大写与字距（原 `.field-label .opt`） */
+.cim-field-label .opt {
+  margin-left: 5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+/* 必填星号：贴在本行内，不参与 letter-spacing 的大写转换 */
+.cim-req {
+  margin-left: 3px;
+  color: var(--err);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.cim-field-control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cim-field-hint {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.cim-field-error {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--err);
+}
+/* 标签在左（layout="left"）：标签固定宽度，控件占满剩余 */
+.cim-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }

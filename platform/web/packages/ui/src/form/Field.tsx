@@ -11,7 +11,7 @@
 // </CimField>
 // ```
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useUiLabel } from '../locale';
 
 export interface CimFieldProps {
@@ -31,6 +31,12 @@ export interface CimFieldProps {
   htmlFor?: string;
   children: ReactNode;
   className?: string;
+  /**
+   * 就地微调（`marginTop` / `padding`）。存量调用点里常见
+   * `style={{ marginTop: 10 }}`、`style={{ padding: '0 10px' }}`，
+   * 都是因为外层容器不同；要求为此包一层 div 只会让 DOM 更深，故透传。
+   */
+  style?: CSSProperties;
 }
 
 export function CimField({
@@ -46,6 +52,7 @@ export function CimField({
   htmlFor,
   children,
   className,
+  style,
 }: CimFieldProps) {
   const t = useUiLabel();
   const text = labelKey ? t(labelKey, labelKey) : label;
@@ -60,7 +67,7 @@ export function CimField({
       ]
         .filter(Boolean)
         .join(' ')}
-      style={span ? { gridColumn: `span ${span}` } : undefined}
+      style={{ ...style, ...(span ? { gridColumn: `span ${span}` } : null) }}
     >
       {text ? (
         <label

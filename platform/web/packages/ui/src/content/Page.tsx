@@ -118,25 +118,44 @@ export function Toolbar({
   );
 }
 
-/** 空态：一句话说明 + 可选引导。不放置插画（产线屏幕不需要，也省体积）。 */
+/**
+ * 空态：一句话说明 + 可选引导。不放置插画（产线屏幕不需要，也省体积）。
+ *
+ * <p>`icon` / `children` / `large` 是为**整页状态页**（403 / 404 / 占位页）加的：
+ * 这类页面此前在三个应用里各写一套——iam 用 `.panel > .panel-body > .empty`、
+ * rms 用 `.empty-state > .empty-icon`、approval 用 `.page > .empty-state`，
+ * 三份的图标尺寸、标题字号、返回按钮间距都不一致。统一到这里后，
+ * 状态页只需 `Page + Panel + EmptyState`。</p>
+ */
 export function EmptyState({
   titleKey,
   title,
   hintKey,
   hint,
+  icon,
+  children,
+  large = false,
 }: {
   titleKey?: string;
   title?: ReactNode;
   hintKey?: string;
   hint?: ReactNode;
+  /** 顶部图标（整页状态页用；列表内空态通常不需要）。 */
+  icon?: ReactNode;
+  /** 底部动作区（返回首页 / 重试）。 */
+  children?: ReactNode;
+  /** 大号形态：整页状态页（图标更大、留白更多）。 */
+  large?: boolean;
 }) {
   const t = useUiT();
   const main = titleKey ? t(titleKey) : title;
   const sub = hintKey ? t(hintKey) : hint;
   return (
-    <div className="cim-empty">
+    <div className={large ? 'cim-empty cim-empty-lg' : 'cim-empty'}>
+      {icon ? <div className="cim-empty-icon">{icon}</div> : null}
       {main ? <div className="cim-empty-title">{main}</div> : null}
       {sub ? <div className="cim-empty-hint">{sub}</div> : null}
+      {children ? <div className="cim-empty-actions">{children}</div> : null}
     </div>
   );
 }
