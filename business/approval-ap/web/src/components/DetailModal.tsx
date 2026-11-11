@@ -15,6 +15,7 @@ import {
   type DataTableColumn,
   type DescItem,
   type InfoItem,
+  StatusTag,
 } from '@cim/ui';
 import CompleteModal from '@/components/CompleteModal';
 import { DisplayFields } from '@/components/DisplayFields';
@@ -135,9 +136,6 @@ const ACTION_TONE: Record<string, StatusTone> = {
   CALLBACK_FAILED: 'err',
 };
 
-/** 实例状态 → 语义档。 */
-const STATUS_TONE: Record<string, StatusTone> = { ACTIVE: 'run', COMPLETED: 'ok', WITHDRAWN: 'warn' };
-
 /** 审批详情弹窗：基本信息 / 审批内容 / 当前待办 / 附件 / 审批历史。
  *  <p>详情内直达操作：办理人可审批（通过/驳回），发起人可催办/撤回——消除「关弹窗回列表」断点。</p> */
 export default function DetailModal({
@@ -243,13 +241,18 @@ export default function DetailModal({
   const basicItems = useMemo<Array<DescItem<never>>>(() => {
     if (!detail) return [];
     const tags = [
-      <CimTag key="s" tone={STATUS_TONE[detail.status] ?? 'idle'}>
-        {detail.status === 'ACTIVE'
-          ? t('detail.statusActive')
-          : detail.status === 'WITHDRAWN'
-            ? t('detail.statusWithdrawn')
-            : t('detail.statusCompleted')}
-      </CimTag>,
+      <StatusTag
+        key="s"
+        dict="approvalState"
+        value={detail.status}
+        label={
+          detail.status === 'ACTIVE'
+            ? t('detail.statusActive')
+            : detail.status === 'WITHDRAWN'
+              ? t('detail.statusWithdrawn')
+              : t('detail.statusCompleted')
+        }
+      />,
     ];
     if (detail.round != null && detail.round > 1) {
       tags.push(

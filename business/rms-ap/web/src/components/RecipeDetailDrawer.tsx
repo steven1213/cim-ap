@@ -21,6 +21,7 @@ import {
   InlineAlert,
   CimField,
   CimInput,
+  StatusTag,
 } from '@cim/ui';
 import SpecEditModal from '@/components/SpecEditModal';
 import * as api from '@/lib/rmsApi';
@@ -55,14 +56,6 @@ function base64ToUtf8(b64: string): string {
 function shortHash(h: string | null | undefined): string {
   if (!h) return '—';
   return h.length <= 20 ? h : `${h.slice(0, 8)}…${h.slice(-8)}`;
-}
-
-/** 版本状态 → 语义档（与 @cim/theme 的 recipeState 口径一致）。 */
-function statusTone(status: string | undefined) {
-  if (status === 'ACTIVE') return 'ok' as const;
-  if (status === 'PENDING_SIGN') return 'warn' as const;
-  if (status === 'DRAFT') return 'run' as const;
-  return 'idle' as const;
 }
 
 /** 规格值摘要（与规格参数页同规则）。 */
@@ -274,9 +267,12 @@ export default function RecipeDetailDrawer({
         render: (v) => (
           <>
             <span className="cim-mono">v{v.versionNo}</span>{' '}
-            <CimTag size="small" tone={statusTone(v.status)}>
-              {t('rms.recipe.status.' + v.status, { defaultValue: v.status })}
-            </CimTag>
+            <StatusTag
+              size="small"
+              dict="recipeState"
+              value={v.status}
+              label={t('rms.recipe.status.' + v.status, { defaultValue: v.status })}
+            />
           </>
         ),
       },

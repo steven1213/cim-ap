@@ -16,6 +16,7 @@ import {
   type FormField,
   CimButton,
   InlineAlert,
+  CimSplitPane,
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import { changeLanguage, currentLang } from '@/lib/i18n';
@@ -467,7 +468,7 @@ export default function I18nAdminPage() {
 
   return (
     <Page>
-      <div className="split">
+      <CimSplitPane>
         <Panel
           className="scroll-y"
           title={t('iam.admin.i18n.locales')}
@@ -669,7 +670,7 @@ export default function I18nAdminPage() {
             ) : null}
           </Panel>
         </div>
-      </div>
+      </CimSplitPane>
 
       <CimModal
         open={!!localeDraft}

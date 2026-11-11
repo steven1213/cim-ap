@@ -24,7 +24,7 @@ import {
 } from 'react';
 import { toneOf, type StatusTone } from '@cim/theme';
 import { useUiLabel } from './locale';
-import { ToneTag } from './data/StatusTag';
+import { CimTag } from './basic/Tag';
 
 export interface DictItem {
   /** 落库值，如 DRAFT。 */
@@ -186,6 +186,12 @@ export function EnumTag({
   const d = useDict(dict);
   const raw = value ?? '—';
   const text = label ?? (d.items.length ? d.labelOf(raw) : uiLabel(`enum.${dict}.${raw}`, raw));
-  // 用统一的 ToneTag 渲染：语义色只有一处实现（@cim/theme 的 TONE_VAR）
-  return <ToneTag tone={tone ?? d.toneOf(raw)}>{children ?? text}</ToneTag>;
+  // 用 CimTag tone 渲染：语义色只有一处实现（@cim/theme 的 TONE_VAR）。
+  // `cim-status-tag` 类必须带上——`.cim-status-tag.ant-tag` 定义了圆角/字号/内边距，
+  // 原来它由已删除的 ToneTag 自带，换成 CimTag 后要显式传。
+  return (
+    <CimTag className="cim-status-tag" tone={tone ?? d.toneOf(raw)}>
+      {children ?? text}
+    </CimTag>
+  );
 }

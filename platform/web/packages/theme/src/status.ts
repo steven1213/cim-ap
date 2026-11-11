@@ -33,11 +33,23 @@ export const TONE_SOFT_VAR: Record<StatusTone, string> = {
 /**
  * 域 → 枚举值 → 语义档。
  *
- * 依据：
- * - `recipeState`：RMS 配方版本状态（DRAFT / PENDING_SIGN / ACTIVE / OBSOLETE）
- * - `downloadStage`：RMS IF-E2 下发阶段，见服务端 `DownloadStage`
- *   （QUEUED → GRANTED → SENT_TO_TOOL → TOOL_ACKED → VERIFIED / FAILED）
- * - `approvalState`：approval-ap 实例状态（RUNNING / APPROVED / REJECTED / WITHDRAWN / RETURNED）
+ * 依据（**每条都能在代码里指到出处**，这是本表唯一的准入标准）：
+ * - `recipeState`：RMS `RecipeVersionStatus`（DRAFT / PENDING_SIGN / ACTIVE / OBSOLETE）。
+ * - `downloadStage`：RMS IF-E2 下发阶段 `DownloadStage`
+ *   （QUEUED → GRANTED → SENT_TO_TOOL → TOOL_ACKED → VERIFIED / FAILED）。
+ * - `signoffState`：RMS `SignoffStatus`（PENDING / APPROVED / REJECTED）。
+ * - `approvalState`：approval-ap 流程实例状态——服务端 `ApprovalProcessService` 里按
+ *   `running ? "ACTIVE" : (deleteReason != null ? "WITHDRAWN" : "COMPLETED")` 产出，
+ *   即 **ACTIVE / COMPLETED / WITHDRAWN**。
+ * - `bypassState`：RMS `Bypass['status']`（ACTIVE / SCHEDULED / EXPIRED / REVOKED）。
+ * - `overrideState`：RMS 资格矩阵 `Qualification.status` 与黄金覆盖 `GoldenOverride.status`
+ *   共用（两者枚举与语义相同：PENDING / APPROVED / REJECTED 的审批结论）。
+ *
+ * ⚠️ **2026-11-12 修正**：`approvalState` 原先登记为
+ * RUNNING / APPROVED / REJECTED / RETURNED —— 那是 Flowable 的结束事件语义，
+ * 不是本 ap 的实例状态，与后端实际产出**不符**（值全错、多两个不存在的值）。
+ * 同时 `RecipeDetailDrawer` 自己写了份 `DRAFT → run`，与本表的 `DRAFT → idle` 分叉。
+ * 这类「表里写一套、页面写另一套」的错误比没有表更难查，所以下面只留核实过的值。
  */
 export const STATUS_TONES: Record<string, Record<string, StatusTone>> = {
   recipeState: {
@@ -54,12 +66,33 @@ export const STATUS_TONES: Record<string, Record<string, StatusTone>> = {
     VERIFIED: 'ok',
     FAILED: 'err',
   },
-  approvalState: {
-    RUNNING: 'run',
+  signoffState: {
+    PENDING: 'warn',
     APPROVED: 'ok',
     REJECTED: 'err',
-    WITHDRAWN: 'idle',
-    RETURNED: 'warn',
+  },
+  approvalState: {
+    ACTIVE: 'run',
+    COMPLETED: 'ok',
+    WITHDRAWN: 'warn',
+  },
+  bypassState: {
+    ACTIVE: 'ok',
+    // 已排期未生效：给「需关注」的橙，与 ACTIVE 的绿拉开，避免现场把未生效当已生效
+    SCHEDULED: 'warn',
+    EXPIRED: 'err',
+    REVOKED: 'err',
+  },
+  overrideState: {
+    PENDING: 'warn',
+    APPROVED: 'ok',
+    REJECTED: 'err',
+  },
+  /** 签核单上的「预设限时放行」窗口状态；`NONE` = 未预设（页面据此显示占位符而非标签）。 */
+  tempReleaseState: {
+    NONE: 'idle',
+    ACTIVE: 'ok',
+    EXPIRED: 'err',
   },
 };
 

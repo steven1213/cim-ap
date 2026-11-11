@@ -21,6 +21,7 @@ import {
   KpiCard,
   CimField,
   CimInput,
+  StatusTag,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { BatchDownloadModal, BatchHoldModal } from '@/components/BatchOpsModal';
@@ -71,13 +72,6 @@ const EVT_TYPE_OPTIONS = [
 ];
 
 const CHANGE_TYPE_OPTIONS = ['CREATED', 'EDITED', 'DELETED'].map((v) => ({ value: v, label: v }));
-
-/** 下发阶段 → 语义档。 */
-function stageTone(stage: string): StatusTone {
-  if (stage === 'VERIFIED') return 'ok';
-  if (stage === 'FAILED') return 'err';
-  return 'warn';
-}
 
 /** 阶段机的合法下一步（与后端 DownloadStage.canMoveTo 对齐）。 */
 function nextStage(stage: string): string | null {
@@ -959,9 +953,7 @@ function DownloadPanel({
         titleKey: 'rms.integration.dl.stage',
         width: 140,
         render: (x) => (
-          <CimTag size="small" tone={stageTone(x.stage)}>
-            {x.stage}
-          </CimTag>
+          <StatusTag size="small" dict="downloadStage" value={x.stage} />
         ),
       },
       {

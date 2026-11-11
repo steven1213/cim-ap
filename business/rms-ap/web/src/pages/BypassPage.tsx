@@ -4,7 +4,6 @@ import { useResource } from '@cim/data';
 import {
   Can,
   CimModal,
-  CimTag,
   DataTable,
   FormGrid,
   Page,
@@ -14,6 +13,7 @@ import {
   type DataTableColumn,
   type FormField,
   CimButton,
+  StatusTag,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { BYPASS_MANAGE } from '@/lib/permCodes';
@@ -63,9 +63,6 @@ export default function BypassPage() {
     refresh();
   };
 
-  const statusTone = (s: Bypass['status']) =>
-    s === 'ACTIVE' ? 'ok' : s === 'EXPIRED' || s === 'REVOKED' ? 'err' : 'warn';
-
   const columns = useMemo<Array<DataTableColumn<Bypass>>>(
     () => [
       {
@@ -96,7 +93,7 @@ export default function BypassPage() {
         titleKey: 'rms.bypass.status',
         width: 100,
         render: (r) => (
-          <CimTag tone={statusTone(r.status)}>{t(`rms.bypass.status.${r.status}`)}</CimTag>
+          <StatusTag dict="bypassState" value={r.status} label={t(`rms.bypass.status.${r.status}`)} />
         ),
       },
       {

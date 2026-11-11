@@ -13,6 +13,7 @@ import {
   CimButton,
   InlineAlert,
   CimField,
+  CimSplitPane,
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
@@ -167,7 +168,7 @@ export default function PermissionsAdminPage() {
 
   return (
     <Page>
-      <div className="split">
+      <CimSplitPane>
         <Panel
           className="scroll-y"
           title={t('iam.admin.perms.count')}
@@ -311,7 +312,7 @@ export default function PermissionsAdminPage() {
             </Panel>
           )}
         </div>
-      </div>
+      </CimSplitPane>
     </Page>
   );
 }

@@ -14,6 +14,7 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+  CimSplitPane,
 } from '@cim/ui';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
 import * as api from '@/lib/rmsApi';
@@ -302,7 +303,7 @@ export default function DeviceRecipePage() {
     <Page>
       <PageHead titleKey="rms.deviceRecipes.title" subtitleKey="rms.deviceRecipes.sub" />
 
-      <div className="split">
+      <CimSplitPane>
         <Panel
           titleKey="rms.deviceRecipes.areas"
           flush
@@ -376,7 +377,7 @@ export default function DeviceRecipePage() {
             onRowClick={(r) => void openDetail(r)}
           />
         </Panel>
-      </div>
+      </CimSplitPane>
 
       {detail && (
         <RecipeDetailDrawer

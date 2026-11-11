@@ -16,6 +16,7 @@ import {
   type FormOption,
   CimButton,
   InlineAlert,
+  CimSplitPane,
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, SysMenuDto, MenuNodeType } from '@/types';
@@ -328,7 +329,7 @@ export default function MenusAdminPage() {
 
   return (
     <Page>
-      <div className="split">
+      <CimSplitPane>
         <Panel
           className="scroll-y"
           title={t('iam.admin.menus.tree')}
@@ -449,7 +450,7 @@ export default function MenusAdminPage() {
             </Panel>
           )}
         </div>
-      </div>
+      </CimSplitPane>
     </Page>
   );
 }

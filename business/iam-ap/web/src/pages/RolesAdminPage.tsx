@@ -18,6 +18,7 @@ import {
   type TabItem,
   CimButton,
   InlineAlert,
+  CimSplitPane,
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '@/types';
@@ -535,7 +536,7 @@ export default function RolesAdminPage() {
 
   return (
     <Page>
-      <div className="split">
+      <CimSplitPane>
         <Panel
           className="scroll-y"
           title={t('iam.admin.roles.list')}
@@ -580,7 +581,7 @@ export default function RolesAdminPage() {
             </Panel>
           )}
         </div>
-      </div>
+      </CimSplitPane>
     </Page>
   );
 }

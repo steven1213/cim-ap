@@ -10,9 +10,9 @@ import {
   Panel,
   useConfirm,
   useToast,
+  StatusTag,
   type DataTableColumn,
 } from '@cim/ui';
-import type { StatusTone } from '@cim/theme';
 import DetailModal from '@/components/DetailModal';
 import { IconBell, IconSearch, IconShield, IconUndo } from '@/components/Icons';
 import { DisplayFields } from '@/components/DisplayFields';
@@ -22,13 +22,6 @@ import { fmtDate, fmtOverdue } from '@/lib/format';
 import type { ProcessInstanceView } from '@/types';
 
 const PAGE_SIZE = 20;
-
-/** 实例状态 → 语义档（4 档，没有「任意颜色」）。 */
-const STATUS_TONE: Record<string, StatusTone> = {
-  ACTIVE: 'run',
-  COMPLETED: 'ok',
-  WITHDRAWN: 'warn',
-};
 
 export default function InitiatedPage() {
   const { t } = useTranslation();
@@ -113,7 +106,7 @@ export default function InitiatedPage() {
       width: 220,
       render: (pi) => (
         <span className="cell-inline">
-          <CimTag tone={STATUS_TONE[pi.status] ?? 'run'}>{t('init.status.' + pi.status)}</CimTag>
+          <StatusTag dict="approvalState" value={pi.status} label={t('init.status.' + pi.status)} />
           {pi.round != null && pi.round > 1 && <CimTag tone="run">{t('init.roundBadge', { n: pi.round })}</CimTag>}
           {pi.awaitingResubmit && <CimTag tone="warn">{t('init.awaitingResubmit')}</CimTag>}
           {pi.overdueMinutes != null && (

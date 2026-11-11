@@ -25,8 +25,8 @@ import {
   InlineAlert,
   KpiCard,
   CimField,
+  StatusTag,
 } from '@cim/ui';
-import type { StatusTone } from '@cim/theme';
 import DiffTable from '@/components/DiffTable';
 import * as api from '@/lib/rmsApi';
 import type {
@@ -55,20 +55,6 @@ const ROUTE_OPTIONS = [
   { value: 'COUNTERSIGN', labelKey: 'rms.signoff.route.COUNTERSIGN' },
   { value: 'ANY', labelKey: 'rms.signoff.route.ANY' },
 ];
-
-/** 签核状态 → 语义档。 */
-function statusTone(s: string): StatusTone {
-  if (s === 'APPROVED') return 'ok';
-  if (s === 'REJECTED') return 'err';
-  return 'warn';
-}
-
-/** 限时放行状态 → 语义档。 */
-function tempTone(s: string): StatusTone {
-  if (s === 'ACTIVE') return 'ok';
-  if (s === 'EXPIRED') return 'err';
-  return 'idle';
-}
 
 /**
  * 签核流（Req.md FR-L2/L4/L5、Req 3/20/41）：待办 KPI + 审批队列 + 批量决策 +
@@ -207,9 +193,12 @@ export default function SignoffPage() {
         titleKey: 'rms.common.status',
         width: 100,
         render: (r) => (
-          <CimTag size="small" tone={statusTone(r.status)}>
-            {t('rms.signoff.' + r.status.toLowerCase(), { defaultValue: r.status })}
-          </CimTag>
+          <StatusTag
+            size="small"
+            dict="signoffState"
+            value={r.status}
+            label={t('rms.signoff.' + r.status.toLowerCase(), { defaultValue: r.status })}
+          />
         ),
       },
       {
@@ -218,9 +207,12 @@ export default function SignoffPage() {
         width: 110,
         render: (r) =>
           r.tempAllowStatus !== 'NONE' ? (
-            <CimTag size="small" tone={tempTone(r.tempAllowStatus)}>
-              {t('rms.signoff.tempStatus.' + r.tempAllowStatus, { defaultValue: r.tempAllowStatus })}
-            </CimTag>
+            <StatusTag
+            size="small"
+            dict="tempReleaseState"
+            value={r.tempAllowStatus}
+            label={t('rms.signoff.tempStatus.' + r.tempAllowStatus, { defaultValue: r.tempAllowStatus })}
+          />
           ) : (
             <span className="dim">{t('rms.common.dash')}</span>
           ),
@@ -791,9 +783,12 @@ function DetailDrawer({ id, onClose }: { id: string | null; onClose: () => void 
         key: 'status',
         labelKey: 'rms.common.status',
         render: (d) => (
-          <CimTag size="small" tone={statusTone(d.status)}>
-            {t('rms.signoff.' + d.status.toLowerCase(), { defaultValue: d.status })}
-          </CimTag>
+          <StatusTag
+            size="small"
+            dict="signoffState"
+            value={d.status}
+            label={t('rms.signoff.' + d.status.toLowerCase(), { defaultValue: d.status })}
+          />
         ),
       },
       {
@@ -840,9 +835,12 @@ function DetailDrawer({ id, onClose }: { id: string | null; onClose: () => void 
         span: 3,
         render: (d) => (
           <>
-            <CimTag size="small" tone={tempTone(d.tempAllowStatus)}>
-              {t('rms.signoff.tempStatus.' + d.tempAllowStatus, { defaultValue: d.tempAllowStatus })}
-            </CimTag>
+            <StatusTag
+            size="small"
+            dict="tempReleaseState"
+            value={d.tempAllowStatus}
+            label={t('rms.signoff.tempStatus.' + d.tempAllowStatus, { defaultValue: d.tempAllowStatus })}
+          />
             {d.tempAllowTo ? (
               <span className="dim"> · {t('rms.signoff.tempUntil', { t: d.tempAllowTo })}</span>
             ) : null}

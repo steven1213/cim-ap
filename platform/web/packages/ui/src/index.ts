@@ -46,7 +46,7 @@ export { CimScrollArea, type CimScrollAreaProps } from './content/ScrollArea';
 
 // ── data 数据展示 ───────────────────────────────────────────────
 export { DataTable, type DataTableColumn, type DataTableProps, type SortDir } from './data/DataTable';
-export { StatusTag, ToneTag } from './data/StatusTag';
+export { StatusTag } from './data/StatusTag';
 export { KpiCard, KpiGrid, type KpiCardProps, type KpiTone } from './data/KpiCard';
 export { useColumns, type ColumnMeta, type ColumnState } from './data/useColumns';
 export { CimDescriptions, type DescItem, type CimDescriptionsProps } from './data/Descriptions';
@@ -89,6 +89,7 @@ export { CimPopconfirm, type CimPopconfirmProps } from './feedback/Popconfirm';
 export { CimPopover, type CimPopoverProps } from './feedback/Popover';
 
 // ── layout 布局 ────────────────────────────────────────────────
+export { CimSplitPane, type CimSplitPaneProps } from './layout/SplitPane';
 export {
   CimSplitter,
   type CimSplitterProps,
@@ -111,6 +112,7 @@ export {
   IconAlert,
   IconCheckCircle,
   IconInbox,
+  IconBell,
   IconRefresh,
   IconEye,
   IconEyeOff,

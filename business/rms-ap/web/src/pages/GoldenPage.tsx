@@ -4,7 +4,6 @@ import { useResource } from '@cim/data';
 import {
   Can,
   CimModal,
-  CimTag,
   DataTable,
   FormGrid,
   Page,
@@ -14,6 +13,7 @@ import {
   type DataTableColumn,
   type FormField,
   CimButton,
+  StatusTag,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { GOLDEN_MANAGE } from '@/lib/permCodes';
@@ -64,9 +64,6 @@ export default function GoldenPage() {
     refresh();
   };
 
-  const statusTone = (s: GoldenOverride['status']) =>
-    s === 'APPROVED' ? 'ok' : s === 'REJECTED' ? 'err' : 'warn';
-
   const columns = useMemo<Array<DataTableColumn<GoldenOverride>>>(
     () => [
       {
@@ -107,7 +104,7 @@ export default function GoldenPage() {
         titleKey: 'rms.golden.status',
         width: 100,
         render: (r) => (
-          <CimTag tone={statusTone(r.status)}>{t(`rms.golden.status.${r.status}`)}</CimTag>
+          <StatusTag dict="overrideState" value={r.status} label={t(`rms.golden.status.${r.status}`)} />
         ),
       },
       {

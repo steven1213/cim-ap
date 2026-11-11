@@ -16,6 +16,7 @@ import {
   CimButton,
   InlineAlert,
   CimField,
+  CimSplitPane,
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
@@ -271,7 +272,7 @@ export default function OrgPage() {
 
   return (
     <Page>
-      <div className="split">
+      <CimSplitPane>
         <Panel
           className="scroll-y"
           title={t('iam.orgs.title')}
@@ -475,7 +476,7 @@ export default function OrgPage() {
             </>
           )}
         </Panel>
-      </div>
+      </CimSplitPane>
 
       {showCreate && (
         <Panel title={t('iam.orgs.newTitle')} sub={t('iam.orgs.newSub')}>

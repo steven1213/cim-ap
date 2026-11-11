@@ -147,6 +147,22 @@ export function IconInbox(p: IconProps) {
   );
 }
 
+/**
+ * 通知铃（顶栏）。
+ *
+ * <p>取 RMS 那版的画法。approval 原本另有一版（线条更圆），但它只是同一个
+ * 「铃铛」语义的另一种画法，且 approval 的图标集本就属于「不强合并」的负向清单；
+ * 铃铛随 `NotificationBell` 组件上提后，共用一份比在组件里留一个 `icon` prop 更简单。</p>
+ */
+export function IconBell(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 16.5v-5.2a6 6 0 0 1 12 0v5.2l1.6 2.5H4.4L6 16.5z" />
+      <path d="M10 21a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
 export function IconRefresh(p: IconProps) {
   return (
     <svg {...base} {...p}>
