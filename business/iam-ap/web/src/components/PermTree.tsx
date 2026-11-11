@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { MenuTreeNode, SysPermissionDto } from '@/types';
 import { IconChevron } from '@/components/Icons';
 
+import { CimButton } from '@cim/ui';
 /**
  * 权限点树（权限管理 / 角色授权共用）——与菜单树**同构**的 DIR → MENU → BUTTON 三层树。
  *
@@ -259,8 +260,9 @@ export default function PermTree({
         <div className="ptree-node" key={m.id}>
           <div className={'ptree-row is-page' + (active ? ' on' : '')}>
             {btns.length ? (
-              <button
-                type="button"
+              <CimButton
+                type="primary"
+                htmlType="button"
                 className={'tree-toggle' + (open ? ' open' : '')}
                 aria-expanded={open}
                 onClick={(e) => {
@@ -269,7 +271,7 @@ export default function PermTree({
                 }}
               >
                 <IconChevron width={11} height={11} />
-              </button>
+              </CimButton>
             ) : (
               <span className="tree-toggle hollow" />
             )}

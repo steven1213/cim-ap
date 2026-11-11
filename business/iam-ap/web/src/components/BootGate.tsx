@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import { IconAlert } from '@/components/Icons';
 
+import { CimButton } from '@cim/ui';
 /**
  * 启动数据闸门：登录态下，先取齐「菜单树 + 权限码集」再渲染控制台。
  *
@@ -64,7 +65,7 @@ export default function BootGate({ children }: { children: ReactNode }) {
               <IconAlert width={28} height={28} />
               <b>{t('iam.common.menuFailed')}</b>
               <p>{error}</p>
-              <button onClick={() => setAttempt((v) => v + 1)}>{t('iam.common.retry')}</button>
+              <CimButton type="primary" onClick={() => setAttempt((v) => v + 1)}>{t('iam.common.retry')}</CimButton>
             </div>
           </div>
         </div>

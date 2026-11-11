@@ -11,7 +11,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,} from '@cim/ui';
+  type DataTableColumn,
+  CimButton,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode } from '@/types';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
@@ -376,31 +379,31 @@ export default function UsersPage() {
         render: (r) => (
           <div className="cell-actions">
             <Can perm={USER_UPDATE}>
-              <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
+              <CimButton size="small" onClick={() => openProfile(r)}>
                 <IconEdit width={13} height={13} />
                 {t('iam.users.btnProfile')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm={USER_ORGS}>
-              <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
+              <CimButton size="small" onClick={() => openOrgs(r)}>
                 <IconTree width={13} height={13} />
                 {t('iam.users.btnOrgs')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm={USER_STATUS}>
-              <button
-                className="btn-ghost btn-sm"
+              <CimButton
+                size="small"
                 disabled={toggling === r.userId}
                 onClick={() => void onToggleStatus(r)}
               >
                 {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
                 {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
-              </button>
+              </CimButton>
             </Can>
             {r.hasCredential && (
               <Can perm={USER_RESET_PWD}>
-                <button
-                  className="btn-ghost btn-sm"
+                <CimButton
+                  size="small"
                   onClick={() => {
                     setTarget(r);
                     setRp('');
@@ -409,25 +412,26 @@ export default function UsersPage() {
                 >
                   <IconKey width={13} height={13} />
                   {t('iam.users.btnReset')}
-                </button>
+                </CimButton>
               </Can>
             )}
             {r.locked && (
               <Can perm={USER_UNLOCK}>
-                <button className="btn-ghost btn-sm" onClick={() => void onUnlock(r)}>
+                <CimButton size="small" onClick={() => void onUnlock(r)}>
                   <IconKey width={13} height={13} />
                   {t('iam.users.btnUnlock')}
-                </button>
+                </CimButton>
               </Can>
             )}
             <Can perm={USER_DELETE}>
-              <button
-                className="btn-danger btn-sm"
+              <CimButton
+                danger
+                size="small"
                 onClick={() => void onDelete(r)}
                 disabled={!r.hasCredential}
               >
                 <IconTrash width={13} height={13} />
-              </button>
+              </CimButton>
             </Can>
           </div>
         ),
@@ -449,8 +453,9 @@ export default function UsersPage() {
             {adCount > 0 && <CimTag tone="run">{t('iam.users.adSynced', { n: adCount })}</CimTag>}
             {locked > 0 && <CimTag tone="err">{t('iam.users.locked', { n: locked })}</CimTag>}
             <Can perm={USER_CREATE}>
-              <button
-                className="btn-sm"
+              <CimButton
+                type="primary"
+                size="small"
                 onClick={() => {
                   setPanel('create');
                   setTarget(null);
@@ -458,7 +463,7 @@ export default function UsersPage() {
               >
                 <IconPlus width={13} height={13} />
                 {t('iam.users.newAccount')}
-              </button>
+              </CimButton>
             </Can>
           </>
         }
@@ -488,16 +493,10 @@ export default function UsersPage() {
       {panel === 'create' && (
         <Panel title={t('iam.users.createTitle')} sub={t('iam.users.createSub')}>
           <div className="row">
-            <div className="field">
-              <label className="field-label" htmlFor="nu">
-                {t('iam.users.f.username')}
-              </label>
+            <CimField label={t('iam.users.f.username')} htmlFor="nu">
               <CimInput id="nu" mono placeholder="operator01" value={nu} onChange={setNu} width={180} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="np">
-                {t('iam.users.f.password')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.password')} htmlFor="np">
               <CimInput
                 id="np"
                 password
@@ -506,31 +505,22 @@ export default function UsersPage() {
                 onChange={setNp}
                 width={200}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="nd">
-                {t('iam.users.f.name')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.name')} htmlFor="nd">
               <CimInput id="nd" placeholder={t('iam.users.phName')} value={nd} onChange={setNd} width={160} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="ne">
-                {t('iam.users.f.empNo')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.empNo')} htmlFor="ne">
               <CimInput id="ne" mono placeholder="1001" value={ne} onChange={setNe} width={130} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="nj">
-                {t('iam.users.f.job')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.job')} htmlFor="nj">
               <CimInput id="nj" placeholder={t('iam.users.phJob')} value={nj} onChange={setNj} width={160} />
-            </div>
-            <button type="button" disabled={busy || !nu.trim() || !np} onClick={() => void onCreate()}>
+            </CimField>
+            <CimButton type="primary" htmlType="button" disabled={busy || !nu.trim() || !np} onClick={() => void onCreate()}>
               {busy ? t('iam.users.creating') : t('iam.users.createSubmit')}
-            </button>
-            <button type="button" className="btn-ghost" onClick={closePanel}>
+            </CimButton>
+            <CimButton htmlType="button" onClick={closePanel}>
               {t('iam.users.cancel')}
-            </button>
+            </CimButton>
           </div>
           <p className="hint">{t('iam.users.createHint')}</p>
         </Panel>
@@ -539,10 +529,7 @@ export default function UsersPage() {
       {panel === 'reset' && target && (
         <Panel title={t('iam.users.resetTitle', { id: target.userId })} sub={t('iam.users.resetSub')}>
           <div className="row">
-            <div className="field">
-              <label className="field-label" htmlFor="rp">
-                {t('iam.users.resetNew')}
-              </label>
+            <CimField label={t('iam.users.resetNew')} htmlFor="rp">
               <CimInput
                 id="rp"
                 password
@@ -552,13 +539,13 @@ export default function UsersPage() {
                 width={220}
                 onEnter={() => void onReset()}
               />
-            </div>
-            <button type="button" disabled={busy || !rp} onClick={() => void onReset()}>
+            </CimField>
+            <CimButton type="primary" htmlType="button" disabled={busy || !rp} onClick={() => void onReset()}>
               {busy ? t('iam.users.submitting') : t('iam.users.resetSubmit')}
-            </button>
-            <button type="button" className="btn-ghost" onClick={closePanel}>
+            </CimButton>
+            <CimButton htmlType="button" onClick={closePanel}>
               {t('iam.users.cancel')}
-            </button>
+            </CimButton>
           </div>
         </Panel>
       )}
@@ -569,10 +556,7 @@ export default function UsersPage() {
           sub={target.source === 'AD_SYNCED' ? t('iam.users.profileSubAd') : t('iam.users.profileSubIam')}
         >
           <div className="row">
-            <div className="field">
-              <label className="field-label" htmlFor="pdn">
-                {t('iam.users.f.name')}
-              </label>
+            <CimField label={t('iam.users.f.name')} htmlFor="pdn">
               <CimInput
                 id="pdn"
                 value={edName}
@@ -580,11 +564,8 @@ export default function UsersPage() {
                 disabled={target.source === 'AD_SYNCED'}
                 width={160}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="pem">
-                {t('iam.users.f.email')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.email')} htmlFor="pem">
               <CimInput
                 id="pem"
                 value={edEmail}
@@ -593,11 +574,8 @@ export default function UsersPage() {
                 placeholder="zhangsan@corp.com"
                 width={220}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="pmb">
-                {t('iam.users.f.mobile')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.mobile')} htmlFor="pmb">
               <CimInput
                 id="pmb"
                 value={edMobile}
@@ -605,11 +583,8 @@ export default function UsersPage() {
                 disabled={target.source === 'AD_SYNCED'}
                 width={160}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="pjt">
-                {t('iam.users.f.job')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.users.f.job')} htmlFor="pjt">
               <CimInput
                 id="pjt"
                 value={edJob}
@@ -617,13 +592,13 @@ export default function UsersPage() {
                 placeholder={t('iam.users.phJob')}
                 width={160}
               />
-            </div>
-            <button type="button" disabled={busy} onClick={() => void onSaveProfile()}>
+            </CimField>
+            <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSaveProfile()}>
               {busy ? t('iam.users.saving') : t('iam.users.save')}
-            </button>
-            <button type="button" className="btn-ghost" onClick={closePanel}>
+            </CimButton>
+            <CimButton htmlType="button" onClick={closePanel}>
               {t('iam.users.cancel')}
-            </button>
+            </CimButton>
           </div>
           <p className="hint">
             {t('iam.users.profileHint', { no: target.employeeNo ?? '—', src: originLabel(target.source) })}
@@ -651,10 +626,7 @@ export default function UsersPage() {
             {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
           </div>
           <div className="row" style={{ marginTop: 12 }}>
-            <div className="field">
-              <label className="field-label" htmlFor="prm">
-                {t('iam.users.primaryOrg')}
-              </label>
+            <CimField label={t('iam.users.primaryOrg')} htmlFor="prm">
               <CimSelect
                 id="prm"
                 value={orgPrimary}
@@ -665,13 +637,13 @@ export default function UsersPage() {
                 ]}
                 width={280}
               />
-            </div>
-            <button type="button" disabled={busy} onClick={() => void onSaveOrgs()}>
+            </CimField>
+            <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSaveOrgs()}>
               {busy ? t('iam.users.saving') : t('iam.users.saveOrgs')}
-            </button>
-            <button type="button" className="btn-ghost" onClick={closePanel}>
+            </CimButton>
+            <CimButton htmlType="button" onClick={closePanel}>
               {t('iam.users.cancel')}
-            </button>
+            </CimButton>
           </div>
           <p className="hint">{t('iam.users.orgsHint')}</p>
         </Panel>

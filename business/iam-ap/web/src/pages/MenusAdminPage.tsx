@@ -13,7 +13,10 @@ import {
   useToast,
   type CimTreeNode,
   type FormField,
-  type FormOption,} from '@cim/ui';
+  type FormOption,
+  CimButton,
+  InlineAlert,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, SysMenuDto, MenuNodeType } from '@/types';
 import { useHasAllPermissions } from '@/lib/usePermission';
@@ -317,9 +320,7 @@ export default function MenusAdminPage() {
     return (
       <Page>
         <Panel>
-          <div className="alert warn">
-            <span>{t('iam.common.noPlatformPerm')}</span>
-          </div>
+          <InlineAlert tone="warn">{t('iam.common.noPlatformPerm')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -335,37 +336,36 @@ export default function MenusAdminPage() {
           flush
           actions={
             <>
-              <button
-                className="btn-ghost btn-sm"
+              <CimButton
+                size="small"
                 onClick={() => setExpanded(allExpanded ? [] : allParentIds)}
                 disabled={!allParentIds.length}
               >
                 {allExpanded ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
-              </button>
+              </CimButton>
               <Can perm={[MENU_CREATE, SYS.MENU_SAVE]}>
-                <button
+                <CimButton
+                  bare
                   className="icon-btn"
                   title={t('iam.admin.menus.newRoot')}
                   onClick={() => startCreate(null)}
                 >
                   <IconPlus width={14} height={14} />
-                </button>
+                </CimButton>
               </Can>
-              <button className="btn-ghost btn-sm" onClick={treeRes.refresh} disabled={treeRes.loading}>
+              <CimButton size="small" onClick={treeRes.refresh} disabled={treeRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {treeRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </>
           }
         >
           {treeRes.error ? (
             <div style={{ padding: 14 }}>
-              <div className="alert err">
-                <span>{treeRes.error.message || t('iam.common.loadFailed')}</span>
-              </div>
-              <button className="btn-sm" style={{ marginTop: 10 }} onClick={treeRes.refresh}>
+              <InlineAlert tone="err">{treeRes.error.message || t('iam.common.loadFailed')}</InlineAlert>
+              <CimButton type="primary" size="small" style={{ marginTop: 10 }} onClick={treeRes.refresh}>
                 {t('iam.common.retry')}
-              </button>
+              </CimButton>
             </div>
           ) : treeNodes.length ? (
             <div className="tree-pad">
@@ -395,10 +395,10 @@ export default function MenusAdminPage() {
               sub={draft.id ? t(draft.i18nCode || draft.id) : t('iam.admin.menus.newRoot')}
               actions={
                 canRemove && draft.id ? (
-                  <button className="btn-ghost btn-sm" onClick={onDelete} disabled={busy}>
+                  <CimButton size="small" onClick={onDelete} disabled={busy}>
                     <IconTrash width={13} height={13} />
                     {t('iam.common.delete')}
-                  </button>
+                  </CimButton>
                 ) : undefined
               }
             >
@@ -413,32 +413,32 @@ export default function MenusAdminPage() {
 
               <div className="sub-head" style={{ marginTop: 12 }}>
                 <Can perm={draft.id ? [MENU_UPDATE, SYS.MENU_SAVE] : [MENU_CREATE, SYS.MENU_SAVE]}>
-                  <button type="button" className="btn" onClick={onSave} disabled={busy}>
+                  <CimButton type="primary" htmlType="button" onClick={onSave} disabled={busy}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
-                  </button>
+                  </CimButton>
                 </Can>
                 <Can perm={[MENU_CREATE, SYS.MENU_SAVE]}>
                   {/* 两个「新建」是次要动作，收成一组靠右；否则 .sub-head 的 space-between
                       会把三个按钮拉成三段散点 */}
                   <span className="row">
                     {draft.type !== 'BUTTON' && (
-                      <button
-                        type="button"
-                        className="btn-ghost btn-sm"
+                      <CimButton
+                        size="small"
+                        htmlType="button"
                         onClick={() => startCreate(draft.id || selected?.id || null, 'MENU')}
                       >
                         <IconPlus width={13} height={13} />
                         {t('iam.admin.menus.addChild')}
-                      </button>
+                      </CimButton>
                     )}
-                    <button
-                      type="button"
-                      className="btn-ghost btn-sm"
+                    <CimButton
+                      size="small"
+                      htmlType="button"
                       onClick={() => startCreate(draft.id || selected?.id || null, 'BUTTON')}
                     >
                       <IconPlus width={13} height={13} />
                       {t('iam.type.button')}
-                    </button>
+                    </CimButton>
                   </span>
                 </Can>
               </div>

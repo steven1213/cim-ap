@@ -13,6 +13,7 @@ import {
   Page,
   Panel,
   type DataTableColumn,
+  CimButton,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import * as api from '@/lib/api';
@@ -111,9 +112,9 @@ function AdminOverview() {
       <Page>
         <Panel title={t('iam.dashboard.platformTitle')}>
           <InlineAlert tone="err">{ovRes.error.message || t('iam.dashboard.errLoad')}</InlineAlert>
-          <button className="btn-sm" style={{ marginTop: 12 }} onClick={ovRes.refresh}>
+          <CimButton type="primary" size="small" style={{ marginTop: 12 }} onClick={ovRes.refresh}>
             {t('iam.common.refresh')}
-          </button>
+          </CimButton>
         </Panel>
       </Page>
     );
@@ -149,10 +150,10 @@ function AdminOverview() {
         title={t('iam.dashboard.recentAudit')}
         sub={t('iam.dashboard.recentAuditSub')}
         actions={
-          <button className="btn-ghost btn-sm" onClick={() => navigate('/audit')}>
+          <CimButton size="small" onClick={() => navigate('/audit')}>
             <IconList width={13} height={13} />
             {t('iam.dashboard.viewAll')}
-          </button>
+          </CimButton>
         }
       >
         <DataTable

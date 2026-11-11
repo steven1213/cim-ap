@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { EmptyState, Panel } from '@cim/ui';
 
 /**
  * 占位页：菜单已入库、路由已动态挂载，但页面实现尚未落地时的兜底展示。
@@ -9,16 +10,11 @@ import { useTranslation } from 'react-i18next';
 export default function ComingSoon({ titleKey, descKey }: { titleKey?: string; descKey?: string }) {
   const { t } = useTranslation();
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <h2>{titleKey ? t(titleKey) : t('iam.common.loading')}</h2>
-      </div>
-      <div className="panel-body">
-        <div className="empty">
-          <b>{t('iam.common.wip')}</b>
-          {descKey && <p>{t(descKey)}</p>}
-        </div>
-      </div>
-    </div>
+    <Panel title={titleKey ? t(titleKey) : t('iam.common.loading')}>
+      <EmptyState
+        titleKey="iam.common.wip"
+        hint={descKey ? t(descKey) : undefined}
+      />
+    </Panel>
   );
 }

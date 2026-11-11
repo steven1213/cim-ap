@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { CimInput, CimTag, Page, Panel } from '@cim/ui';
+import { CimField, InlineAlert, CimButton, CimInput, CimTag, Page, Panel } from '@cim/ui';
 import { useAuthStore } from '@/store/authStore';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import * as api from '@/lib/api';
 import type { ChangePasswordRequest, SaltResponse } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
-import { IconAlert, IconTree } from '@/components/Icons';
+import { IconTree } from '@/components/Icons';
 
 /**
  * 自助改密：与登录一致，浏览器内先对旧/新口令做第一层 PBKDF2 派生，仅传 clientHash
@@ -123,10 +123,7 @@ export default function ProfilePage() {
         </Panel>
 
         <Panel title={t('iam.profile.pwdTitle')} sub={t('iam.profile.pwdSub')}>
-          <div className="field">
-            <label className="field-label" htmlFor="pw-old">
-              {t('iam.profile.f.old')}
-            </label>
+          <CimField label={t('iam.profile.f.old')} htmlFor="pw-old">
             <CimInput
               id="pw-old"
               password
@@ -134,11 +131,8 @@ export default function ProfilePage() {
               onChange={setOld}
               autoComplete="current-password"
             />
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="pw-new">
-              {t('iam.profile.f.new')}
-            </label>
+          </CimField>
+          <CimField label={t('iam.profile.f.new')} htmlFor="pw-new">
             <CimInput
               id="pw-new"
               password
@@ -146,11 +140,8 @@ export default function ProfilePage() {
               onChange={setNew}
               autoComplete="new-password"
             />
-          </div>
-          <div className="field">
-            <label className="field-label" htmlFor="pw-confirm">
-              {t('iam.profile.f.confirm')}
-            </label>
+          </CimField>
+          <CimField label={t('iam.profile.f.confirm')} htmlFor="pw-confirm">
             <CimInput
               id="pw-confirm"
               password
@@ -159,24 +150,22 @@ export default function ProfilePage() {
               autoComplete="new-password"
               status={mismatch ? 'error' : undefined}
             />
-          </div>
+          </CimField>
 
           {err && (
-            <div className="alert err" style={{ marginTop: 12 }}>
-              <IconAlert width={15} height={15} />
-              <span>{err}</span>
-            </div>
+            <InlineAlert tone="err" style={{ marginTop: 12 }}>{err}</InlineAlert>
           )}
 
-          <button
-            type="button"
-            className="btn-block"
+          <CimButton
+            type="primary"
+            block
+            htmlType="button"
             disabled={busy || !canSubmit}
             style={{ marginTop: 14 }}
             onClick={() => void onSubmit()}
           >
             {busy ? t('iam.profile.submitting') : t('iam.profile.submit')}
-          </button>
+          </CimButton>
           <p className="hint">{t('iam.profile.hint')}</p>
         </Panel>
       </div>

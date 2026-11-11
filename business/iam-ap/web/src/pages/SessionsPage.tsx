@@ -10,7 +10,11 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,} from '@cim/ui';
+  type DataTableColumn,
+  CimButton,
+  InlineAlert,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { KickResult, SessionRow, TokenVersionBump } from '@/types';
 import { fmtDateTime } from '@/lib/format';
@@ -98,13 +102,14 @@ export default function SessionsPage() {
         width: 130,
         render: (r) => (
           <Can perm={SESSION_KICK}>
-            <button
-              className="btn-danger btn-sm"
+            <CimButton
+              danger
+              size="small"
               onClick={() => void kick(r.userId, r.username)}
               disabled={kicking === r.userId}
             >
               {t('iam.sessions.kick')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -146,10 +151,7 @@ export default function SessionsPage() {
           }
         >
           <div className="row">
-            <div className="field">
-              <label className="field-label" htmlFor="kick-uid">
-                {t('iam.sessions.f.userId')}
-              </label>
+            <CimField label={t('iam.sessions.f.userId')} htmlFor="kick-uid">
               <CimInput
                 id="kick-uid"
                 mono
@@ -159,16 +161,14 @@ export default function SessionsPage() {
                 onEnter={() => void onManualBump()}
                 width={280}
               />
-            </div>
-            <button className="btn-danger" type="button" onClick={() => void onManualBump()} disabled={busy || !uid.trim()}>
+            </CimField>
+            <CimButton danger htmlType="button" onClick={() => void onManualBump()} disabled={busy || !uid.trim()}>
               {busy ? t('iam.sessions.processing') : t('iam.sessions.process')}
-            </button>
+            </CimButton>
           </div>
 
           {bump && (
-            <div className="alert ok" style={{ marginTop: 12 }}>
-              <span>{t('iam.sessions.bumpDone', { uid: bump.uid, version: bump.version })}</span>
-            </div>
+            <InlineAlert tone="ok" style={{ marginTop: 12 }}>{t('iam.sessions.bumpDone', { uid: bump.uid, version: bump.version })}</InlineAlert>
           )}
 
           <ul className="note-list" style={{ marginTop: 12 }}>

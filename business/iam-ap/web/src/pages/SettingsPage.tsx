@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
-import { Can, CimSpin, CimTag, Page, Panel, useToast } from '@cim/ui';
+import { InlineAlert, CimButton, Can, CimSpin, CimTag, Page, Panel, useToast } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { SettingsDto, SyncResult } from '@/types';
 import { SYNC_RUN } from '@/lib/permCodes';
-import { IconAlert, IconSync } from '@/components/Icons';
+import { IconSync } from '@/components/Icons';
 
 /**
  * 系统设置：只读展示当前生效的运行时策略参数（目录同步按钮按 `iam:sync:run` 显隐）。
@@ -46,13 +46,10 @@ export default function SettingsPage() {
     return (
       <Page>
         <Panel title={t('iam.settings.title')}>
-          <div className="alert err">
-            <IconAlert width={15} height={15} />
-            <span>{sRes.error.message || t('iam.settings.errLoad')}</span>
-          </div>
-          <button className="btn-sm" style={{ marginTop: 12 }} onClick={sRes.refresh}>
+          <InlineAlert tone="err">{sRes.error.message || t('iam.settings.errLoad')}</InlineAlert>
+          <CimButton type="primary" size="small" style={{ marginTop: 12 }} onClick={sRes.refresh}>
             {t('iam.common.refresh')}
-          </button>
+          </CimButton>
         </Panel>
       </Page>
     );
@@ -195,10 +192,10 @@ export default function SettingsPage() {
           </dl>
           <div className="row" style={{ marginTop: 12 }}>
             <Can perm={SYNC_RUN}>
-              <button type="button" className="btn-sm" onClick={() => void onSync()} disabled={syncBusy}>
+              <CimButton type="primary" size="small" htmlType="button" onClick={() => void onSync()} disabled={syncBusy}>
                 <IconSync width={13} height={13} />
                 {syncBusy ? t('iam.settings.syncing') : t('iam.settings.sync')}
-              </button>
+              </CimButton>
             </Can>
           </div>
         </Panel>

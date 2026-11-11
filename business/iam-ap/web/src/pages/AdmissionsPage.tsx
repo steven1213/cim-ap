@@ -10,7 +10,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,} from '@cim/ui';
+  type DataTableColumn,
+  CimButton,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, AssignmentDto } from '@/types';
 import { ADMISSION_GRANT, ADMISSION_REVOKE } from '@/lib/permCodes';
@@ -146,15 +149,15 @@ export default function AdmissionsPage() {
           return (
             <div className="cell-actions">
               <Can perm={ADMISSION_GRANT}>
-                <button className="btn-sm" disabled={busy === a.appCode} onClick={() => void grant(a.appCode)}>
+                <CimButton type="primary" size="small" disabled={busy === a.appCode} onClick={() => void grant(a.appCode)}>
                   {admitted ? t('iam.admissions.update') : t('iam.admissions.grant')}
-                </button>
+                </CimButton>
               </Can>
               {admitted && (
                 <Can perm={ADMISSION_REVOKE}>
-                  <button className="btn-danger btn-sm" disabled={busy === a.appCode} onClick={() => void revoke(a.appCode)}>
+                  <CimButton danger size="small" disabled={busy === a.appCode} onClick={() => void revoke(a.appCode)}>
                     {t('iam.admissions.revoke')}
-                  </button>
+                  </CimButton>
                 </Can>
               )}
             </div>
@@ -170,10 +173,7 @@ export default function AdmissionsPage() {
     <Page>
       <Panel title={t('iam.admissions.title')} sub={t('iam.admissions.sub')}>
         <div className="row">
-          <div className="field">
-            <label className="field-label" htmlFor="au">
-              {t('iam.admissions.f.userId')}
-            </label>
+          <CimField label={t('iam.admissions.f.userId')} htmlFor="au">
             <CimInput
               id="au"
               mono
@@ -183,10 +183,10 @@ export default function AdmissionsPage() {
               onEnter={submit}
               width={280}
             />
-          </div>
-          <button type="button" onClick={submit} disabled={!userId.trim()}>
+          </CimField>
+          <CimButton type="primary" htmlType="button" onClick={submit} disabled={!userId.trim()}>
             {t('iam.admissions.query')}
-          </button>
+          </CimButton>
           <CimTag>{t('iam.admissions.currentUser', { user: applied })}</CimTag>
         </div>
 

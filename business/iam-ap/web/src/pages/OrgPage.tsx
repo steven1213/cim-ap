@@ -12,7 +12,11 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type CimTreeNode,} from '@cim/ui';
+  type CimTreeNode,
+  CimButton,
+  InlineAlert,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
 import { fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
@@ -276,22 +280,20 @@ export default function OrgPage() {
             <>
               <CimTag>{t('iam.orgs.count', { n: nodes.length })}</CimTag>
               <Can perm={ORG_CREATE}>
-                <button className="btn-sm" onClick={() => setShowCreate((v) => !v)}>
+                <CimButton type="primary" size="small" onClick={() => setShowCreate((v) => !v)}>
                   <IconPlus width={13} height={13} />
                   {t('iam.orgs.newNode')}
-                </button>
+                </CimButton>
               </Can>
             </>
           }
         >
           {bundleRes.error ? (
             <div style={{ padding: 14 }}>
-              <div className="alert err">
-                <span>{bundleRes.error.message || t('iam.orgs.errLoad')}</span>
-              </div>
-              <button className="btn-sm" style={{ marginTop: 10 }} onClick={bundleRes.refresh}>
+              <InlineAlert tone="err">{bundleRes.error.message || t('iam.orgs.errLoad')}</InlineAlert>
+              <CimButton type="primary" size="small" style={{ marginTop: 10 }} onClick={bundleRes.refresh}>
                 {t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </div>
           ) : treeNodes.length ? (
             <div className="tree-pad">
@@ -350,16 +352,10 @@ export default function OrgPage() {
               {managed ? (
                 <>
                   <div className="row" style={{ marginTop: 14 }}>
-                    <div className="field">
-                      <label className="field-label" htmlFor="on">
-                        {t('iam.orgs.f.name')}
-                      </label>
+                    <CimField label={t('iam.orgs.f.name')} htmlFor="on">
                       <CimInput id="on" value={editName} onChange={setEditName} width={180} />
-                    </div>
-                    <div className="field">
-                      <label className="field-label" htmlFor="os">
-                        {t('iam.orgs.f.sort')}
-                      </label>
+                    </CimField>
+                    <CimField label={t('iam.orgs.f.sort')} htmlFor="os">
                       <CimInput
                         id="os"
                         mono
@@ -367,11 +363,8 @@ export default function OrgPage() {
                         onChange={(v) => setEditSort(Number(v) || 0)}
                         width={100}
                       />
-                    </div>
-                    <div className="field">
-                      <label className="field-label" htmlFor="ost">
-                        {t('iam.orgs.f.status')}
-                      </label>
+                    </CimField>
+                    <CimField label={t('iam.orgs.f.status')} htmlFor="ost">
                       <CimSelect
                         id="ost"
                         value={editStatus}
@@ -385,20 +378,17 @@ export default function OrgPage() {
                         allowClear={false}
                         width={140}
                       />
-                    </div>
+                    </CimField>
                     <Can perm={ORG_UPDATE}>
-                      <button type="button" className="btn-sm" disabled={busy} onClick={() => void onUpdate()}>
+                      <CimButton type="primary" size="small" htmlType="button" disabled={busy} onClick={() => void onUpdate()}>
                         <IconEdit width={13} height={13} />
                         {t('iam.orgs.save')}
-                      </button>
+                      </CimButton>
                     </Can>
                   </div>
 
                   <div className="row" style={{ marginTop: 12 }}>
-                    <div className="field">
-                      <label className="field-label" htmlFor="mv">
-                        {t('iam.orgs.moveTo')}
-                      </label>
+                    <CimField label={t('iam.orgs.moveTo')} htmlFor="mv">
                       <CimSelect
                         id="mv"
                         value={moveTo}
@@ -412,17 +402,17 @@ export default function OrgPage() {
                         allowClear={false}
                         width={300}
                       />
-                    </div>
+                    </CimField>
                     <Can perm={ORG_MOVE}>
-                      <button type="button" className="btn-ghost btn-sm" onClick={() => void onMove()}>
+                      <CimButton size="small" htmlType="button" onClick={() => void onMove()}>
                         {t('iam.orgs.move')}
-                      </button>
+                      </CimButton>
                     </Can>
                     <Can perm={ORG_DELETE}>
-                      <button type="button" className="btn-danger btn-sm" onClick={() => void onDelete()}>
+                      <CimButton danger size="small" htmlType="button" onClick={() => void onDelete()}>
                         <IconTrash width={13} height={13} />
                         {t('iam.orgs.delete')}
-                      </button>
+                      </CimButton>
                     </Can>
                   </div>
                 </>
@@ -449,15 +439,16 @@ export default function OrgPage() {
                     />
                   </div>
                   <Can perm={ORG_MEMBER}>
-                    <button
-                      type="button"
-                      className="btn-sm"
+                    <CimButton
+                      type="primary"
+                      size="small"
+                      htmlType="button"
                       onClick={() => void onAddMember()}
                       disabled={!addUser.trim()}
                     >
                       <IconPlus width={13} height={13} />
                       {t('iam.orgs.addMember')}
-                    </button>
+                    </CimButton>
                   </Can>
                 </div>
                 <div className="tag-list" style={{ marginTop: 10 }}>
@@ -465,14 +456,15 @@ export default function OrgPage() {
                     <span key={m} className="role-chip">
                       <span className="mono">{m}</span>
                       <Can perm={ORG_MEMBER}>
-                        <button
-                          type="button"
+                        <CimButton
+                          bare
                           className="chip-x"
+                          htmlType="button"
                           onClick={() => void onRemoveMember(m)}
                           aria-label={t('iam.orgs.removeMember')}
                         >
                           ×
-                        </button>
+                        </CimButton>
                       </Can>
                     </span>
                   ))}
@@ -488,10 +480,7 @@ export default function OrgPage() {
       {showCreate && (
         <Panel title={t('iam.orgs.newTitle')} sub={t('iam.orgs.newSub')}>
           <div className="row">
-            <div className="field">
-              <label className="field-label" htmlFor="pp">
-                {t('iam.orgs.f.parent')}
-              </label>
+            <CimField label={t('iam.orgs.f.parent')} htmlFor="pp">
               <CimSelect
                 id="pp"
                 value={parentId}
@@ -503,11 +492,8 @@ export default function OrgPage() {
                 allowClear={false}
                 width={260}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="cc">
-                {t('iam.orgs.f.code')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.orgs.f.code')} htmlFor="cc">
               <CimInput
                 id="cc"
                 mono
@@ -516,17 +502,11 @@ export default function OrgPage() {
                 onChange={setCode}
                 width={170}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="nn">
-                {t('iam.orgs.f.name')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.orgs.f.name')} htmlFor="nn">
               <CimInput id="nn" placeholder={t('iam.orgs.namePH')} value={name} onChange={setName} width={160} />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="nt">
-                {t('iam.orgs.f.type')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.orgs.f.type')} htmlFor="nt">
               <CimSelect
                 id="nt"
                 value={nodeType}
@@ -535,11 +515,8 @@ export default function OrgPage() {
                 allowClear={false}
                 width={130}
               />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="sn">
-                {t('iam.orgs.f.sort')}
-              </label>
+            </CimField>
+            <CimField label={t('iam.orgs.f.sort')} htmlFor="sn">
               <CimInput
                 id="sn"
                 mono
@@ -547,15 +524,16 @@ export default function OrgPage() {
                 onChange={(v) => setSortNo(Number(v) || 0)}
                 width={90}
               />
-            </div>
+            </CimField>
             <Can perm={ORG_CREATE}>
-              <button
-                type="button"
+              <CimButton
+                type="primary"
+                htmlType="button"
                 disabled={busy || !code.trim() || !name.trim()}
                 onClick={() => void onCreate()}
               >
                 {busy ? t('iam.orgs.creating') : t('iam.orgs.create')}
-              </button>
+              </CimButton>
             </Can>
           </div>
           <p className="hint">{t('iam.orgs.hint')}</p>

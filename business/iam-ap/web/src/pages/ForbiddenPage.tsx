@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { EmptyState, Panel } from '@cim/ui';
 import { IconBan } from '@/components/Icons';
 
 /**
@@ -12,15 +13,17 @@ import { IconBan } from '@/components/Icons';
 export default function ForbiddenPage() {
   const { t } = useTranslation();
   return (
-    <div className="panel">
-      <div className="panel-body">
-        <div className="empty">
-          <IconBan width={28} height={28} />
-          <b>{t('iam.common.forbidden.title')}</b>
-          <p>{t('iam.common.forbidden.desc')}</p>
-          <Link className="btn" to="/">{t('iam.common.backHome')}</Link>
-        </div>
-      </div>
-    </div>
+    <Panel>
+      <EmptyState
+        large
+        icon={<IconBan width={28} height={28} />}
+        titleKey="iam.common.forbidden.title"
+        hintKey="iam.common.forbidden.desc"
+      >
+        <Link className="btn" to="/">
+          {t('iam.common.backHome')}
+        </Link>
+      </EmptyState>
+    </Panel>
   );
 }

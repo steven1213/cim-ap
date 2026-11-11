@@ -11,7 +11,9 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, AppStatus } from '@/types';
 import { APP_CREATE, APP_UPDATE } from '@/lib/permCodes';
@@ -125,13 +127,13 @@ export default function AppMgmtPage() {
         width: 120,
         render: (a) => (
           <Can perm={APP_UPDATE}>
-            <button
-              className="btn-ghost btn-sm"
+            <CimButton
+              size="small"
               disabled={toggling === a.appCode}
               onClick={() => void toggleStatus(a)}
             >
               {a.status === 'ENABLED' ? t('iam.appMgmt.disable') : t('iam.appMgmt.enable')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -176,16 +178,17 @@ export default function AppMgmtPage() {
             columns={3}
           />
           <p className="hint">{t('iam.appMgmt.hint')}</p>
-          <button
-            type="button"
-            className="btn-block"
+          <CimButton
+            type="primary"
+            block
+            htmlType="button"
             style={{ marginTop: 12 }}
             disabled={busy || !form.appCode.trim() || !form.appName.trim()}
             onClick={() => void onRegister()}
           >
             <IconPlus width={13} height={13} />
             {t('iam.appMgmt.register')}
-          </button>
+          </CimButton>
         </Panel>
       </Can>
 

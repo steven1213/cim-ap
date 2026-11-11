@@ -15,7 +15,10 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
-  type TabItem,} from '@cim/ui';
+  type TabItem,
+  CimButton,
+  InlineAlert,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '@/types';
 import PermTree from '@/components/PermTree';
@@ -394,27 +397,27 @@ export default function RolesAdminPage() {
       }}
       superMode={draft?.isSuper ?? false}
       pageAction={(node) => (
-        <button
-          type="button"
-          className="btn-ghost btn-sm"
+        <CimButton
+          size="small"
+          htmlType="button"
           style={{ padding: '1px 8px' }}
           onClick={() => toggleMenuPage(node)}
         >
           {t('iam.common.selectAll')}
-        </button>
+        </CimButton>
       )}
       groups={ifaceGroups.map((g) => ({ key: g.key, label: g.label, iface: true, perms: g.perms }))}
       groupAction={(g) => {
         const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
         return (
-          <button
-            type="button"
-            className="btn-ghost btn-sm"
+          <CimButton
+            size="small"
+            htmlType="button"
             style={{ padding: '1px 8px' }}
             onClick={() => toggleGroup(g)}
           >
             {allOn ? t('iam.common.clearAll') : t('iam.common.selectAll')}
-          </button>
+          </CimButton>
         );
       }}
       kw={permKw}
@@ -425,9 +428,7 @@ export default function RolesAdminPage() {
     return (
       <Page>
         <Panel>
-          <div className="alert warn">
-            <span>{t('iam.common.noPlatformPerm')}</span>
-          </div>
+          <InlineAlert tone="warn">{t('iam.common.noPlatformPerm')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -444,10 +445,10 @@ export default function RolesAdminPage() {
               sub={draft.id ? draft.code : undefined}
               actions={
                 canRemove && draft.id ? (
-                  <button className="btn-ghost btn-sm" onClick={onDelete} disabled={busy}>
+                  <CimButton size="small" onClick={onDelete} disabled={busy}>
                     <IconTrash width={13} height={13} />
                     {t('iam.common.delete')}
-                  </button>
+                  </CimButton>
                 ) : undefined
               }
             >
@@ -461,13 +462,13 @@ export default function RolesAdminPage() {
               />
               <div className="sub-head" style={{ marginTop: 12 }}>
                 <Can perm={draft.id ? [ROLE_ADMIN_UPDATE, SYS.ROLE_SAVE] : [ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
-                  <button type="button" className="btn" onClick={onSave} disabled={busy}>
+                  <CimButton type="primary" htmlType="button" onClick={onSave} disabled={busy}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
-                  </button>
+                  </CimButton>
                 </Can>
-                <button type="button" className="btn-ghost btn-sm" onClick={closeDraft}>
+                <CimButton size="small" htmlType="button" onClick={closeDraft}>
                   {t('iam.common.close')}
-                </button>
+                </CimButton>
               </div>
             </Panel>
           ),
@@ -486,18 +487,16 @@ export default function RolesAdminPage() {
           sub={`${grantedPerms.size} / ${allPerms.length} · ${grantedMenus.size} / ${allMenus.length}`}
           actions={
             <Can perm={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
-              <button className="btn-ghost btn-sm" onClick={saveGrant} disabled={busy}>
+              <CimButton size="small" onClick={saveGrant} disabled={busy}>
                 <IconSave width={13} height={13} />
                 {t('iam.admin.roles.grantSave')}
-              </button>
+              </CimButton>
             </Can>
           }
         >
           <p className="hint">{t('iam.admin.roles.grantNote')}</p>
           {(catalogErr || grantsRes.error) && (
-            <div className="alert warn">
-              <span>{catalogErr || grantsRes.error?.message}</span>
-            </div>
+            <InlineAlert tone="warn">{catalogErr || grantsRes.error?.message}</InlineAlert>
           )}
           {!draft.isSuper && (
             <div className="sub-head">
@@ -511,16 +510,16 @@ export default function RolesAdminPage() {
                   value={permKw}
                   onChange={setPermKw}
                 />
-                <button
-                  type="button"
-                  className="btn-ghost btn-sm"
+                <CimButton
+                  size="small"
+                  htmlType="button"
                   onClick={() => setGrantedPerms(new Set(allPerms.map((p) => p.id)))}
                 >
                   {t('iam.common.selectAll')}
-                </button>
-                <button type="button" className="btn-ghost btn-sm" onClick={() => setGrantedPerms(new Set())}>
+                </CimButton>
+                <CimButton size="small" htmlType="button" onClick={() => setGrantedPerms(new Set())}>
                   {t('iam.common.clearAll')}
-                </button>
+                </CimButton>
               </span>
             </div>
           )}
@@ -545,14 +544,14 @@ export default function RolesAdminPage() {
           actions={
             <>
               <Can perm={[ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
-                <button className="icon-btn" title={t('iam.admin.roles.new')} onClick={startCreate}>
+                <CimButton bare className="icon-btn" title={t('iam.admin.roles.new')} onClick={startCreate}>
                   <IconPlus width={14} height={14} />
-                </button>
+                </CimButton>
               </Can>
-              <button className="btn-ghost btn-sm" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
+              <CimButton size="small" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {rolesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </>
           }
         >

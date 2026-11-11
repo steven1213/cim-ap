@@ -9,14 +9,18 @@ import {
   Page,
   Panel,
   useConfirm,
-  useToast,} from '@cim/ui';
+  useToast,
+  CimButton,
+  InlineAlert,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
 import PermTree from '@/components/PermTree';
 import { useHasAllPermissions } from '@/lib/usePermission';
 import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
 import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
-import { IconAlert, IconPlus, IconTrash } from '@/components/Icons';
+import { IconPlus, IconTrash } from '@/components/Icons';
 
 /**
  * 权限管理（`/permissions`）：权限点 CRUD（`module:res:action`）。
@@ -155,10 +159,7 @@ export default function PermissionsAdminPage() {
     return (
       <Page>
         <Panel>
-          <div className="alert warn">
-            <IconAlert width={15} height={15} />
-            <span>{t('iam.common.noPlatformPerm')}</span>
-          </div>
+          <InlineAlert tone="warn">{t('iam.common.noPlatformPerm')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -175,17 +176,18 @@ export default function PermissionsAdminPage() {
           actions={
             <>
               <Can perm={[PERM_CREATE, SYS.PERM_SAVE]}>
-                <button
+                <CimButton
+                  bare
                   className="icon-btn"
                   title={t('iam.admin.perms.new')}
                   onClick={() => setDraft({ id: '', code: 'iam:', name: '', status: 'ENABLED', origin: null })}
                 >
                   <IconPlus width={14} height={14} />
-                </button>
+                </CimButton>
               </Can>
-              <button className="btn-ghost btn-sm" onClick={listRes.refresh} disabled={listRes.loading}>
+              <CimButton size="small" onClick={listRes.refresh} disabled={listRes.loading}>
                 {listRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </>
           }
         >
@@ -202,13 +204,10 @@ export default function PermissionsAdminPage() {
 
           {listRes.error ? (
             <div style={{ padding: 14 }}>
-              <div className="alert err">
-                <IconAlert width={15} height={15} />
-                <span>{listRes.error.message || t('iam.common.loadFailed')}</span>
-              </div>
-              <button className="btn-sm" style={{ marginTop: 10 }} onClick={listRes.refresh}>
+              <InlineAlert tone="err">{listRes.error.message || t('iam.common.loadFailed')}</InlineAlert>
+              <CimButton type="primary" size="small" style={{ marginTop: 10 }} onClick={listRes.refresh}>
                 {t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </div>
           ) : filtered.length || moduleGroups.length ? (
             <PermTree
@@ -239,19 +238,22 @@ export default function PermissionsAdminPage() {
               sub={draft.id ?? t('iam.admin.perms.new')}
               actions={
                 canRemove && draft.id ? (
-                  <button className="btn-ghost btn-sm" onClick={() => void onDelete()} disabled={busy}>
+                  <CimButton size="small" onClick={() => void onDelete()} disabled={busy}>
                     <IconTrash width={13} height={13} />
                     {t('iam.common.delete')}
-                  </button>
+                  </CimButton>
                 ) : null
               }
             >
               <div className="form-grid">
-                <div className="field">
-                  <label className="field-label" htmlFor="p-code">
-                    {t('iam.field.code')}
-                    <span className="opt">{t('iam.common.required')}</span>
-                  </label>
+                <CimField
+                  label={
+                    <>
+                      {t('iam.field.code')} <span className="opt">{t('iam.common.required')}</span>
+                    </>
+                  }
+                  htmlFor="p-code"
+                >
                   <CimInput
                     id="p-code"
                     mono
@@ -259,21 +261,22 @@ export default function PermissionsAdminPage() {
                     value={draft.code}
                     onChange={(v) => setDraft({ ...draft, code: v })}
                   />
-                </div>
-                <div className="field">
-                  <label className="field-label" htmlFor="p-name">
-                    {t('iam.field.name')}
-                  </label>
+                </CimField>
+                <CimField label={t('iam.field.name')} htmlFor="p-name">
                   <CimInput
                     id="p-name"
                     value={draft.name}
                     onChange={(v) => setDraft({ ...draft, name: v })}
                   />
-                </div>
-                <div className="field">
-                  <label className="field-label" htmlFor="p-status">
-                    {t('iam.common.enabled')} / {t('iam.common.disabled')}
-                  </label>
+                </CimField>
+                <CimField
+                  label={
+                    <>
+                      {t('iam.common.enabled')} / {t('iam.common.disabled')}
+                    </>
+                  }
+                  htmlFor="p-status"
+                >
                   <CimSelect
                     value={draft.status}
                     onChange={(v) =>
@@ -285,7 +288,7 @@ export default function PermissionsAdminPage() {
                     ]}
                     allowClear={false}
                   />
-                </div>
+                </CimField>
               </div>
 
               <p className="hint">{t('iam.admin.perms.codeHint')}</p>
@@ -293,13 +296,13 @@ export default function PermissionsAdminPage() {
 
               <div className="sub-head" style={{ marginTop: 12 }}>
                 <Can perm={saveCodes}>
-                  <button type="button" className="btn" disabled={busy} onClick={() => void onSubmit()}>
+                  <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSubmit()}>
                     {busy ? t('iam.common.saving') : t('iam.common.save')}
-                  </button>
+                  </CimButton>
                 </Can>
-                <button type="button" className="btn-ghost btn-sm" onClick={() => setDraft(null)}>
+                <CimButton size="small" htmlType="button" onClick={() => setDraft(null)}>
                   {t('iam.common.close')}
-                </button>
+                </CimButton>
               </div>
             </Panel>
           ) : (

@@ -12,7 +12,10 @@ import {
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,} from '@cim/ui';
+  type DataTableColumn,
+  CimButton,
+  CimField,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, OrgGrantRow, OrgNode } from '@/types';
 import { orgTypeLabel, originLabel } from '@/lib/format';
@@ -182,14 +185,15 @@ export default function OrgGrantsPage() {
         width: 110,
         render: (g) => (
           <Can perm={GRANT_REVOKE}>
-            <button
-              className="btn-danger btn-sm"
+            <CimButton
+              danger
+              size="small"
               disabled={revoking === `${g.orgId}:${g.appCode}`}
               onClick={() => void onRevoke(g)}
             >
               <IconTrash width={13} height={13} />
               {t('iam.orgGrants.revoke')}
-            </button>
+            </CimButton>
           </Can>
         ),
       },
@@ -224,8 +228,7 @@ export default function OrgGrantsPage() {
       <Can perm={GRANT_GRANT}>
         <Panel title={t('iam.orgGrants.grantTitle')} sub={t('iam.orgGrants.grantSub')}>
           <div className="row">
-            <div className="field">
-              <label className="field-label">{t('iam.orgGrants.f.org')}</label>
+            <CimField label={t('iam.orgGrants.f.org')}>
               <CimSelect
                 value={orgId}
                 onChange={(v) => setOrgId(typeof v === 'string' ? v : '')}
@@ -233,9 +236,8 @@ export default function OrgGrantsPage() {
                 placeholderKey="iam.orgGrants.selectOrg"
                 width={300}
               />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('iam.orgGrants.f.appCode')}</label>
+            </CimField>
+            <CimField label={t('iam.orgGrants.f.appCode')}>
               <CimSelect
                 value={appCode}
                 onChange={(v) => setAppCode(typeof v === 'string' ? v : '')}
@@ -243,9 +245,8 @@ export default function OrgGrantsPage() {
                 placeholderKey="iam.orgGrants.selectApp"
                 width={220}
               />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('iam.orgGrants.f.roles')}</label>
+            </CimField>
+            <CimField label={t('iam.orgGrants.f.roles')}>
               <CimInput
                 mono
                 value={roles}
@@ -253,15 +254,14 @@ export default function OrgGrantsPage() {
                 placeholder="OPERATOR,SHIFT_LEAD"
                 width={240}
               />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('iam.orgGrants.includeChildren')}</label>
+            </CimField>
+            <CimField label={t('iam.orgGrants.includeChildren')}>
               <CimSwitch checked={includeChildren} onChange={setIncludeChildren} />
-            </div>
-            <button type="button" disabled={busy || !orgId || !appCode} onClick={() => void onGrant()}>
+            </CimField>
+            <CimButton type="primary" htmlType="button" disabled={busy || !orgId || !appCode} onClick={() => void onGrant()}>
               <IconPlus width={13} height={13} />
               {busy ? t('iam.orgGrants.granting') : t('iam.orgGrants.grant')}
-            </button>
+            </CimButton>
           </div>
           <p className="hint">
             {t('iam.orgGrants.hint')}

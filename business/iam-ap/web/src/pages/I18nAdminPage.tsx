@@ -13,7 +13,10 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type FormField,} from '@cim/ui';
+  type FormField,
+  CimButton,
+  InlineAlert,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import { changeLanguage, currentLang } from '@/lib/i18n';
 import type { SysI18nDto, SysLocaleDto } from '@/types';
@@ -264,7 +267,8 @@ export default function I18nAdminPage() {
         render: (l) => (
           <span className="cell-actions" onClick={(e) => e.stopPropagation()}>
             <Can perm={I18N_LOCALE}>
-              <button
+              <CimButton
+                bare
                 className="icon-btn"
                 title={t('iam.common.edit')}
                 onClick={() =>
@@ -279,17 +283,18 @@ export default function I18nAdminPage() {
                 }
               >
                 <IconEdit width={13} height={13} />
-              </button>
+              </CimButton>
             </Can>
             {!l.isDefault && (
               <Can perm={I18N_LOCALE}>
-                <button
+                <CimButton
+                  bare
                   className="icon-btn danger"
                   title={t('iam.common.delete')}
                   onClick={() => onDeleteLocale(l)}
                 >
                   <IconTrash width={13} height={13} />
-                </button>
+                </CimButton>
               </Can>
             )}
           </span>
@@ -339,8 +344,8 @@ export default function I18nAdminPage() {
         render: (m) => (
           <span className="cell-actions">
             <Can perm={I18N_CREATE}>
-              <button
-                className="btn-ghost btn-sm"
+              <CimButton
+                size="small"
                 onClick={() =>
                   setMsgDraft({
                     id: m.id,
@@ -353,12 +358,12 @@ export default function I18nAdminPage() {
                 }
               >
                 {t('iam.common.edit')}
-              </button>
+              </CimButton>
             </Can>
             <Can perm={I18N_DELETE}>
-              <button className="icon-btn danger" title={t('iam.common.delete')} onClick={() => onDeleteMessage(m)}>
+              <CimButton bare className="icon-btn danger" title={t('iam.common.delete')} onClick={() => onDeleteMessage(m)}>
                 <IconTrash width={13} height={13} />
-              </button>
+              </CimButton>
             </Can>
           </span>
         ),
@@ -454,9 +459,7 @@ export default function I18nAdminPage() {
     return (
       <Page>
         <Panel>
-          <div className="alert warn">
-            <span>{t('iam.common.forbidden.desc')}</span>
-          </div>
+          <InlineAlert tone="warn">{t('iam.common.forbidden.desc')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -473,7 +476,8 @@ export default function I18nAdminPage() {
           actions={
             <>
               <Can perm={I18N_LOCALE}>
-                <button
+                <CimButton
+                  bare
                   className="icon-btn"
                   title={t('iam.admin.i18n.newLocale')}
                   onClick={() => {
@@ -482,12 +486,12 @@ export default function I18nAdminPage() {
                   }}
                 >
                   <IconPlus width={14} height={14} />
-                </button>
+                </CimButton>
               </Can>
-              <button className="btn-ghost btn-sm" onClick={localesRes.refresh} disabled={localesRes.loading}>
+              <CimButton size="small" onClick={localesRes.refresh} disabled={localesRes.loading}>
                 <IconRefresh width={13} height={13} />
                 {localesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
-              </button>
+              </CimButton>
             </>
           }
         >
@@ -516,7 +520,8 @@ export default function I18nAdminPage() {
             actions={
               <>
                 <Can perm={I18N_CREATE}>
-                  <button
+                  <CimButton
+                    bare
                     className="icon-btn"
                     title={t('iam.admin.i18n.newMessage')}
                     onClick={() => {
@@ -532,17 +537,17 @@ export default function I18nAdminPage() {
                     }}
                   >
                     <IconPlus width={14} height={14} />
-                  </button>
+                  </CimButton>
                 </Can>
                 {currentLang() && (
-                  <button
-                    className="btn-ghost btn-sm"
+                  <CimButton
+                    size="small"
                     title={t('iam.admin.i18n.reloadHint')}
                     onClick={() => changeLanguage(currentLang(), true)}
                   >
                     <IconSave width={13} height={13} />
                     {t('iam.common.refresh')}
-                  </button>
+                  </CimButton>
                 )}
               </>
             }
@@ -565,14 +570,14 @@ export default function I18nAdminPage() {
               actions={
                 <>
                   {filterLocale && (
-                    <button
-                      type="button"
-                      className="btn-ghost btn-sm"
+                    <CimButton
+                      size="small"
+                      htmlType="button"
                       title={t('iam.admin.i18n.clickToFilter')}
                       onClick={() => setFilterLocale('')}
                     >
                       {filterLocale} ✕
-                    </button>
+                    </CimButton>
                   )}
                   <CimSelect
                     id="i18n-module"
@@ -609,14 +614,15 @@ export default function I18nAdminPage() {
                   {t('iam.admin.i18n.missingCount', { n: missingKeys.length })}
                 </CimTag>
                 {canRemove && missOpen && missingKeys.length > 0 && (
-                  <button className="btn-ghost btn-sm" onClick={onClearMissing} disabled={busy}>
+                  <CimButton size="small" onClick={onClearMissing} disabled={busy}>
                     <IconTrash width={13} height={13} />
                     {t('iam.admin.i18n.clearMissing')}
-                  </button>
+                  </CimButton>
                 )}
-                <button
-                  type="button"
+                <CimButton
+                  bare
                   className="icon-btn"
+                  htmlType="button"
                   title={missOpen ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
                   aria-expanded={missOpen}
                   onClick={() => setMissOpen((v) => !v)}
@@ -624,7 +630,7 @@ export default function I18nAdminPage() {
                   <span className={'tree-toggle' + (missOpen ? ' open' : '')} style={{ width: 14, height: 14 }}>
                     <IconChevron width={12} height={12} />
                   </span>
-                </button>
+                </CimButton>
               </>
             }
           >
@@ -634,7 +640,8 @@ export default function I18nAdminPage() {
                   {missingKeys.map((k) => (
                     <CimTag key={k} tone="warn" className="cim-mono">
                       <span title={missing[k]}>{k}</span>
-                      <button
+                      <CimButton
+                        bare
                         className="chip-x"
                         title={t('iam.common.add')}
                         onClick={() => {
@@ -650,7 +657,7 @@ export default function I18nAdminPage() {
                         }}
                       >
                         +
-                      </button>
+                      </CimButton>
                     </CimTag>
                   ))}
                 </div>
