@@ -57,7 +57,7 @@ export default function SessionsPage() {
     setBump(null);
     setBusy(true);
     try {
-      const r = await api.postRaw<TokenVersionBump>(`/internal/token-version/bump?uid=${encodeURIComponent(uid.trim())}`);
+      const r = await api.post<TokenVersionBump>(`/internal/token-version/bump?uid=${encodeURIComponent(uid.trim())}`);
       setBump(r);
       listRes.refresh();
     } catch (e: any) {

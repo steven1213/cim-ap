@@ -121,12 +121,6 @@ export function del<T>(url: string): Promise<T> {
   return request<T>(http, 'DELETE', url);
 }
 
-/** 透传原始响应体（不按 Result 解包），用于返回裸对象 / 非 Result 的端点（如 token-version bump）。 */
-export async function postRaw<T>(url: string, body?: unknown): Promise<T> {
-  const r = await http.post<T>(url, body);
-  return r.data;
-}
-
 // ------------------------------------------------------------ 平台路径（无 /api/v1）
 
 /** 平台端点 GET（`/sys/**`、`/api/i18n/**`）。 */
@@ -149,4 +143,4 @@ export function rootDel<T>(url: string): Promise<T> {
   return request<T>(rootHttp, 'DELETE', url);
 }
 
-export default { get, post, put, del, postRaw, rootGet, rootPost, rootPut, rootDel };
+export default { get, post, put, del, rootGet, rootPost, rootPut, rootDel };

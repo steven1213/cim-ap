@@ -34,8 +34,20 @@ await build({
       'const require = __cimCreateRequire(import.meta.url);',
     ].join('\n'),
   },
-  // 与 vite/vitest 的 `@` 别名保持一致（vite.config.ts 的 resolve.alias）
-  alias: { '@': path.join(root, 'src') },
+  // 与 vite.config.ts 的 resolve.alias 保持一致：页面迁到 @cim/* 之后，渲染契约若不跟着配
+  // 别名，会在打包阶段报「Could not resolve react」——闸门看似存在，实际从未跑通。
+  alias: {
+    '@': path.join(root, 'src'),
+    '@cim/theme': path.join(root, '../../../platform/web/packages/theme/src'),
+    '@cim/ui': path.join(root, '../../../platform/web/packages/ui/src'),
+    '@cim/data': path.join(root, '../../../platform/web/packages/data/src'),
+    '@cim/shell': path.join(root, '../../../platform/web/packages/shell/src'),
+    '@cim/i18n': path.join(root, '../../../platform/web/packages/i18n/src'),
+    antd: path.join(root, 'node_modules/antd'),
+  },
+  // @cim/* 是源码直引，它们内部 import 的 react / i18next 在包目录向上查找不到，
+  // 统一指向本应用的 node_modules（避免两份 React 实例）。
+  nodePaths: [path.join(root, 'node_modules')],
   // 源码里引用了 vite 注入的 `import.meta.env`（lib/i18n.ts、zustand 内部）
   define: {
     'import.meta.env.DEV': 'false',
