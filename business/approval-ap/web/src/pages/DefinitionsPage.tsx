@@ -1,16 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import Panel from '@/components/Panel';
-import Modal from '@/components/Modal';
-import { IconFlow, IconPlay, IconPencil, IconPlus, IconX } from '@/components/Icons';
-import { listDefinitions, startProcess, suspendDefinition, duplicateDefinition, getDefinitionXml } from '@/lib/api';
+import { useResource } from '@cim/data';
+import {
+  CimButton,
+  CimModal,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  Panel,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
+import { IconPencil, IconPlay, IconPlus, IconX } from '@/components/Icons';
+import {
+  duplicateDefinition,
+  getDefinitionXml,
+  listDefinitions,
+  startProcess,
+  suspendDefinition,
+} from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
-import { toast } from '@/store/toastStore';
 import { parseVariables } from '@/lib/format';
-import type { ProcessDefinitionView } from '@/types';
+import type { FormSchemaField, ProcessDefinitionView, StartProcessRequest } from '@/types';
 
-/** 从 BPMN 提取角色型审批节点（G6 / D8）：userTask 上 flowable:candidateGroups="${ccg_<nodeId>}"。返回 nodeId + 节点名。 */
+/** 从 BPMN 提取角色型审批节点（G6 / D8）：userTask 上 flowable:candidateGroups="${ccg_<nodeId>}"。 */
 function parseRoleNodes(xml: string): { nodeId: string; name: string }[] {
   try {
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -31,43 +47,35 @@ function parseRoleNodes(xml: string): { nodeId: string; name: string }[] {
 export default function DefinitionsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [defs, setDefs] = useState<ProcessDefinitionView[]>([]);
-  const [showStart, setShowStart] = useState(false);
-  const [busy, setBusy] = useState(false);
-
+  const toast = useToast();
   const { userId, tenantId } = useIdentityStore();
 
-  async function load() {
-    try {
-      setDefs(await listDefinitions());
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    }
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  // 同 key 最新版本 → 可编辑；历史版本 → 只可查看
-  const latestVersionOf = new Map<string, number>();
-  for (const d of defs) {
-    latestVersionOf.set(d.key, Math.max(latestVersionOf.get(d.key) ?? 0, d.version));
-  }
-  const isLatest = (d: ProcessDefinitionView) => latestVersionOf.get(d.key) === d.version;
+  const [showStart, setShowStart] = useState(false);
+  const [busy, setBusy] = useState(false);
+  /** 逐行锁：只锁被操作的那行。 */
   const [busyDef, setBusyDef] = useState<string | null>(null);
 
-  const [duplicating, setDuplicating] = useState<string | null>(null);
+  const defsRes = useResource<ProcessDefinitionView[]>(({ signal }) => listDefinitions({ signal }));
+  const defs = defsRes.data ?? [];
+
+  /** 同 key 最新版本 → 可编辑；历史版本 → 只可查看。 */
+  const latestVersionOf = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of defs) m.set(d.key, Math.max(m.get(d.key) ?? 0, d.version));
+    return m;
+  }, [defs]);
+  const isLatest = (d: ProcessDefinitionView) => latestVersionOf.get(d.key) === d.version;
 
   async function onDuplicate(d: ProcessDefinitionView) {
-    setDuplicating(d.id);
+    setBusyDef(d.id);
     try {
       const copy = await duplicateDefinition(d.id);
-      toast(t('def.duplicateOk') + '：' + copy.key, 'ok');
-      await load();
+      toast.success(t('def.duplicateOk') + '：' + copy.key);
+      defsRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
-      setDuplicating(null);
+      setBusyDef(null);
     }
   }
 
@@ -75,114 +83,107 @@ export default function DefinitionsPage() {
     setBusyDef(d.id);
     try {
       await suspendDefinition(d.id, !d.suspended);
-      toast(d.suspended ? t('def.activateOk') : t('def.suspendOk'), 'ok');
-      await load();
+      toast.success(d.suspended ? t('def.activateOk') : t('def.suspendOk'));
+      defsRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusyDef(null);
     }
   }
 
+  const columns: Array<DataTableColumn<ProcessDefinitionView>> = [
+    { key: 'key', titleKey: 'def.colKey', width: 170, mono: true },
+    { key: 'name', titleKey: 'def.colName', width: 180 },
+    { key: 'version', titleKey: 'def.colVersion', width: 80, align: 'right', render: (d) => 'v' + d.version },
+    {
+      key: 'status',
+      titleKey: 'def.colStatus',
+      width: 190,
+      render: (d) => (
+        <span className="cell-inline">
+          <CimTag tone={isLatest(d) ? 'ok' : 'idle'}>{t(isLatest(d) ? 'def.status.latest' : 'def.status.history')}</CimTag>
+          {d.suspended && <CimTag tone="warn">{t('def.suspended')}</CimTag>}
+        </span>
+      ),
+    },
+    { key: 'tenantId', titleKey: 'def.colTenant', width: 120, render: (d) => d.tenantId ?? '—' },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 420,
+      render: (d) => {
+        const latest = isLatest(d);
+        const rowBusy = busyDef === d.id;
+        return (
+          <span className="cell-actions">
+            {latest ? (
+              <CimButton
+                size="small"
+                type="primary"
+                icon={<IconPencil width={13} height={13} />}
+                onClick={() => navigate('/designer', { state: { definitionId: d.id } })}
+              >
+                {t('def.action.design')}
+              </CimButton>
+            ) : (
+              <CimButton
+                size="small"
+                onClick={() => navigate('/designer', { state: { definitionId: d.id, readonly: true } })}
+              >
+                {t('def.action.view')}
+              </CimButton>
+            )}
+            {latest && !d.suspended && (
+              <CimButton size="small" onClick={() => setShowStart(true)}>
+                {t('def.start')}
+              </CimButton>
+            )}
+            {latest && (
+              <>
+                <CimButton size="small" disabled={rowBusy} onClick={() => onDuplicate(d)}>
+                  {t('def.duplicate')}
+                </CimButton>
+                <CimButton size="small" disabled={rowBusy} onClick={() => onToggleSuspend(d)}>
+                  {d.suspended ? t('def.activate') : t('def.suspendAction')}
+                </CimButton>
+              </>
+            )}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="page">
+    <Page>
       <Panel
-        title={t('def.title')}
-        sub={t('def.sub')}
+        titleKey="def.title"
+        subKey="def.sub"
         actions={
           <>
-            <button className="btn btn-sm" onClick={() => navigate('/designer')}>
-              <IconPencil width={14} height={14} /> {t('def.newDesign')}
-            </button>
-            <button className="btn btn-sm" onClick={() => setShowStart(true)}>
-              <IconPlay width={14} height={14} /> {t('def.start')}
-            </button>
+            <CimButton size="small" icon={<IconPencil width={13} height={13} />} onClick={() => navigate('/designer')}>
+              {t('def.newDesign')}
+            </CimButton>
+            <CimButton size="small" type="primary" icon={<IconPlay width={13} height={13} />} onClick={() => setShowStart(true)}>
+              {t('def.start')}
+            </CimButton>
           </>
         }
+        flush
       >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('def.colKey')}</th>
-                <th>{t('def.colName')}</th>
-                <th className="num">{t('def.colVersion')}</th>
-                <th>{t('def.colStatus')}</th>
-                <th>{t('def.colTenant')}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {defs.length === 0 && (
-                <tr>
-                  <td colSpan={6}>
-                    <div className="empty">
-                      <IconFlow width={26} height={26} />
-                      <span>{t('common.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {defs.map((d) => {
-                const latest = isLatest(d);
-                return (
-                  <tr key={d.id}>
-                    <td className="mono">{d.key}</td>
-                    <td>{d.name}</td>
-                    <td className="num">v{d.version}</td>
-                    <td>
-                      <span className={'tag ' + (latest ? 'ok' : '')}>{t(latest ? 'def.status.latest' : 'def.status.history')}</span>
-                      {d.suspended && <span className="tag warn" style={{ marginLeft: 4 }}>{t('def.suspended')}</span>}
-                    </td>
-                    <td>{d.tenantId ?? '—'}</td>
-                    <td>
-                      <div className="cell-actions">
-                        {latest ? (
-                          <button
-                            className="btn btn-sm"
-                            onClick={() => navigate('/designer', { state: { definitionId: d.id } })}
-                          >
-                            <IconPencil width={13} height={13} /> {t('def.action.design')}
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => navigate('/designer', { state: { definitionId: d.id, readonly: true } })}
-                          >
-                            {t('def.action.view')}
-                          </button>
-                        )}
-                        {latest && !d.suspended && (
-                          <button className="btn btn-ghost btn-sm" onClick={() => setShowStart(true)}>
-                            {t('def.start')}
-                          </button>
-                        )}
-                        {latest && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            disabled={duplicating === d.id}
-                            onClick={() => onDuplicate(d)}
-                          >
-                            {t('def.duplicate')}
-                          </button>
-                        )}
-                        {latest && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            disabled={busyDef === d.id}
-                            onClick={() => onToggleSuspend(d)}
-                          >
-                            {d.suspended ? t('def.activate') : t('def.suspendAction')}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<ProcessDefinitionView>
+          flat
+          columns={columns}
+          rows={defs}
+          rowKey={(d) => d.id}
+          loading={defsRes.loading}
+          error={defsRes.error ? defsRes.error.message : null}
+          onRetry={defsRes.refresh}
+          onRefresh={defsRes.refresh}
+          emptyTitleKey="common.empty"
+          scrollX="max-content"
+        />
       </Panel>
 
       {showStart && (
@@ -196,34 +197,27 @@ export default function DefinitionsPage() {
             setBusy(true);
             try {
               const r = await startProcess(req);
-              toast(t('def.started') + r.processInstanceId, 'ok');
+              toast.success(t('def.started') + r.processInstanceId);
               setShowStart(false);
-              await load();
+              defsRes.refresh();
             } catch (e) {
-              toast((e as Error).message, 'err');
+              toast.error((e as Error).message);
             } finally {
               setBusy(false);
             }
           }}
         />
       )}
-    </div>
+    </Page>
   );
 }
 
-interface StartModalProps {
-  defs: ProcessDefinitionView[];
-  defaultTenant: string;
-  defaultInitiator: string;
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (req: import('@/types').StartProcessRequest) => void;
-}
+// ── 发起表单 ────────────────────────────────────────────────
 
-/** 发起表单草稿（localStorage 暂存，关闭/刷新不丢；提交成功后清除）。 */
-/** 草稿按 processKey 分槽，避免不同定义字段串台。 */
+/** 草稿按 processKey 分槽，避免不同定义的字段串台。 */
 const draftKeyOf = (pk: string) => `approval.draft.v1:${pk}`;
-const DRAFT_KEY = 'approval.draft.v1'; // 兼容旧草稿的一次性迁移读取
+/** 旧版单槽（无 processKey 维度）的键，只用于读取它的 processKey 后按槽迁移。 */
+const LEGACY_DRAFT_KEY = 'approval.draft.v1';
 
 interface DraftShape {
   processKey: string;
@@ -235,96 +229,160 @@ interface DraftShape {
   formRows: { key: string; label: string; type: string; value: string }[];
 }
 
-function loadDraft(): DraftShape | null {
+interface StartForm {
+  processKey: string;
+  businessKey: string;
+  title: string;
+  assignee: string;
+  approvers: string;
+  variables: string;
+}
+
+type FormRow = { key: string; label: string; type: string; value: string };
+
+const EMPTY_ROW: FormRow = { key: '', label: '', type: 'text', value: '' };
+
+/**
+ * 只读**指定 processKey 的槽**。
+ *
+ * <p>改造前是「遍历 localStorage 取第一个 `approval.draft.v1:` 开头的草稿」：
+ * 同时存在两个流程的草稿时，打开 A 的发起表单可能加载到 B 的内容（并且把 processKey
+ * 也切到 B）。按 key 精确读槽，行为才是确定的。</p>
+ */
+function loadDraft(processKey: string): DraftShape | null {
   try {
-    // 优先读分槽草稿（approval.draft.v1:<key>），回退旧版单槽
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('approval.draft.v1:')) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const d = JSON.parse(raw);
-          if (d && typeof d === 'object') return d as DraftShape;
-        }
-      }
-    }
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = localStorage.getItem(draftKeyOf(processKey)) ?? localStorage.getItem(LEGACY_DRAFT_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    return d && typeof d === 'object' ? (d as DraftShape) : null;
+    if (!d || typeof d !== 'object') return null;
+    // 旧单槽草稿没有 processKey 维度：只在它属于当前流程时才采用
+    if (d.processKey && d.processKey !== processKey) return null;
+    return d as DraftShape;
   } catch {
     return null;
   }
 }
 
-function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSubmit }: StartModalProps) {
+function StartModal({
+  defs,
+  defaultTenant,
+  defaultInitiator,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  defs: ProcessDefinitionView[];
+  defaultTenant: string;
+  defaultInitiator: string;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (req: StartProcessRequest) => void;
+}) {
   const { t } = useTranslation();
-  // 发起永远走同 key 最新版本（引擎亦如此），下拉中去重
-  const latestByKey = new Map<string, ProcessDefinitionView>();
-  for (const d of defs) {
-    const cur = latestByKey.get(d.key);
-    if (!cur || d.version > cur.version) latestByKey.set(d.key, d);
-  }
-  const latestDefs = [...latestByKey.values()];
-  // 草稿恢复：仅当草稿里的 processKey 仍存在时才采用
-  const [saved] = useState(loadDraft);
-  const [processKey, setProcessKey] = useState(
-    saved && latestByKey.has(saved.processKey) ? saved.processKey : (latestDefs[0]?.key ?? ''),
+  const toast = useToast();
+
+  /** 发起永远走同 key 最新版本（引擎亦如此），下拉去重。 */
+  const latestDefs = useMemo(() => {
+    const byKey = new Map<string, ProcessDefinitionView>();
+    for (const d of defs) {
+      const cur = byKey.get(d.key);
+      if (!cur || d.version > cur.version) byKey.set(d.key, d);
+    }
+    return [...byKey.values()];
+  }, [defs]);
+
+  const [saved] = useState<DraftShape | null>(() => loadDraft(latestDefs[0]?.key ?? ''));
+  const [form, setForm] = useState<StartForm>({
+    processKey: saved?.processKey || latestDefs[0]?.key || '',
+    businessKey: saved?.businessKey ?? '',
+    title: saved?.title ?? '',
+    assignee: saved?.assignee ?? '',
+    approvers: saved?.approvers ?? '',
+    variables: saved?.variables ?? '',
+  });
+  const [formRows, setFormRows] = useState<FormRow[]>(
+    saved?.formRows?.length ? saved.formRows : [EMPTY_ROW],
   );
-  const [businessKey, setBusinessKey] = useState(saved?.businessKey ?? '');
-  const [title, setTitle] = useState(saved?.title ?? '');
-  const [assignee, setAssignee] = useState(saved?.assignee ?? '');
-  const [approvers, setApprovers] = useState(saved?.approvers ?? '');
-  const [variables, setVariables] = useState(saved?.variables ?? '');
-  /** 结构化业务表单数据（审批内容主体）；label/type 组装 formSchema 供详情页正确展示 */
-  const [formRows, setFormRows] = useState<
-    { key: string; label: string; type: string; value: string }[]
-  >(saved?.formRows?.length ? saved.formRows : [{ key: '', label: '', type: 'text', value: '' }]);
+  const [roleInput, setRoleInput] = useState<Record<string, string>>({});
   const [draftRestored, setDraftRestored] = useState(
     !!saved && !!(saved.businessKey?.trim() || saved.title?.trim()),
   );
-  /** 会签定义（key 含 countersign）需要 approvers 列表；其余显示单人 assignee——防选错定义 500 */
-  const isCountersign = processKey.toLowerCase().includes('countersign');
 
-  /** 角色型节点（G6 / D8）：选中定义后解析 BPMN 中 ccg_<id> 引用的审批节点，逐节点收集角色。 */
-  const [roleNodes, setRoleNodes] = useState<{ nodeId: string; name: string }[]>([]);
-  const [roleInput, setRoleInput] = useState<Record<string, string>>({});
-  useEffect(() => {
-    let cancelled = false;
-    const def = latestByKey.get(processKey);
-    if (!def) { setRoleNodes([]); return; }
-    getDefinitionXml(def.id)
-      .then((v) => { if (!cancelled) setRoleNodes(parseRoleNodes(v.bpmnXml)); })
-      .catch(() => { if (!cancelled) setRoleNodes([]); });
-    return () => { cancelled = true; };
-  }, [processKey, latestByKey]);
+  /** 会签定义（key 含 countersign）需要 approvers 列表；其余显示单人 assignee。 */
+  const isCountersign = form.processKey.toLowerCase().includes('countersign');
 
-  // 草稿自动暂存：有任何实质内容即写 localStorage
+  /**
+   * 角色型节点：解析选中定义 BPMN 里 `ccg_<id>` 引用的审批节点。
+   *
+   * <p>改造前这个 effect 的依赖里放了每次 render 新建的 `Map`，等于每一次渲染都重发
+   * 一次 XML 请求，而回包又 setState → 再渲染 → 再请求（自激循环）。这里只依赖
+   * **定义 id** 这个稳定值。</p>
+   */
+  const defId = useMemo(
+    () => latestDefs.find((d) => d.key === form.processKey)?.id ?? '',
+    [latestDefs, form.processKey],
+  );
+  const xmlRes = useResource(({ signal }) => getDefinitionXml(defId, { signal }), {
+    deps: [defId],
+    enabled: !!defId,
+  });
+  const roleNodes = useMemo(() => (xmlRes.data ? parseRoleNodes(xmlRes.data.bpmnXml) : []), [xmlRes.data]);
+
+  // 草稿自动暂存：有任何实质内容即写该流程的槽
   useEffect(() => {
     const hasContent =
-      businessKey.trim() || title.trim() || formRows.some((r) => r.key.trim() || r.value.trim());
+      form.businessKey.trim() || form.title.trim() || formRows.some((r) => r.key.trim() || r.value.trim());
     if (!hasContent) return;
-    const draft: DraftShape = { processKey, businessKey, title, assignee, approvers, variables, formRows };
+    const draft: DraftShape = { ...form, formRows };
     try {
-      localStorage.setItem(draftKeyOf(processKey), JSON.stringify(draft));
-      localStorage.removeItem(DRAFT_KEY);
+      localStorage.setItem(draftKeyOf(form.processKey), JSON.stringify(draft));
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch {
       /* 存储满等异常静默 */
     }
-  }, [processKey, businessKey, title, assignee, approvers, variables, formRows]);
+  }, [form, formRows]);
+
+  const fields: Array<FormField<StartForm>> = [
+    {
+      key: 'processKey',
+      labelKey: 'def.form.processKey',
+      kind: 'select',
+      required: true,
+      options: latestDefs.map((d) => ({ value: d.key, label: `${d.name}`, hint: d.key })),
+      span: 2,
+    },
+    { key: 'businessKey', labelKey: 'def.form.businessKey', kind: 'text', required: true, mono: true, placeholder: 'BK-2026-001' },
+    { key: 'title', labelKey: 'def.form.title', kind: 'text', required: true, placeholder: '配方签核 / 请假申请' },
+    isCountersign
+      ? {
+          key: 'approvers',
+          labelKey: 'def.form.approvers',
+          kind: 'text',
+          required: true,
+          placeholder: 'bob,carol',
+          hint: 'countersign · comma separated',
+          span: 2,
+        }
+      : { key: 'assignee', labelKey: 'def.form.assignee', kind: 'text', placeholder: 'alice', hint: 'single', span: 2 },
+    { key: 'variables', labelKey: 'def.form.variables', kind: 'textarea', rows: 3, span: 2, hintKey: 'def.form.variablesHint' },
+  ];
 
   function submit() {
-    if (!processKey || !businessKey || !title) {
-      toast(t('common.confirm') + '：' + t('def.form.processKey') + ' / ' + t('def.form.businessKey') + ' / ' + t('def.form.title'), 'warn');
+    if (!form.processKey || !form.businessKey || !form.title) {
+      toast.warning(
+        t('common.confirm') +
+          '：' +
+          [t('def.form.processKey'), t('def.form.businessKey'), t('def.form.title')].join(' / '),
+      );
       return;
     }
-    const vars = parseVariables(variables);
-    if (variables.trim() && vars === null) {
-      toast(t('def.form.variables') + ' JSON ' + t('common.empty'), 'warn');
+    const vars = parseVariables(form.variables);
+    if (form.variables.trim() && vars === null) {
+      toast.warning(t('def.form.variables') + ' JSON ' + t('common.empty'));
       return;
     }
     const formData: Record<string, unknown> = {};
-    const formSchema: import('@/types').FormSchemaField[] = [];
+    const formSchema: FormSchemaField[] = [];
     for (const r of formRows) {
       const key = r.key.trim();
       if (!key) continue;
@@ -337,107 +395,70 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
         v = r.value === 'true' || r.value === '是';
       }
       formData[key] = v;
-      if (r.label.trim()) {
-        formSchema.push({ key, label: r.label.trim(), type: r.type });
-      }
+      if (r.label.trim()) formSchema.push({ key, label: r.label.trim(), type: r.type });
     }
-    // G6 角色选人：仅收集填写了的节点，组装为 { nodeId: [roles] }
-  const candidateGroups: Record<string, string[]> = {};
-  for (const rn of roleNodes) {
-    const raw = (roleInput[rn.nodeId] ?? '').trim();
-    if (raw) candidateGroups[rn.nodeId] = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  }
-  onSubmit({
-      processKey,
-      businessKey,
+    const candidateGroups: Record<string, string[]> = {};
+    for (const rn of roleNodes) {
+      const raw = (roleInput[rn.nodeId] ?? '').trim();
+      if (raw) candidateGroups[rn.nodeId] = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    onSubmit({
+      processKey: form.processKey,
+      businessKey: form.businessKey,
       tenantId: defaultTenant,
       initiator: defaultInitiator,
-      title,
-      assignee: approvers.trim() ? null : assignee.trim() || null,
-      approvers: approvers.trim()
-        ? approvers.split(',').map((s) => s.trim()).filter(Boolean)
-        : null,
+      title: form.title,
+      assignee: form.approvers.trim() ? null : form.assignee.trim() || null,
+      approvers: form.approvers.trim() ? form.approvers.split(',').map((s) => s.trim()).filter(Boolean) : null,
       variables: vars,
       formData: Object.keys(formData).length > 0 ? formData : null,
       formSchema: formSchema.length > 0 ? formSchema : null,
       candidateGroups: Object.keys(candidateGroups).length > 0 ? candidateGroups : null,
     });
     // 提交成功路径由父组件关闭弹窗；无论成败先清草稿（表单内容仍在弹窗中，失败可重试）
-    localStorage.removeItem(draftKeyOf(processKey));
+    localStorage.removeItem(draftKeyOf(form.processKey));
     setDraftRestored(false);
   }
 
   return (
-    <Modal
-      title={t('def.startTitle')}
+    <CimModal
+      open
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>
-            {t('common.cancel')}
-          </button>
-          <button className="btn btn-sm" disabled={busy} onClick={submit}>
-            <IconPlay width={14} height={14} /> {t('common.submit')}
-          </button>
-        </>
-      }
+      titleKey="def.startTitle"
+      width={720}
+      onOk={submit}
+      okLoading={busy}
+      okKey="common.submit"
+      cancelKey="common.cancel"
     >
       {draftRestored && (
-        <div className="field-hint" style={{ color: 'var(--warn)', marginBottom: 8 }}>
+        <div className="cim-field-hint" style={{ color: 'var(--warn)', marginBottom: 8 }}>
           {t('def.form.draftRestored')}
-          <button
-            className="btn btn-ghost btn-sm"
-            style={{ marginLeft: 8 }}
+          <CimButton
+            size="small"
+            type="link"
             onClick={() => {
-              localStorage.removeItem(draftKeyOf(processKey));
+              localStorage.removeItem(draftKeyOf(form.processKey));
               setDraftRestored(false);
             }}
           >
             {t('def.form.draftDiscard')}
-          </button>
+          </CimButton>
         </div>
       )}
-      <div className="field">
-        <label className="field-label">{t('def.form.processKey')}</label>
-        <select value={processKey} onChange={(e) => setProcessKey(e.target.value)}>
-          {latestDefs.map((d) => (
-            <option key={d.id} value={d.key}>
-              {d.name}（{d.key}）
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label className="field-label">{t('def.form.businessKey')}</label>
-        <input className="mono" value={businessKey} onChange={(e) => setBusinessKey(e.target.value)} placeholder="BK-2026-001" />
-      </div>
-      <div className="field">
-        <label className="field-label">{t('def.form.title')}</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="配方签核 / 请假申请" />
-      </div>
-      <div className="grid-2">
-        {isCountersign ? (
-          <div className="field">
-            <label className="field-label">
-              {t('def.form.approvers')} <span className="opt">(countersign · required)</span>
-            </label>
-            <input value={approvers} onChange={(e) => setApprovers(e.target.value)} placeholder="bob,carol" />
-          </div>
-        ) : (
-          <div className="field">
-            <label className="field-label">
-              {t('def.form.assignee')} <span className="opt">(single)</span>
-            </label>
-            <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="alice" />
-          </div>
-        )}
-      </div>
 
-      {/* G6 角色选人：每个角色型审批节点收集一组角色 key（逗号分隔） */}
+      <FormGrid<StartForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+      />
+
+      {/* G6 角色选人：每个角色型审批节点收集一组角色 key（逗号分隔）。
+          节点数是后端 BPMN 决定的，没法写成 FormGrid 的静态字段数组。 */}
       {roleNodes.length > 0 && (
-        <div className="field">
+        <div className="field" style={{ marginTop: 10 }}>
           <label className="field-label">{t('def.form.roleCandidates')}</label>
-          <small>{t('def.form.roleCandidatesHint')}</small>
+          <p className="cim-field-hint" style={{ marginBottom: 6 }}>{t('def.form.roleCandidatesHint')}</p>
           <div className="role-node-list">
             {roleNodes.map((rn) => (
               <div className="field-row" key={rn.nodeId}>
@@ -453,7 +474,9 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
           </div>
         </div>
       )}
-      <div className="field">
+
+      {/* 业务表单字段：行数由用户增删，同样不适合静态字段数组 */}
+      <div className="field" style={{ marginTop: 10 }}>
         <label className="field-label">
           {t('def.form.formData')} <span className="opt">{t('def.form.formDataHint')}</span>
         </label>
@@ -488,32 +511,21 @@ function StartModal({ defs, defaultTenant, defaultInitiator, busy, onClose, onSu
             />
             <button
               className="icon-btn"
+              type="button"
               title={t('common.delete')}
               onClick={() =>
-                setFormRows((rs) =>
-                  rs.length === 1 ? [{ key: '', label: '', type: 'text', value: '' }] : rs.filter((_, j) => j !== i),
-                )
+                setFormRows((rs) => (rs.length === 1 ? [EMPTY_ROW] : rs.filter((_, j) => j !== i)))
               }
             >
               <IconX width={13} height={13} />
             </button>
           </div>
         ))}
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setFormRows((rs) => [...rs, { key: '', label: '', type: 'text', value: '' }])}
-        >
-          <IconPlus width={13} height={13} /> {t('def.form.addField')}
-        </button>
-        <p className="field-hint">{t('def.form.formSchemaHint')}</p>
+        <CimButton size="small" icon={<IconPlus width={13} height={13} />} onClick={() => setFormRows((rs) => [...rs, EMPTY_ROW])}>
+          {t('def.form.addField')}
+        </CimButton>
+        <p className="cim-field-hint">{t('def.form.formSchemaHint')}</p>
       </div>
-      <div className="field">
-        <label className="field-label">
-          {t('def.form.variables')} <span className="opt">JSON</span>
-        </label>
-        <textarea rows={3} value={variables} onChange={(e) => setVariables(e.target.value)} placeholder='{"leader":"alice","manager":"bob"}' />
-        <p className="field-hint">{t('def.form.variablesHint')}</p>
-      </div>
-    </Modal>
+    </CimModal>
   );
 }

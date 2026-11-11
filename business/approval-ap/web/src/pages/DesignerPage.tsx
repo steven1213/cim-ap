@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { CimButton, CimModal, PageHead, useToast } from '@cim/ui';
 import api from '@/lib/api';
-import { toast } from '@/store/toastStore';
 import {
   KIND_LABEL,
   NODE_H,
@@ -84,6 +84,7 @@ function sampleModel(): FlowModel {
 export default function DesignerPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const toast = useToast();
   const location = useLocation();
   const routeState = (location.state || {}) as DesignerRouteState;
 
@@ -111,10 +112,10 @@ export default function DesignerPage() {
         setModel(fromBpmn(def.bpmnXml));
         setReadonly(!!routeState.readonly);
       } catch (e) {
-        toast(t('designer.parseFailed') + '：' + (e as Error).message, 'err');
+        toast.error(t('designer.parseFailed') + '：' + (e as Error).message);
       }
     }).catch((e) => {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeState.definitionId, routeState.readonly]);
@@ -370,17 +371,17 @@ export default function DesignerPage() {
     if (readonly) return;
     const errs = errors();
     if (errs.length) {
-      toast(errs[0], 'err');
+      toast.error(errs[0]);
       return;
     }
     const xml = buildXml();
     setBusy(true);
     try {
       const def = await api.deployProcess({ processKey: processKey.trim(), processName: processName.trim(), bpmnXml: xml });
-      toast(`已部署：${def.name} (v${def.version})`, 'ok');
+      toast.success(`${t('designer.deploy')} ✓ ${def.name} (v${def.version})`);
       navigate('/definitions');
     } catch (e) {
-      toast((e as Error).message || '部署失败', 'err');
+      toast.error((e as Error).message || t('designer.deploy'));
     } finally {
       setBusy(false);
     }
@@ -392,58 +393,80 @@ export default function DesignerPage() {
   const selEdgeSource = selEdge ? nodeMap.get(selEdge.source) : null;
   const selEdgeTarget = selEdge ? nodeMap.get(selEdge.target) : null;
 
+  /**
+   * 复制 XML。
+   *
+   * <p>不能「先 toast 再写」：`navigator.clipboard` 在非安全上下文或未授权时直接拒绝，
+   * 先提示成功会让用户以为剪贴板里已经有内容（headless 里 100% 复现）。</p>
+   */
+  async function copyXml() {
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(buildXml());
+      toast.success(t('common.copied'));
+    } catch {
+      toast.error(t('common.copy') + ' ✗');
+    }
+  }
+
   return (
     <div className="designer">
-      <div className="page-head">
-        <div>
-          <h1>{t('designer.title')}</h1>
-          <p className="page-sub">{t('designer.sub')}</p>
-        </div>
-        <div className="designer-meta">
-          <label className="field field-inline">
-            <span className="field-label">{t('def.colKey')}</span>
-            <input
-              className="text-input"
-              style={{ width: 180 }}
-              value={processKey}
-              onChange={(e) => setProcessKey(e.target.value)}
-              placeholder="customApproval"
-              disabled={readonly}
-            />
-          </label>
-          <label className="field field-inline">
-            <span className="field-label">{t('def.colName')}</span>
-            <input
-              className="text-input"
-              style={{ width: 200 }}
-              value={processName}
-              onChange={(e) => setProcessName(e.target.value)}
-              placeholder="自定义审批"
-              disabled={readonly}
-            />
-          </label>
-          <div className="designer-actions">
-            {!readonly && (
-              <>
-                <button className="btn btn-sm" onClick={() => { setModel(sampleModel()); setSelectedNode(null); setSelectedEdge(null); }}>
-                  {t('designer.loadSample')}
-                </button>
-                <button className="btn btn-sm" onClick={() => { setModel({ nodes: [], edges: [] }); setSelectedNode(null); setSelectedEdge(null); }}>
-                  {t('common.clear')}
-                </button>
-              </>
-            )}
-            <button className="btn btn-sm" onClick={() => setShowXml(true)}>
-              <IconCopy width={14} height={14} /> {t('designer.exportXml')}
-            </button>
-            {!readonly && (
-              <button className="btn btn-primary btn-sm" disabled={busy || errs.length > 0} onClick={onDeploy}>
-                <IconPlay width={14} height={14} /> {t('designer.deploy')}
-              </button>
-            )}
+      <PageHead
+        titleKey="designer.title"
+        subtitleKey="designer.sub"
+        actions={
+          <div className="designer-meta">
+            <label className="field field-inline">
+              <span className="field-label">{t('def.colKey')}</span>
+              <input
+                className="text-input"
+                style={{ width: 180 }}
+                value={processKey}
+                onChange={(e) => setProcessKey(e.target.value)}
+                placeholder="customApproval"
+                disabled={readonly}
+              />
+            </label>
+            <label className="field field-inline">
+              <span className="field-label">{t('def.colName')}</span>
+              <input
+                className="text-input"
+                style={{ width: 200 }}
+                value={processName}
+                onChange={(e) => setProcessName(e.target.value)}
+                placeholder="自定义审批"
+                disabled={readonly}
+              />
+            </label>
+            <div className="designer-actions">
+              {!readonly && (
+                <>
+                  <CimButton size="small" onClick={() => { setModel(sampleModel()); setSelectedNode(null); setSelectedEdge(null); }}>
+                    {t('designer.loadSample')}
+                  </CimButton>
+                  <CimButton size="small" onClick={() => { setModel({ nodes: [], edges: [] }); setSelectedNode(null); setSelectedEdge(null); }}>
+                    {t('common.clear')}
+                  </CimButton>
+                </>
+              )}
+              <CimButton size="small" icon={<IconCopy width={14} height={14} />} onClick={() => setShowXml(true)}>
+                {t('designer.exportXml')}
+              </CimButton>
+              {!readonly && (
+                <CimButton
+                  size="small"
+                  type="primary"
+                  icon={<IconPlay width={14} height={14} />}
+                  disabled={busy || errs.length > 0}
+                  onClick={onDeploy}
+                >
+                  {t('designer.deploy')}
+                </CimButton>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {readonly && (
         <div className="designer-hint" style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}>
@@ -633,19 +656,27 @@ export default function DesignerPage() {
       </div>
 
       {showXml && (
-        <div className="modal-backdrop" onClick={() => setShowXml(false)}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h3>{t('designer.exportXml')} · BPMN 2.0</h3>
-              <button className="icon-btn" onClick={() => setShowXml(false)}><IconX width={16} height={16} /></button>
+        <CimModal
+          open
+          onClose={() => setShowXml(false)}
+          title={`${t('designer.exportXml')} · BPMN 2.0`}
+          width={900}
+          footer={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <CimButton
+                icon={<IconCopy width={13} height={13} />}
+                onClick={() => void copyXml()}
+              >
+                {t('common.copy')}
+              </CimButton>
+              <CimButton type="primary" onClick={() => setShowXml(false)}>
+                {t('common.close')}
+              </CimButton>
             </div>
-            <pre className="xml-view">{buildXml()}</pre>
-            <div className="modal-foot">
-              <button className="btn" onClick={() => navigator.clipboard?.writeText(buildXml())}>{t('common.copy')}</button>
-              <button className="btn btn-primary" onClick={() => setShowXml(false)}>{t('common.close')}</button>
-            </div>
-          </div>
-        </div>
+          }
+        >
+          <pre className="xml-view">{buildXml()}</pre>
+        </CimModal>
       )}
     </div>
   );

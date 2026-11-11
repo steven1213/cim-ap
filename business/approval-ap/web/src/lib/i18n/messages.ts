@@ -112,6 +112,8 @@ export const zhCN: Record<string, string> = {
   'common.copy': '复制',
   'common.copied': '已复制',
   'common.operationOk': '操作成功',
+  'common.clear': '清空',
+  'common.delete': '删除',
   'common.yes': '是',
   'common.no': '否',
 
@@ -560,6 +562,8 @@ export const enUS: Record<string, string> = {
   'common.copy': 'Copy',
   'common.copied': 'Copied',
   'common.operationOk': 'Done',
+  'common.clear': 'Clear',
+  'common.delete': 'Delete',
   'common.yes': 'Yes',
   'common.no': 'No',
 
