@@ -16,7 +16,7 @@
 //   <KpiCard bare icon={<IconChip />} label={t('rms.kpi.devices')} value={12} />
 // </Link>
 // ```
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 /** 左侧色条语义。`err` 是「超标/异常」，与 `warn` 的区别是它要求立即处理。 */
 export type KpiTone = 'ok' | 'warn' | 'err' | 'info';
@@ -55,6 +55,21 @@ export function KpiCard({ icon, label, value, sub, tone, bare = false }: KpiCard
 }
 
 /** KPI 卡片容器：等宽自适应网格（`repeat(auto-fit, minmax(168px, 1fr))`）。 */
-export function KpiGrid({ children }: { children: ReactNode }) {
-  return <div className="kpi-grid">{children}</div>;
+export interface KpiGridProps {
+  children: ReactNode;
+  /** 追加类名（与 `kpi-grid` 合并，不覆盖）。 */
+  className?: string;
+  /**
+   * 追加行内样式。
+   * 面板内嵌场景要压掉容器外边距（`margin: '10px 14px 0'`），页面此前因此绕开组件手写 `<div>`。
+   */
+  style?: CSSProperties;
+}
+
+export function KpiGrid({ children, className, style }: KpiGridProps) {
+  return (
+    <div className={className ? `kpi-grid ${className}` : 'kpi-grid'} style={style}>
+      {children}
+    </div>
+  );
 }

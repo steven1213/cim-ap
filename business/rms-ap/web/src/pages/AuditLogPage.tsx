@@ -18,6 +18,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import * as api from '@/lib/rmsApi';
@@ -265,12 +267,12 @@ export default function AuditLogPage() {
       <PageHead titleKey="rms.audit.title" subtitleKey="rms.audit.sub" />
 
       {/* KPI */}
-      <div className="kpi-grid">
+      <KpiGrid>
         <KpiCard label={t('rms.audit.kpi.total')} value={summary?.total ?? '—'} />
         <KpiCard tone="ok" label={t('rms.audit.kpi.success')} value={summary?.success ?? '—'} />
         <KpiCard tone="warn" label={t('rms.audit.kpi.failure')} value={summary?.failure ?? '—'} />
         <KpiCard tone="info" label={t('rms.audit.kpi.today')} value={summary?.today ?? '—'} />
-      </div>
+      </KpiGrid>
 
       {/* 动作分布 */}
       {summary && summary.topTypes.length > 0 && (

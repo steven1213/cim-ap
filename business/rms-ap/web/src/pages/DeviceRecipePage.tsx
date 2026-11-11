@@ -14,6 +14,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
   CimSplitPane,
 } from '@cim/ui';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
@@ -355,12 +357,12 @@ export default function DeviceRecipePage() {
           )}
 
           {view && (
-            <div className="kpi-grid" style={{ margin: '10px 14px 0' }}>
+            <KpiGrid style={{ margin: '10px 14px 0' }}>
               <KpiCard label={t('rms.deviceRecipes.total')} value={view.total} />
               <KpiCard tone="warn" label={t('rms.deviceRecipes.orphan')} value={view.orphan} />
               <KpiCard tone="info" label={t('rms.deviceRecipes.drift')} value={view.drift} />
               <KpiCard label={t('rms.deviceRecipes.unqualified')} value={view.unqualified} />
-            </div>
+            </KpiGrid>
           )}
 
           <DataTable<DeviceRecipeRow>

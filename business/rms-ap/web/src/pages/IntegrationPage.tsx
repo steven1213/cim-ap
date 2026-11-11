@@ -19,6 +19,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
   CimField,
   CimInput,
   StatusTag,
@@ -1421,12 +1423,12 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
       ) : null}
 
       {summary ? (
-        <div className="kpi-grid" style={{ marginBottom: 10 }}>
+        <KpiGrid style={{ marginBottom: 10 }}>
           <KpiCard label={t('rms.integration.inv.total')} value={summary.total} />
           <KpiCard tone="ok" label={'OK'} value={summary.ok} />
           <KpiCard tone="warn" label={'DRIFT'} value={summary.drift} />
           <KpiCard tone="warn" label={'ORPHAN'} value={summary.orphan} />
-        </div>
+        </KpiGrid>
       ) : null}
 
       <FormGrid<InvForm>

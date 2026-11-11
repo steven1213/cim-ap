@@ -19,6 +19,8 @@ import {
   type FormField,
   CimButton,
   KpiCard,
+
+  KpiGrid,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import { ECSV_MANAGE } from '@/lib/permCodes';
@@ -218,12 +220,12 @@ export default function EcSvPage() {
       />
 
       {summary && (
-        <div className="kpi-grid">
+        <KpiGrid>
           <KpiCard label={t('rms.ecsv.kpi.specs')} value={summary.specs} />
           <KpiCard tone="ok" label={t('rms.ecsv.kpi.pass')} value={summary.pass} />
           <KpiCard tone="warn" label={t('rms.ecsv.kpi.fail')} value={summary.fail} />
           <KpiCard tone="info" label={t('rms.ecsv.kpi.noSpec')} value={summary.noSpec} />
-        </div>
+        </KpiGrid>
       )}
 
       {tab === 'spec' && (

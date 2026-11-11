@@ -5,6 +5,7 @@ import { useResource } from '@cim/data';
 import {
   CimTag,
   DataTable,
+  KpiGrid,
   Page,
   PageHead,
   Panel,
@@ -220,7 +221,7 @@ export default function DashboardPage() {
       />
 
       {/* 行动卡片：点卡片直达处理现场 */}
-      <div className="kpi-grid">
+      <KpiGrid>
         {cards.map((k) => (
           <Link key={k.label} to={k.to} className="kpi">
             <div className={'tag ' + k.tone} style={{ marginBottom: 6 }}>
@@ -229,7 +230,7 @@ export default function DashboardPage() {
             <div className="kpi-label">{k.label}</div>
           </Link>
         ))}
-      </div>
+      </KpiGrid>
 
       <div className="grid-2">
         {/* 待批签核清单 */}

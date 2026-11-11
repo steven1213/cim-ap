@@ -25,6 +25,11 @@ export {
 } from './locale';
 export { UiPermissionProvider, useCan, usePermissionContext, Can } from './perm';
 export {
+  hasPermission,
+  hasAnyPermission,
+  hasAllPermissions,
+} from './permissions';
+export {
   UiDictProvider,
   useDict,
   useDictContext,

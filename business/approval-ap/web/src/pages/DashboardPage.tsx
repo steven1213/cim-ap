@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useResource } from '@cim/data';
-import { KpiCard, InlineAlert, DataTable, Page, Panel, type DataTableColumn, CimButton } from '@cim/ui';
+import { KpiCard, KpiGrid, InlineAlert, DataTable, Page, Panel, type DataTableColumn, CimButton } from '@cim/ui';
 import { IconCheck, IconFlow, IconInbox, IconOutbox, IconWebhook } from '@/components/Icons';
 import {
   getStats,
@@ -117,7 +117,7 @@ export default function DashboardPage() {
           <InlineAlert tone="err">{overviewRes.error.message}</InlineAlert>
         ) : (
           <>
-            <div className="kpi-grid">
+            <KpiGrid>
               {kpis.map((k) => (
                 <Link key={k.key} to={k.to} className={'kpi' + (k.tone ? ' ' + k.tone : '')} style={{ textDecoration: 'none' }}>
                   {/* 整卡是链接：外壳与跳转归 <Link>，卡片内容由 KpiCard bare 输出 */}
@@ -129,7 +129,7 @@ export default function DashboardPage() {
                   />
                 </Link>
               ))}
-            </div>
+            </KpiGrid>
             {ov && ov.failed > 0 && (
               <p className="dim" style={{ marginTop: 8, fontSize: 11 }}>
                 {t('dash.partial', { n: ov.failed, total: TOTAL_ROUTES })}
@@ -141,7 +141,7 @@ export default function DashboardPage() {
 
       {stats && (
         <Panel titleKey="dash.stats.title" subKey="dash.stats.sub">
-          <div className="kpi-grid">
+          <KpiGrid>
             <KpiCard icon={<IconFlow width={16} height={16} />} label={t('dash.stats.avgHours')} value={stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'} />
             <div className={'kpi' + (stats.overdueCount > 0 ? ' warn' : '')}>
               <KpiCard
@@ -152,7 +152,7 @@ export default function DashboardPage() {
               />
             </div>
             <KpiCard icon={<IconCheck width={16} height={16} />} label={t('dash.stats.rejectRate')} value={stats.rejectRate != null ? (stats.rejectRate * 100).toFixed(0) + '%' : '—'} />
-          </div>
+          </KpiGrid>
 
           {/* 近 30 天发起/完成趋势（纯 CSS 条形；不引图表库，一面板里两根线不值得 200 KB） */}
           <div className="stats-trend">

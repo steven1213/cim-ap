@@ -18,6 +18,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
 } from '@cim/ui';
 import DiffTable from '@/components/DiffTable';
 import * as api from '@/lib/rmsApi';
@@ -233,12 +235,12 @@ export default function ComparePage() {
       <PageHead titleKey="rms.compare.title" subtitleKey="rms.compare.sub" />
 
       {/* 校验日志 KPI */}
-      <div className="kpi-grid">
+      <KpiGrid>
         <KpiCard label={t('rms.compare.summary.total')} value={logSummary?.total ?? '—'} />
         <KpiCard tone="ok" label={t('rms.compare.summary.pass')} value={logSummary?.pass ?? '—'} />
         <KpiCard tone="warn" label={t('rms.compare.summary.fail')} value={logSummary?.fail ?? '—'} />
         <KpiCard tone="info" label={t('rms.compare.summary.diffTotal')} value={logSummary?.diffTotal ?? '—'} />
-      </div>
+      </KpiGrid>
 
       {/* 版本比对 */}
       <Panel

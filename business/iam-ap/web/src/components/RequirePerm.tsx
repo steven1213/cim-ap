@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
+import { RequirePermission } from '@cim/shell';
 import { useHasPermission } from '@/lib/usePermission';
 
 /**
@@ -10,9 +11,15 @@ import { useHasPermission } from '@/lib/usePermission';
  *
  * <p>前置条件：调用方须在 {@code BootGate} 之内（权限码集已就绪），否则会把「尚未加载」
  * 误判为「无权限」。见 `components/BootGate.tsx`。</p>
+ *
+ * <p>判定与呈现分离：`RequirePermission` 在 `@cim/shell`（三 ap 共用），未授权呈现由本应用
+ * 注入 —— IAM 跳转 {@code /403}（URL 变），RMS 就地渲染 403 页（URL 不变）。</p>
  */
 export default function RequirePerm({ code, children }: { code?: string | null; children: ReactNode }) {
   const allowed = useHasPermission(code);
-  if (!allowed) return <Navigate to="/403" replace />;
-  return <>{children}</>;
+  return (
+    <RequirePermission allowed={allowed} fallback={<Navigate to="/403" replace />}>
+      {children}
+    </RequirePermission>
+  );
 }

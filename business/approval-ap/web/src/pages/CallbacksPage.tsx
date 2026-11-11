@@ -13,6 +13,8 @@ import {
   type DataTableColumn,
   type FormField,
   KpiCard,
+
+  KpiGrid,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { IconSend } from '@/components/Icons';
@@ -252,7 +254,7 @@ export default function CallbacksPage() {
 
       {stats && (
         <Panel titleKey="cb.stats.title" subKey="cb.stats.sub">
-          <div className="kpi-grid">
+          <KpiGrid>
             <KpiCard label={t('cb.stats.sent')} value={stats.sent ?? '—'} />
             <KpiCard tone="warn" label={t('cb.stats.pending')} value={stats.pending ?? '—'} />
             <KpiCard
@@ -262,7 +264,7 @@ export default function CallbacksPage() {
             />
             <KpiCard label={t('cb.stats.rate')} value={stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'} />
             <KpiCard label={t('cb.stats.cost')} value={stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'} />
-          </div>
+          </KpiGrid>
         </Panel>
       )}
 

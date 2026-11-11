@@ -24,6 +24,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
   CimField,
   StatusTag,
 } from '@cim/ui';
@@ -294,13 +296,13 @@ export default function SignoffPage() {
       />
 
       {/* KPI 指标块 */}
-      <div className="kpi-grid">
+      <KpiGrid>
         <KpiCard label={t('rms.signoff.kpi.pending')} value={summary?.pending ?? '—'} />
         <KpiCard tone="ok" label={t('rms.signoff.kpi.approvedToday')} value={summary?.approvedToday ?? '—'} />
         <KpiCard label={t('rms.signoff.kpi.rejectedToday')} value={summary?.rejectedToday ?? '—'} />
         <KpiCard tone="info" label={t('rms.signoff.kpi.tempActive')} value={summary?.tempActive ?? '—'} />
         <KpiCard tone="warn" label={t('rms.signoff.kpi.expiringSoon')} value={summary?.expiringSoon ?? '—'} />
-      </div>
+      </KpiGrid>
 
       {/* 批量操作条：只在有选中时出现 */}
       {selected.length > 0 ? (
@@ -738,10 +740,10 @@ function BatchResultModal({ results, onClose }: { results: BatchResult[]; onClos
         </div>
       }
     >
-      <div className="kpi-grid" style={{ marginBottom: 10 }}>
+      <KpiGrid style={{ marginBottom: 10 }}>
         <KpiCard tone="ok" label={t('rms.signoff.batchOk')} value={ok} />
         <KpiCard tone="warn" label={t('rms.signoff.batchFail')} value={fail} />
-      </div>
+      </KpiGrid>
       <DataTable<BatchResult>
         flat
         columns={columns}

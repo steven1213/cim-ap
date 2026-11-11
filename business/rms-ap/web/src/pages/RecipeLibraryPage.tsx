@@ -21,6 +21,8 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
+
+  KpiGrid,
   CimField,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
@@ -857,11 +859,11 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         </>
       ) : (
         <div>
-          <div className="kpi-grid">
+          <KpiGrid>
             <KpiCard label={t('rms.recipe.importCreated')} value={report.created} />
             <KpiCard tone="info" label={t('rms.recipe.importUpdated')} value={report.updated} />
             <KpiCard tone="warn" label={t('rms.recipe.importSkipped')} value={report.skipped} />
-          </div>
+          </KpiGrid>
           {report.errors.length > 0 ? (
             <Panel titleKey="rms.recipe.importErrors" style={{ marginTop: 12 }}>
               <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
