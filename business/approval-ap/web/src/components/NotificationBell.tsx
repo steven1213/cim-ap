@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useIdentityStore } from '@/store/identityStore';
 import { notificationsStreamUrl } from '@/lib/api';
 import { SseClient } from '@cim/notify-client';
-import { toast } from '@/store/toastStore';
+import { useToast } from '@cim/ui';
 import { IconBell, IconInbox } from '@/components/Icons';
 import type { NotificationEvent } from '@/types';
 
@@ -21,6 +21,7 @@ interface NotifyEnvelope {
 // （approval-ap 当前未持久化通知，红点以本会话内存角标表示；后续可按各 AP 自管原则补通知表）。
 export default function NotificationBell() {
   const { t } = useTranslation();
+  const toast = useToast();
   const userId = useIdentityStore((s) => s.userId);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationEvent[]>([]);
@@ -45,13 +46,13 @@ export default function NotificationBell() {
           if (!biz || !biz.type) return;
           if (biz.type === 'NEW_TASK') {
             setItems((prev) => [biz, ...prev].slice(0, 12));
-            toast(`${t('notify.newTask')}: ${biz.name ?? biz.taskId ?? ''}`, 'info');
+            toast.info(`${t('notify.newTask')}: ${biz.name ?? biz.taskId ?? ''}`);
           } else if (biz.type === 'URGE') {
             setItems((prev) => [biz, ...prev].slice(0, 12));
-            toast(`${t('notify.urge')}: ${biz.title ?? biz.name ?? ''}`, 'warn');
+            toast.warning(`${t('notify.urge')}: ${biz.title ?? biz.name ?? ''}`);
           } else if (biz.type === 'TASK_OVERDUE') {
             setItems((prev) => [biz, ...prev].slice(0, 12));
-            toast(`${t('notify.overdue')}: ${biz.name ?? biz.taskId ?? ''}`, 'warn');
+            toast.warning(`${t('notify.overdue')}: ${biz.name ?? biz.taskId ?? ''}`);
           }
         } catch {
           /* ignore */

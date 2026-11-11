@@ -1753,91 +1753,22 @@ table.data tbody tr.row-link:hover td {
   font-weight: 600;
   color: var(--text);
 }
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px 16px;
-}
-.detail-grid-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.detail-label {
-  font-size: 11px;
-  color: var(--muted);
-}
 .detail-empty {
   margin: 4px 0;
   font-size: 12px;
   color: var(--muted);
   font-style: italic;
 }
-.detail-kv-value {
-  word-break: break-all;
-  white-space: pre-wrap;
-}
-/* schema 模式的审批内容：分组标题 + 两列标签/值网格，长文本独占整行 */
-.detail-form-group {
-  margin-top: 4px;
-}
-.detail-form-group + .detail-form-group {
-  margin-top: 14px;
-}
-.detail-form-group-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary);
-  margin-bottom: 8px;
-}
-.detail-form-group-title::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-}
-.detail-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 20px;
-}
-.detail-form-item {
+/* 详情/重提弹窗取数失败：留原因 + 重试出口（别把弹窗关掉，关了等于把错误一起关掉） */
+.detail-load-error {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.detail-form-item.wide {
-  grid-column: 1 / -1;
-}
-.detail-form-label {
-  font-size: 12px;
-  color: var(--muted);
-}
-.detail-form-value {
-  font-size: 13px;
-  color: var(--text);
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-.detail-form-value.long {
-  line-height: 1.55;
-}
-.detail-task-row {
-  display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--line);
+  padding: 12px 0;
 }
-.detail-task-row:last-child {
-  border-bottom: none;
-}
-.detail-task-meta {
+.detail-resubmit-hint {
+  margin: 0 0 12px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -1845,6 +1776,7 @@ table.data tbody tr.row-link:hover td {
   margin-left: auto;
   cursor: pointer;
 }
+
 .detail-file {
   display: inline-flex;
   align-items: center;
@@ -2063,3 +1995,36 @@ table.data tbody tr.row-link:hover td {
 }
 .fp-skipped .fp-name,
 .fp-skipped .fp-sub { opacity: 0.65; }
+
+/* ============ 企微免登回调页 ============ */
+/* 用户被企微直接甩进来，没有外壳内容区可用：一张居中状态卡 */
+.wecom-callback {
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+}
+.wecom-mark {
+  display: flex;
+  justify-content: center;
+  color: var(--primary);
+}
+.wecom-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+}
+.wecom-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.wecom-ok {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ok);
+}

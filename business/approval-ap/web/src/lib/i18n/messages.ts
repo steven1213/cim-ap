@@ -175,6 +175,7 @@ export const zhCN: Record<string, string> = {
 
   // 审批详情
   'detail.title': '审批详情',
+  'detail.loadFailedHint': '详情取数失败，可重试或先关闭弹窗',
   'detail.status': '状态',
   'detail.statusActive': '进行中',
   'detail.statusWithdrawn': '已撤回',
@@ -190,6 +191,7 @@ export const zhCN: Record<string, string> = {
   'detail.field': '字段',
   'detail.value': '内容',
   'detail.currentTasks': '当前待办节点',
+  'detail.taskNode': '节点',
   'detail.noActiveTask': '引擎解析中或无活动任务',
   'detail.assignee': '办理人',
   'detail.candidates': '候选人',
@@ -623,6 +625,7 @@ export const enUS: Record<string, string> = {
 
   // 审批详情
   'detail.title': 'Approval Detail',
+  'detail.loadFailedHint': 'Failed to load detail; retry or close the dialog',
   'detail.status': 'Status',
   'detail.statusActive': 'Active',
   'detail.statusWithdrawn': 'Withdrawn',
@@ -638,6 +641,7 @@ export const enUS: Record<string, string> = {
   'detail.field': 'Field',
   'detail.value': 'Value',
   'detail.currentTasks': 'Current active tasks',
+  'detail.taskNode': 'Node',
   'detail.noActiveTask': 'Resolving or no active task',
   'detail.assignee': 'Assignee',
   'detail.candidates': 'Candidates',

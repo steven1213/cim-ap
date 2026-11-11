@@ -9,7 +9,6 @@ import { useIdentityStore } from '@/store/identityStore';
 import IdentitySwitcher from '@/components/IdentitySwitcher';
 import NotificationBell from '@/components/NotificationBell';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import ToastHost from '@/components/ToastHost';
 
 /**
  * 审批流平台外壳。
@@ -117,7 +116,6 @@ export default function Layout() {
       >
         <Outlet />
       </ConsoleShell>
-      <ToastHost />
     </>
   );
 }

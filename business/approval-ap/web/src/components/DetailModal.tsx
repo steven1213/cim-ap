@@ -1,6 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Modal from '@/components/Modal';
+import { useResource } from '@cim/data';
+import type { StatusTone } from '@cim/theme';
+import {
+  CimButton,
+  CimDescriptions,
+  CimInfoTable,
+  CimModal,
+  CimTag,
+  DataTable,
+  EmptyState,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type DescItem,
+  type InfoItem,
+} from '@cim/ui';
 import CompleteModal from '@/components/CompleteModal';
 import { DisplayFields } from '@/components/DisplayFields';
 import { FlowProgress } from '@/components/FlowProgress';
@@ -15,10 +30,9 @@ import {
   uploadAttachment,
   withdrawInstance,
 } from '@/lib/api';
-import { useIdentityStore } from '@/store/identityStore';
-import { toast } from '@/store/toastStore';
 import { fmtDate as formatDateTime } from '@/lib/format';
-import type { FormSchemaField, ProcessDetailView, TaskView } from '@/types';
+import { useIdentityStore } from '@/store/identityStore';
+import type { AttachmentView, FormSchemaField, ProcessDetailView, TaskView } from '@/types';
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -105,21 +119,24 @@ function buildFormGroups(
   return [...groups.entries()].map(([name, rows]) => ({ name, rows }));
 }
 
-/** 审计动作 → 时间线标签色。 */
-const ACTION_STYLE: Record<string, string> = {
-  START: 'tag info',
-  COMPLETE_APPROVE: 'tag ok',
-  COMPLETE_REJECT: 'tag err',
-  RETURN: 'tag warn',
-  ADD_SIGN: 'tag info',
-  REASSIGN: 'tag info',
-  URGE: 'tag warn',
-  WITHDRAW: 'tag err',
-  ATTACHMENT_ADD: 'tag',
-  ATTACHMENT_DEL: 'tag',
-  CALLBACK_SENT: 'tag',
-  CALLBACK_FAILED: 'tag err',
+/** 审计动作 → 语义档（只有 5 档；原 `info` 类一律归 run，避免出现第 6 色）。 */
+const ACTION_TONE: Record<string, StatusTone> = {
+  START: 'run',
+  COMPLETE_APPROVE: 'ok',
+  COMPLETE_REJECT: 'err',
+  RETURN: 'warn',
+  ADD_SIGN: 'run',
+  REASSIGN: 'run',
+  URGE: 'warn',
+  WITHDRAW: 'err',
+  ATTACHMENT_ADD: 'idle',
+  ATTACHMENT_DEL: 'idle',
+  CALLBACK_SENT: 'idle',
+  CALLBACK_FAILED: 'err',
 };
+
+/** 实例状态 → 语义档。 */
+const STATUS_TONE: Record<string, StatusTone> = { ACTIVE: 'run', COMPLETED: 'ok', WITHDRAWN: 'warn' };
 
 /** 审批详情弹窗：基本信息 / 审批内容 / 当前待办 / 附件 / 审批历史。
  *  <p>详情内直达操作：办理人可审批（通过/驳回），发起人可催办/撤回——消除「关弹窗回列表」断点。</p> */
@@ -135,60 +152,23 @@ export default function DetailModal({
 }) {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
-  const [detail, setDetail] = useState<ProcessDetailView | null>(null);
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [completeFor, setCompleteFor] = useState<{ task: TaskView; outcome: 'APPROVE' | 'REJECT' } | null>(null);
   /** 发起人重提弹窗（awaitingResubmit 态）。 */
   const [resubmitOpen, setResubmitOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setDetail(await getProcessDetail(processInstanceId, userId));
-    } catch (e) {
-      toast((e as Error).message, 'err');
-      onClose();
-    }
-  }, [processInstanceId, userId, onClose]);
+  // 取数走 useResource：竞态/取消内建；**失败留在弹窗里**给重试，不再 toast 完直接关掉
+  // （关掉后用户看不到原因，也没有任何可操作的东西）。
+  const detailRes = useResource<ProcessDetailView>(
+    ({ signal }) => getProcessDetail(processInstanceId, userId, { signal }),
+    { deps: [processInstanceId, userId] },
+  );
+  const detail = detailRes.data;
+  const reload = detailRes.refresh;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function onUpload(files: FileList | null) {
-    if (!files || files.length === 0 || !detail) return;
-    setBusy(true);
-    try {
-      for (const f of Array.from(files)) {
-        await uploadAttachment(f, detail.businessKey, {
-          processInstanceId: detail.processInstanceId,
-          tenantId: detail.tenantId ?? undefined,
-        });
-      }
-      toast(t('detail.attachUploaded'), 'ok');
-      await load();
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }
-
-  async function onDeleteAttachment(id: string) {
-    setBusy(true);
-    try {
-      await deleteAttachment(id);
-      toast(t('detail.attachDeleted'), 'ok');
-      await load();
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const formDataEntries = detail ? Object.entries(detail.formData ?? {}) : [];
   const running = detail?.status === 'ACTIVE';
 
   // 详情内直达操作：当前用户是待办办理人/候选人 → 可审批；是发起人 → 可催办/撤回
@@ -200,308 +180,399 @@ export default function DetailModal({
       : null;
   const isInitiator = detail?.initiator === userId;
 
-  async function runAction(fn: () => Promise<void>, okMsg: string) {
+  async function onUpload(files: FileList | null) {
+    if (!files || files.length === 0 || !detail) return;
     setBusy(true);
     try {
-      await fn();
-      toast(okMsg, 'ok');
-      await load();
-      onChanged?.();
+      for (const f of Array.from(files)) {
+        await uploadAttachment(f, detail.businessKey, {
+          processInstanceId: detail.processInstanceId,
+          tenantId: detail.tenantId ?? undefined,
+        });
+      }
+      toast.success(t('detail.attachUploaded'));
+      reload();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+      // 清空 input：否则连着再选同一个文件不会触发 change
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function onDeleteAttachment(id: string) {
+    setBusy(true);
+    try {
+      await deleteAttachment(id);
+      toast.success(t('detail.attachDeleted'));
+      reload();
+    } catch (e) {
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <Modal
-      title={t('detail.title')}
-      onClose={onClose}
-      width={560}
-      footer={
-        detail && (
-          <div className="detail-actions">
-            {operableTask && (
-              <>
-                <button
-                  className="btn btn-sm"
-                  disabled={busy}
-                  onClick={() => setCompleteFor({ task: operableTask, outcome: 'APPROVE' })}
-                >
-                  <IconCheck width={14} height={14} /> {t('detail.act.approve')}
-                </button>
-                <button
-                  className="btn btn-sm btn-danger"
-                  disabled={busy}
-                  onClick={() => setCompleteFor({ task: operableTask, outcome: 'REJECT' })}
-                >
-                  {t('detail.act.reject')}
-                </button>
-              </>
-            )}
-            {isInitiator && running && (
-              <>
-                {detail.awaitingResubmit && (
-                  <button className="btn btn-sm" disabled={busy} onClick={() => setResubmitOpen(true)}>
-                    <IconRefresh width={14} height={14} /> {t('init.resubmit')}
-                  </button>
-                )}
-                <button
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => runAction(() => urgeInstance(detail.processInstanceId, userId), t('init.urgeSent'))}
-                >
-                  <IconBell width={14} height={14} /> {t('init.urge')}
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => {
-                    if (window.confirm(t('init.withdrawConfirm', { bk: detail.businessKey }))) {
-                      runAction(
-                        () => withdrawInstance(detail.processInstanceId, userId),
-                        t('init.withdrawDone'),
-                      );
-                    }
-                  }}
-                >
-                  <IconUndo width={14} height={14} /> {t('init.withdraw')}
-                </button>
-              </>
-            )}
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>
-              {t('common.close')}
-            </button>
-          </div>
-        )
-      }
-    >
-      {!detail ? (
-        <div className="empty" style={{ padding: '24px 0' }}>
-          <span>{t('common.loading')}</span>
+  async function runAction(fn: () => Promise<void>, okMsg: string) {
+    setBusy(true);
+    try {
+      await fn();
+      toast.success(okMsg);
+      reload();
+      onChanged?.();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdraw() {
+    if (!detail) return;
+    const ok = await confirm({
+      titleKey: 'init.withdraw',
+      okKey: 'init.withdraw',
+      content: t('init.withdrawConfirm', { bk: detail.businessKey }),
+      danger: true,
+    });
+    if (!ok) return;
+    await runAction(() => withdrawInstance(detail.processInstanceId, userId), t('init.withdrawDone'));
+  }
+
+  const basicItems = useMemo<Array<DescItem<never>>>(() => {
+    if (!detail) return [];
+    const tags = [
+      <CimTag key="s" tone={STATUS_TONE[detail.status] ?? 'idle'}>
+        {detail.status === 'ACTIVE'
+          ? t('detail.statusActive')
+          : detail.status === 'WITHDRAWN'
+            ? t('detail.statusWithdrawn')
+            : t('detail.statusCompleted')}
+      </CimTag>,
+    ];
+    if (detail.round != null && detail.round > 1) {
+      tags.push(
+        <CimTag key="r" tone="run">
+          {t('init.roundBadge', { n: detail.round })}
+        </CimTag>,
+      );
+    }
+    if (detail.awaitingResubmit) {
+      tags.push(
+        <CimTag key="w" tone="warn">
+          {t('init.awaitingResubmit')}
+        </CimTag>,
+      );
+    }
+    return [
+      { key: 'status', label: t('detail.status'), value: <span className="cell-inline">{tags}</span> },
+      { key: 'bk', label: t('detail.businessKey'), value: <span className="mono">{detail.businessKey}</span> },
+      { key: 'proc', label: t('detail.process'), value: detail.definitionName || detail.processKey },
+      { key: 'initiator', label: t('detail.initiator'), value: detail.initiator ?? '—' },
+      {
+        key: 'startedAt',
+        label: t('detail.startedAt'),
+        value: detail.startedAt ? formatDateTime(detail.startedAt) : '—',
+      },
+      { key: 'endedAt', label: t('detail.endedAt'), value: detail.endedAt ? formatDateTime(detail.endedAt) : '—' },
+    ];
+    // t 随语言变化，语言切换时 useTranslation 会触发重渲染，这里跟着重算
+  }, [detail, t]);
+
+  /** 无 schema 时的回退：原始键值表（长文本折行，不截断）。 */
+  const rawItems = useMemo<Array<InfoItem<never>>>(() => {
+    if (!detail) return [];
+    return Object.entries(detail.formData ?? {}).map(([k, v]) => ({
+      key: k,
+      label: k,
+      value: String(v),
+      wrap: true,
+      mono: true,
+    }));
+  }, [detail]);
+
+  const formGroups = useMemo(
+    () => (detail ? buildFormGroups(detail.formData ?? {}, detail.formSchema ?? [], t('detail.groupOther')) : []),
+    [detail, t],
+  );
+  // schema 一个 group 都没声明时，整块只有「其他信息」这一个伪分组 —— 别给它加标题，
+  // 否则详情里会凭空多出一行分组名，看着像漏配了分组
+  const hasExplicitGroup = (detail?.formSchema ?? []).some((f) => (f.group ?? '').trim());
+
+  const taskColumns = useMemo<Array<DataTableColumn<TaskView>>>(
+    () => [
+      {
+        key: 'name',
+        titleKey: 'detail.taskNode',
+        width: 160,
+        render: (tk) => <CimTag tone="run">{tk.name}</CimTag>,
+      },
+      {
+        key: 'who',
+        titleKey: 'detail.assignee',
+        render: (tk) =>
+          tk.assignee
+            ? tk.assignee
+            : `${t('detail.candidates')}: ${tk.candidateUsers.join(', ') || '—'}`,
+      },
+      {
+        key: 'createdAt',
+        titleKey: 'common.createdAt',
+        width: 150,
+        render: (tk) => formatDateTime(tk.createdAt),
+      },
+    ],
+    [t],
+  );
+
+  const attachColumns = useMemo<Array<DataTableColumn<AttachmentView>>>(
+    () => [
+      {
+        key: 'fileName',
+        titleKey: 'detail.attachName',
+        // 文件名本身就是下载入口（action 列不再重复放一个「下载」按钮）
+        render: (a) => (
+          <a className="detail-file" href={attachmentDownloadUrl(a.id)} download>
+            <IconDownload width={14} height={14} /> {a.fileName}
+          </a>
+        ),
+      },
+      {
+        key: 'sizeBytes',
+        titleKey: 'detail.attachSize',
+        width: 90,
+        render: (a) => fmtSize(a.sizeBytes),
+      },
+      { key: 'uploader', titleKey: 'detail.attachUploader', width: 110 },
+      {
+        key: 'actions',
+        titleKey: 'common.actions',
+        width: 70,
+        align: 'right',
+        render: (a) => (
+          <CimButton
+            size="small"
+            danger
+            icon={<IconTrash width={13} height={13} />}
+            iconOnly
+            tooltipKey="common.delete"
+            disabled={busy}
+            onClick={() => onDeleteAttachment(a.id)}
+          />
+        ),
+      },
+    ],
+    // onDeleteAttachment 依赖 detail/busy，闭包每次 render 重建；列定义只依赖 busy 与文案
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [busy, t],
+  );
+
+  const body = () => {
+    if (detailRes.error && !detail) {
+      // 取不到详情：留在弹窗里给原因 + 重试，关掉弹窗等于把错误一起关掉
+      return (
+        <div className="detail-load-error">
+          <EmptyState title={detailRes.error.message} hint={t('detail.loadFailedHint')} />
+          <CimButton size="small" onClick={reload}>
+            {t('common.refresh')}
+          </CimButton>
         </div>
-      ) : (
-        <div className="detail-body">
-          {/* 基本信息 */}
-          <section className="detail-section">
-            <h3 className="detail-section-title">{detail.title || detail.businessKey}</h3>
-            <DisplayFields fields={detail.displayFields} />
-            {/* 审批进度节点条：已到达节点亮起，未到达置灰 */}
-            <FlowProgress nodes={detail.flowNodes} />
-            <div className="detail-grid">
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.status')}</span>
-                <span>
-                  <span className={`tag ${detail.status === 'ACTIVE' ? 'info' : detail.status === 'WITHDRAWN' ? 'warn' : 'ok'}`}>
-                    {detail.status === 'ACTIVE'
-                      ? t('detail.statusActive')
-                      : detail.status === 'WITHDRAWN'
-                        ? t('detail.statusWithdrawn')
-                        : t('detail.statusCompleted')}
-                  </span>
-                  {detail.round != null && detail.round > 1 && (
-                    <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: detail.round })}</span>
-                  )}
-                  {detail.awaitingResubmit && (
-                    <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
-                  )}
-                </span>
-              </div>
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.businessKey')}</span>
-                <span className="mono">{detail.businessKey}</span>
-              </div>
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.process')}</span>
-                <span>{detail.definitionName || detail.processKey}</span>
-              </div>
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.initiator')}</span>
-                <span>{detail.initiator ?? '—'}</span>
-              </div>
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.startedAt')}</span>
-                <span>{detail.startedAt ? formatDateTime(detail.startedAt) : '—'}</span>
-              </div>
-              <div className="detail-grid-item">
-                <span className="detail-label">{t('detail.endedAt')}</span>
-                <span>{detail.endedAt ? formatDateTime(detail.endedAt) : '—'}</span>
-              </div>
-            </div>
-          </section>
+      );
+    }
+    if (!detail) return <EmptyState title={t('common.loading')} />;
+    return (
+      <div className="detail-body">
+        {/* 基本信息 */}
+        <section className="detail-section">
+          <h3 className="detail-section-title">{detail.title || detail.businessKey}</h3>
+          <DisplayFields fields={detail.displayFields} />
+          {/* 审批进度节点条：已到达节点亮起，未到达置灰 */}
+          <FlowProgress nodes={detail.flowNodes} />
+          <CimDescriptions items={basicItems} column={3} />
+        </section>
 
-          {/* 审批内容 */}
-          <section className="detail-section">
-            <h4 className="detail-heading">{t('detail.formData')}</h4>
-            {formDataEntries.length === 0 ? (
-              <p className="detail-empty">{t('detail.formDataEmpty')}</p>
-            ) : detail.formSchema.length > 0 ? (
-              /* schema 模式：按分组渲染中文标签 + 类型化值 */
-              buildFormGroups(detail.formData, detail.formSchema, t('detail.groupOther')).map((g) => (
-                <div className="detail-form-group" key={g.name}>
-                  <div className="detail-form-group-title">{g.name}</div>
-                  <div className="detail-form-grid">
-                    {g.rows.map((r) => (
-                      <div className={`detail-form-item${r.wide ? ' wide' : ''}`} key={r.key}>
-                        <span className="detail-form-label">{r.label}</span>
-                        <span className={`detail-form-value${r.display.length > 40 ? ' long' : ''}`}>
-                          {r.display}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              /* 无 schema：回退为原始键值表 */
-              <div className="table-wrap detail-kv">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 130 }}>{t('detail.field')}</th>
-                      <th>{t('detail.value')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formDataEntries.map(([k, v]) => (
-                      <tr key={k}>
-                        <td className="dim">{k}</td>
-                        <td className="detail-kv-value">{String(v)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+        {/* 审批内容 */}
+        <section className="detail-section">
+          <h4 className="detail-heading">{t('detail.formData')}</h4>
+          {Object.keys(detail.formData ?? {}).length === 0 ? (
+            <p className="detail-empty">{t('detail.formDataEmpty')}</p>
+          ) : (detail.formSchema ?? []).length > 0 ? (
+            /* schema 模式：按分组渲染中文标签 + 类型化值 */
+            formGroups.map((g) => (
+              <CimDescriptions
+                key={g.name}
+                title={hasExplicitGroup ? g.name : undefined}
+                column={2}
+                items={g.rows.map((r) => ({
+                  key: r.key,
+                  label: r.label,
+                  value: r.display,
+                  span: r.wide ? 2 : 1,
+                }))}
+              />
+            ))
+          ) : (
+            /* 无 schema：回退为原始键值表 */
+            <CimInfoTable items={rawItems} />
+          )}
+        </section>
 
-          {/* 当前待办（运行中） */}
-          {running && (
-            <section className="detail-section">
-              <h4 className="detail-heading">{t('detail.currentTasks')}</h4>
-              {detail.activeTasks.length === 0 ? (
-                <p className="detail-empty">{t('detail.noActiveTask')}</p>
-              ) : (
-                <div className="detail-kv">
-                  {detail.activeTasks.map((tk) => (
-                    <div key={tk.taskId} className="detail-task-row">
-                      <span className="tag info">{tk.name}</span>
-                      <span className="detail-task-meta">
-                        {tk.assignee
-                          ? `${t('detail.assignee')}: ${tk.assignee}`
-                          : `${t('detail.candidates')}: ${tk.candidateUsers.join(', ') || '—'}`}
-                        <span className="dim"> · {formatDateTime(tk.createdAt)}</span>
+        {/* 当前待办（运行中） */}
+        {running && (
+          <section className="detail-section">
+            <h4 className="detail-heading">{t('detail.currentTasks')}</h4>
+            <DataTable
+              flat
+              size="small"
+              columns={taskColumns}
+              rows={detail.activeTasks}
+              rowKey={(tk) => tk.taskId}
+              emptyTitleKey="detail.noActiveTask"
+            />
+          </section>
+        )}
+
+        {/* 附件 */}
+        <section className="detail-section">
+          <h4 className="detail-heading">
+            <IconClip width={14} height={14} /> {t('detail.attachments')}
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={(e) => onUpload(e.target.files)}
+            />
+            <CimButton
+              size="small"
+              className="detail-upload-btn"
+              icon={<IconClip width={13} height={13} />}
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              {t('detail.upload')}
+            </CimButton>
+          </h4>
+          <DataTable
+            flat
+            size="small"
+            columns={attachColumns}
+            rows={detail.attachments}
+            rowKey={(a) => a.id}
+            emptyTitleKey="detail.attachEmpty"
+          />
+        </section>
+
+        {/* 审批历史（哈希链：保留自定义时间线，标签色走 5 档语义） */}
+        <section className="detail-section">
+          <h4 className="detail-heading">{t('detail.history')}</h4>
+          <div className="detail-timeline">
+            {detail.history.map((h) => {
+              // 仅 COMPLETE_* 的 detail 是 {comment} JSON；其余动作为 key=value 摘要，不作为意见展示
+              let comment = '';
+              try {
+                const parsed = JSON.parse(h.detail);
+                if (parsed && typeof parsed === 'object' && 'comment' in parsed && parsed.comment) {
+                  comment = String(parsed.comment);
+                }
+              } catch {
+                // 非 JSON：非审批意见，忽略
+              }
+              return (
+                <div key={h.id} className="detail-timeline-item">
+                  <CimTag tone={ACTION_TONE[h.action] ?? 'idle'} size="small">
+                    {t(`detail.action.${h.action}`, h.action)}
+                  </CimTag>
+                  <div className="detail-timeline-body">
+                    <div>
+                      <b>{h.actor}</b>
+                      {h.afterState && <span className="dim"> → {h.afterState}</span>}
+                      <span className="dim" style={{ marginLeft: 8 }}>
+                        {formatDateTime(h.createdAt)}
                       </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* 附件 */}
-          <section className="detail-section">
-            <h4 className="detail-heading">
-              <IconClip width={14} height={14} /> {t('detail.attachments')}
-              <label className="btn btn-sm detail-upload-btn">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={(e) => onUpload(e.target.files)}
-                  disabled={busy}
-                />
-                {t('detail.upload')}
-              </label>
-            </h4>
-            {detail.attachments.length === 0 ? (
-              <p className="detail-empty">{t('detail.attachEmpty')}</p>
-            ) : (
-              <div className="table-wrap detail-kv">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>{t('detail.attachName')}</th>
-                      <th style={{ width: 80 }}>{t('detail.attachSize')}</th>
-                      <th style={{ width: 90 }}>{t('detail.attachUploader')}</th>
-                      <th style={{ width: 120 }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.attachments.map((a) => (
-                      <tr key={a.id}>
-                        <td>
-                          <a className="detail-file" href={attachmentDownloadUrl(a.id)} download>
-                            <IconDownload width={14} height={14} /> {a.fileName}
-                          </a>
-                        </td>
-                        <td>{fmtSize(a.sizeBytes)}</td>
-                        <td>{a.uploader}</td>
-                        <td>
-                          <div className="cell-actions">
-                            <a className="btn btn-sm" href={attachmentDownloadUrl(a.id)} download>
-                              <IconDownload width={13} height={13} /> {t('detail.download')}
-                            </a>
-                            <button
-                              className="btn btn-sm btn-danger"
-                              disabled={busy}
-                              onClick={() => onDeleteAttachment(a.id)}
-                            >
-                              <IconTrash width={13} height={13} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* 审批历史 */}
-          <section className="detail-section">
-            <h4 className="detail-heading">{t('detail.history')}</h4>
-            <div className="detail-timeline">
-              {detail.history.map((h) => {
-                // 仅 COMPLETE_* 的 detail 是 {comment} JSON；其余动作为 key=value 摘要，不作为意见展示
-                let comment = '';
-                try {
-                  const parsed = JSON.parse(h.detail);
-                  if (parsed && typeof parsed === 'object' && 'comment' in parsed && parsed.comment) {
-                    comment = String(parsed.comment);
-                  }
-                } catch {
-                  // 非 JSON：非审批意见，忽略
-                }
-                return (
-                  <div key={h.id} className="detail-timeline-item">
-                    <span className={`tag ${ACTION_STYLE[h.action] ?? 'tag-muted'}`}>
-                      {t(`detail.action.${h.action}`, h.action)}
-                    </span>
-                    <div className="detail-timeline-body">
-                      <div>
-                        <b>{h.actor}</b>
-                        {h.afterState && <span className="dim"> → {h.afterState}</span>}
-                        <span className="dim" style={{ marginLeft: 8 }}>
-                          {formatDateTime(h.createdAt)}
-                        </span>
-                      </div>
-                      {comment && <div className="detail-comment">“{comment}”</div>}
-                      <div className="detail-hash mono" title={h.hash}>
-                        #{h.seq} {h.hash.slice(0, 12)}…
-                      </div>
+                    {comment && <div className="detail-comment">“{comment}”</div>}
+                    <div className="detail-hash mono" title={h.hash}>
+                      #{h.seq} {h.hash.slice(0, 12)}…
                     </div>
                   </div>
-                );
-              })}
-              {detail.history.length === 0 && <p className="detail-empty">{t('common.empty')}</p>}
-            </div>
-          </section>
+                </div>
+              );
+            })}
+            {detail.history.length === 0 && <p className="detail-empty">{t('common.empty')}</p>}
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  return (
+    <CimModal
+      open
+      onClose={onClose}
+      title={t('detail.title')}
+      width={820}
+      footer={
+        <div className="detail-actions">
+          {operableTask && (
+            <>
+              <CimButton
+                size="small"
+                type="primary"
+                icon={<IconCheck width={14} height={14} />}
+                disabled={busy}
+                onClick={() => setCompleteFor({ task: operableTask, outcome: 'APPROVE' })}
+              >
+                {t('detail.act.approve')}
+              </CimButton>
+              <CimButton
+                size="small"
+                danger
+                disabled={busy}
+                onClick={() => setCompleteFor({ task: operableTask, outcome: 'REJECT' })}
+              >
+                {t('detail.act.reject')}
+              </CimButton>
+            </>
+          )}
+          {isInitiator && running && (
+            <>
+              {detail?.awaitingResubmit && (
+                <CimButton
+                  size="small"
+                  icon={<IconRefresh width={14} height={14} />}
+                  disabled={busy}
+                  onClick={() => setResubmitOpen(true)}
+                >
+                  {t('init.resubmit')}
+                </CimButton>
+              )}
+              <CimButton
+                size="small"
+                icon={<IconBell width={14} height={14} />}
+                disabled={busy}
+                onClick={() => runAction(() => urgeInstance(detail!.processInstanceId, userId), t('init.urgeSent'))}
+              >
+                {t('init.urge')}
+              </CimButton>
+              <CimButton
+                size="small"
+                icon={<IconUndo width={14} height={14} />}
+                disabled={busy}
+                onClick={withdraw}
+              >
+                {t('init.withdraw')}
+              </CimButton>
+            </>
+          )}
+          <CimButton size="small" type="text" onClick={onClose}>
+            {t('common.close')}
+          </CimButton>
         </div>
-      )}
+      }
+    >
+      {body()}
       {completeFor && (
         <CompleteModal
           task={completeFor.task}
@@ -521,13 +592,14 @@ export default function DetailModal({
       {resubmitOpen && detail && (
         <ResubmitModal
           processInstanceId={detail.processInstanceId}
+          initial={detail}
           onClose={() => setResubmitOpen(false)}
           onDone={() => {
-            load();
+            reload();
             onChanged?.();
           }}
         />
       )}
-    </Modal>
+    </CimModal>
   );
 }
