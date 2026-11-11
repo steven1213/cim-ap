@@ -4,6 +4,10 @@
 > 目的：回答两个问题——① 页面**真的用**了 `platform/web/packages` 里的组件吗？② 现有界面里还有哪些东西**该上提**却没上提？
 > 统计口径见 [§6](#6-统计口径可复现)，全部数字由脚本实测得出，不是估算。
 
+> **状态：已收口（同日）**。用户指令「没有用已有组件的都应该用」下达后，按本文 §3 的 **B 方案**全部执行完毕：171 个裸 `<button>`、22 个 `.alert`、`.field` 容器、`.kpi` 容器、6 个手写状态页全部清零，`CimButton` 改为渲染原生 `<button className="btn …">`（视觉零变化）。执行记录见 `AUDIT.md §31`，**本文保留为审计证据与决策依据**；§3 的「A / B 两方案待拍板」已按 B 定案，§4 清单里除 `LanguageSwitcher` / `NotificationBell` 外均已落地。
+
+⚠️ **§1 表内 `.kpi` / `.field` 两列的原始数字有口径错误**，见 §1 下方的更正说明。
+
 ---
 
 ## 1. 采用度现状
@@ -13,7 +17,9 @@
 | iam-ap | 21 | 16 | 74 | 0（已迁） | 11 | 65 | 5 | 593 行 |
 | rms-ap | 23 | 19 | 92 | 131 | 9 | 0 | 1 | 1175 行 |
 | approval-ap | 10 | 9 | 5 | 40 | 1 | 36 | 0 | 1994 行 |
-| **合计** | **54** | **44** | **171** | **171** | **21** | **101** | **6** | **3762 行** |
+| **合计** | **54** | **44** | **171** | **171**⚠️ | **21** | **101**⚠️ | **6** | **3762 行** |
+
+⚠️ **口径更正**：`.kpi` 与 `.field` 两列是按 `className="kpi` / `"field"` **前缀**匹配出来的，把 `kpi-main` / `kpi-label` / `kpi-val` / `field-label` / `field-hint` 这些**子元素**也算进去了，属于口径错误。按「容器元素」精确复核后：`.kpi` 容器 **40 处**（原记 171）、`.field` 容器 **49 处**（原记 101）。裸 `<button>` 的 74/92/5 = 171 是对的（按元素计）。§6 的脚本已按此更新（加 `\s|>` 边界约束）。
 
 **结论一：数据层与容器层已收敛，控件层没有。**
 
@@ -89,22 +95,30 @@
 
 倾向 **B**（先统一语义、再统一外观），但这是产品决策，不宜由重构单方面决定。
 
+**→ 已定案并按 B 执行完毕（2026-11-12）**。定案依据是用户指令「没有用已有组件的都应该用」——这条要求同时蕴含"必须用组件"和"视觉不能变"，只有 B 能同时成立。执行要点（细节见 `AUDIT.md §31`）：
+
+- `.btn` 体系上提 `ui.css`，但**必须保留联合选择器 `button, .btn`**：原设计下所有原生 `<button>` 默认就是主色按钮外观，`btn-ghost`/`btn-sm` 只是修饰类（页面里大量 `<button className="btn-ghost btn-sm">` 根本没有 `.btn` 基类）。拆开会静默改变 166 个按钮的外观。
+- `CimButton` 加 `bare` 形态：`icon-btn`/`chip-x`/`tree-toggle`/`user-chip`/`bell-item`/`node-del` 这些**不是按钮的控件**不能套 `.btn` 基类。
+- 余 9 处 `<Link className="btn …">` 与 1 处 `<Link className="kpi">` 保留手写：`CimButton` 渲染 `<button>`，`<a>` 内嵌 `<button>` 是非法 HTML；这正是联合选择器要留 `button, .btn` 两半的原因。
+
 ---
 
 ## 4. 待上提清单（按 ROI 排序）
 
-| # | 候选 | 现状与证据 | 阻塞点 | 建议动作 |
-| --- | --- | --- | --- | --- |
-| 1 | `.btn` 系列按钮 | 见 §3，171 处 | 视觉路线未定 | 先定 A/B，再机械替换 |
-| 2 | `KpiCard` 推广（RMS 131 / approval 40） | 组件已就绪；RMS 用 `<Link className="kpi">`、approval 用 `<Link>` 包 `<span>` | 带跳转的卡需要"外层是链接"的形态 | 给 `KpiCard` 加 `as`/`href` 或提供 `KpiCardLink`（不引 router，收 `render` 回调） |
-| 3 | `InlineAlert` 推广（余 21 处） | 组件已就绪 | 无 | 逐页替换，顺带把「错误 + 重试」组合统一到 `useResource` 的 `refresh` |
-| 4 | `LanguageSwitcher` × 3 | IAM 61 / RMS 51 / approval 31 行，**语义不同**：IAM 走 `/api/i18n/locales` 远端目录 + `LocaleInfo`，另两个用内置两语种 | 三份行为不一致 | 上提 `@cim/shell`，语言目录由应用注入（props 传 `locales` / `onChange`） |
-| 5 | `NotificationBell` × 2（RMS 180 / approval 123） | 重复的"轮询未读 + 下拉列表"逻辑，取数接口不同 | 依赖各 ap 通知 API | 上提为受控组件：`fetch` 与 `onOpenItem` 由 props 注入 |
-| 6 | 状态页（403 / 404 / ComingSoon / 登录中继） | 6 个文件 ~350 行，同一套 `.panel` + `<h1>` + 裸按钮手写三遍 | 无 | 上提 `StatusPage`（`code` / `titleKey` / `descKey` / `action`），三应用替换 |
-| 7 | `.split` 双栏 | 6 处 5 文件；`ui.css` 已有 `.split` 样式但**无组件** | 无 | 加 `SplitPane`（`left` / `right` / `ratio`），顺带把 `CimSplitter` 的用途讲清 |
-| 8 | `.field` 表单块 | 101 处（IAM 65 / approval 36）；`FormGrid` 已存在但只 4/4 文件使用 | 与 `FormGrid` 职责重叠 | **不建议**新增组件，按页把 `.field` 手写块并进 `FormGrid` |
-| 9 | `PermTree`（IAM 335 行） | 单应用 | 领域组件 | 不上提 |
-| 10 | `th`/`td` 手写表 | 仅 RMS `Dashboard` / `DeviceArea` 各 1 处 | 无 | 换 `DataTable`（`scrollX` 已支持） |
+> 状态列：✅ 已落地 / ⏳ 仍待办。除 `LanguageSwitcher` 与 `NotificationBell` 外均已于同日落地（`AUDIT.md §31`）。
+
+| # | 候选 | 现状与证据 | 阻塞点 | 建议动作 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `.btn` 系列按钮 | 见 §3，171 处 | 视觉路线未定 | 先定 A/B，再机械替换 | ✅ 按 B 落地，裸 `<button>` 清零 |
+| 2 | `KpiCard` 推广（RMS 131 / approval 40） | 组件已就绪；RMS 用 `<Link className="kpi">`、approval 用 `<Link>` 包 `<span>` | 带跳转的卡需要"外层是链接"的形态 | 给 `KpiCard` 加 `as`/`href` 或提供 `KpiCardLink`（不引 router，收 `render` 回调） | ✅ 改为 `KpiCard bare` 只吐内层 body，链接仍由 `<Link>` 承担（比引 router 更轻） |
+| 3 | `InlineAlert` 推广（余 21 处） | 组件已就绪 | 无 | 逐页替换，顺带把「错误 + 重试」组合统一到 `useResource` 的 `refresh` | ✅ `.alert` 清零 |
+| 4 | `LanguageSwitcher` × 3 | IAM 61 / RMS 51 / approval 31 行，**语义不同**：IAM 走 `/api/i18n/locales` 远端目录 + `LocaleInfo`，另两个用内置两语种 | 三份行为不一致 | 上提 `@cim/shell`，语言目录由应用注入（props 传 `locales` / `onChange`） | ⏳ 仍待办 |
+| 5 | `NotificationBell` × 2（RMS 180 / approval 123） | 重复的"轮询未读 + 下拉列表"逻辑，取数接口不同 | 依赖各 ap 通知 API | 上提为受控组件：`fetch` 与 `onOpenItem` 由 props 注入 | ⏳ 仍待办 |
+| 6 | 状态页（403 / 404 / ComingSoon / 登录中继） | 6 个文件 ~350 行，同一套 `.panel` + `<h1>` + 裸按钮手写三遍 | 无 | 上提 `StatusPage`（`code` / `titleKey` / `descKey` / `action`），三应用替换 | ✅ 未新增 `StatusPage`，而是把 `EmptyState` 扩到 `icon`/`children`/`large` 后统一为 `Panel + EmptyState`（少一个组件、少一层概念） |
+| 7 | `.split` 双栏 | 6 处 5 文件；`ui.css` 已有 `.split` 样式但**无组件** | 无 | 加 `SplitPane`（`left` / `right` / `ratio`），顺带把 `CimSplitter` 的用途讲清 | ⏳ 仍待办 |
+| 8 | `.field` 表单块 | 101 处（IAM 65 / approval 36）；`FormGrid` 已存在但只 4/4 文件使用 | 与 `FormGrid` 职责重叠 | **不建议**新增组件，按页把 `.field` 手写块并进 `FormGrid` | ✅ 结论修正：容器口径实为 49 处，`CimField` 已存在但**没有 CSS**（空壳）→ 补样式后全部替换，`FormGrid` 只在"整表配置驱动"时用 |
+| 9 | `PermTree`（IAM 335 行） | 单应用 | 领域组件 | 不上提 | — |
+| 10 | `th`/`td` 手写表 | 仅 RMS `Dashboard` / `DeviceArea` 各 1 处 | 无 | 换 `DataTable`（`scrollX` 已支持） | ⏳ 仍待办 |
 
 ---
 
@@ -127,8 +141,10 @@
 ```bash
 # 1) 裸控件：页面目录下数原生标签
 grep -rc '<button' business/*/web/src/pages/*.tsx
-# 2) 手写结构：数 style 类名出现次数
-grep -rc 'className="kpi\|className="alert\|className="field\|className="split' business/*/web/src/pages/*.tsx
+# 2) 手写结构：数「容器元素」，必须带边界约束。
+#    ⚠️ 别写 'className="kpi' —— 前缀匹配会把 kpi-main/kpi-label/kpi-val/field-label/field-hint
+#    这些子元素一起算上（首版就是这样把 40 数成 171、49 数成 101 的）。
+grep -rEo 'className="(kpi|alert|field|split)("|\s)' business/*/web/src --include=*.tsx
 # 3) 组件采用度：每个页面是否 import 了 @cim/*
 grep -rl "@cim/ui\|@cim/data" business/*/web/src/pages/*.tsx
 # 4) 跨应用重复组件：逐字节比对（先按文件名配对）
@@ -136,4 +152,7 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 # 5) 样式重复：按选择器聚合三份 styles.css，比较规则体 md5
 ```
 
-**坑**：页面是 `pageRegistry` 里 `lazy(() => import(...))` 的，按"谁 import 了它"扫会全部误判成死代码；判断死代码要先排除 `pages/`，再对 `components/` 单独 grep。
+**坑一**：页面是 `pageRegistry` 里 `lazy(() => import(...))` 的，按"谁 import 了它"扫会全部误判成死代码；判断死代码要先排除 `pages/`，再对 `components/` 单独 grep。
+
+**坑二（数字口径）**：`className="kpi` 这类**前缀**匹配会把子元素算进容器数。凡是要报"容器有几处"，正则必须带 `("|\s)` 边界。这条错误已经污染过一版审计表（`.kpi` 40→被数成 171、`.field` 49→被数成 101），更正记录见 §1。
+

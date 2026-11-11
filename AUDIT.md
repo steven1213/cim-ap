@@ -414,6 +414,7 @@
   | approval-ap | 10 | 9 | 5 | 40 | 1 | 36 | 0 | 1994 |
 
   结论：数据层与容器层（`Page`/`Panel`/`DataTable`/`useResource`/`FormGrid`/`CimModal`）已收敛；控件层没收敛——`CimButton` 仅 11 文件，`StatusTag`/`ToneTag`/`CimTooltip`/`CimSplitter`/`useColumns` **0 采用**。
+  - ⚠️ **口径更正（同日后补）**：上表 `.kpi` 与 `.field` 两列是按 `className="kpi` / `"field"` **前缀**匹配出来的，把 `kpi-main`/`kpi-label`/`kpi-val`/`field-label`/`field-hint` 这些**子元素**也算进去了，属于口径错误。按「容器元素」精确复核：`.kpi` 容器 **40 处**（非 171）、`.field` 容器 **49 处**（非 101）。裸 `<button>` 的 74/92/5=171 是对的（按元素计）。
 - **关键修复（静默失效，本轮最重要的一条）**：`@cim/ui` 的 `<Can>` 与 `<CimButton perm>` 读 `UiPermissionProvider` 注入的上下文，而**三个应用一个都没挂这个 Provider**——未挂时走「一律放行」兜底，界面完全正常、权限门却不起作用，也不会有任何报错。已在 `iam`/`rms` 的 `main.tsx` 补挂（`has` ← `usePermissions`，`ready` ← `permissionsLoaded`），30 处 `<Perms code|codes>` 全量并入 `<Can perm>`（含 9 处字符串字面量写法），删两份逐字节相同的 `Perms.tsx`。
 - **上提与去重**：
   - 通用图标 34 个 → `@cim/ui/icons.tsx`：证据是 IAM 34 个是 RMS 37 个的**子集**且 `<svg>` 子节点**逐字节相同**（md5），两份 723 行重复；两应用文件改薄壳（44 / 86 行），页面 `from '@/components/Icons'` 零改动。approval 的 30 个是另一套画法（`IconCheck` vs `IconCheckCircle`），**不强合并**。
@@ -421,11 +422,48 @@
   - 新增 `KpiCard`/`KpiGrid`（`.kpi` 手写 178 处，IAM 还自带同款局部组件）与 `InlineAlert`（`.alert` 手写 22 处，刻意不含重试按钮——按钮位置各页现状不同）。
   - 删 4 个**零引用**组件：`components/Panel.tsx` ×3、`rms/components/Drawer.tsx`。（页面是 `pageRegistry` 里 `lazy()` 的，按「谁 import 了它」扫会把全部页面误判成死代码——审计文档已记录这个坑。）
 - **验证（已跑通）**：三应用 `tsc -p tsconfig.json --noEmit` 零错 + `vite build` 通过（9.35s / 9.79s / 9.65s）；IAM 渲染契约 **33/33**（该测试同步补挂 `UiPermissionProvider`——否则 `<Can>` 走放行兜底，「无权限不挂载」的断言会**反转成通过**）；产物 CSS 中 `.alert` 7 选择器来自 `cim-ui-*.css`、`.login-card .alert` 覆盖仍在。
-- **风险 / 待办**：
-  - **171 个裸 `<button>` 未动**，因为存在两套视觉：`CimButton` 基于 antd `Button`，页面用的是手写 `.btn`（样式仍在各应用 `styles.css`）。批量替换等于全站按钮改版。审计文档给了 A（视觉向 antd 收）/ B（`CimButton` 内部改渲染 `.btn`，保留 `perm`/`tooltip`/`labelKey` 三个增量）两条路，**倾向 B，但属产品决策，未单方面执行**。
-  - `KpiCard` 尚未推广到 RMS（131 处，卡外层是 `<Link className="kpi">`）与 approval（40 处，`<Link>` 包 `<span>`）：需要先给组件加「外层是链接」的形态（不引 router，收 `render` 回调）。
-  - `InlineAlert` 余 21 处待逐页替换；`LanguageSwitcher`（三份语义不同）/ `NotificationBell`（两份，依赖各 ap 通知 API）/ 状态页（403/404/ComingSoon/登录中继，三遍手写）见审计文档 §4 的 ROI 排序。
+- **风险 / 待办**（下列三条均已于同日落地，见 §31）：
+  - ~~**171 个裸 `<button>` 未动**~~ → **已按 B 方案全量替换**（`CimButton` 内部改渲染原生 `.btn`，视觉零变化），见 §31。
+  - ~~`KpiCard` 尚未推广到 RMS / approval~~ → **已推广**，靠 `KpiCard bare` 承载「整卡是链接」形态，见 §31。
+  - ~~`InlineAlert` 余 21 处待逐页替换~~ → 已清零；状态页 6 个统一 `Panel + EmptyState`，见 §31。
+  - 仍待办：`LanguageSwitcher`（三份语义不同）/ `NotificationBell`（两份，依赖各 ap 通知 API）见审计文档 §4 的 ROI 排序。
   - 负向清单（明确**不**上提）：`RecipeDetailDrawer` / `SpecEditModal` / `DiffTable` / `DetailModal` / `FlowProgress` / `IdentitySwitcher` / `PermTree` —— 均绑领域模型，避免后来者重复评估。
+
+### 31. refactor(web)：手写控件全量改用组件层（按钮 / 表单 / 提示 / 指标卡 / 状态页）
+
+- **决策依据**：用户指令「**没有用已有组件的都应该用**」。这条同时隐含了 §30 里 A/B 两方案的选择——「都用组件」与「视觉不变」必须同时成立，若 `CimButton` 保持 antd 外观，替换就是全站改版 → 走 **B**：`CimButton` 内部改为渲染原生 `<button className="btn …">`。
+- **数量决定方向**：手写 `.btn` 侧 200 处 vs `CimButton`(antd) 侧 45 处。让组件迁就多数派只改一处；让 200 处迁就 antd 是一次全站视觉改版。
+- **先补组件、再做替换**（关键顺序，否则每一步替换都是退化）：
+  | 缺口 | 补法 | 为什么必须先补 |
+  | --- | --- | --- |
+  | `CimButton` 只有 antd 外观 | 改渲染原生 `<button>`，新增 `bare`/`btn-text`/`btn-spinner`/原生属性透传 | 否则每一个替换点都是视觉变更 |
+  | `icon-btn`/`chip-x`/`tree-toggle`/`user-chip`/`bell-item`/`node-del`/`dcrumb-link` 不是按钮 | `bare`：不套 `.btn` 基类，样式全交给 `className`，组件只给权限门与无障碍 | 套上 `.btn` 会拿到主色底 + 14px 内边距 + 600 字重 |
+  | `CimField` 是**空壳**：组件存在但 `ui.css` 里没有任何 `.cim-field` 样式 | 补 `.cim-field*` 全套（原样搬自三份逐字节相同的 `.field` 段） | 这是「组件化不了」的真实根因——不是组件没写，是样式没跟着上来 |
+  | `KpiCard` 只能渲染 `<div>` | 加 `bare`（只吐内层 body）与 `err` 色调 | RMS 指标卡整卡是 `<Link>`；approval 早就拼 `'kpi' + (dead>0?' err':'')` 但 `kpi.err` 这条 CSS 从来没写过 |
+  | `EmptyState` 只有主副文案 | 加 `icon`/`children`（动作区）/`large` | 403/404/ComingSoon 是整页状态，需要图标与「返回概览」按钮 |
+  | `CimField`/`InlineAlert` 无 `style` | 透传 `style` 与其余原生属性 | 存量 21+14 处 `style={{ marginTop: 10 }}` 这类就地微调，否则每处都要包一层 div |
+- **替换结果（脚本批量 + 逐页复核）**：
+  | 项 | 替换前 | 替换后 | 说明 |
+  | --- | --- | --- | --- |
+  | 裸 `<button>` | 171 | **0** | `CimButton` 元素数 45 → **248** |
+  | `.field` 容器（含手抄 `cim-field`） | 49 + 20 | **0** | `CimField` 元素数 → **79** |
+  | 裸 `input`/`textarea.text-input` | 11 类 98 处 | 仅剩 checkbox/radio/file/number | `CimInput` 元素数 → **66**；语义控件不属文本框组件 |
+  | `.alert` | 22 | **0** | `InlineAlert` 元素数 → **31** |
+  | `.kpi` 容器 | 40 | **0** | `KpiCard` 元素数 → **51**（含 `bare` 链接形态） |
+  | 手写状态页 | 6（三套写法） | 0 | 统一 `Panel + EmptyState large` |
+  | 三份 `styles.css` 合计 | 3762 | **3347** | 删 `.btn` 62 / `.field*` 79 / `.alert` / `.empty-state*` / `.text-input` |
+- **三条坑（都是「不看就会踩」级别）**：
+  1. **`.btn` 是联合选择器 `button, .btn`**，不是单纯类。原设计下**所有原生 `<button>` 默认就是主色按钮外观**，`btn-ghost`/`btn-sm` 只是修饰类——页面里大量 `<button className="btn-ghost btn-sm">`（**没有** `.btn` 基类）照样正常。第一版把 `.btn` 单独搬走，导致 166 个按钮退回浏览器默认外观，还在三份 `styles.css` 留下悬空的 `button,` 让后继 `.row` 规则被吞进同一组选择器。已在 `ui.css` 恢复联合选择器并写明原因。
+  2. **批量替换必须区分「按钮」与「长得像按钮的控件」**。第一版把 `icon-btn` 全改成 `type="primary"`，视觉全变——**IAM 渲染契约 3 条断言当场抓到**，否则会静默上线。故脚本加 `bare` 分支，回滚全部 `.tsx` 重跑。
+  3. **改渲染目标会改变属性顺序**：`{...rest}` 提前展开后标签变成 `title → type → class`，写死相邻属性的断言（`<button class="icon-btn" title="…"`）会因为一个正确的新增属性而失败 → 断言改 lookahead 跨属性匹配（`05482da`）。
+- **伴生规则漏搬的回归（`d793fe5` 修）**：`.cim-field + .cim-field { margin-top: 11px }` 原本由 `.grid-2 > .field + .field { margin-top: 0 }` 在网格里禁掉；换成组件后网格容器变成 `.cim-form-grid`，**这条例外没跟着上来** → 2/3 列字段在 11px gap 上又叠 11px margin，整列下移。补 `.cim-form-grid > .cim-field + .cim-field`，`.grid-2/.grid-3` 两条也保留（页面手写网格仍在用）。**教训：上提一段 CSS 时要连它的「例外 / 覆盖」规则一起搬，只搜主选择器会漏。**
+- **保留的手写（不是漏网，是「组件表达不了」）**：
+  - 9 处 `<Link className="btn …">`：`CimButton` 渲染 `<button>`，`<a>` 里嵌 `<button>` 是非法 HTML。这正是 `.btn` 必须保留联合选择器 `button, .btn` 的另一半理由。
+  - `<Link className="kpi">`：整卡是链接，内层用 `KpiCard bare`。
+  - `approval` 的 `.field-row`：一行控件的布局工具，不带标签，与 `CimField` 语义不同。
+- **验证（全绿）**：三应用 `tsc -p tsconfig.json --noEmit` 零错；`vite build` 通过（13.51 / 13.37 / 13.64s）；IAM 渲染契约 **33/33**；产物 CSS 核对 `.btn-ghost` 仅 1 份且来自 `cim-ui` 包。
+- **提交**：`d00227f`（ui 层补齐）→ `dc5d6a1`（iam）→ `72f69fd`（rms）→ `35ed2b3`（approval）→ `05482da`（渲染契约）→ `d793fe5`（网格 margin + compact）→ `5158e2f`（最后 3 处 `.field` 与三份 CSS 段删除）。
+- **待办**：`StatusTag`/`ToneTag`/`CimTooltip`/`CimSplitter`/`useColumns` 仍 0 采用（`ToneTag`/`StatusTag` 与 `Tone` 语义重叠，需先合并 API）；`LanguageSwitcher` 三份语义不同；`NotificationBell` 两份依赖各 ap 通知 API。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
