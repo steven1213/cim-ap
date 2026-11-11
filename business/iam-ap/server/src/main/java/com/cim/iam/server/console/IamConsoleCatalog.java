@@ -381,6 +381,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.field.type", "类型", "Type"));
         t.add(new TextDef("iam.field.sortNo", "排序", "Order"));
         t.add(new TextDef("iam.field.visible", "可见", "Visible"));
+        t.add(new TextDef("iam.field.status", "状态", "Status"));
         t.add(new TextDef("iam.field.permCode", "权限码", "Permission"));
         t.add(new TextDef("iam.field.i18nCode", "文案键", "Text key"));
         t.add(new TextDef("iam.field.locale", "语言", "Locale"));
@@ -445,6 +446,9 @@ public final class IamConsoleCatalog {
                 "A button node requires a permission code"));
         t.add(new TextDef("iam.admin.menus.visibleHint", "关闭后不出现在侧栏导航（路由仍可达）",
                 "When off, the entry is hidden from the sidebar (the route stays reachable)"));
+        t.add(new TextDef("iam.admin.menus.empty", "暂无菜单节点", "No menu nodes yet"));
+        t.add(new TextDef("iam.admin.menus.emptyHint", "点右上角「新建根节点」开始搭建导航树",
+                "Use \"New root node\" at the top-right to start building the navigation tree"));
         // —— 权限管理页 ——
         t.add(new TextDef("iam.admin.perms.new", "新建权限码", "New permission code"));
         t.add(new TextDef("iam.admin.perms.count", "权限点", "Permissions"));

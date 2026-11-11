@@ -611,12 +611,13 @@ button:disabled {
   }
 }
 
-/* 组织树节点：名称 + 编码 + 语义标签同一行（CimTree 的 labelNode） */
-.org-tree-node {
+/* 树节点内容：名称 + 编码/徽标同一行（CimTree 的 labelNode）。组织页与菜单页共用 */
+.tree-node-inline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.org-tree {
+/* 嵌在 flush 面板里的树：给一点内边距，否则第一行贴着标题栏 */
+.tree-pad {
   padding: 8px 10px 12px;
 }

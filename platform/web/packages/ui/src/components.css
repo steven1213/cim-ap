@@ -87,6 +87,11 @@
   line-height: 1.5;
   color: var(--muted);
 }
+/* `.cim-field` 是竖向 flex，子项默认 `align-items: stretch` —— 开关（inline-flex，
+   宽度靠内容）会被拉成整行，看上去像一条蓝色横条而不是开关。让它保持自身宽度。 */
+.cim-field > .ant-switch {
+  align-self: flex-start;
+}
 .cim-field-error {
   margin: 0;
   font-size: 11px;

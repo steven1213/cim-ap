@@ -123,7 +123,7 @@ export default function OrgPage() {
       key: n.id,
       searchText: `${n.name} ${n.code}`,
       labelNode: (
-        <span className="org-tree-node">
+        <span className="tree-node-inline">
           <span className="tree-name">{n.name}</span>
           <span className="cim-mono dim">{n.code}</span>
           <CimTag size="small">{orgTypeLabel(n.nodeType)}</CimTag>
@@ -295,7 +295,7 @@ export default function OrgPage() {
               </button>
             </div>
           ) : treeNodes.length ? (
-            <div className="org-tree">
+            <div className="tree-pad">
               <CimTree
                 nodes={treeNodes}
                 selectedKeys={selected ? [selected] : []}
