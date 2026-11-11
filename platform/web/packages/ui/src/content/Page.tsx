@@ -47,20 +47,55 @@ export function PageHead({
   );
 }
 
-/** 面板容器（等价于 `.panel`），用于包裹表格 / 详情块。 */
+/**
+ * 面板容器（等价于 `.panel`），用于包裹表格 / 详情块。
+ *
+ * 传 `title`（或 `titleKey`）时渲染标题栏 —— 现仓各 ap 都有一份自家的 `Panel`
+ * 薄壳（`business/<ap>/web/src/components/Panel.tsx`），结构完全一样、只是无法复用。
+ * 这里补上 `title / sub / actions / flush` 四个属性，业务侧那份薄壳即可删除。
+ *
+ * 不传 `title` 且不传 `actions` 时不渲染头部，保持「纯容器」行为不变。
+ */
 export function Panel({
   children,
   className,
   style,
+  titleKey,
+  title,
+  subKey,
+  sub,
+  actions,
+  flush = false,
 }: {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
+  titleKey?: string;
+  title?: ReactNode;
+  /** 标题下方的小号说明。 */
+  subKey?: string;
+  sub?: ReactNode;
+  /** 头部右侧操作区。 */
+  actions?: ReactNode;
+  /** 内容区去掉内边距（表格贴边）。 */
+  flush?: boolean;
 }) {
+  const t = useUiT();
+  const head = titleKey ? t(titleKey) : title;
+  const desc = subKey ? t(subKey) : sub;
   return (
-    <div className={cx('panel', className)} style={style}>
-      {children}
-    </div>
+    <section className={cx('panel', className)} style={style}>
+      {head || actions ? (
+        <header className="panel-head">
+          <div className="panel-heading">
+            {head ? <h2 className="panel-title">{head}</h2> : null}
+            {desc ? <p className="panel-sub">{desc}</p> : null}
+          </div>
+          {actions ? <div className="panel-actions">{actions}</div> : null}
+        </header>
+      ) : null}
+      <div className={cx('panel-body', flush && 'flush')}>{children}</div>
+    </section>
   );
 }
 

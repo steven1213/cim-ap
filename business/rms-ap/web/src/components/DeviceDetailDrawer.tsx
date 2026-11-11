@@ -1,15 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimDescriptions,
+  CimDrawer,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type DescItem,
+  type FormField,
+} from '@cim/ui';
+import type { StatusTone } from '@cim/theme';
 import Perms from '@/components/Perms';
 import ChamberSection from '@/components/ChamberPanel';
 import * as api from '@/lib/rmsApi';
-import type {
-  Device,
-  DeviceChamber,
-  DeviceRecipeRow,
-  DeviceRecipeView,
-  Recipe,
-} from '@/types';
+import type { Device, DeviceChamber, DeviceRecipeRow, Recipe } from '@/types';
 
 interface Props {
   device: Device;
@@ -25,12 +34,34 @@ interface Props {
   onEdit?: () => void;
 }
 
+const NO_RECIPES: Recipe[] = [];
+const NO_CHAMBERS: DeviceChamber[] = [];
+
+interface BindDraft {
+  ppid: string;
+  recipeId: string;
+  chamberId: string;
+}
+
+const EMPTY_BIND: BindDraft = { ppid: '', recipeId: '', chamberId: '' };
+
 /**
  * 机台详情抽屉（W7 体验整合的「机台枢纽」）。
  *
  * <p>用户动线：在设备台账点开一台机 → <b>一处</b>看到并维护它的全部配方相关事项：
  * 基本信息 / 腔体 / 装载的配方（含资格与漂移）/ 绑定新配方（PPID + 腔体）。
  * 不再需要跨「设备台账 → 集成监控 → 设备配方」三个页面。</p>
+ *
+ * <p>迁移要点：</p>
+ * <ul>
+ *   <li>手写 `.drawer-backdrop` → `CimDrawer`（焦点/Esc/锁滚动由 antd 承担）。</li>
+ *   <li>`view` / `recipes` / `chambers` 三份状态各一个 `useResource`，
+ *       `deps:[device.id]`：抽屉换机台时旧请求被取消，不会把上一台的配方画到这一台。</li>
+ *   <li>`window.confirm` → `useConfirm`；页内常驻红条 → toast。</li>
+ *   <li>两个原生 `<select>` → `CimSelect`（可搜索：配方上百条时下拉可筛）。</li>
+ *   <li>手写 `<table class="data">` → `DataTable flat`；行点击进配方详情用 `onRowClick`，
+ *       孤儿行（`recipeId` 为空）不可点。</li>
+ * </ul>
  */
 export default function DeviceDetailDrawer({
   device,
@@ -42,278 +73,223 @@ export default function DeviceDetailDrawer({
   onEdit,
 }: Props) {
   const { t } = useTranslation();
-  const [view, setView] = useState<DeviceRecipeView | null>(null);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [recipeId, setRecipeId] = useState('');
-  const [chambers, setChambers] = useState<DeviceChamber[]>([]);
-  const [chamberId, setChamberId] = useState('');
-  const [ppid, setPpid] = useState('');
+  const toast = useToast();
+  const confirm = useConfirm();
+
+  const [draft, setDraft] = useState<BindDraft>(EMPTY_BIND);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
 
-  async function loadView() {
-    try {
-      setView(await api.deviceRecipes(device.id));
-    } catch (e: any) {
-      setErr(e?.message || 'error');
-    }
-  }
+  const viewRes = useResource(() => api.deviceRecipes(device.id), { deps: [device.id] });
+  const recipesRes = useResource(() => api.listRecipes(), { deps: [device.id] });
+  const chambersRes = useResource(() => api.listChambers(device.id), { deps: [device.id] });
 
-  useEffect(() => {
-    setErr('');
-    loadView();
-    api.listRecipes().then(setRecipes).catch(() => undefined);
-    api.listChambers(device.id).then(setChambers).catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [device.id]);
+  const view = viewRes.data;
+  const rows = view?.rows ?? [];
+  const recipes = recipesRes.data ?? NO_RECIPES;
+  const chambers = chambersRes.data ?? NO_CHAMBERS;
 
-  useEffect(() => {
-    setChamberId('');
-  }, [ppid]);
+  const recipeOptions = recipes.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}` }));
+  const chamberOptions = chambers.map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` }));
+
+  const fields: Array<FormField<BindDraft>> = [
+    { key: 'ppid', kind: 'text', labelKey: 'rms.tools.ppid', placeholder: 'PPID-001', mono: true, required: true },
+    { key: 'recipeId', kind: 'select', labelKey: 'rms.deviceRecipes.recipe', options: recipeOptions, placeholderKey: 'rms.tools.pickRecipe', required: true },
+    { key: 'chamberId', kind: 'select', labelKey: 'rms.tools.chamber', options: chamberOptions, placeholderKey: 'rms.tools.noChamber' },
+  ];
+
+  const headerItems: Array<DescItem<Device>> = [
+    { key: 'type', labelKey: 'rms.device.type', value: typeName ?? '—' },
+    { key: 'area', labelKey: 'rms.device.area', value: areaName ?? '—' },
+    { key: 'ip', labelKey: 'IP', value: <span className="mono">{device.ip ?? '—'}</span> },
+    {
+      key: 'status',
+      labelKey: 'rms.device.status',
+      value: (
+        <CimTag tone={device.status === 'ENABLED' ? 'ok' : 'warn'} size="small">
+          {device.status}
+        </CimTag>
+      ),
+    },
+  ];
+
+  const columns: Array<DataTableColumn<DeviceRecipeRow>> = [
+    {
+      key: 'code',
+      titleKey: 'rms.deviceRecipes.recipe',
+      render: (r) => (
+        <>
+          <span className="mono">{r.code ?? t('rms.deviceRecipes.unmanaged')}</span>
+          {r.name ? <span className="muted"> · {r.name}</span> : null}
+          {r.recipeId ? null : (
+            <span style={{ marginLeft: 6 }}>
+              <CimTag tone="err" size="small">
+                {t('rms.deviceRecipes.orphan')}
+              </CimTag>
+            </span>
+          )}
+        </>
+      ),
+    },
+    { key: 'ppidOnTool', titleKey: 'rms.deviceRecipes.ppid', mono: true, width: 130 },
+    { key: 'chamberCode', titleKey: 'rms.deviceRecipes.chamber', mono: true, width: 120 },
+    {
+      key: 'activeVersionNo',
+      titleKey: 'rms.deviceRecipes.version',
+      width: 140,
+      render: (r) => (
+        <>
+          <span className="mono">{r.activeVersionNo ? `v${r.activeVersionNo}` : '—'}</span>
+          {r.versionStatus ? (
+            <span style={{ marginLeft: 6 }}>
+              <CimTag tone={r.versionStatus === 'ACTIVE' ? 'ok' : 'idle'} size="small">
+                {r.versionStatus}
+              </CimTag>
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'qualificationStatus',
+      titleKey: 'rms.deviceRecipes.qualification',
+      width: 140,
+      render: (r) => {
+        const tone: StatusTone = r.qualificationStatus === 'GRANTED' ? 'ok' : 'warn';
+        return (
+          <CimTag tone={tone} size="small">
+            {r.qualificationStatus ?? 'NOT_QUALIFIED'}
+          </CimTag>
+        );
+      },
+    },
+    {
+      key: '__ops',
+      titleKey: 'rms.common.actions',
+      width: 110,
+      render: (r) =>
+        r.mapId ? (
+          <Perms code="rms:device:update">
+            <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => unbind(r)}>
+              {t('rms.tools.unbind')}
+            </button>
+          </Perms>
+        ) : null,
+    },
+  ];
 
   async function bind() {
-    if (!ppid.trim() || !recipeId) {
-      setErr(t('rms.deviceDetail.bindRequired'));
+    if (!draft.ppid.trim() || !draft.recipeId) {
+      toast.error(t('rms.deviceDetail.bindRequired'));
       return;
     }
     setBusy(true);
-    setErr('');
     try {
       await api.registerPpidMap({
         deviceId: device.id,
         deviceTypeId: null,
-        ppidOnTool: ppid.trim(),
-        recipeId,
-        chamberId: chamberId || null,
+        ppidOnTool: draft.ppid.trim(),
+        recipeId: draft.recipeId,
+        chamberId: draft.chamberId || null,
       });
-      setPpid('');
-      setRecipeId('');
-      await loadView();
-      api.listChambers(device.id).then(setChambers).catch(() => undefined);
+      setDraft(EMPTY_BIND);
+      viewRes.refresh();
+      chambersRes.refresh();
       onChanged?.();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error((e as Error)?.message || t('rms.common.opFailed'));
     } finally {
       setBusy(false);
     }
   }
 
   async function unbind(row: DeviceRecipeRow) {
-    if (!window.confirm(t('rms.tools.unbindConfirm'))) return;
+    const ok = await confirm({
+      titleKey: 'rms.tools.unbindConfirm',
+      okKey: 'rms.tools.unbind',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
-    setErr('');
     try {
-      await api.deletePpidMap(row.mapId!);
-      await loadView();
+      await api.deletePpidMap(row.mapId as string);
+      viewRes.refresh();
       onChanged?.();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error((e as Error)?.message || t('rms.common.opFailed'));
     } finally {
       setBusy(false);
     }
   }
 
+  const editButton = onEdit ? (
+    <Perms code="rms:device:update">
+      <button className="btn btn-ghost btn-sm" onClick={onEdit}>
+        {t('rms.common.edit')}
+      </button>
+    </Perms>
+  ) : undefined;
+
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="drawer-head">
-          <h3>
-            {device.code} · {device.name}
-          </h3>
-          <div className="cell-actions">
-            {onEdit && (
-              <Perms code="rms:device:update">
-                <button className="btn btn-ghost btn-sm" onClick={onEdit}>
-                  {t('rms.common.edit')}
-                </button>
-              </Perms>
-            )}
-            <button className="icon-btn" onClick={onClose}>
-              ✕
+    <CimDrawer
+      open
+      onClose={onClose}
+      title={`${device.code} · ${device.name}`}
+      width={860}
+      extra={editButton}
+    >
+      <CimDescriptions items={headerItems} record={device} column={2} size="small" bordered />
+
+      {/* 腔体（受控面板：在哪台机上点开就维护哪台机） */}
+      <ChamberSection
+        deviceId={device.id}
+        onChanged={() => {
+          chambersRes.refresh();
+          onChanged?.();
+        }}
+      />
+
+      {/* 绑定配方：PPID + 配方 + 腔体（可选）——装载操作收进机台详情，一处搞定 */}
+      <Panel
+        titleKey="rms.deviceDetail.bind"
+        subKey="rms.deviceDetail.bindHint"
+        actions={
+          <Perms code="rms:device:update">
+            <button className="btn btn-primary" disabled={busy} onClick={bind}>
+              {t('rms.tools.bind')}
             </button>
-          </div>
-        </div>
-        <div className="drawer-body">
-          {err && (
-            <div className="alert err">
-              <span>{err}</span>
-            </div>
-          )}
+          </Perms>
+        }
+      >
+        <FormGrid
+          fields={fields}
+          value={draft}
+          onChange={(p) => setDraft({ ...draft, ...p })}
+          columns={3}
+        />
+      </Panel>
 
-          {/* 基本信息 */}
-          <div className="form-grid">
-            <div className="field">
-              <label className="field-label">{t('rms.device.type')}</label>
-              <div>{typeName ?? '—'}</div>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.device.area')}</label>
-              <div>{areaName ?? '—'}</div>
-            </div>
-            <div className="field">
-              <label className="field-label">IP</label>
-              <div className="mono">{device.ip ?? '—'}</div>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.device.status')}</label>
-              <div>
-                <span className={'tag ' + (device.status === 'ENABLED' ? 'ok' : 'warn')}>
-                  {device.status}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 腔体（受控面板：在哪台机上点开就维护哪台机） */}
-          <ChamberSection deviceId={device.id} onChanged={() => {
-            api.listChambers(device.id).then(setChambers).catch(() => undefined);
-            onChanged?.();
-          }} />
-
-          {/* 绑定配方：PPID + 配方 + 腔体（可选）——装载操作收进机台详情，一处搞定 */}
-          <div className="panel">
-            <div className="panel-head">
-              <h3>{t('rms.deviceDetail.bind')}</h3>
-              <span className="muted">{t('rms.deviceDetail.bindHint')}</span>
-            </div>
-            <div className="form-grid">
-              <div className="field">
-                <label className="field-label">{t('rms.tools.ppid')}</label>
-                <input
-                  className="text-input"
-                  value={ppid}
-                  placeholder="PPID-001"
-                  onChange={(e) => setPpid(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label">{t('rms.deviceRecipes.recipe')}</label>
-                <select
-                  className="text-input"
-                  value={recipeId}
-                  onChange={(e) => setRecipeId(e.target.value)}
-                >
-                  <option value="">{t('rms.tools.pickRecipe')}</option>
-                  {recipes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.code} · {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label className="field-label">{t('rms.tools.chamber')}</label>
-                <select
-                  className="text-input"
-                  value={chamberId}
-                  onChange={(e) => setChamberId(e.target.value)}
-                >
-                  <option value="">{t('rms.tools.noChamber')}</option>
-                  {chambers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code} · {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label className="field-label">&nbsp;</label>
-                <Perms code="rms:device:update">
-                  <button className="btn btn-primary" disabled={busy} onClick={bind}>
-                    {t('rms.tools.bind')}
-                  </button>
-                </Perms>
-              </div>
-            </div>
-          </div>
-
-          {/* 装载的配方（四来源聚合，行可点开配方详情） */}
-          <div className="panel">
-            <div className="panel-head">
-              <h3>{t('rms.deviceDetail.loaded')}</h3>
-              {view && (
-                <span className="muted">
-                  {t('rms.deviceRecipes.total')} {view.total} · {t('rms.deviceRecipes.orphan')}{' '}
-                  {view.orphan} · {t('rms.deviceRecipes.drift')} {view.drift}
-                </span>
-              )}
-            </div>
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('rms.deviceRecipes.recipe')}</th>
-                    <th>{t('rms.deviceRecipes.ppid')}</th>
-                    <th>{t('rms.deviceRecipes.chamber')}</th>
-                    <th>{t('rms.deviceRecipes.version')}</th>
-                    <th>{t('rms.deviceRecipes.qualification')}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(view?.rows ?? []).map((r, i) => (
-                    <tr
-                      key={r.recipeId ?? `orphan-${r.ppidOnTool}-${i}`}
-                      className={r.recipeId ? 'clickable' : ''}
-                      onClick={() => r.recipeId && onOpenRecipe?.(r)}
-                    >
-                      <td className="mono">
-                        {r.code ?? <span className="muted">{t('rms.deviceRecipes.unmanaged')}</span>}
-                        {r.name ? <span className="muted"> · {r.name}</span> : null}
-                        {r.recipeId ? null : (
-                          <span className="tag err">{t('rms.deviceRecipes.orphan')}</span>
-                        )}
-                      </td>
-                      <td className="mono">{r.ppidOnTool ?? '—'}</td>
-                      <td className="mono">{r.chamberCode ?? '—'}</td>
-                      <td className="mono">
-                        {r.activeVersionNo ? `v${r.activeVersionNo}` : '—'}
-                        {r.versionStatus ? (
-                          <span
-                            className={'tag ' + (r.versionStatus === 'ACTIVE' ? 'ok' : 'info')}
-                          >
-                            {r.versionStatus}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        <span
-                          className={'tag ' + (r.qualificationStatus === 'GRANTED' ? 'ok' : 'warn')}
-                        >
-                          {r.qualificationStatus ?? 'NOT_QUALIFIED'}
-                        </span>
-                      </td>
-                      <td className="cell-actions">
-                        {r.mapId && (
-                          <Perms code="rms:device:update">
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              disabled={busy}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                unbind(r);
-                              }}
-                            >
-                              {t('rms.tools.unbind')}
-                            </button>
-                          </Perms>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {(view?.rows ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="empty-cell">
-                        {t('rms.deviceRecipes.empty')}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      {/* 装载的配方（四来源聚合，行可点开配方详情） */}
+      <Panel
+        titleKey="rms.deviceDetail.loaded"
+        sub={
+          view
+            ? `${t('rms.deviceRecipes.total')} ${view.total} · ${t('rms.deviceRecipes.orphan')} ${view.orphan} · ${t('rms.deviceRecipes.drift')} ${view.drift}`
+            : undefined
+        }
+      >
+        <DataTable
+          flat
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.recipeId ?? `orphan:${r.ppidOnTool ?? ''}:${r.code ?? ''}`}
+          loading={viewRes.loading}
+          error={viewRes.error?.message}
+          onRetry={viewRes.refresh}
+          onRefresh={viewRes.refresh}
+          onRowClick={(r) => (r.recipeId ? onOpenRecipe?.(r) : undefined)}
+          emptyTitleKey="rms.deviceRecipes.empty"
+        />
+      </Panel>
+    </CimDrawer>
   );
 }

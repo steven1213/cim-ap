@@ -18,6 +18,17 @@ export interface CimTreeNode {
   key: string;
   labelKey?: string;
   label?: string;
+  /**
+   * 自定义标题节点（优先级最高）。用于「名称 + 编码 + 语义标签」这类富节点
+   * —— 例如设备树的一个机台节点既要显示 `EQP-01 · 刻蚀机`，右侧还要跟状态标签，
+   * 纯字符串表达不了；用字符串拼又拿不到样式。
+   */
+  labelNode?: ReactNode;
+  /**
+   * 搜索用的纯文本。`labelNode` 是 ReactNode，`search` 无法从中取文案，
+   * 这类节点必须显式给出可搜索文本（如 `EQP-01 刻蚀机`），否则过滤时会被漏掉。
+   */
+  searchText?: string;
   children?: CimTreeNode[];
   disabled?: boolean;
   /** 叶子节点（无 children 时自动判定，不必手填）。 */
@@ -54,7 +65,11 @@ function toDataNode(
   node: CimTreeNode,
   label: (k: string, fb: string) => string,
 ): DataNode & { children?: DataNode[] } {
-  const title = node.labelKey ? label(node.labelKey, node.labelKey) : node.label;
+  const title = node.labelNode
+    ? node.labelNode
+    : node.labelKey
+      ? label(node.labelKey, node.labelKey)
+      : node.label;
   return {
     key: node.key,
     title,
@@ -72,7 +87,10 @@ function filterTree(nodes: CimTreeNode[], kw: string, label: (k: string, fb: str
   const walk = (list: CimTreeNode[]): CimTreeNode[] => {
     const out: CimTreeNode[] = [];
     list.forEach((n) => {
-      const text = (n.labelKey ? label(n.labelKey, n.labelKey) : n.label ?? '').toLowerCase();
+      const text = (
+        n.searchText ??
+        (n.labelKey ? label(n.labelKey, n.labelKey) : n.label ?? '')
+      ).toLowerCase();
       const kids = n.children ? walk(n.children) : [];
       if (text.includes(lower) || kids.length > 0) {
         out.push({ ...n, children: kids.length > 0 ? kids : n.children });

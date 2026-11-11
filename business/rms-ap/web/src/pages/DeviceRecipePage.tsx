@@ -1,7 +1,19 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import * as api from '@/lib/rmsApi';
+import { useResource } from '@cim/data';
+import {
+  CimTag,
+  CimTree,
+  DataTable,
+  Page,
+  PageHead,
+  Panel,
+  useToast,
+  type CimTreeNode,
+  type DataTableColumn,
+} from '@cim/ui';
 import RecipeDetailDrawer from '@/components/RecipeDetailDrawer';
+import * as api from '@/lib/rmsApi';
 import type {
   AreaNode,
   Device,
@@ -10,12 +22,17 @@ import type {
   RecipeVersion,
 } from '@/types';
 
-/** 树折叠箭头（内联 SVG，避免图标库）。 */
-function Chevron() {
+const NO_AREAS: AreaNode[] = [];
+const NO_DEVICES: Device[] = [];
+const NO_ROWS: DeviceRecipeRow[] = [];
+
+/** 树节点标题：主文案 + 右侧补充（编码 / 标签），单行省略。 */
+function nodeLabel(main: string, extra?: ReactNode) {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M3 1.5 L7 5 L3 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, maxWidth: '100%' }}>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{main}</span>
+      {extra}
+    </span>
   );
 }
 
@@ -25,63 +42,38 @@ function Chevron() {
  * <p>左侧树顶层节点即「工厂」（区域树自引用，parent=null 的顶层=工厂），
  * 选中机台后自动展开其祖先链，并在右侧以面包屑呈现完整路径，
  * 点面包屑任一层级可跳回树中对应位置。</p>
+ *
+ * <p>迁移要点：</p>
+ * <ul>
+ *   <li>手写递归树 → `CimTree`（受控展开/选中）。旧实现每次渲染都重建整棵 DOM，
+ *       且折叠箭头对「无子节点的区域」也渲染成可点，点了没反应。</li>
+ *   <li>机台与区域同树，选中靠 `selectedKeys`；旧实现给机台行加 `.on` 类，
+ *       切机台后旧行不会清（浏览器里能看到两个高亮）。</li>
+ *   <li>取数走 `useResource`：切机台时旧视图保留到新回包到达（`keepPreviousData`），
+ *       不再出现右侧先空一帧再填。</li>
+ * </ul>
  */
 export default function DeviceRecipePage() {
   const { t } = useTranslation();
-  const [areas, setAreas] = useState<AreaNode[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toast = useToast();
+
   const [deviceId, setDeviceId] = useState('');
-  const [view, setView] = useState<DeviceRecipeView | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [expanded, setExpanded] = useState<string[]>([]);
   const [detail, setDetail] = useState<{ row: DeviceRecipeRow; versions: RecipeVersion[] } | null>(null);
+  const seeded = useRef(false);
 
-  useEffect(() => {
-    Promise.all([api.areaTree(), api.listDevices()])
-      .then(([ar, dv]) => {
-        setAreas(ar);
-        setDevices(dv);
-        // 展开所有顶层工厂；选中首台机台并展开其祖先链（首屏即可见选中态）
-        const flat: Record<string, AreaNode> = {};
-        const walk = (ns: AreaNode[]) => {
-          for (const n of ns) {
-            flat[n.id] = n;
-            if (n.children) walk(n.children);
-          }
-        };
-        walk(ar);
-        const exp = new Set<string>(ar.map((a) => a.id));
-        const first = dv[0];
-        if (first) {
-          setDeviceId(first.id);
-          let cur = first.areaId ? flat[first.areaId] : undefined;
-          while (cur) {
-            exp.add(cur.id);
-            cur = cur.parentId ? flat[cur.parentId] : undefined;
-          }
-        }
-        setExpanded(exp);
-      })
-      .catch((e) => setErr(e?.message || 'error'));
-  }, []);
+  const baseRes = useResource(async () => {
+    const [areas, devices] = await Promise.all([api.areaTree(), api.listDevices()]);
+    return { areas, devices };
+  });
+  const areas = baseRes.data?.areas ?? NO_AREAS;
+  const devices = baseRes.data?.devices ?? NO_DEVICES;
 
-  useEffect(() => {
-    if (!deviceId) return;
-    setLoading(true);
-    api
-      .deviceRecipes(deviceId)
-      .then(setView)
-      .catch((e) => setErr(e?.message || 'error'))
-      .finally(() => setLoading(false));
-  }, [deviceId]);
-
-  /** 区域扁平索引（含子孙），供面包屑上溯与展开链计算。 */
   const areaById = useMemo(() => {
-    const m: Record<string, AreaNode> = {};
+    const m = new Map<string, AreaNode>();
     const walk = (ns: AreaNode[]) => {
       for (const n of ns) {
-        m[n.id] = n;
+        m.set(n.id, n);
         if (n.children) walk(n.children);
       }
     };
@@ -91,187 +83,265 @@ export default function DeviceRecipePage() {
 
   /** 机台 → [工厂, ..., 直属区域] 路径。 */
   const pathOf = useMemo(() => {
-    const m: Record<string, AreaNode[]> = {};
+    const m = new Map<string, AreaNode[]>();
     for (const d of devices) {
       const chain: AreaNode[] = [];
-      let cur = d.areaId ? areaById[d.areaId] : undefined;
+      let cur = d.areaId ? areaById.get(d.areaId) : undefined;
       while (cur) {
         chain.unshift(cur);
-        cur = cur.parentId ? areaById[cur.parentId] : undefined;
+        cur = cur.parentId ? areaById.get(cur.parentId) : undefined;
       }
-      m[d.id] = chain;
+      m.set(d.id, chain);
     }
     return m;
   }, [devices, areaById]);
 
-  /** 选中机台并展开其全部祖先（保持树与面包屑同步）。 */
-  function revealDevice(d: Device) {
-    setDeviceId(d.id);
-    const chain = pathOf[d.id] ?? [];
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      chain.forEach((a) => next.add(a.id));
-      return next;
-    });
-  }
-
-  /** 面包屑点击：展开到该层级（含祖先），机台层则直接选中。 */
-  function expandToArea(areaId: string) {
-    const chain: string[] = [];
-    let cur: AreaNode | undefined = areaById[areaId];
-    while (cur) {
-      chain.push(cur.id);
-      cur = cur.parentId ? areaById[cur.parentId] : undefined;
+  // 首屏：展开所有工厂 + 选中首台机台并展开其祖先链（只做一次，之后尊重用户展开状态）
+  useEffect(() => {
+    if (seeded.current || !baseRes.loaded) return;
+    if (!areas.length && !devices.length) return;
+    seeded.current = true;
+    const exp = new Set<string>(areas.map((a) => a.id));
+    const first = devices[0];
+    if (first) {
+      setDeviceId(first.id);
+      (pathOf.get(first.id) ?? []).forEach((a) => exp.add(a.id));
     }
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      chain.forEach((id) => next.add(id));
-      return next;
-    });
-  }
+    setExpanded([...exp]);
+  }, [baseRes.loaded, areas, devices, pathOf]);
+
+  const viewRes = useResource(() => api.deviceRecipes(deviceId), {
+    deps: [deviceId],
+    enabled: !!deviceId,
+    keepPreviousData: true,
+  });
+  const view: DeviceRecipeView | undefined = viewRes.data;
 
   const devicesByArea = useMemo(() => {
-    const m: Record<string, Device[]> = {};
+    const m = new Map<string, Device[]>();
     for (const d of devices) {
       const key = d.areaId || '__none__';
-      (m[key] ||= []).push(d);
+      const list = m.get(key);
+      if (list) list.push(d);
+      else m.set(key, [d]);
     }
     return m;
   }, [devices]);
 
-  function toggle(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const deviceIds = useMemo(() => new Set(devices.map((d) => d.id)), [devices]);
 
-  async function openDetail(row: DeviceRecipeRow) {
+  const nodes = useMemo<CimTreeNode[]>(() => {
+    const factoryTag = (
+      <CimTag size="small" tone="run">
+        {t('rms.deviceRecipes.factoryTag')}
+      </CimTag>
+    );
+    const walk = (n: AreaNode, isRoot: boolean): CimTreeNode => ({
+      key: n.id,
+      searchText: `${n.name} ${n.code}`,
+      labelNode: nodeLabel(n.name, isRoot ? factoryTag : <span className="dim">{n.code}</span>),
+      children: [
+        ...(n.children ?? []).map((c) => walk(c, false)),
+        ...(devicesByArea.get(n.id) ?? []).map((d) => ({
+          key: d.id,
+          searchText: `${d.code} ${d.name}`,
+          labelNode: nodeLabel(`${d.code} · ${d.name}`),
+          isLeaf: true,
+        })),
+      ],
+    });
+    const out = areas.map((a) => walk(a, true));
+    const unassigned = devicesByArea.get('__none__') ?? [];
+    if (unassigned.length) {
+      out.push({
+        key: '__unassigned__',
+        label: t('rms.deviceRecipes.unassigned'),
+        children: unassigned.map((d) => ({
+          key: d.id,
+          searchText: `${d.code} ${d.name}`,
+          labelNode: nodeLabel(`${d.code} · ${d.name}`),
+          isLeaf: true,
+        })),
+      });
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areas, devicesByArea, t]);
+
+  /** 选中机台并展开其全部祖先（保持树与面包屑同步）。 */
+  const revealDevice = (id: string) => {
+    setDeviceId(id);
+    const chain = pathOf.get(id) ?? [];
+    setExpanded((prev) => [...new Set([...prev, ...chain.map((a) => a.id)])]);
+  };
+
+  const onSelectNode = (key: string) => {
+    if (deviceIds.has(key)) revealDevice(key);
+    else setExpanded((prev) => [...new Set([...prev, key])]);
+  };
+
+  /** 面包屑点击：展开到该层级（含祖先）。 */
+  const expandToArea = (areaId: string) => {
+    const chain: string[] = [];
+    let cur: AreaNode | undefined = areaById.get(areaId);
+    while (cur) {
+      chain.push(cur.id);
+      cur = cur.parentId ? areaById.get(cur.parentId) : undefined;
+    }
+    setExpanded((prev) => [...new Set([...prev, ...chain])]);
+  };
+
+  const openDetail = async (row: DeviceRecipeRow) => {
     if (!row.recipeId) return;
     try {
       const versions = await api.listVersions(row.recipeId);
       setDetail({ row, versions });
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     }
-  }
+  };
 
-  function renderBranch(node: AreaNode, isRoot = false) {
-    const kids = node.children || [];
-    const devs = devicesByArea[node.id] || [];
-    const total = kids.length + devs.length;
-    const open = expanded.has(node.id);
-    return (
-      <div key={node.id} className="ptree-node">
-        <div className="tree-row">
-          <button
-            className={'tree-toggle' + (open ? ' open' : '') + (total === 0 ? ' hollow' : '')}
-            onClick={() => toggle(node.id)}
-            aria-label={node.name}
-          >
-            <Chevron />
-          </button>
-          <span className="tree-name">
-            {node.name}
-            {isRoot && (
-              <span className="tag info">{t('rms.deviceRecipes.factoryTag')}</span>
-            )}
-          </span>
-          <span className="tree-code dim">{node.code}</span>
-        </div>
-        {open && (
-          <div className="ptree-kids">
-            {kids.map((k) => renderBranch(k))}
-            {devs.map((d) => (
-              <div
-                key={d.id}
-                className={'tree-row is-leaf' + (d.id === deviceId ? ' on' : '')}
-                onClick={() => revealDevice(d)}
-              >
-                <span className="tree-toggle hollow">
-                  <Chevron />
-                </span>
-                <span className="tree-name">
-                  {d.code} · {d.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  const unassigned = devicesByArea['__none__'] || [];
   const currentDevice = devices.find((d) => d.id === deviceId) ?? null;
-  const currentPath = currentDevice ? pathOf[currentDevice.id] ?? [] : [];
+  const currentPath = currentDevice ? pathOf.get(currentDevice.id) ?? [] : [];
+
+  const columns = useMemo<Array<DataTableColumn<DeviceRecipeRow>>>(
+    () => [
+      {
+        key: 'code',
+        titleKey: 'rms.deviceRecipes.recipe',
+        mono: true,
+        width: 190,
+        render: (r) =>
+          r.code ? (
+            <>
+              {r.code}
+              {r.name ? <span className="muted"> · {r.name}</span> : null}
+            </>
+          ) : (
+            <span className="muted">{t('rms.deviceRecipes.unmanaged')}</span>
+          ),
+      },
+      {
+        key: 'ppidOnTool',
+        titleKey: 'rms.deviceRecipes.ppid',
+        mono: true,
+        width: 130,
+        render: (r) => r.ppidOnTool ?? t('rms.common.dash'),
+      },
+      {
+        key: 'chamberCode',
+        titleKey: 'rms.deviceRecipes.chamber',
+        mono: true,
+        width: 150,
+        render: (r) =>
+          r.chamberCode ? (
+            <>
+              {r.chamberCode}
+              {r.chamberName ? <span className="muted"> · {r.chamberName}</span> : null}
+            </>
+          ) : (
+            t('rms.common.dash')
+          ),
+      },
+      {
+        key: 'activeVersionNo',
+        titleKey: 'rms.deviceRecipes.version',
+        mono: true,
+        width: 130,
+        render: (r) => (
+          <>
+            {r.activeVersionNo ? `v${r.activeVersionNo}` : t('rms.common.dash')}
+            {r.versionStatus ? (
+              <CimTag size="small" tone={r.versionStatus === 'ACTIVE' ? 'ok' : 'idle'}>
+                {t('rms.recipe.status.' + r.versionStatus, { defaultValue: r.versionStatus })}
+              </CimTag>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        key: 'qualificationStatus',
+        titleKey: 'rms.deviceRecipes.qualification',
+        width: 120,
+        render: (r) => (
+          <CimTag size="small" tone={r.qualificationStatus === 'GRANTED' ? 'ok' : 'warn'}>
+            {r.qualificationStatus ?? 'NOT_QUALIFIED'}
+          </CimTag>
+        ),
+      },
+      {
+        key: 'onToolState',
+        titleKey: 'rms.deviceRecipes.onTool',
+        width: 110,
+        render: (r) =>
+          r.onToolState ? (
+            <CimTag
+              size="small"
+              tone={r.onToolState === 'OK' ? 'ok' : r.onToolState === 'DRIFT' ? 'err' : 'warn'}
+            >
+              {r.onToolState}
+            </CimTag>
+          ) : (
+            <span className="muted">{t('rms.common.dash')}</span>
+          ),
+      },
+      {
+        key: 'sources',
+        titleKey: 'rms.deviceRecipes.sources',
+        render: (r) => <span className="muted">{r.sources.join(' · ')}</span>,
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <h1>{t('rms.deviceRecipes.title')}</h1>
-        <span className="muted">{t('rms.deviceRecipes.sub')}</span>
-      </div>
-
-      {err && (
-        <div className="alert err">
-          <span>{err}</span>
-        </div>
-      )}
+    <Page>
+      <PageHead titleKey="rms.deviceRecipes.title" subtitleKey="rms.deviceRecipes.sub" />
 
       <div className="split">
-        <div className="panel">
-          <div className="panel-head">
-            <h3>{t('rms.deviceRecipes.areas')}</h3>
-            {loading && <span className="muted">{t('rms.common.loading')}</span>}
-          </div>
-          <div className="panel-body">
-            <div className="ptree">
-              {areas.map((a) => renderBranch(a, true))}
-              {unassigned.length > 0 && (
-                <div className="ptree-node">
-                  <div className="tree-row">
-                    <span className="tree-toggle hollow">
-                      <Chevron />
-                    </span>
-                    <span className="tree-name">{t('rms.deviceRecipes.unassigned')}</span>
-                  </div>
-                  <div className="ptree-kids">
-                    {unassigned.map((d) => (
-                      <div
-                        key={d.id}
-                        className={'tree-row is-leaf' + (d.id === deviceId ? ' on' : '')}
-                        onClick={() => revealDevice(d)}
-                      >
-                        <span className="tree-toggle hollow">
-                          <Chevron />
-                        </span>
-                        <span className="tree-name">
-                          {d.code} · {d.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {areas.length === 0 && unassigned.length === 0 && (
-                <div className="empty">{t('rms.deviceRecipes.noAreas')}</div>
-              )}
+        <Panel
+          titleKey="rms.deviceRecipes.areas"
+          flush
+          className="scroll-y"
+        >
+          {baseRes.error ? (
+            <div className="alert err" style={{ margin: 14 }}>
+              <span>{baseRes.error.message}</span>
             </div>
-          </div>
-        </div>
+          ) : null}
+          {nodes.length === 0 && baseRes.loaded ? (
+            <div className="empty">{t('rms.deviceRecipes.noAreas')}</div>
+          ) : (
+            <div style={{ padding: '8px 6px' }}>
+              <CimTree
+                nodes={nodes}
+                selectedKeys={deviceId ? [deviceId] : []}
+                onSelect={onSelectNode}
+                expandedKeys={expanded}
+                onExpand={setExpanded}
+              />
+            </div>
+          )}
+        </Panel>
 
-        <div className="panel">
+        <Panel
+          title={view ? `${view.deviceCode} · ${view.deviceName}` : t('rms.deviceRecipes.pickDevice')}
+          actions={view?.deviceTypeName ? <span className="muted">{view.deviceTypeName}</span> : undefined}
+          flush
+        >
           {currentDevice && (
-            <div className="dcrumb" title={t('rms.deviceRecipes.pathTitle')}>
+            <div className="dcrumb" title={t('rms.deviceRecipes.pathTitle')} style={{ margin: '10px 14px 0' }}>
               {currentPath.map((a, i) => (
                 <Fragment key={a.id}>
                   {i > 0 && <span className="dcrumb-sep">/</span>}
                   <button className="dcrumb-link" onClick={() => expandToArea(a.id)}>
                     {a.name}
-                    {i === 0 && <span className="tag info">{t('rms.deviceRecipes.factoryTag')}</span>}
+                    {i === 0 && (
+                      <CimTag size="small" tone="run">
+                        {t('rms.deviceRecipes.factoryTag')}
+                      </CimTag>
+                    )}
                   </button>
                 </Fragment>
               ))}
@@ -281,111 +351,50 @@ export default function DeviceRecipePage() {
               </span>
             </div>
           )}
-          <div className="panel-head">
-            <h3>
-              {view ? `${view.deviceCode} · ${view.deviceName}` : t('rms.deviceRecipes.pickDevice')}
-            </h3>
-            {view?.deviceTypeName && <span className="muted">{view.deviceTypeName}</span>}
-          </div>
-          <div className="panel-body">
-            {view && (
-              <div className="kpi-grid">
-                <div className="kpi">
+
+          {view && (
+            <div className="kpi-grid" style={{ margin: '10px 14px 0' }}>
+              <div className="kpi">
+                <div className="kpi-main">
                   <div className="kpi-label">{t('rms.deviceRecipes.total')}</div>
                   <div className="kpi-val">{view.total}</div>
                 </div>
-                <div className="kpi">
+              </div>
+              <div className="kpi warn">
+                <div className="kpi-main">
                   <div className="kpi-label">{t('rms.deviceRecipes.orphan')}</div>
                   <div className="kpi-val">{view.orphan}</div>
                 </div>
-                <div className="kpi">
+              </div>
+              <div className="kpi info">
+                <div className="kpi-main">
                   <div className="kpi-label">{t('rms.deviceRecipes.drift')}</div>
                   <div className="kpi-val">{view.drift}</div>
                 </div>
-                <div className="kpi">
+              </div>
+              <div className="kpi">
+                <div className="kpi-main">
                   <div className="kpi-label">{t('rms.deviceRecipes.unqualified')}</div>
                   <div className="kpi-val">{view.unqualified}</div>
                 </div>
               </div>
-            )}
-
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('rms.deviceRecipes.recipe')}</th>
-                    <th>{t('rms.deviceRecipes.ppid')}</th>
-                    <th>{t('rms.deviceRecipes.chamber')}</th>
-                    <th>{t('rms.deviceRecipes.version')}</th>
-                    <th>{t('rms.deviceRecipes.qualification')}</th>
-                    <th>{t('rms.deviceRecipes.onTool')}</th>
-                    <th>{t('rms.deviceRecipes.sources')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(view?.rows ?? []).map((r, i) => (
-                    <tr
-                      key={r.recipeId ?? `orphan-${r.ppidOnTool}-${i}`}
-                      className={r.recipeId ? 'clickable' : ''}
-                      onClick={() => openDetail(r)}
-                    >
-                      <td className="mono">
-                        {r.code ?? (
-                          <span className="muted">{t('rms.deviceRecipes.unmanaged')}</span>
-                        )}
-                        {r.name ? <span className="muted"> · {r.name}</span> : null}
-                      </td>
-                      <td className="mono">{r.ppidOnTool ?? t('rms.common.dash')}</td>
-                      <td className="mono">
-                        {r.chamberCode ?? t('rms.common.dash')}
-                        {r.chamberName ? <span className="muted"> · {r.chamberName}</span> : null}
-                      </td>
-                      <td className="mono">
-                        {r.activeVersionNo ? `v${r.activeVersionNo}` : t('rms.common.dash')}
-                        {r.versionStatus ? (
-                          <span className={'tag ' + (r.versionStatus === 'ACTIVE' ? 'ok' : 'info')}>
-                            {r.versionStatus}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        <span className={'tag ' + (r.qualificationStatus === 'GRANTED' ? 'ok' : 'warn')}>
-                          {r.qualificationStatus ?? 'NOT_QUALIFIED'}
-                        </span>
-                      </td>
-                      <td>
-                        {r.onToolState ? (
-                          <span
-                            className={
-                              'tag ' +
-                              (r.onToolState === 'OK'
-                                ? 'ok'
-                                : r.onToolState === 'DRIFT'
-                                  ? 'err'
-                                  : 'warn')
-                            }
-                          >
-                            {r.onToolState}
-                          </span>
-                        ) : (
-                          <span className="muted">{t('rms.common.dash')}</span>
-                        )}
-                      </td>
-                      <td className="muted">{r.sources.join(' · ')}</td>
-                    </tr>
-                  ))}
-                  {(view?.rows ?? []).length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="empty-cell">
-                        {t('rms.deviceRecipes.empty')}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
             </div>
-          </div>
-        </div>
+          )}
+
+          <DataTable<DeviceRecipeRow>
+            flat
+            columns={columns}
+            rows={view?.rows ?? NO_ROWS}
+            rowKey={(r) => r.recipeId ?? `orphan-${r.ppidOnTool}-${r.chamberCode ?? ''}`}
+            loading={viewRes.loading}
+            error={viewRes.error?.message}
+            onRetry={viewRes.refresh}
+            onRefresh={viewRes.refresh}
+            scrollX="max-content"
+            emptyTitleKey="rms.deviceRecipes.empty"
+            onRowClick={(r) => void openDetail(r)}
+          />
+        </Panel>
       </div>
 
       {detail && (
@@ -396,9 +405,9 @@ export default function DeviceRecipePage() {
           versions={detail.versions}
           initialVersionId={detail.row.activeVersionId}
           onClose={() => setDetail(null)}
-          onChanged={() => deviceId && api.deviceRecipes(deviceId).then(setView).catch(() => undefined)}
+          onChanged={() => viewRes.refresh()}
         />
       )}
-    </div>
+    </Page>
   );
 }

@@ -111,6 +111,12 @@
 .cim-datatable .ant-table-wrapper {
   min-width: 0;
 }
+/* 嵌在已有面板里的第二张表：外层已画框，内层不再画（否则框套框） */
+.cim-datatable.is-flat > .panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 /* 表格内等宽文本（编码 / 时间戳） */
 .cim-mono {
   font-family: var(--font-mono);

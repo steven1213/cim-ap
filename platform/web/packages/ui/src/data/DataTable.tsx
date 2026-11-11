@@ -103,6 +103,13 @@ export interface DataTableProps<T> {
   virtual?: number;
   /** 计数展示：默认显示「已选 n / 共 m」。 */
   showCount?: boolean;
+  /**
+   * 去掉外框（边框 / 圆角 / 背景），用于**嵌在已有面板里**的第二张表。
+   *
+   * 场景：一面板内「工具栏 + 主表 + 明细表」这类分区，外层 `Panel` 已经画了框，
+   * 内层再画一层会出现框套框（历史上各页为此各写一遍 `table-wrap`）。
+   */
+  flat?: boolean;
 }
 
 function GearIcon() {
@@ -151,6 +158,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
     scrollX,
     virtual,
     showCount = true,
+    flat = false,
   } = props;
 
   const label = useUiLabel();
@@ -314,7 +322,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
   );
 
   return (
-    <div className="cim-datatable">
+    <div className={'cim-datatable' + (flat ? ' is-flat' : '')}>
       {hasToolbar ? (
         <div className="cim-toolbar">
           <div className="cim-toolbar-left">

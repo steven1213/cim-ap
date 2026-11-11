@@ -1,11 +1,27 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  CimModal,
+  CimSelect,
+  CimTag,
+  DataTable,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
 import * as api from '@/lib/rmsApi';
-import type { BatchOpResult, DeviceType, BatchDownloadItem } from '@/types';
+import type { BatchDownloadItem, BatchOpResult, DeviceType } from '@/types';
+
+const ACTION_OPTIONS = [
+  { value: 'APPLY', labelKey: 'rms.batch.apply' },
+  { value: 'RELEASE', labelKey: 'rms.batch.release' },
+];
 
 /**
  * 批量操作弹窗（W9）：批量 Hold（APPLY/RELEASE，按设备/机型/配方展开）与批量下发。
  * 结果逐项报告（部分成功语义），失败项明细可见。
+ *
+ * <p>迁移要点：手写 `.modal-backdrop` → `CimModal`；三组「勾选清单」改成可搜索的多选下拉
+ * —— 设备上百台时原清单会把弹窗撑成一整屏，且无法按编码搜。</p>
  */
 export function BatchHoldModal({
   devices,
@@ -21,110 +37,123 @@ export function BatchHoldModal({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [action, setAction] = useState<'APPLY' | 'RELEASE'>('APPLY');
-  const [deviceIds, setDeviceIds] = useState<string[]>([]);
-  const [typeIds, setTypeIds] = useState<string[]>([]);
-  const [recipeIds, setRecipeIds] = useState<string[]>([]);
-  const [reason, setReason] = useState('');
+  const [form, setForm] = useState<{ deviceIds: string[]; typeIds: string[]; recipeIds: string[]; reason: string }>({
+    deviceIds: [],
+    typeIds: [],
+    recipeIds: [],
+    reason: '',
+  });
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
   const [report, setReport] = useState<BatchOpResult | null>(null);
 
-  function toggle(list: string[], v: string, set: (x: string[]) => void) {
-    set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-  }
-
-  async function run() {
-    if (!reason.trim()) {
-      setErr(t('rms.batch.reasonRequired'));
+  const run = async () => {
+    if (!form.reason.trim()) {
+      toast.warning(t('rms.batch.reasonRequired'));
       return;
     }
     setBusy(true);
-    setErr('');
     try {
       const r = await api.batchHold({
         action,
-        deviceIds,
-        deviceTypeIds: typeIds,
-        recipeIds,
-        reason: reason.trim(),
+        deviceIds: form.deviceIds,
+        deviceTypeIds: form.typeIds,
+        recipeIds: form.recipeIds,
+        reason: form.reason.trim(),
       });
       setReport(r);
       onDone();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }
+  };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>{t('rms.batch.holdTitle')}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="rms.batch.holdTitle"
+      width={780}
+      footer={
+        report ? (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary" onClick={onClose}>
+              {t('rms.common.close')}
+            </button>
+          </div>
+        ) : undefined
+      }
+      onOk={report ? undefined : run}
+      okKey="rms.batch.run"
+      okLoading={busy}
+      cancelKey="rms.common.close"
+      maskClosable={false}
+    >
+      <div className="cim-field">
+        <label className="cim-field-label">{t('rms.batch.action')}</label>
+        <CimSelect
+          value={action}
+          onChange={(v) => setAction((typeof v === 'string' ? v : 'APPLY') as 'APPLY' | 'RELEASE')}
+          options={ACTION_OPTIONS}
+          allowClear={false}
+          width="100%"
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+        <div className="cim-field">
+          <label className="cim-field-label">{t('rms.batch.devices')}</label>
+          <CimSelect
+            multiple
+            value={form.deviceIds}
+            onChange={(v) => setForm((prev) => ({ ...prev, deviceIds: Array.isArray(v) ? v : v ? [v] : [] }))}
+            options={devices.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
+            width="100%"
+          />
         </div>
-        <div className="modal-body">
-          <div className="field">
-            <label className="field-label">{t('rms.batch.action')}</label>
-            <select className="text-input" value={action} onChange={(e) => setAction(e.target.value as 'APPLY' | 'RELEASE')}>
-              <option value="APPLY">{t('rms.batch.apply')}</option>
-              <option value="RELEASE">{t('rms.batch.release')}</option>
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">
-              {t('rms.batch.devices')}（{t('rms.batch.multiHint')}）
-            </label>
-            <div className="pick-list">
-              {devices.map((d) => (
-                <label key={d.id} className="check">
-                  <input type="checkbox" checked={deviceIds.includes(d.id)} onChange={() => toggle(deviceIds, d.id, setDeviceIds)} />
-                  {d.code} · {d.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.batch.byTypes')}（{t('rms.batch.multiHint')}）</label>
-            <div className="pick-list">
-              {types.map((d) => (
-                <label key={d.id} className="check">
-                  <input type="checkbox" checked={typeIds.includes(d.id)} onChange={() => toggle(typeIds, d.id, setTypeIds)} />
-                  {d.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="field">
-            <label className="field-label">
-              {t('rms.batch.recipes')}（{t('rms.batch.emptyMeansDeviceLevel')}）
-            </label>
-            <div className="pick-list">
-              {recipes.map((r) => (
-                <label key={r.id} className="check">
-                  <input type="checkbox" checked={recipeIds.includes(r.id)} onChange={() => toggle(recipeIds, r.id, setRecipeIds)} />
-                  {r.code} · {r.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.batch.reason')} *</label>
-            <input className="text-input" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-          {err && <div className="form-error">{err}</div>}
-          {report && <BatchReport report={report} />}
+        <div className="cim-field">
+          <label className="cim-field-label">{t('rms.batch.byTypes')}</label>
+          <CimSelect
+            multiple
+            value={form.typeIds}
+            onChange={(v) => setForm((prev) => ({ ...prev, typeIds: Array.isArray(v) ? v : v ? [v] : [] }))}
+            options={types.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
+            width="100%"
+          />
         </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.close')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={run}>
-            {t('rms.batch.run')}
-          </button>
+        <div className="cim-field">
+          <label className="cim-field-label">
+            {t('rms.batch.recipes')}
+            <span className="dim" style={{ fontWeight: 400, marginLeft: 6 }}>
+              {t('rms.batch.emptyMeansDeviceLevel')}
+            </span>
+          </label>
+          <CimSelect
+            multiple
+            value={form.recipeIds}
+            onChange={(v) => setForm((prev) => ({ ...prev, recipeIds: Array.isArray(v) ? v : v ? [v] : [] }))}
+            options={recipes.map((r) => ({ value: r.id, label: r.code, hint: r.name }))}
+            width="100%"
+          />
+        </div>
+        <div className="cim-field">
+          <label className="cim-field-label">
+            {t('rms.batch.reason')}
+            <span className="cim-req">*</span>
+          </label>
+          <input
+            className="text-input"
+            value={form.reason}
+            onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
+          />
         </div>
       </div>
-    </div>
+
+      {report ? <BatchReport report={report} /> : null}
+    </CimModal>
   );
 }
 
@@ -140,105 +169,156 @@ export function BatchDownloadModal({
   onDone: () => void;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [rows, setRows] = useState<BatchDownloadItem[]>([{ toolId: '', recipeUid: '' }]);
   const [requestor, setRequestor] = useState('');
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
   const [report, setReport] = useState<BatchOpResult | null>(null);
 
-  function setRow(i: number, patch: Partial<BatchDownloadItem>) {
+  const setRow = (i: number, patch: Partial<BatchDownloadItem>) =>
     setRows((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  }
 
-  async function run() {
+  const run = async () => {
     const valid = rows.filter((r) => r.toolId && r.recipeUid);
     if (valid.length === 0) {
-      setErr(t('rms.batch.needOneItem'));
+      toast.warning(t('rms.batch.needOneItem'));
       return;
     }
     setBusy(true);
-    setErr('');
     try {
-      const r = await api.batchDownload({ downloadMode: 'IMMEDIATE', requestor: requestor || undefined, items: valid });
+      const r = await api.batchDownload({
+        downloadMode: 'IMMEDIATE',
+        requestor: requestor || undefined,
+        items: valid,
+      });
       setReport(r);
       onDone();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }
+  };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>{t('rms.batch.downloadTitle')}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="field">
-            <label className="field-label">{t('rms.batch.requestor')}</label>
-            <input className="text-input" value={requestor} onChange={(e) => setRequestor(e.target.value)} />
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="rms.batch.downloadTitle"
+      width={820}
+      footer={
+        report ? (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary" onClick={onClose}>
+              {t('rms.common.close')}
+            </button>
           </div>
-          {rows.map((row, i) => (
-            <div className="grid-2" key={i}>
-              <div className="field">
-                <label className="field-label">{t('rms.batch.device')} {i + 1}</label>
-                <select className="text-input" value={row.toolId} onChange={(e) => setRow(i, { toolId: e.target.value })}>
-                  <option value="">—</option>
-                  {devices.map((d) => (
-                    <option key={d.id} value={d.id}>{d.code} · {d.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label className="field-label">{t('rms.batch.recipe')} {i + 1}</label>
-                <select className="text-input" value={row.recipeUid} onChange={(e) => setRow(i, { recipeUid: e.target.value })}>
-                  <option value="">—</option>
-                  {recipes.map((r) => (
-                    <option key={r.id} value={r.id}>{r.code} · {r.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm" onClick={() => setRows((l) => [...l, { toolId: '', recipeUid: '' }])}>
-            + {t('rms.batch.addRow')}
-          </button>
-          {err && <div className="form-error">{err}</div>}
-          {report && <BatchReport report={report} />}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.close')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={run}>
-            {t('rms.batch.run')}
-          </button>
-        </div>
+        ) : undefined
+      }
+      onOk={report ? undefined : run}
+      okKey="rms.batch.run"
+      okLoading={busy}
+      cancelKey="rms.common.close"
+      maskClosable={false}
+    >
+      <div className="cim-field" style={{ marginBottom: 10 }}>
+        <label className="cim-field-label">{t('rms.batch.requestor')}</label>
+        <input className="text-input" value={requestor} onChange={(e) => setRequestor(e.target.value)} />
       </div>
-    </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map((row, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="cim-field">
+              <label className="cim-field-label">
+                {t('rms.batch.device')} {i + 1}
+              </label>
+              <CimSelect
+                value={row.toolId || null}
+                onChange={(v) => setRow(i, { toolId: typeof v === 'string' ? v : '' })}
+                options={devices.map((d) => ({ value: d.id, label: d.code, hint: d.name }))}
+                width="100%"
+              />
+            </div>
+            <div className="cim-field">
+              <label className="cim-field-label">
+                {t('rms.batch.recipe')} {i + 1}
+              </label>
+              <CimSelect
+                value={row.recipeUid || null}
+                onChange={(v) => setRow(i, { recipeUid: typeof v === 'string' ? v : '' })}
+                options={recipes.map((r) => ({ value: r.id, label: r.code, hint: r.name }))}
+                width="100%"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 8 }}>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setRows((l) => [...l, { toolId: '', recipeUid: '' }])}
+        >
+          + {t('rms.batch.addRow')}
+        </button>
+      </div>
+
+      {report ? <BatchReport report={report} /> : null}
+    </CimModal>
   );
 }
 
 /** 逐项结果报告（部分成功语义：成功/失败一目了然）。 */
 export function BatchReport({ report }: { report: BatchOpResult }) {
   const { t } = useTranslation();
+
+  const columns = useMemo<Array<DataTableColumn<BatchOpResult['items'][number]>>>(
+    () => [
+      {
+        key: 'ok',
+        titleKey: 'rms.common.status',
+        width: 80,
+        render: (it) => (
+          <CimTag size="small" tone={it.ok ? 'ok' : 'err'}>
+            {it.ok ? 'OK' : 'FAIL'}
+          </CimTag>
+        ),
+      },
+      { key: 'key', titleKey: 'rms.batch.key', mono: true, width: 140 },
+      {
+        key: 'target',
+        titleKey: 'rms.batch.target',
+        mono: true,
+        width: 180,
+        render: (it) => <span className="muted">{it.target}</span>,
+      },
+      {
+        key: 'message',
+        titleKey: 'rms.audit.th.detail',
+        render: (it) => <span className="muted">{it.message}</span>,
+      },
+    ],
+    [t],
+  );
+
   return (
-    <div className="batch-report">
-      <div>
-        <span className="tag ok">{t('rms.batch.okCount', { n: report.ok })}</span>{' '}
-        <span className="tag err">{t('rms.batch.failedCount', { n: report.failed })}</span>
+    <div style={{ marginTop: 12 }}>
+      <div style={{ marginBottom: 6 }}>
+        <CimTag tone="ok">{t('rms.batch.okCount', { n: report.ok })}</CimTag>{' '}
+        <CimTag tone={report.failed > 0 ? 'err' : 'idle'}>
+          {t('rms.batch.failedCount', { n: report.failed })}
+        </CimTag>
       </div>
-      <div className="batch-report-list">
-        {report.items.map((it, i) => (
-          <div className="batch-report-row" key={i}>
-            <span className={'tag ' + (it.ok ? 'ok' : 'err')}>{it.ok ? 'OK' : 'FAIL'}</span>
-            <b className="mono">{it.key}</b>
-            <span className="mono muted">{it.target}</span>
-            <span className="muted">{it.message}</span>
-          </div>
-        ))}
-      </div>
+      <DataTable
+        flat
+        columns={columns}
+        rows={report.items}
+        rowKey={(it) => `${it.key}-${it.target}`}
+        scrollX="max-content"
+        showCount={false}
+        emptyTitleKey="rms.common.noData"
+      />
     </div>
   );
 }

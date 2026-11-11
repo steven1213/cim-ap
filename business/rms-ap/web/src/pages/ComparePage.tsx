@@ -1,41 +1,63 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Panel from '@/components/Panel';
-import Drawer from '@/components/Drawer';
+import { useResource } from '@cim/data';
+import {
+  CimDescriptions,
+  CimDrawer,
+  CimField,
+  CimSelect,
+  CimTag,
+  DataTable,
+  EmptyState,
+  Page,
+  PageHead,
+  Panel,
+  useToast,
+  type DataTableColumn,
+  type DescItem,
+} from '@cim/ui';
 import DiffTable from '@/components/DiffTable';
 import * as api from '@/lib/rmsApi';
 import type {
-  Recipe,
-  RecipeVersion,
-  CompareResult,
-  CompareRun,
   CompareLog,
   CompareLogDetail,
   CompareLogSummary,
   CompareMode,
+  CompareResult,
+  CompareRun,
+  Recipe,
+  RecipeVersion,
 } from '@/types';
-import {
-  IconAlert,
-  IconCheckCircle,
-  IconList,
-  IconRefresh,
-  IconSearch,
-  IconSliders,
-  IconSync,
-} from '@/components/Icons';
 
 const MODES: CompareMode[] = ['FULL_BODY', 'PARAMETER', 'STRUCTURE'];
+const MODE_OPTIONS = MODES.map((m) => ({ value: m, labelKey: `rms.compare.mode.${m}` }));
 
-/** 在线比对（Req.md FR-C1~C8、Req 21/24~28/33/37~39）：三模式版本比对 + 批量 + 校验日志下钻。 */
+const NO_RECIPES: Recipe[] = [];
+const NO_VERSIONS: RecipeVersion[] = [];
+const NO_LOGS: CompareLog[] = [];
+
+const VERTICAL = { display: 'flex', flexDirection: 'column', gap: 8 } as const;
+
+/**
+ * 在线比对（Req.md FR-C1~C8、Req 21/24~28/33~37~39）：三模式版本比对 + 批量 + 校验日志下钻。
+ *
+ * <p>迁移要点：</p>
+ * <ul>
+ *   <li>「左侧 / 右侧 / 批量」三处版本列表各是一份 `useResource`（`enabled` 绑配方），
+ *       切配方即重取且旧请求被取消 —— 旧实现三处 `useEffect` 各发一次请求，快速切配方时
+ *       慢回包会把新配方的版本列表冲掉，界面上出现「A 的版本挂在 B 下」。</li>
+ *   <li>批量目标从一长列 checkbox 改为多选下拉（`CimSelect multiple`）：版本多时
+ *       原列表会把面板撑到两屏高，且无法搜索。</li>
+ *   <li>错误提示统一走 toast；面板内的取数错误由 `DataTable` 的错误态兜底。</li>
+ * </ul>
+ */
 export default function ComparePage() {
   const { t } = useTranslation();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const toast = useToast();
 
   // 单次比对
   const [leftRecipe, setLeftRecipe] = useState('');
   const [rightRecipe, setRightRecipe] = useState('');
-  const [leftVersions, setLeftVersions] = useState<RecipeVersion[]>([]);
-  const [rightVersions, setRightVersions] = useState<RecipeVersion[]>([]);
   const [leftVersion, setLeftVersion] = useState('');
   const [rightVersion, setRightVersion] = useState('');
   const [mode, setMode] = useState<CompareMode>('FULL_BODY');
@@ -44,139 +66,190 @@ export default function ComparePage() {
 
   // 批量比对
   const [bRecipe, setBRecipe] = useState('');
-  const [bVersions, setBVersions] = useState<RecipeVersion[]>([]);
   const [bBaseline, setBBaseline] = useState('');
-  const [bTargets, setBTargets] = useState<Set<string>>(new Set());
+  const [bTargets, setBTargets] = useState<string[]>([]);
   const [bResults, setBResults] = useState<CompareRun[]>([]);
   const [bBusy, setBBusy] = useState(false);
 
   // 校验日志
-  const [logs, setLogs] = useState<CompareLog[]>([]);
-  const [logSummary, setLogSummary] = useState<CompareLogSummary | null>(null);
   const [logFilter, setLogFilter] = useState('');
   const [logDetailId, setLogDetailId] = useState<string | null>(null);
 
-  const [err, setErr] = useState('');
+  const recipesRes = useResource(() => api.listRecipes());
+  const recipes = recipesRes.data ?? NO_RECIPES;
 
-  useEffect(() => {
-    api.listRecipes().then(setRecipes).catch(() => setRecipes([]));
-    loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const leftRes = useResource(
+    () => (leftRecipe ? api.listVersions(leftRecipe) : Promise.resolve(NO_VERSIONS)),
+    { deps: [leftRecipe], enabled: !!leftRecipe, keepPreviousData: true },
+  );
+  const rightRes = useResource(
+    () => (rightRecipe ? api.listVersions(rightRecipe) : Promise.resolve(NO_VERSIONS)),
+    { deps: [rightRecipe], enabled: !!rightRecipe, keepPreviousData: true },
+  );
+  const batchRes = useResource(
+    () => (bRecipe ? api.listVersions(bRecipe) : Promise.resolve(NO_VERSIONS)),
+    { deps: [bRecipe], enabled: !!bRecipe, keepPreviousData: true },
+  );
 
-  useEffect(() => {
-    if (!leftRecipe) { setLeftVersions([]); setLeftVersion(''); return; }
-    api.listVersions(leftRecipe).then(setLeftVersions).catch(() => setLeftVersions([]));
-  }, [leftRecipe]);
-  useEffect(() => {
-    if (!rightRecipe) { setRightVersions([]); setRightVersion(''); return; }
-    api.listVersions(rightRecipe).then(setRightVersions).catch(() => setRightVersions([]));
-  }, [rightRecipe]);
-  useEffect(() => {
-    if (!bRecipe) { setBVersions([]); setBBaseline(''); setBTargets(new Set()); return; }
-    api.listVersions(bRecipe).then(setBVersions).catch(() => setBVersions([]));
-  }, [bRecipe]);
-
-  async function loadLogs(filter = logFilter) {
-    try {
-      const [ls, sum] = await Promise.all([
-        api.listCompareLogs({ ...(filter ? { result: filter } : {}), limit: 200 }),
+  const logsRes = useResource(
+    async () => {
+      const [list, sum] = await Promise.all([
+        api.listCompareLogs({ ...(logFilter ? { result: logFilter } : {}), limit: 200 }),
         api.compareLogSummary(),
       ]);
-      setLogs(ls);
-      setLogSummary(sum);
-    } catch (e: any) {
-      setErr(e?.message || 'error');
-    }
-  }
+      return { list, sum };
+    },
+    { deps: [logFilter], keepPreviousData: true },
+  );
+  const logs = logsRes.data?.list ?? NO_LOGS;
+  const logSummary: CompareLogSummary | undefined = logsRes.data?.sum;
 
-  async function runOnce() {
+  const recipeOptions = useMemo(
+    () => recipes.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}` })),
+    [recipes],
+  );
+
+  const versionOptions = (list: RecipeVersion[]) =>
+    list.map((v) => ({
+      value: v.id,
+      label: `v${v.versionNo} · ${t('rms.recipe.status.' + v.status, { defaultValue: v.status })}`,
+      hint: v.changeSummary ?? undefined,
+    }));
+
+  const runOnce = async () => {
     if (!leftVersion || !rightVersion) {
-      setErr(t('rms.compare.pickRequired'));
+      toast.warning(t('rms.compare.pickRequired'));
       return;
     }
     setBusy(true);
-    setErr('');
     setResult(null);
     try {
       setResult(await api.compareVersions(leftVersion, rightVersion, mode));
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  async function runBatch() {
-    if (!bBaseline || bTargets.size === 0) {
-      setErr(t('rms.compare.pickTargets'));
+  const runBatch = async () => {
+    if (!bBaseline || bTargets.length === 0) {
+      toast.warning(t('rms.compare.pickTargets'));
       return;
     }
     setBBusy(true);
-    setErr('');
     try {
-      const runs = await api.batchCompare({
-        baselineVersionId: bBaseline,
-        targetVersionIds: [...bTargets],
-        mode,
-      });
-      setBResults(runs);
-      await loadLogs();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+      setBResults(
+        await api.batchCompare({
+          baselineVersionId: bBaseline,
+          targetVersionIds: bTargets,
+          mode,
+        }),
+      );
+      logsRes.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
       setBBusy(false);
     }
-  }
+  };
 
-  function vlabel(v: RecipeVersion): string {
-    return `v${v.versionNo} · ${t('rms.recipe.status.' + v.status, { defaultValue: v.status })} · ${v.changeSummary ?? ''}`;
-  }
+  const logColumns = useMemo<Array<DataTableColumn<CompareLog>>>(
+    () => [
+      { key: 'createTime', titleKey: 'rms.audit.th.time', mono: true, width: 170 },
+      {
+        key: 'mode',
+        titleKey: 'rms.compare.mode',
+        width: 110,
+        render: (l) => <CimTag size="small">{t('rms.compare.mode.' + l.mode, { defaultValue: l.mode })}</CimTag>,
+      },
+      {
+        key: 'recipeCode',
+        titleKey: 'rms.compare.col.target',
+        mono: true,
+        width: 170,
+        render: (l) => l.recipeCode ?? t('rms.common.dash'),
+      },
+      {
+        key: 'identical',
+        titleKey: 'rms.compare.col.result',
+        width: 90,
+        render: (l) => (
+          <CimTag tone={l.identical ? 'ok' : 'err'} size="small">
+            {l.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
+          </CimTag>
+        ),
+      },
+      { key: 'diffCount', titleKey: 'rms.compare.col.diffCount', width: 100 },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 110,
+        render: (l) => (
+          <button className="btn btn-ghost btn-sm" onClick={() => setLogDetailId(l.id)}>
+            {t('rms.compare.logView')}
+          </button>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
 
-  function toggleTarget(id: string) {
-    setBTargets((prev) => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  }
+  const batchColumns = useMemo<Array<DataTableColumn<CompareRun>>>(
+    () => [
+      {
+        key: 'target',
+        titleKey: 'rms.compare.col.target',
+        width: 200,
+        mono: true,
+        render: (r) => `${r.result.right.recipeCode} v${r.result.right.versionNo}`,
+      },
+      {
+        key: 'identical',
+        titleKey: 'rms.compare.col.result',
+        width: 90,
+        render: (r) => (
+          <CimTag tone={r.result.identical ? 'ok' : 'err'} size="small">
+            {r.result.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
+          </CimTag>
+        ),
+      },
+      {
+        key: 'diffCount',
+        titleKey: 'rms.compare.col.diffCount',
+        render: (r) => r.result.items.filter((i) => i.changed).length,
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
 
   return (
-    <div className="page">
-      {err && <div className="alert err"><IconAlert width={15} height={15} /><span>{err}</span></div>}
-
-      <div className="page-head">
-        <div>
-          <h1>{t('rms.compare.title')}</h1>
-          <p className="dim" style={{ margin: '2px 0 0' }}>{t('rms.compare.sub')}</p>
-        </div>
-      </div>
+    <Page>
+      <PageHead titleKey="rms.compare.title" subtitleKey="rms.compare.sub" />
 
       {/* 校验日志 KPI */}
       <div className="kpi-grid">
         <div className="kpi">
-          <div className="kpi-ico"><IconList width={16} height={16} /></div>
           <div className="kpi-main">
             <div className="kpi-label">{t('rms.compare.summary.total')}</div>
             <div className="kpi-val">{logSummary?.total ?? '—'}</div>
           </div>
         </div>
         <div className="kpi ok">
-          <div className="kpi-ico"><IconCheckCircle width={16} height={16} /></div>
           <div className="kpi-main">
             <div className="kpi-label">{t('rms.compare.summary.pass')}</div>
             <div className="kpi-val">{logSummary?.pass ?? '—'}</div>
           </div>
         </div>
         <div className="kpi warn">
-          <div className="kpi-ico"><IconAlert width={16} height={16} /></div>
           <div className="kpi-main">
             <div className="kpi-label">{t('rms.compare.summary.fail')}</div>
             <div className="kpi-val">{logSummary?.fail ?? '—'}</div>
           </div>
         </div>
         <div className="kpi info">
-          <div className="kpi-ico"><IconSliders width={16} height={16} /></div>
           <div className="kpi-main">
             <div className="kpi-label">{t('rms.compare.summary.diffTotal')}</div>
             <div className="kpi-val">{logSummary?.diffTotal ?? '—'}</div>
@@ -186,241 +259,259 @@ export default function ComparePage() {
 
       {/* 版本比对 */}
       <Panel
-        title={t('rms.compare.title')}
-        sub={t('rms.compare.sub')}
+        titleKey="rms.compare.title"
+        subKey="rms.compare.sub"
         actions={
           <>
-            <select className="select-sm" value={mode} onChange={(e) => setMode(e.target.value as CompareMode)}>
-              {MODES.map((m) => <option key={m} value={m}>{t('rms.compare.mode.' + m)}</option>)}
-            </select>
+            <CimSelect
+              value={mode}
+              onChange={(v) => setMode((typeof v === 'string' ? v : 'FULL_BODY') as CompareMode)}
+              options={MODE_OPTIONS}
+              allowClear={false}
+              width={150}
+            />
             <button className="btn btn-primary btn-sm" onClick={runOnce} disabled={busy}>
-              <IconSync width={13} height={13} /> {busy ? t('rms.common.loading') : t('rms.compare.run')}
+              {busy ? t('rms.common.loading') : t('rms.compare.run')}
             </button>
           </>
         }
       >
-        <div className="grid-2">
-          <div className="field">
-            <label className="field-label">{t('rms.compare.left')}</label>
-            <select className="select-sm" style={{ width: '100%' }} value={leftRecipe}
-              onChange={(e) => setLeftRecipe(e.target.value)}>
-              <option value="">{t('rms.signoff.pickRecipe')}</option>
-              {recipes.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
-            </select>
-            <select className="select-sm" style={{ width: '100%', marginTop: 6 }} value={leftVersion}
-              onChange={(e) => setLeftVersion(e.target.value)} disabled={!leftRecipe}>
-              <option value="">{t('rms.signoff.pickVersion')}</option>
-              {leftVersions.map((v) => <option key={v.id} value={v.id}>{vlabel(v)}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.compare.right')}</label>
-            <select className="select-sm" style={{ width: '100%' }} value={rightRecipe}
-              onChange={(e) => setRightRecipe(e.target.value)}>
-              <option value="">{t('rms.signoff.pickRecipe')}</option>
-              {recipes.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
-            </select>
-            <select className="select-sm" style={{ width: '100%', marginTop: 6 }} value={rightVersion}
-              onChange={(e) => setRightVersion(e.target.value)} disabled={!rightRecipe}>
-              <option value="">{t('rms.signoff.pickVersion')}</option>
-              {rightVersions.map((v) => <option key={v.id} value={v.id}>{vlabel(v)}</option>)}
-            </select>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <CimField labelKey="rms.compare.left">
+            <div style={VERTICAL}>
+              <CimSelect
+                value={leftRecipe || null}
+                onChange={(v) => {
+                  setLeftRecipe(typeof v === 'string' ? v : '');
+                  setLeftVersion('');
+                  setResult(null);
+                }}
+                options={recipeOptions}
+                placeholderKey="rms.signoff.pickRecipe"
+                width="100%"
+              />
+              <CimSelect
+                value={leftVersion || null}
+                onChange={(v) => setLeftVersion(typeof v === 'string' ? v : '')}
+                options={versionOptions(leftRes.data ?? NO_VERSIONS)}
+                placeholderKey="rms.signoff.pickVersion"
+                disabled={!leftRecipe}
+                loading={leftRes.loading}
+                width="100%"
+              />
+            </div>
+          </CimField>
+          <CimField labelKey="rms.compare.right">
+            <div style={VERTICAL}>
+              <CimSelect
+                value={rightRecipe || null}
+                onChange={(v) => {
+                  setRightRecipe(typeof v === 'string' ? v : '');
+                  setRightVersion('');
+                  setResult(null);
+                }}
+                options={recipeOptions}
+                placeholderKey="rms.signoff.pickRecipe"
+                width="100%"
+              />
+              <CimSelect
+                value={rightVersion || null}
+                onChange={(v) => setRightVersion(typeof v === 'string' ? v : '')}
+                options={versionOptions(rightRes.data ?? NO_VERSIONS)}
+                placeholderKey="rms.signoff.pickVersion"
+                disabled={!rightRecipe}
+                loading={rightRes.loading}
+                width="100%"
+              />
+            </div>
+          </CimField>
         </div>
 
-        {result ? (
-          <>
-            <div className={'alert ' + (result.identical ? 'ok' : 'warn')} style={{ marginTop: 12 }}>
-              {result.identical ? <IconCheckCircle width={15} height={15} /> : <IconAlert width={15} height={15} />}
-              <span>
-                {result.identical ? t('rms.compare.identical') : t('rms.compare.diff')}
-                {' · '}
-                {result.left.recipeCode} v{result.left.versionNo} ↔ {result.right.recipeCode} v{result.right.versionNo}
-                {!result.identical && ' · ' + result.items.filter((i) => i.changed).length + ' / ' + result.items.length}
-              </span>
-            </div>
-            <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 12 }}>
+          {result ? (
+            <>
+              <div className={'alert ' + (result.identical ? 'ok' : 'warn')} style={{ marginBottom: 10 }}>
+                <span>
+                  {result.identical ? t('rms.compare.identical') : t('rms.compare.diff')}
+                  {' · '}
+                  {result.left.recipeCode} v{result.left.versionNo} ↔ {result.right.recipeCode} v
+                  {result.right.versionNo}
+                  {!result.identical &&
+                    ' · ' + result.items.filter((i) => i.changed).length + ' / ' + result.items.length}
+                </span>
+              </div>
               <DiffTable items={result.items} />
-            </div>
-          </>
-        ) : (
-          <div className="empty" style={{ marginTop: 12 }}>
-            <IconSliders width={22} height={22} />
-            <b>{t('rms.compare.emptyResult')}</b>
-          </div>
-        )}
+            </>
+          ) : (
+            <EmptyState titleKey="rms.compare.emptyResult" />
+          )}
+        </div>
       </Panel>
 
       {/* 批量比对 */}
-      <Panel title={t('rms.compare.batch.title')} sub={t('rms.compare.batch.sub')}
+      <Panel
+        titleKey="rms.compare.batch.title"
+        subKey="rms.compare.batch.sub"
         actions={
           <button className="btn btn-primary btn-sm" onClick={runBatch} disabled={bBusy}>
-            <IconSync width={13} height={13} /> {bBusy ? t('rms.common.loading') : t('rms.compare.batchRun')}
+            {bBusy ? t('rms.common.loading') : t('rms.compare.batchRun')}
           </button>
-        }>
-        <div className="grid-2">
-          <div className="field">
-            <label className="field-label">{t('rms.compare.baseline')}</label>
-            <select className="select-sm" style={{ width: '100%' }} value={bRecipe}
-              onChange={(e) => setBRecipe(e.target.value)}>
-              <option value="">{t('rms.signoff.pickRecipe')}</option>
-              {recipes.map((r) => <option key={r.id} value={r.id}>{r.code} · {r.name}</option>)}
-            </select>
-            <select className="select-sm" style={{ width: '100%', marginTop: 6 }} value={bBaseline}
-              onChange={(e) => setBBaseline(e.target.value)} disabled={!bRecipe}>
-              <option value="">{t('rms.signoff.pickVersion')}</option>
-              {bVersions.map((v) => <option key={v.id} value={v.id}>{vlabel(v)}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">
-              {t('rms.compare.targets')}
-              {bTargets.size > 0 && <span className="tag pri" style={{ marginLeft: 8 }}>{t('rms.compare.batchPicked', { n: bTargets.size })}</span>}
-            </label>
-            <div className="pick-list">
-              {bVersions.filter((v) => v.id !== bBaseline).map((v) => (
-                <label key={v.id} className="pick-item">
-                  <span className="check"><input type="checkbox" checked={bTargets.has(v.id)} onChange={() => toggleTarget(v.id)} /></span>
-                  <span className="mono">{vlabel(v)}</span>
-                </label>
-              ))}
-              {bRecipe && bVersions.length <= 1 && <span className="dim">{t('rms.common.noData')}</span>}
+        }
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <CimField labelKey="rms.compare.baseline">
+            <div style={VERTICAL}>
+              <CimSelect
+                value={bRecipe || null}
+                onChange={(v) => {
+                  setBRecipe(typeof v === 'string' ? v : '');
+                  setBBaseline('');
+                  setBTargets([]);
+                }}
+                options={recipeOptions}
+                placeholderKey="rms.signoff.pickRecipe"
+                width="100%"
+              />
+              <CimSelect
+                value={bBaseline || null}
+                onChange={(v) => {
+                  setBBaseline(typeof v === 'string' ? v : '');
+                  setBTargets((prev) => prev.filter((id) => id !== v));
+                }}
+                options={versionOptions(batchRes.data ?? NO_VERSIONS)}
+                placeholderKey="rms.signoff.pickVersion"
+                disabled={!bRecipe}
+                loading={batchRes.loading}
+                width="100%"
+              />
             </div>
-          </div>
+          </CimField>
+          <CimField labelKey="rms.compare.targets">
+            <CimSelect
+              multiple
+              value={bTargets}
+              onChange={(v) => setBTargets(Array.isArray(v) ? v : v ? [v] : [])}
+              options={versionOptions(batchRes.data ?? NO_VERSIONS).filter((o) => o.value !== bBaseline)}
+              placeholderKey="rms.signoff.pickVersion"
+              disabled={!bRecipe}
+              notFoundKey="rms.common.noData"
+              width="100%"
+            />
+          </CimField>
         </div>
 
-        {bResults.length ? (
-          <div className="table-wrap" style={{ marginTop: 12 }}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th style={{ width: 180 }}>{t('rms.compare.col.target')}</th>
-                  <th style={{ width: 90 }}>{t('rms.compare.col.result')}</th>
-                  <th>{t('rms.compare.col.diffCount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bResults.map((r) => (
-                  <tr key={r.logId}>
-                    <td className="mono">{r.result.right.recipeCode} v{r.result.right.versionNo}</td>
-                    <td>
-                      <span className={'tag ' + (r.result.identical ? 'ok' : 'err')}>
-                        {r.result.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
-                      </span>
-                    </td>
-                    <td>{r.result.items.filter((i) => i.changed).length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty" style={{ marginTop: 12 }}>
-            <IconSearch width={22} height={22} />
-            <b>{t('rms.compare.emptyBatch')}</b>
-          </div>
-        )}
+        <div style={{ marginTop: 12 }}>
+          {bResults.length ? (
+            <DataTable<CompareRun>
+              flat
+              columns={batchColumns}
+              rows={bResults}
+              rowKey={(r) => r.logId}
+              scrollX="max-content"
+            />
+          ) : (
+            <EmptyState titleKey="rms.compare.emptyBatch" />
+          )}
+        </div>
       </Panel>
 
       {/* 校验日志 */}
-      <Panel title={t('rms.compare.logs.title')} sub={t('rms.compare.logs.sub')} flush
+      <Panel
+        titleKey="rms.compare.logs.title"
+        subKey="rms.compare.logs.sub"
+        flush
         actions={
-          <>
-            <select className="select-sm" value={logFilter}
-              onChange={(e) => { setLogFilter(e.target.value); loadLogs(e.target.value); }}>
-              <option value="">{t('rms.compare.filterResult')}</option>
-              <option value="PASS">{t('rms.compare.onlyPass')}</option>
-              <option value="FAIL">{t('rms.compare.onlyFail')}</option>
-            </select>
-            <button className="btn btn-ghost btn-sm" onClick={() => loadLogs()}>
-              <IconRefresh width={13} height={13} /> {t('rms.common.refresh')}
-            </button>
-          </>
-        }>
-        {logs.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th style={{ width: 160 }}>{t('rms.audit.th.time')}</th>
-                  <th style={{ width: 110 }}>{t('rms.compare.mode')}</th>
-                  <th style={{ width: 160 }}>{t('rms.compare.col.target')}</th>
-                  <th style={{ width: 90 }}>{t('rms.compare.col.result')}</th>
-                  <th>{t('rms.compare.col.diffCount')}</th>
-                  <th style={{ width: 120 }}>{t('rms.common.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td className="mono dim">{l.createTime ?? t('rms.common.dash')}</td>
-                    <td><span className="tag">{t('rms.compare.mode.' + l.mode, { defaultValue: l.mode })}</span></td>
-                    <td className="mono">{l.recipeCode ?? t('rms.common.dash')}</td>
-                    <td>
-                      <span className={'tag ' + (l.identical ? 'ok' : 'err')}>
-                        {l.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
-                      </span>
-                    </td>
-                    <td>{l.diffCount}</td>
-                    <td className="cell-actions">
-                      <button className="btn btn-ghost btn-sm" onClick={() => setLogDetailId(l.id)}>
-                        {t('rms.compare.logView')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconList width={22} height={22} />
-            <b>{t('rms.compare.log.empty')}</b>
-            <span>{t('rms.compare.log.emptyHint')}</span>
-          </div>
-        )}
+          <CimSelect
+            value={logFilter}
+            onChange={(v) => setLogFilter(typeof v === 'string' ? v : '')}
+            options={[
+              { value: 'PASS', labelKey: 'rms.compare.onlyPass' },
+              { value: 'FAIL', labelKey: 'rms.compare.onlyFail' },
+            ]}
+            placeholderKey="rms.compare.filterResult"
+            width={140}
+          />
+        }
+      >
+        <DataTable<CompareLog>
+          flat
+          columns={logColumns}
+          rows={logs}
+          rowKey={(l) => l.id}
+          loading={logsRes.loading}
+          error={logsRes.error?.message}
+          onRetry={logsRes.refresh}
+          onRefresh={logsRes.refresh}
+          settingsKey="rms.compare.logs"
+          scrollX="max-content"
+          emptyTitleKey="rms.compare.log.empty"
+          emptyHintKey="rms.compare.log.emptyHint"
+        />
       </Panel>
 
-      {logDetailId && <LogDetailDrawer id={logDetailId} onClose={() => setLogDetailId(null)} />}
-    </div>
+      <LogDetailDrawer id={logDetailId} onClose={() => setLogDetailId(null)} />
+    </Page>
   );
 }
 
 /** 校验日志明细抽屉：两级下钻的叶子（差异项逐条）。 */
-function LogDetailDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+function LogDetailDrawer({ id, onClose }: { id: string | null; onClose: () => void }) {
   const { t } = useTranslation();
-  const [detail, setDetail] = useState<CompareLogDetail | null>(null);
-  const [err, setErr] = useState('');
 
-  useEffect(() => {
-    api.compareLogDetail(id).then(setDetail).catch((e) => setErr(e?.message || 'error'));
-  }, [id]);
+  const { data, loading, error } = useResource<CompareLogDetail>(
+    () => api.compareLogDetail(id as string),
+    { deps: [id], enabled: !!id },
+  );
+
+  const items = useMemo<Array<DescItem<CompareLogDetail>>>(
+    () => [
+      { key: 'time', labelKey: 'rms.audit.th.time', render: (v) => v.view.createTime },
+      {
+        key: 'mode',
+        labelKey: 'rms.compare.mode',
+        render: (v) => t('rms.compare.mode.' + v.view.mode, { defaultValue: v.view.mode }),
+      },
+      { key: 'target', labelKey: 'rms.compare.col.target', render: (v) => v.view.recipeCode },
+      {
+        key: 'result',
+        labelKey: 'rms.compare.col.result',
+        render: (v) => (
+          <>
+            <CimTag tone={v.view.identical ? 'ok' : 'err'} size="small">
+              {v.view.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
+            </CimTag>
+            <span className="dim">
+              {' '}
+              · {v.view.diffCount} {t('rms.compare.col.diffCount')}
+            </span>
+          </>
+        ),
+      },
+    ],
+    [t],
+  );
 
   return (
-    <Drawer title={<><IconList width={15} height={15} /> {t('rms.compare.detail.title')}</>} onClose={onClose}>
-      {err && <div className="alert err"><IconAlert width={15} height={15} /><span>{err}</span></div>}
-      {!detail ? (
-        <div className="dim">{t('rms.common.loading')}</div>
-      ) : (
+    <CimDrawer
+      open={!!id}
+      onClose={onClose}
+      titleKey="rms.compare.detail.title"
+      width={820}
+    >
+      {error ? (
+        <div className="alert err">
+          <span>{error.message}</span>
+        </div>
+      ) : null}
+      {loading && !data ? <div className="dim">{t('rms.common.loading')}</div> : null}
+      {data ? (
         <>
-          <dl className="kv">
-            <dt>{t('rms.audit.th.time')}</dt>
-            <dd className="mono">{detail.view.createTime}</dd>
-            <dt>{t('rms.compare.mode')}</dt>
-            <dd>{t('rms.compare.mode.' + detail.view.mode, { defaultValue: detail.view.mode })}</dd>
-            <dt>{t('rms.compare.col.target')}</dt>
-            <dd className="mono">{detail.view.recipeCode}</dd>
-            <dt>{t('rms.compare.col.result')}</dt>
-            <dd>
-              <span className={'tag ' + (detail.view.identical ? 'ok' : 'err')}>
-                {detail.view.identical ? t('rms.compare.pass') : t('rms.compare.fail')}
-              </span>
-              <span className="dim"> · {detail.view.diffCount} {t('rms.compare.col.diffCount')}</span>
-            </dd>
-          </dl>
-          <DiffTable items={detail.items} />
+          <CimDescriptions record={data} items={items} column={2} />
+          <div style={{ marginTop: 12 }}>
+            <DiffTable items={data.items} />
+          </div>
         </>
-      )}
-    </Drawer>
+      ) : null}
+    </CimDrawer>
   );
 }
