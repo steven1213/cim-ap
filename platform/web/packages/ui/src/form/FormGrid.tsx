@@ -10,9 +10,15 @@
 // 不做的事：不做校验规则 DSL。校验只有两处：前端必填（`required` 标 *）与后端返回的错误。
 // 复杂的联动/异步校验请在页面里写，硬塞进配置会变成小型框架。
 
-import { Input, InputNumber, Select, Switch } from 'antd';
+import { Switch } from 'antd';
 import type { ReactNode } from 'react';
 import { useUiLabel } from '../locale';
+// 底层控件一律复用本包的原子组件，避免 FormGrid 与页面各写一套默认值
+import { CimInput } from './Input';
+import { CimInputNumber } from './InputNumber';
+import { CimSelect } from './Select';
+import { CimDatePicker, CimTimePicker } from './DatePicker';
+import { CimChoice } from './Choice';
 
 export interface FormOption {
   value: string;
@@ -33,17 +39,41 @@ interface FieldBase<V> {
 }
 
 export type FormField<V> =
-  | (FieldBase<V> & { kind: 'text'; placeholderKey?: string; maxLength?: number; mono?: boolean })
+  | (FieldBase<V> & {
+      kind: 'text';
+      placeholderKey?: string;
+      maxLength?: number;
+      mono?: boolean;
+      /** 单位后缀（nm / ℃ / s）。 */
+      unit?: string;
+    })
   | (FieldBase<V> & { kind: 'password'; placeholderKey?: string })
   | (FieldBase<V> & { kind: 'textarea'; placeholderKey?: string; rows?: number })
-  | (FieldBase<V> & { kind: 'number'; min?: number; max?: number; step?: number; precision?: number })
+  | (FieldBase<V> & {
+      kind: 'number';
+      min?: number;
+      max?: number;
+      step?: number;
+      precision?: number;
+      /** 单位后缀，工艺参数必备。 */
+      unit?: string;
+      thousandSeparator?: boolean;
+    })
   | (FieldBase<V> & {
       kind: 'select';
-      options: FormOption[];
+      /** 静态选项（与 dict 二选一）。 */
+      options?: FormOption[];
+      /** 字典码：由 UiDictProvider 提供选项，无需页面自己拉字典。 */
+      dict?: string;
       allowClear?: boolean;
       showSearch?: boolean;
       placeholderKey?: string;
     })
+  | (FieldBase<V> & { kind: 'date'; placeholderKey?: string })
+  | (FieldBase<V> & { kind: 'datetime'; placeholderKey?: string })
+  | (FieldBase<V> & { kind: 'time'; placeholderKey?: string })
+  | (FieldBase<V> & { kind: 'checkbox'; options: FormOption[] })
+  | (FieldBase<V> & { kind: 'radio'; options: FormOption[]; button?: boolean })
   | (FieldBase<V> & { kind: 'switch' })
   | (FieldBase<V> & {
       kind: 'custom';
@@ -135,68 +165,118 @@ function FieldControl<V>({
   switch (field.kind) {
     case 'text':
       return (
-        <Input
+        <CimInput
           id={id}
           value={(raw as string) ?? ''}
           disabled={off}
           maxLength={field.maxLength}
-          className={field.mono ? 'cim-mono' : undefined}
+          mono={field.mono}
+          unit={field.unit}
           placeholder={placeholder(field.placeholderKey)}
-          onChange={(e) => patch(key, e.target.value)}
+          onChange={(v) => patch(key, v)}
         />
       );
     case 'password':
       return (
-        <Input.Password
+        <CimInput
           id={id}
+          password
           value={(raw as string) ?? ''}
           disabled={off}
           placeholder={placeholder(field.placeholderKey)}
-          onChange={(e) => patch(key, e.target.value)}
+          onChange={(v) => patch(key, v)}
         />
       );
     case 'textarea':
       return (
-        <Input.TextArea
+        <CimInput
           id={id}
+          rows={field.rows ?? 3}
           value={(raw as string) ?? ''}
           disabled={off}
-          rows={field.rows ?? 3}
           placeholder={placeholder(field.placeholderKey)}
-          onChange={(e) => patch(key, e.target.value)}
+          onChange={(v) => patch(key, v)}
         />
       );
     case 'number':
       return (
-        <InputNumber
+        <CimInputNumber
           id={id}
-          style={{ width: '100%' }}
           value={typeof raw === 'number' ? raw : raw === '' || raw == null ? null : Number(raw)}
           disabled={off}
           min={field.min}
           max={field.max}
           step={field.step}
           precision={field.precision}
+          unit={field.unit}
+          thousandSeparator={field.thousandSeparator}
           onChange={(v) => patch(key, v)}
         />
       );
     case 'select':
       return (
-        <Select
+        <CimSelect
           id={id}
-          style={{ width: '100%' }}
-          value={(raw as string) ?? undefined}
+          value={(raw as string) ?? null}
           disabled={off}
+          dict={field.dict}
+          options={field.options}
           allowClear={field.allowClear ?? true}
-          showSearch={field.showSearch ?? false}
-          optionFilterProp="label"
+          showSearch={field.showSearch ?? true}
           placeholder={placeholder(field.placeholderKey)}
-          options={field.options.map((o) => ({
-            value: o.value,
-            label: o.labelKey ? label(o.labelKey, o.label ?? o.value) : o.label ?? o.value,
-            disabled: o.disabled,
-          }))}
-          onChange={(v) => patch(key, v ?? null)}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'date':
+      return (
+        <CimDatePicker
+          id={id}
+          mode="date"
+          value={(raw as string) ?? null}
+          disabled={off}
+          placeholder={placeholder(field.placeholderKey)}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'datetime':
+      return (
+        <CimDatePicker
+          id={id}
+          mode="datetime"
+          value={(raw as string) ?? null}
+          disabled={off}
+          placeholder={placeholder(field.placeholderKey)}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'time':
+      return (
+        <CimTimePicker
+          id={id}
+          value={(raw as string) ?? null}
+          disabled={off}
+          placeholderKey={field.placeholderKey}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'checkbox':
+      return (
+        <CimChoice
+          mode="checkbox"
+          options={field.options}
+          value={(raw as string[]) ?? []}
+          disabled={off}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'radio':
+      return (
+        <CimChoice
+          mode={field.button ? 'button' : 'radio'}
+          options={field.options}
+          value={(raw as string) ?? ''}
+          disabled={off}
+          onChange={(v) => patch(key, v)}
         />
       );
     case 'switch':

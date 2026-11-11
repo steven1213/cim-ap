@@ -23,6 +23,8 @@
       "@cim/ui": ["../../../platform/web/packages/ui/src/index.ts"],
       "@cim/ui/*": ["../../../platform/web/packages/ui/src/*"],
       "antd": ["node_modules/antd"],
+      "dayjs": ["node_modules/dayjs"],
+      "dayjs/*": ["node_modules/dayjs/*"],
       "antd/*": ["node_modules/antd/*"],
       "react": ["node_modules/@types/react"],
       "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime"],

@@ -224,3 +224,185 @@
   line-height: 18px;
   padding-inline: 7px;
 }
+
+/* ================================================================
+   以下为组件补齐批次（basic / content / data / form / feedback / layout）
+   规则：只写布局与间距，颜色一律取 var(--*)，不出现裸色值
+   ================================================================ */
+
+/* ---------- 表单：标签 + 控件包装（CimField） ---------- */
+.cim-field-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cim-field-inline {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cim-field-inline > .cim-field-label {
+  padding-top: 6px;
+  text-align: right;
+  white-space: nowrap;
+}
+.cim-field-inline > .cim-field-control {
+  flex: 1 1 auto;
+}
+
+/* ---------- 输入框单位后缀 ---------- */
+.cim-unit-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+.cim-unit-input > .ant-input-affix-wrapper,
+.cim-unit-input > .ant-input,
+.cim-unit-input > .ant-input-number {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cim-unit {
+  display: inline-flex;
+  align-items: center;
+  height: var(--cim-hit, 28px);
+  padding: 0 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  background: var(--panel-2);
+  border: 1px solid var(--line-strong);
+  border-left: none;
+  border-top-right-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
+  white-space: nowrap;
+  user-select: none;
+}
+.cim-mono-input input,
+.cim-mono-input.ant-input {
+  font-family: var(--font-mono);
+}
+
+/* ---------- 开关 ---------- */
+.cim-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cim-switch-text {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
+/* ---------- 下拉选项（值 + 右侧补充说明） ---------- */
+.cim-select-opt {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cim-select-opt-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+/* ---------- 标签页徽标 ---------- */
+.cim-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cim-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 折叠面板标题 ---------- */
+.cim-collapse-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: var(--fs-base);
+}
+.cim-collapse .ant-collapse-header {
+  padding-block: 6px !important;
+}
+
+/* ---------- 图标按钮 ---------- */
+.cim-btn-icon.ant-btn {
+  padding-inline: 6px;
+}
+
+/* ---------- 滚动区 ---------- */
+.cim-scroll-area {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---------- 分栏 ---------- */
+.cim-splitter {
+  display: flex;
+  flex-direction: column;
+}
+.cim-splitter > .ant-splitter {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cim-splitter-panel {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 描述列表 ---------- */
+.cim-desc .ant-descriptions-item-label {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.cim-desc .ant-descriptions-item-content {
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+/* ---------- 键值表 ---------- */
+.cim-infotable td {
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* ---------- 树 ---------- */
+.cim-tree .ant-tree-node-content-wrapper {
+  font-size: var(--fs-sm);
+}
+
+/* ---------- 上传 ---------- */
+.cim-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cim-upload-summary {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
