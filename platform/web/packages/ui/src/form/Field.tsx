@@ -24,6 +24,14 @@ export interface CimFieldProps {
   hint?: string;
   /** 标签在左（横向）还是在上（纵向），默认在上。 */
   layout?: 'top' | 'left';
+  /**
+   * 紧凑档：密集工具条里的元数据字段（标签字号 10.5、间距 3）。
+   *
+   * <p>原 approval 设计器 `.designer-meta` 里手写的 `.field.field-inline` 就是这个形态——
+   * 名字与 `layout="left"` 的 `.cim-field-inline` 撞了却语义相反（那个是横向），
+   * 所以这里另起 `compact`，别按名字猜。</p>
+   */
+  compact?: boolean;
   /** layout=left 时的标签宽度，默认 96。 */
   labelWidth?: number;
   /** 占几列（配合 .cim-form-grid 使用）。 */
@@ -47,6 +55,7 @@ export function CimField({
   hintKey,
   hint,
   layout = 'top',
+  compact = false,
   labelWidth = 96,
   span,
   htmlFor,
@@ -63,6 +72,7 @@ export function CimField({
       className={[
         'cim-field',
         layout === 'left' ? 'cim-field-inline' : '',
+        compact ? 'cim-field-compact' : '',
         className ?? '',
       ]
         .filter(Boolean)

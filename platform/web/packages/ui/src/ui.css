@@ -752,6 +752,14 @@ button:disabled {
 .cim-field + .cim-field {
   margin-top: 11px;
 }
+/* 网格内由 gap 控距：必须禁掉纵向堆叠的相邻 margin，否则第 2/3 列整体下移错位。
+   原 `.grid-2 > .field + .field` 的作用；换成组件后网格容器是 `.cim-form-grid`，
+   而页面里手写的 `.grid-2/.grid-3` 仍在用，两个都要覆盖。 */
+.cim-form-grid > .cim-field + .cim-field,
+.grid-2 > .cim-field + .cim-field,
+.grid-3 > .cim-field + .cim-field {
+  margin-top: 0;
+}
 .cim-field-label {
   font-size: 10px;
   font-weight: 650;
@@ -796,4 +804,14 @@ button:disabled {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+}
+/* 紧凑档（compact）：密集工具条里的元数据字段，标签更小、间距更紧。
+   对应 approval 设计器 `.designer-meta` 里那套 `.field-inline`——
+   名字撞了但语义相反（那个是纵向紧凑，`cim-field-inline` 是横向）。 */
+.cim-field-compact {
+  gap: 3px;
+}
+.cim-field-compact .cim-field-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
 }
