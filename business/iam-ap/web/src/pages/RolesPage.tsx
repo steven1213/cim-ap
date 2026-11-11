@@ -1,100 +1,71 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import { CimTag, DataTable, Page, Panel, type DataTableColumn } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRoleGroup } from '@/types';
-import Panel from '@/components/Panel';
-import { IconAlert, IconRefresh, IconShield } from '@/components/Icons';
 
 /** 角色组视图（路由级 `RequirePerm`，需 `iam:role:list`）：按接入码聚合实际在用的粗角色组与人数分布。 */
 export default function RolesPage() {
   const { t } = useTranslation();
-  const [groups, setGroups] = useState<AppRoleGroup[]>([]);
-  const [err, setErr] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    setErr('');
-    try {
-      setGroups(await api.get<AppRoleGroup[]>('/admin/roles'));
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.rolesView.errLoad'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
+  const listRes = useResource<AppRoleGroup[]>(({ signal }) => api.get<AppRoleGroup[]>('/admin/roles', undefined, { signal }));
+  const groups = listRes.data ?? [];
   const totalRoles = groups.reduce((s, g) => s + g.roles.length, 0);
 
-  return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
+  const columns = useMemo<Array<DataTableColumn<AppRoleGroup>>>(
+    () => [
+      { key: 'appCode', titleKey: 'iam.rolesView.th.appCode', width: 170, mono: true, render: (g) => g.appCode },
+      { key: 'appName', titleKey: 'iam.rolesView.th.appName', width: 220, render: (g) => g.appName },
+      {
+        key: 'roles',
+        titleKey: 'iam.rolesView.th.roles',
+        render: (g) =>
+          g.roles.length ? (
+            <div className="tag-list">
+              {g.roles.map((r) => (
+                // CimTag 不收 title，人数提示包一层 span
+                <span key={r.role} title={t('iam.rolesView.userCount', { n: r.userCount })}>
+                  <CimTag tone="run" size="small">
+                    {r.role}
+                    <b className="tag-count">{r.userCount}</b>
+                  </CimTag>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="dim">{t('iam.rolesView.noRole')}</span>
+          ),
+      },
+    ],
+    [t],
+  );
 
+  return (
+    <Page>
       <Panel
         title={t('iam.rolesView.title')}
         sub={t('iam.rolesView.sub')}
-        flush
         actions={
           <>
-            <span className="tag">{t('iam.rolesView.countApps', { n: groups.length })}</span>
-            <span className="tag pri">{t('iam.rolesView.countRoles', { n: totalRoles })}</span>
-            <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-              <IconRefresh width={13} height={13} />
-              {loading ? t('iam.rolesView.refreshing') : t('iam.rolesView.refresh')}
-            </button>
+            <CimTag>{t('iam.rolesView.countApps', { n: groups.length })}</CimTag>
+            <CimTag tone="run">{t('iam.rolesView.countRoles', { n: totalRoles })}</CimTag>
           </>
         }
       >
-        {groups.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th style={{ width: 170 }}>{t('iam.rolesView.th.appCode')}</th>
-                  <th style={{ width: 220 }}>{t('iam.rolesView.th.appName')}</th>
-                  <th>{t('iam.rolesView.th.roles')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g) => (
-                  <tr key={g.appCode}>
-                    <td className="mono">{g.appCode}</td>
-                    <td>{g.appName}</td>
-                    <td>
-                      {g.roles.length ? (
-                        <div className="tag-list">
-                          {g.roles.map((r) => (
-                            <span key={r.role} className="tag pri" title={t('iam.rolesView.userCount', { n: r.userCount })}>
-                              {r.role}
-                              <b className="tag-count">{r.userCount}</b>
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="dim">{t('iam.rolesView.noRole')}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconShield width={22} height={22} />
-            <b>{t('iam.rolesView.emptyTitle')}</b>
-            <span>{t('iam.rolesView.emptyHint')}</span>
-          </div>
-        )}
+        <DataTable<AppRoleGroup>
+          flat
+          columns={columns}
+          rows={groups}
+          rowKey={(g) => g.appCode}
+          loading={listRes.loading}
+          error={listRes.error?.message}
+          onRetry={listRes.refresh}
+          onRefresh={listRes.refresh}
+          settingsKey="iam.rolesView"
+          emptyTitleKey="iam.rolesView.emptyTitle"
+          emptyHintKey="iam.rolesView.emptyHint"
+        />
       </Panel>
 
       <Panel title={t('iam.rolesView.aboutTitle')} sub={t('iam.rolesView.aboutSub')}>
@@ -104,6 +75,6 @@ export default function RolesPage() {
           <li>{t('iam.rolesView.about3')}</li>
         </ul>
       </Panel>
-    </div>
+    </Page>
   );
 }

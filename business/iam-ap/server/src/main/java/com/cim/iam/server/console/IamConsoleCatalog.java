@@ -1113,6 +1113,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admissions.sub", "输入用户 ID 查看其准入矩阵，逐条授予 / 撤销", "Enter a user ID to see their admission matrix; grant / revoke per row"));
         t.add(new TextDef("iam.admissions.f.userId", "用户 ID", "User ID"));
         t.add(new TextDef("iam.admissions.query", "查询", "Query"));
+        t.add(new TextDef("iam.admissions.currentUser", "当前：{{user}}", "Current: {{user}}"));
         t.add(new TextDef("iam.admissions.th.appCode", "接入码", "App code"));
         t.add(new TextDef("iam.admissions.th.appName", "应用名称", "App name"));
         t.add(new TextDef("iam.admissions.th.admission", "准入", "Admission"));
@@ -1123,6 +1124,7 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admissions.update", "更新", "Update"));
         t.add(new TextDef("iam.admissions.grant", "授予", "Grant"));
         t.add(new TextDef("iam.admissions.revoke", "撤销", "Revoke"));
+        t.add(new TextDef("iam.admissions.revokeConfirm", "确认撤销 {{user}} 在 {{app}} 的准入？其存量令牌将立即失效。", "Revoke {{user}}'s admission to {{app}}? Existing tokens are invalidated immediately."));
         t.add(new TextDef("iam.admissions.emptyTitle", "输入用户 ID 后点击「查询」", "Enter a user ID then click “Query”"));
         t.add(new TextDef("iam.admissions.emptyHint", "将列出全部已注册应用及其准入 / 角色状态", "Lists all registered apps with their admission / role status"));
         t.add(new TextDef("iam.admissions.impactTitle", "变更影响", "Change impact"));

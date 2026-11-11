@@ -1,120 +1,115 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import { CimTag, DataTable, Page, Panel, useToast, type DataTableColumn } from '@cim/ui';
 import * as api from '@/lib/api';
 import type { LockRow } from '@/types';
 import { fmtDateTime } from '@/lib/format';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { USER_UNLOCK } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconKey, IconLock, IconRefresh } from '@/components/Icons';
+import { IconKey } from '@/components/Icons';
 
 /** 登录锁定管理：列出被锁账号并支持手动解锁（解锁按钮按 `iam:user:unlock` 显隐）。 */
 export default function LockoutsPage() {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<LockRow[]>([]);
-  const [err, setErr] = useState('');
-  const [msg, setMsg] = useState('');
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const [unlocking, setUnlocking] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setErr('');
-    try {
-      setRows(await api.get<LockRow[]>('/admin/lockouts'));
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.lockouts.errLoad'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
+  const listRes = useResource<LockRow[]>(({ signal }) => api.get<LockRow[]>('/admin/lockouts', undefined, { signal }));
+  const rows = listRes.data ?? [];
 
   async function onUnlock(username: string) {
-    setErr('');
+    // 逐行锁：只禁当前行按钮。整页 busy 会让「连点两行」看起来像卡死
+    setUnlocking(username);
     try {
       const cleared = await api.del<boolean>(`/admin/lockouts/${encodeURIComponent(username)}`);
-      setMsg(cleared ? t('iam.lockouts.msgUnlocked', { user: username }) : t('iam.lockouts.msgNoLock', { user: username }));
-      await load();
+      toast.success(
+        cleared
+          ? t('iam.lockouts.msgUnlocked', { user: username })
+          : t('iam.lockouts.msgNoLock', { user: username }),
+      );
+      listRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.lockouts.errUnlock'));
+      toast.error(e?.msg || t('iam.lockouts.errUnlock'));
+    } finally {
+      setUnlocking(null);
     }
   }
 
-  return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="alert ok">
-          <IconCheckCircle width={15} height={15} />
-          <span>{msg}</span>
-        </div>
-      )}
+  const columns = useMemo<Array<DataTableColumn<LockRow>>>(
+    () => [
+      { key: 'username', titleKey: 'iam.lockouts.th.username', mono: true, render: (r) => r.username },
+      {
+        key: 'failCount',
+        titleKey: 'iam.lockouts.th.failures',
+        width: 110,
+        align: 'right',
+        render: (r) => r.failCount,
+      },
+      {
+        key: 'firstFailAt',
+        titleKey: 'iam.lockouts.th.first',
+        width: 180,
+        mono: true,
+        render: (r) => <span className="dim">{fmtDateTime(r.firstFailAt)}</span>,
+      },
+      {
+        key: 'lastFailAt',
+        titleKey: 'iam.lockouts.th.last',
+        width: 180,
+        mono: true,
+        render: (r) => <span className="dim">{fmtDateTime(r.lastFailAt)}</span>,
+      },
+      {
+        key: 'lockedUntil',
+        titleKey: 'iam.lockouts.th.until',
+        width: 180,
+        mono: true,
+        render: (r) => fmtDateTime(r.lockedUntil),
+      },
+      {
+        key: 'actions',
+        titleKey: 'iam.lockouts.th.actions',
+        width: 120,
+        render: (r) => (
+          <Perms code={USER_UNLOCK}>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => void onUnlock(r.username)}
+              disabled={unlocking === r.username}
+            >
+              <IconKey width={13} height={13} />
+              {t('iam.lockouts.unlock')}
+            </button>
+          </Perms>
+        ),
+      },
+    ],
+    // onUnlock 只依赖 listRes.refresh 与 unlocking；两者都在闭包外，随渲染更新
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, unlocking],
+  );
 
+  return (
+    <Page>
       <Panel
         title={t('iam.lockouts.title')}
         sub={t('iam.lockouts.sub')}
-        flush
-        actions={
-          <>
-            <span className="tag">{t('iam.lockouts.count', { n: rows.length })}</span>
-            <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-              <IconRefresh width={13} height={13} />
-              {loading ? t('iam.lockouts.refreshing') : t('iam.lockouts.refresh')}
-            </button>
-          </>
-        }
+        actions={<CimTag tone={rows.length ? 'warn' : 'idle'}>{t('iam.lockouts.count', { n: rows.length })}</CimTag>}
       >
-        {rows.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('iam.lockouts.th.username')}</th>
-                  <th className="num" style={{ width: 110 }}>
-                    {t('iam.lockouts.th.failures')}
-                  </th>
-                  <th style={{ width: 180 }}>{t('iam.lockouts.th.first')}</th>
-                  <th style={{ width: 180 }}>{t('iam.lockouts.th.last')}</th>
-                  <th style={{ width: 180 }}>{t('iam.lockouts.th.until')}</th>
-                  <th style={{ width: 110 }}>{t('iam.lockouts.th.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.username}>
-                    <td className="mono">{r.username}</td>
-                    <td className="num">{r.failCount}</td>
-                    <td className="mono dim">{fmtDateTime(r.firstFailAt)}</td>
-                    <td className="mono dim">{fmtDateTime(r.lastFailAt)}</td>
-                    <td className="mono">{fmtDateTime(r.lockedUntil)}</td>
-                    <td>
-                      <Perms code={USER_UNLOCK}>
-                        <button className="btn-ghost btn-sm" onClick={() => onUnlock(r.username)}>
-                          <IconKey width={13} height={13} />
-                          {t('iam.lockouts.unlock')}
-                        </button>
-                      </Perms>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconLock width={22} height={22} />
-            <b>{t('iam.lockouts.emptyTitle')}</b>
-            <span>{t('iam.lockouts.emptyHint')}</span>
-          </div>
-        )}
+        <DataTable<LockRow>
+          flat
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.username}
+          loading={listRes.loading}
+          error={listRes.error?.message}
+          onRetry={listRes.refresh}
+          onRefresh={listRes.refresh}
+          settingsKey="iam.lockouts"
+          emptyTitleKey="iam.lockouts.emptyTitle"
+          emptyHintKey="iam.lockouts.emptyHint"
+        />
       </Panel>
 
       <Panel title={t('iam.lockouts.policyTitle')} sub={t('iam.lockouts.policySub')}>
@@ -125,6 +120,6 @@ export default function LockoutsPage() {
           <li>{t('iam.lockouts.policy4')}</li>
         </ul>
       </Panel>
-    </div>
+    </Page>
   );
 }

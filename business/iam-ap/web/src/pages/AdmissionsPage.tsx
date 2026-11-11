@@ -1,11 +1,20 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimInput,
+  CimTag,
+  DataTable,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AppRegistration, AssignmentDto } from '@/types';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import { ADMISSION_GRANT, ADMISSION_REVOKE } from '@/lib/permCodes';
-import { IconAlert, IconCheckCircle, IconInbox, IconLink } from '@/components/Icons';
 
 /**
  * 准入授权：以「用户」为主线，查看并编辑其可进入的 ap 与角色组。
@@ -15,175 +24,194 @@ import { IconAlert, IconCheckCircle, IconInbox, IconLink } from '@/components/Ic
  */
 export default function AdmissionsPage() {
   const { t } = useTranslation();
-  const [apps, setApps] = useState<AppRegistration[]>([]);
+  const toast = useToast();
+  const confirm = useConfirm();
+
+  /** 输入框里的用户（草稿）。 */
   const [userId, setUserId] = useState('admin');
-  const [assignments, setAssignments] = useState<AssignmentDto[] | null>(null);
+  /** 已提交查询的用户（生效）。表格与写操作一律以它为准 —— 否则「改了输入框没点查询就授权」会把角色授给新输入的人。 */
+  const [applied, setApplied] = useState('admin');
+  /** 用户在表格里的临时输入；为空表示「沿用服务端值」。查询成功后整体清空。 */
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const [err, setErr] = useState('');
-  const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.get<AppRegistration[]>('/apps').then(setApps).catch((e: any) => setErr(e?.msg || t('iam.admissions.errLoad')));
-    // 默认即以 admin 查询一次，进入页面立即可见准入矩阵（符合常用使用习惯）
-    void query();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const appsRes = useResource<AppRegistration[]>(({ signal }) => api.get<AppRegistration[]>('/apps', undefined, { signal }));
 
-  function flash(t: string) {
-    setMsg(t);
-    setTimeout(() => setMsg(''), 3000);
-  }
+  const assignRes = useResource<AssignmentDto[]>(
+    ({ signal }) => api.get<AssignmentDto[]>(`/apps/users/${encodeURIComponent(applied)}/assignments`, undefined, { signal }),
+    { deps: [applied], enabled: !!applied, keepPreviousData: true },
+  );
 
-  async function query(e?: FormEvent) {
-    e?.preventDefault();
-    if (!userId.trim()) return;
-    setErr('');
-    setAssignments(null);
-    try {
-      const list = await api.get<AssignmentDto[]>(`/apps/users/${encodeURIComponent(userId.trim())}/assignments`);
-      setAssignments(list);
-      const map: Record<string, string> = {};
-      for (const a of list) map[a.appCode] = a.roles.join(', ');
-      setEdits(map);
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.admissions.errQuery'));
-    }
+  const apps = appsRes.data ?? [];
+  const assignments = assignRes.data;
+
+  function submit() {
+    const next = userId.trim();
+    if (!next) return;
+    setEdits({});
+    if (next === applied) assignRes.refresh();
+    else setApplied(next);
   }
 
   function roleOf(code: string): AssignmentDto | undefined {
     return assignments?.find((a) => a.appCode === code);
   }
 
+  function valueOf(code: string): string {
+    return edits[code] ?? roleOf(code)?.roles.join(', ') ?? '';
+  }
+
   async function grant(appCode: string) {
-    setErr('');
-    setBusy(true);
+    setBusy(appCode);
     try {
-      const roles = (edits[appCode] ?? '')
+      const roles = (valueOf(appCode) ?? '')
         .split(',')
         .map((r) => r.trim())
         .filter(Boolean);
-      await api.post(`/apps/${encodeURIComponent(appCode)}/users`, { userId: userId.trim(), roles });
-      flash(t('iam.admissions.msgGranted', { user: userId, app: appCode, roles: roles.join(', ') || t('iam.admissions.noRole') }));
-      await query();
+      await api.post(`/apps/${encodeURIComponent(appCode)}/users`, { userId: applied, roles });
+      toast.success(
+        t('iam.admissions.msgGranted', {
+          user: applied,
+          app: appCode,
+          roles: roles.join(', ') || t('iam.admissions.noRole'),
+        }),
+      );
+      setEdits({});
+      assignRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.admissions.errGrant'));
+      toast.error(e?.msg || t('iam.admissions.errGrant'));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function revoke(appCode: string) {
-    setErr('');
+    const ok = await confirm({
+      title: t('iam.admissions.revoke'),
+      content: t('iam.admissions.revokeConfirm', { user: applied, app: appCode }),
+      danger: true,
+      okKey: 'iam.admissions.revoke',
+      cancelKey: 'iam.common.cancel',
+    });
+    if (!ok) return;
+    setBusy(appCode);
     try {
-      await api.del(`/apps/${encodeURIComponent(appCode)}/users/${encodeURIComponent(userId.trim())}`);
-      flash(t('iam.admissions.msgRevoked', { user: userId, app: appCode }));
-      await query();
+      await api.del(`/apps/${encodeURIComponent(appCode)}/users/${encodeURIComponent(applied)}`);
+      toast.success(t('iam.admissions.msgRevoked', { user: applied, app: appCode }));
+      setEdits({});
+      assignRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.admissions.errRevoke'));
+      toast.error(e?.msg || t('iam.admissions.errRevoke'));
+    } finally {
+      setBusy(null);
     }
   }
 
-  return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="alert ok">
-          <IconCheckCircle width={15} height={15} />
-          <span>{msg}</span>
-        </div>
-      )}
+  const columns = useMemo<Array<DataTableColumn<AppRegistration>>>(
+    () => [
+      { key: 'appCode', titleKey: 'iam.admissions.th.appCode', width: 150, mono: true, render: (a) => a.appCode },
+      { key: 'appName', titleKey: 'iam.admissions.th.appName', width: 170, render: (a) => a.appName },
+      {
+        key: 'admitted',
+        titleKey: 'iam.admissions.th.admission',
+        width: 110,
+        render: (a) =>
+          roleOf(a.appCode) ? (
+            <CimTag size="small" tone="ok">
+              {t('iam.admissions.admitted')}
+            </CimTag>
+          ) : (
+            <CimTag size="small">{t('iam.admissions.notAdmitted')}</CimTag>
+          ),
+      },
+      {
+        key: 'roles',
+        titleKey: 'iam.admissions.th.roles',
+        render: (a) => (
+          <CimInput
+            mono
+            value={valueOf(a.appCode)}
+            onChange={(v) => setEdits((m) => ({ ...m, [a.appCode]: v }))}
+            placeholder="ADMIN, OPERATOR"
+            onEnter={() => void grant(a.appCode)}
+            width="100%"
+          />
+        ),
+      },
+      {
+        key: 'actions',
+        titleKey: 'iam.admissions.th.actions',
+        width: 180,
+        render: (a) => {
+          const admitted = !!roleOf(a.appCode);
+          return (
+            <div className="cell-actions">
+              <Perms code={ADMISSION_GRANT}>
+                <button className="btn-sm" disabled={busy === a.appCode} onClick={() => void grant(a.appCode)}>
+                  {admitted ? t('iam.admissions.update') : t('iam.admissions.grant')}
+                </button>
+              </Perms>
+              {admitted && (
+                <Perms code={ADMISSION_REVOKE}>
+                  <button className="btn-danger btn-sm" disabled={busy === a.appCode} onClick={() => void revoke(a.appCode)}>
+                    {t('iam.admissions.revoke')}
+                  </button>
+                </Perms>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, edits, assignments, busy, applied],
+  );
 
+  return (
+    <Page>
       <Panel title={t('iam.admissions.title')} sub={t('iam.admissions.sub')}>
-        <form className="row" onSubmit={query}>
+        <div className="row">
           <div className="field">
             <label className="field-label" htmlFor="au">
               {t('iam.admissions.f.userId')}
             </label>
-            <input
+            <CimInput
               id="au"
-              className="mono"
-              placeholder="admin"
+              mono
               value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              onChange={setUserId}
+              placeholder="admin"
+              onEnter={submit}
+              width={280}
             />
           </div>
-          <button type="submit" disabled={!userId.trim()}>
+          <button type="button" onClick={submit} disabled={!userId.trim()}>
             {t('iam.admissions.query')}
           </button>
-        </form>
+          <CimTag>{t('iam.admissions.currentUser', { user: applied })}</CimTag>
+        </div>
 
-        {assignments && (
-          <div className="table-wrap" style={{ marginTop: 14 }}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th style={{ width: 150 }}>{t('iam.admissions.th.appCode')}</th>
-                  <th style={{ width: 170 }}>{t('iam.admissions.th.appName')}</th>
-                  <th style={{ width: 90 }}>{t('iam.admissions.th.admission')}</th>
-                  <th>{t('iam.admissions.th.roles')}</th>
-                  <th style={{ width: 170 }}>{t('iam.admissions.th.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {apps.map((a) => {
-                  const cur = roleOf(a.appCode);
-                  const admitted = !!cur;
-                  return (
-                    <tr key={a.appCode}>
-                      <td className="mono">{a.appCode}</td>
-                      <td>{a.appName}</td>
-                      <td>
-                        <span className="status">
-                          <i className={'led ' + (admitted ? 'ok' : '')} />
-                          <b>{admitted ? t('iam.admissions.admitted') : t('iam.admissions.notAdmitted')}</b>
-                        </span>
-                      </td>
-                      <td>
-                        <input
-                          className="mono"
-                          placeholder="ADMIN, OPERATOR"
-                          value={edits[a.appCode] ?? ''}
-                          onChange={(e) => setEdits((m) => ({ ...m, [a.appCode]: e.target.value }))}
-                        />
-                      </td>
-                      <td>
-                        <div className="cell-actions">
-                          <Perms code={ADMISSION_GRANT}>
-                            <button className="btn-sm" disabled={busy} onClick={() => grant(a.appCode)}>
-                              <IconLink width={13} height={13} />
-                              {admitted ? t('iam.admissions.update') : t('iam.admissions.grant')}
-                            </button>
-                          </Perms>
-                          {admitted && (
-                            <Perms code={ADMISSION_REVOKE}>
-                              <button className="btn-danger btn-sm" onClick={() => revoke(a.appCode)}>
-                                {t('iam.admissions.revoke')}
-                              </button>
-                            </Perms>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {!assignments && (
-          <div className="empty" style={{ marginTop: 14 }}>
-            <IconInbox width={22} height={22} />
-            <b>{t('iam.admissions.emptyTitle')}</b>
-            <span>{t('iam.admissions.emptyHint')}</span>
-          </div>
-        )}
+        <div style={{ marginTop: 14 }}>
+          <DataTable<AppRegistration>
+            flat
+            columns={columns}
+            rows={apps}
+            rowKey={(a) => a.appCode}
+            loading={appsRes.loading || assignRes.loading}
+            error={appsRes.error?.message ?? assignRes.error?.message}
+            onRetry={() => {
+              appsRes.refresh();
+              assignRes.refresh();
+            }}
+            onRefresh={() => {
+              appsRes.refresh();
+              assignRes.refresh();
+            }}
+            settingsKey="iam.admissions"
+            emptyTitleKey="iam.admissions.emptyTitle"
+            emptyHintKey="iam.admissions.emptyHint"
+          />
+        </div>
       </Panel>
 
       <Panel title={t('iam.admissions.impactTitle')} sub={t('iam.admissions.impactSub')}>
@@ -193,6 +221,6 @@ export default function AdmissionsPage() {
           <li>{t('iam.admissions.impact3')}</li>
         </ul>
       </Panel>
-    </div>
+    </Page>
   );
 }

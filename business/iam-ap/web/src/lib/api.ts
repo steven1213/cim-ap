@@ -86,12 +86,18 @@ function assertOk<T>(body: Result<T>): void {
   }
 }
 
+/** 单次请求的可选项。目前只有 `signal`：让 `useResource` 在 deps 变化 / 卸载时真能中止在途请求。 */
+export interface RequestOptions {
+  signal?: AbortSignal;
+}
+
 async function request<T>(instance: AxiosInstance, method: string, url: string,
-                          payload?: unknown): Promise<T> {
+                          payload?: unknown, opts?: RequestOptions): Promise<T> {
   const r = await instance.request<Result<T>>({
     method,
     url,
     ...(method === 'GET' ? { params: payload } : { data: payload }),
+    signal: opts?.signal,
   });
   assertOk(r.data);
   return r.data.data;
@@ -99,8 +105,8 @@ async function request<T>(instance: AxiosInstance, method: string, url: string,
 
 // ----------------------------------------------------------------- /api/v1
 
-export function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  return request<T>(http, 'GET', url, params);
+export function get<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
+  return request<T>(http, 'GET', url, params, opts);
 }
 
 export function post<T>(url: string, body?: unknown): Promise<T> {
@@ -124,8 +130,8 @@ export async function postRaw<T>(url: string, body?: unknown): Promise<T> {
 // ------------------------------------------------------------ 平台路径（无 /api/v1）
 
 /** 平台端点 GET（`/sys/**`、`/api/i18n/**`）。 */
-export function rootGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  return request<T>(rootHttp, 'GET', url, params);
+export function rootGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
+  return request<T>(rootHttp, 'GET', url, params, opts);
 }
 
 /** 平台端点 POST。 */
