@@ -1,22 +1,22 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useTabStore } from '@/store/tabStore';
 import { hasPermission } from '@/lib/permissions';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { GROUPS, NAV_FLAT } from '@/lib/navConfig';
-import { IconShield, IconSidebar, IconMoon, IconSun, IconLogout } from '@/components/Icons';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import NotificationBell from '@/components/NotificationBell';
-import TabBar from '@/components/TabBar';
-
-const SIDEBAR_KEY = 'rms-sidebar-collapsed';
 
 /**
- * RMS 控制台外壳：顶部 header + 可收缩左侧菜单 + 多页签栏 + 内容区 + 底部 footer。
- * 视觉与交互对齐 IAM（四段式、设计令牌、深浅双主题、多标签导航）；菜单为前端静态配置
- * （RMS 自身页面固定，不依赖后端菜单下发），定义在 {@link GROUPS}，与多页签 TabBar 共用。
+ * RMS 控制台外壳。
+ *
+ * <p>框架（侧栏/顶栏/页签/内容/footer）全部来自 {@link ConsoleShell}，
+ * 本文件只保留 RMS 自己的两件事：<b>菜单从哪来</b>（{@link GROUPS} 静态配置 + 权限过滤）、
+ * <b>顶栏多放什么</b>（通知铃 + 语言切换）。收缩态、主题、登出清理、页签导航语义
+ * 都在外壳里，三个 ap 共用一份。</p>
  */
 export default function Layout() {
   const { t } = useTranslation();
@@ -28,7 +28,6 @@ export default function Layout() {
   const openTab = useTabStore((s) => s.open);
   const clearTabs = useTabStore((s) => s.clear);
 
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
   const [theme, setTheme] = useState<Theme>(() => readTheme());
 
   // 超管判定：后端 DbLocalAuthorityLoader 在解析超管角色时会把 SUPER_ADMIN 展开进 authorities
@@ -46,133 +45,94 @@ export default function Layout() {
     if (m) openTab({ path: m.path, i18nCode: m.i18n });
   }, [pathname, openTab]);
 
-  function toggleSidebar() {
-    setCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0');
-      return next;
-    });
-  }
-  function toggleTheme() {
-    const next: Theme = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    persistTheme(next);
-  }
-  async function onLogout() {
-    await logout();
-    clearTabs(); // 下一个登录者不应看到上一个人的页签残留
-    navigate('/login');
-  }
+  /**
+   * 静态菜单 → 外壳的菜单模型。权限过滤在映射前做（无权限的条目根本不进模型），
+   * 而不是在外壳里传一个 perm 字段——外壳不该认识各 ap 的权限码格式。
+   */
+  const groups = useMemo<ShellNavGroup[]>(
+    () =>
+      GROUPS.map((g) => ({
+        key: g.key,
+        cap: g.capI18n ? t(g.capI18n) : undefined,
+        items: g.items
+          .filter((it) => !it.perm || hasPermission(permissions, it.perm))
+          .map((it) => ({ key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon })),
+      })),
+    [t, permissions],
+  );
 
-  const initial = (user?.username || '?').charAt(0).toUpperCase();
+  const labels = useMemo<ShellLabels>(
+    () => ({
+      toggleNav: t('rms.shell.toggleNav'),
+      toggleGroup: t('rms.shell.toggleGroup'),
+      toggleTheme: t('rms.shell.toggleTheme'),
+      themeToDark: t('rms.shell.theme.dark'),
+      themeToLight: t('rms.shell.theme.light'),
+      logout: t('rms.shell.logout'),
+      tabs: {
+        label: t('rms.shell.tabs.label'),
+        scrollLeft: t('rms.shell.tabs.scrollLeft'),
+        scrollRight: t('rms.shell.tabs.scrollRight'),
+        close: t('rms.shell.tabs.close'),
+        closeThis: t('rms.shell.tabs.closeThis'),
+        closeOthers: t('rms.shell.tabs.closeOthers'),
+        closeRight: t('rms.shell.tabs.closeRight'),
+        closeAll: t('rms.shell.tabs.closeAll'),
+      },
+    }),
+    [t],
+  );
+
+  // 标题解析：导航配置优先（码最新），回退开签时的快照（只存码不存译文，切语言即时生效）
+  const tabs = useShellTabs(useTabStore, {
+    titleOf: (path, code) => {
+      const i18n = NAV_FLAT.find((x) => x.path === path)?.i18n ?? code;
+      return i18n ? t(i18n) : path;
+    },
+  });
 
   return (
-    <div className={'shell' + (collapsed ? ' collapsed' : '')}>
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="logo">RM</div>
-          <div className="brand-text">
-            <span className="brand-title">CIM RMS</span>
-            <span className="brand-sub">{t('rms.shell.brandSub')}</span>
-          </div>
-        </div>
-
-        <nav className="side-nav">
-          {GROUPS.map((g, gi) => {
-            const visible = g.items.filter((it) => !it.perm || hasPermission(permissions, it.perm));
-            if (visible.length === 0) return null;
-            return (
-              <div className="side-group" key={g.key || `g${gi}`}>
-                {g.capI18n ? <div className="side-cap static">{t(g.capI18n)}</div> : null}
-                {visible.map((m) => (
-                  <NavLink
-                    key={m.to}
-                    to={m.to}
-                    end={m.to === '/'}
-                    title={t(m.i18n)}
-                    className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
-                  >
-                    <span className="side-ico">
-                      <m.Icon width={18} height={18} />
-                    </span>
-                    <span className="side-text">
-                      <span className="side-label">{t(m.i18n)}</span>
-                    </span>
-                  </NavLink>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-foot">
-          <div className="side-note">
-            <IconShield width={14} height={14} />
-            <span>{t('rms.shell.crypto')}</span>
-          </div>
-        </div>
-      </aside>
-
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn" onClick={toggleSidebar} title={t('rms.shell.toggleNav')}
-            aria-label={t('rms.shell.toggleNav')}>
-            <IconSidebar width={18} height={18} />
-          </button>
-
-          <div className="topbar-right">
-            {admin && (
-              <span className="role-chip" title={t('rms.shell.adminHint')}>
-                {t('rms.shell.adminBadge')}
-              </span>
-            )}
-            <span className="env-chip" title={`build: ${import.meta.env.MODE}`}>
-              <i className={'led ' + (isProd ? 'ok' : 'warn')} />
-              {isProd ? 'PRODUCTION' : 'DEVELOPMENT'}
-            </span>
-
-            <NotificationBell />
-
-            <LanguageSwitcher />
-
-            <button
-              className="icon-btn"
-              onClick={toggleTheme}
-              title={theme === 'light' ? t('rms.shell.theme.dark') : t('rms.shell.theme.light')}
-              aria-label={t('rms.shell.toggleTheme')}
-            >
-              {theme === 'light' ? <IconMoon width={17} height={17} /> : <IconSun width={17} height={17} />}
-            </button>
-
-            <div className="user-chip" title={user?.username}>
-              <span className="avatar">{initial}</span>
-              <span className="user-meta">
-                <b>{user?.username ?? t('rms.common.dash')}</b>
-                <small>{user?.tenantId ? `tenant:${user.tenantId}` : 'local'}</small>
-              </span>
-            </div>
-
-            <button className="icon-btn danger" onClick={onLogout} title={t('rms.shell.logout')}
-              aria-label={t('rms.shell.logout')}>
-              <IconLogout width={17} height={17} />
-            </button>
-          </div>
-        </header>
-
-        <TabBar />
-
-        <main className="content">
-          <Outlet />
-        </main>
-
-        <footer className="footer">
-          <span>CIM-AP / RMS-AP</span>
-          <span className="dot" />
-          <span>{t('rms.shell.tagline')}</span>
-          <span className="dot" />
-          <span>{isProd ? 'production' : 'development'}</span>
-        </footer>
-      </div>
-    </div>
+    <ConsoleShell
+      storageKey="rms"
+      brand={{ logo: 'RM', title: 'CIM RMS', subtitle: t('rms.shell.brandSub') }}
+      groups={groups}
+      labels={labels}
+      sidebarNote={t('rms.shell.crypto')}
+      user={{ name: user?.username ?? t('rms.common.dash'), meta: user?.tenantId ? `tenant:${user.tenantId}` : 'local' }}
+      roleBadge={
+        admin ? (
+          <span className="role-chip" title={t('rms.shell.adminHint')}>
+            {t('rms.shell.adminBadge')}
+          </span>
+        ) : undefined
+      }
+      env={{
+        label: isProd ? 'PRODUCTION' : 'DEVELOPMENT',
+        tone: isProd ? 'ok' : 'warn',
+        title: `build: ${import.meta.env.MODE}`,
+      }}
+      topbarExtra={
+        <>
+          <NotificationBell />
+          <LanguageSwitcher />
+        </>
+      }
+      footerApp="CIM-AP / RMS-AP"
+      footerTagline={t('rms.shell.tagline')}
+      theme={theme}
+      onToggleTheme={() => {
+        const next: Theme = theme === 'light' ? 'dark' : 'light';
+        setTheme(next);
+        persistTheme(next);
+      }}
+      onLogout={async () => {
+        await logout();
+        clearTabs(); // 下一个登录者不应看到上一个人的页签残留
+        navigate('/login');
+      }}
+      tabs={tabs}
+    >
+      <Outlet />
+    </ConsoleShell>
   );
 }

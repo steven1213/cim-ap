@@ -1,0 +1,21 @@
+{
+  "name": "@cim/shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CIM 控制台外壳：四段式框架（侧栏导航 + 顶栏 + 页签条 + 内容区 + footer）。菜单是数据模型（配置驱动），各 ap 的差异用插槽兜底；文案全部由应用注入，包内零中文。依赖 react-router-dom（页签与导航都是路由语义）。",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.26.0",
+    "zustand": "^4.5.0"
+  }
+}

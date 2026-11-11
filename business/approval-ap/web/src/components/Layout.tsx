@@ -1,23 +1,22 @@
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
 import { NAV_GROUPS, NAV_ITEMS } from '@/lib/navConfig';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { useTabStore } from '@/store/tabStore';
+import { useIdentityStore } from '@/store/identityStore';
 import IdentitySwitcher from '@/components/IdentitySwitcher';
 import NotificationBell from '@/components/NotificationBell';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import TabBar from '@/components/TabBar';
 import ToastHost from '@/components/ToastHost';
-import { IconSidebar, IconMoon, IconSun, IconShield, IconLogout } from '@/components/Icons';
-import { useIdentityStore } from '@/store/identityStore';
-
-const SIDEBAR_KEY = 'approval-sidebar-collapsed';
 
 /**
- * 审批流平台外壳：顶部 header + 可收缩左侧菜单 + 多页签栏 + 内容区 + 底部 footer。
- * 视觉与交互对齐 IAM / RMS（四段式、设计令牌、深浅双主题、多标签导航）。
- * dev 态以顶栏「身份切换」标识当前操作人；生产接入 IAM 后此处置换为登录态。
+ * 审批流平台外壳。
+ *
+ * <p>框架来自 {@link ConsoleShell}（与 IAM / RMS 同一份），本文件只保留本 ap 的差异：
+ * 菜单来自 {@link NAV_GROUPS} 静态配置、顶栏放身份切换（dev 态模拟操作人）+ 通知铃，
+ * 且<b>没有用户块</b>——审批平台当前不持有登录态，接入 IAM 后再补 `user`。</p>
  */
 export default function Layout() {
   const { t } = useTranslation();
@@ -27,7 +26,6 @@ export default function Layout() {
   const openTab = useTabStore((s) => s.open);
   const clearTabs = useTabStore((s) => s.clear);
 
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const isProd = import.meta.env.MODE === 'production';
 
@@ -41,116 +39,85 @@ export default function Layout() {
     if (m) openTab({ path: m.to, i18nCode: m.i18n });
   }, [pathname, openTab]);
 
-  function toggleSidebar() {
-    setCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0');
-      return next;
-    });
-  }
-  function toggleTheme() {
-    const next: Theme = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    persistTheme(next);
-  }
-  function onLogout() {
-    // dev 态无真实登出：清身份与页签残留，回到工作台。
-    clearIdentity();
-    clearTabs();
-    navigate('/');
-  }
+  const groups = useMemo<ShellNavGroup[]>(
+    () =>
+      NAV_GROUPS.map((g) => ({
+        key: g.i18n,
+        cap: t(g.i18n),
+        items: g.items.map((it) => ({ key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon })),
+      })),
+    [t],
+  );
+
+  const labels = useMemo<ShellLabels>(
+    () => ({
+      toggleNav: t('shell.toggleNav'),
+      toggleGroup: t('shell.toggleGroup'),
+      toggleTheme: t('shell.toggleTheme'),
+      themeToDark: t('shell.theme.dark'),
+      themeToLight: t('shell.theme.light'),
+      logout: t('shell.logout'),
+      tabs: {
+        label: t('shell.tabs.label'),
+        scrollLeft: t('shell.tabs.scrollLeft'),
+        scrollRight: t('shell.tabs.scrollRight'),
+        close: t('shell.tabs.close'),
+        closeThis: t('shell.tabs.closeThis'),
+        closeOthers: t('shell.tabs.closeOthers'),
+        closeRight: t('shell.tabs.closeRight'),
+        closeAll: t('shell.tabs.closeAll'),
+      },
+    }),
+    [t],
+  );
+
+  // 标题解析优先取导航配置的文案码，回退到开签时快照
+  const tabs = useShellTabs(useTabStore, {
+    titleOf: (path, code) => {
+      const i18n = NAV_ITEMS.find((x) => x.to === path)?.i18n ?? code;
+      return i18n ? t(i18n) : path;
+    },
+  });
 
   return (
-    <div className={'shell' + (collapsed ? ' collapsed' : '')}>
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="logo">AP</div>
-          <div className="brand-text">
-            <span className="brand-title">CIM Approval</span>
-            <span className="brand-sub">{t('shell.brandSub')}</span>
-          </div>
-        </div>
-
-        <nav className="side-nav">
-          {NAV_GROUPS.map((group) => (
-            <div className="side-group" key={group.i18n}>
-              <div className="side-cap">{t(group.i18n)}</div>
-              {group.items.map((m) => (
-                <NavLink
-                  key={m.to}
-                  to={m.to}
-                  end={m.to === '/'}
-                  title={t(m.i18n)}
-                  className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
-                >
-                  <span className="side-ico">
-                    <m.Icon width={18} height={18} />
-                  </span>
-                  <span className="side-text">
-                    <span className="side-label">{t(m.i18n)}</span>
-                  </span>
-                </NavLink>
-              ))}
-            </div>
-          ))}
-        </nav>
-
-        <div className="sidebar-foot">
-          <div className="side-note">
-            <IconShield width={14} height={14} />
-            <span>{t('shell.crypto')}</span>
-          </div>
-        </div>
-      </aside>
-
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn" onClick={toggleSidebar} title={t('shell.toggleNav')} aria-label={t('shell.toggleNav')}>
-            <IconSidebar width={18} height={18} />
-          </button>
-
-          <div className="topbar-right">
-            <span className="env-chip" title={`build: ${import.meta.env.MODE}`}>
-              <i className={'led ' + (isProd ? 'ok' : 'warn')} />
-              {isProd ? 'PRODUCTION' : 'DEVELOPMENT'}
-            </span>
-
+    <>
+      <ConsoleShell
+        storageKey="approval"
+        brand={{ logo: 'AP', title: 'CIM Approval', subtitle: t('shell.brandSub') }}
+        groups={groups}
+        labels={labels}
+        sidebarNote={t('shell.crypto')}
+        env={{
+          label: isProd ? 'PRODUCTION' : 'DEVELOPMENT',
+          tone: isProd ? 'ok' : 'warn',
+          title: `build: ${import.meta.env.MODE}`,
+        }}
+        topbarExtra={
+          <>
             <IdentitySwitcher />
             <NotificationBell />
-
             <LanguageSwitcher />
-
-            <button
-              className="icon-btn"
-              onClick={toggleTheme}
-              title={theme === 'light' ? t('shell.theme.dark') : t('shell.theme.light')}
-              aria-label={t('shell.toggleTheme')}
-            >
-              {theme === 'light' ? <IconMoon width={17} height={17} /> : <IconSun width={17} height={17} />}
-            </button>
-
-            <button className="icon-btn danger" onClick={onLogout} title={t('shell.logout')} aria-label={t('shell.logout')}>
-              <IconLogout width={17} height={17} />
-            </button>
-          </div>
-        </header>
-
-        <TabBar />
-
-        <main className="content">
-          <Outlet />
-        </main>
-
-        <footer className="footer">
-          <span>CIM-AP / Approval-AP</span>
-          <span className="dot" />
-          <span>{t('shell.tagline')}</span>
-          <span className="dot" />
-          <span>{isProd ? 'production' : 'development'}</span>
-        </footer>
-      </div>
-
+          </>
+        }
+        footerApp="CIM-AP / Approval-AP"
+        footerTagline={t('shell.tagline')}
+        theme={theme}
+        onToggleTheme={() => {
+          const next: Theme = theme === 'light' ? 'dark' : 'light';
+          setTheme(next);
+          persistTheme(next);
+        }}
+        onLogout={() => {
+          // dev 态无真实登出：清身份与页签残留，回到工作台。
+          clearIdentity();
+          clearTabs();
+          navigate('/');
+        }}
+        tabs={tabs}
+      >
+        <Outlet />
+      </ConsoleShell>
       <ToastHost />
-    </div>
+    </>
   );
 }

@@ -1,22 +1,18 @@
-// 多标签导航条（tags-view）：点击菜单打开的页签在此聚合成一行。
+// 页签条（tags-view）：把侧栏菜单打开的页面聚合成一行横向标签。
 //
-// <p><b>交互契约</b>：
+// <p><b>交互契约</b>（三份实现原本逐字相同，抽出来时一条没改）：
 // <ul>
-//   <li>「概览」为固定签（pinned），无关闭徽标，右键菜单的「关闭标签页」对其禁用；</li>
-//   <li>每个签支持<b>右键菜单</b>：关闭标签页 / 关闭其它标签页 / 关闭右侧标签页 /
-//       关闭全部标签页（对齐 Ant Design Pro / vue-element-admin 的 tags-view 惯例）；</li>
+//   <li>固定签（`pinned`）无关闭徽标，右键「关闭标签页」对其禁用；</li>
+//   <li>右键菜单：关闭标签页 / 关闭其它 / 关闭右侧 / 关闭全部；</li>
 //   <li>页签溢出时两侧出现滚动箭头，激活签变化时自动滚入可视区；</li>
-//   <li>关闭激活签时由 {@link useTabStore} 决定相邻签并导航过去（优先右邻）。</li>
+//   <li>关闭激活签后去哪，由应用的 store 决定（本组件只回调 `onClose`）。</li>
 // </ul></p>
 //
-// <p>标题解析优先取 {@link NAV_FLAT} 的文案码（随导航配置即时更新），回退到开签时快照——
-// 只存码不存译文，切语言即时生效。</p>
+// <p>组件本身不持有任何全局状态：页签数组、激活路径、关闭语义全部从外部进来，
+// 所以它既能接 zustand store，也能在探针页里用数组直接驱动（P3 的验收就是这么做的）。</p>
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { NAV_FLAT } from '@/lib/navConfig';
-import { HOME_PATH, useTabStore } from '@/store/tabStore';
-import { IconChevron, IconX } from '@/components/Icons';
+import { IconChevron, IconX } from './icons';
+import type { ShellTabLabels, ShellTabs } from './types';
 
 /** 右键菜单状态：屏幕坐标 + 目标签路径。 */
 interface CtxMenu {
@@ -25,20 +21,13 @@ interface CtxMenu {
   path: string;
 }
 
-export default function TabBar() {
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const tabs = useTabStore((s) => s.tabs);
-  const activePath = useTabStore((s) => s.activePath);
-  const scrollTicket = useTabStore((s) => s.scrollTicket);
-  const requestScroll = useTabStore((s) => s.requestScroll);
-  const setActive = useTabStore((s) => s.setActive);
-  const close = useTabStore((s) => s.close);
-  const closeOthers = useTabStore((s) => s.closeOthers);
-  const closeRight = useTabStore((s) => s.closeRight);
-  const closeAll = useTabStore((s) => s.closeAll);
+export type TabStripProps = Omit<ShellTabs, 'syncToken'> & {
+  labels: ShellTabLabels;
+  /** 额外重算几何的触发值（路由 key / 语言 / 滚动票证），变化即重测。 */
+  syncToken?: unknown;
+};
 
+export function TabStrip({ tabs, activePath, labels, syncToken, ...handlers }: TabStripProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<HTMLDivElement>(null);
   const [ctx, setCtx] = useState<CtxMenu | null>(null);
@@ -47,11 +36,13 @@ export default function TabBar() {
   /** 滑动胶囊指示器：激活签在滚动内容坐标系里的位置与宽度（content 坐标，随滚动自然移动）。 */
   const [indicator, setIndicator] = useState({ left: 0, width: 0, ready: false });
 
-  /** 标题：导航配置优先（码最新），回退开签快照；两者皆空显示路径。 */
-  function titleOf(path: string, i18nCode: string): string {
-    const code = NAV_FLAT.find((m) => m.path === path)?.i18n ?? i18nCode;
-    return code ? t(code) : path;
-  }
+  /**
+   * 页签内容签名。effect 的依赖不能用 `tabs` 数组本身：调用方（`useShellTabs`）
+   * 每次 render 都会 `.map` 出新数组，引用永远不等 → effect 每次都跑 →
+   * `setIndicator` 又触发 render → 无限循环。用内容签名把「真的变了」和
+   * 「引用变了」分开，切语言时 label 变（宽度变）也能正确重测。
+   */
+  const tabsSig = tabs.map((t) => t.path + '\u0001' + t.label).join('\u0002');
 
   /** 依据滚动位置刷新左右箭头的可用态（scroll 事件 + ResizeObserver 双触发）。 */
   const updateArrows = useCallback(() => {
@@ -73,17 +64,14 @@ export default function TabBar() {
       el.removeEventListener('scroll', onScroll);
       ro.disconnect();
     };
-  }, [updateArrows, tabs]);
+  }, [updateArrows, tabsSig]);
 
   /**
    * 同步激活签：滚入可视区（贴缘留 24px）+ 更新滑动胶囊指示器几何。
    *
    * <p>双 rAF 延后一帧再量几何，等 flex/字体布局稳定。测量用
-   * `getBoundingClientRect` 差值 + `scrollLeft`（`offsetLeft` 相对
-   * offsetParent，受祖先定位影响会算偏）。触发时机覆盖：激活签变化、
-   * 页签增删、任意路由跳转（`location.key`）、切语言（标签宽度变化）、
-   * 以及侧栏/页签点击发出的滚动票证（`scrollTicket`）——票证是
-   * 「点击已激活路由菜单」等一切状态都没变场景下的兜底。</p>
+   * `getBoundingClientRect` 差值 + `scrollLeft`（`offsetLeft` 相对 offsetParent，
+   * 受祖先定位影响会算偏）。</p>
    */
   const syncTabs = useCallback(() => {
     requestAnimationFrame(() =>
@@ -114,7 +102,7 @@ export default function TabBar() {
 
   useEffect(() => {
     syncTabs();
-  }, [syncTabs, activePath, tabs, location.key, scrollTicket, i18n.language]);
+  }, [syncTabs, activePath, tabsSig, syncToken]);
 
   // 右键菜单：点击外部 / Escape 关闭
   useEffect(() => {
@@ -139,21 +127,6 @@ export default function TabBar() {
     el.scrollBy({ left: dir * Math.max(180, el.clientWidth * 0.6), behavior: 'smooth' });
   }
 
-  function onTab(path: string) {
-    if (path === activePath) {
-      requestScroll(); // 已激活：无状态变化，仍要滚回可视区
-      return;
-    }
-    setActive(path);
-    navigate(path);
-  }
-
-  function onCloseBtn(e: React.MouseEvent, path: string) {
-    e.stopPropagation();
-    const next = close(path);
-    if (next) navigate(next);
-  }
-
   /** 页签右键菜单（对齐参考实现：关闭标签页 / 关闭其它 / 关闭右侧）。 */
   function onTabCtx(e: React.MouseEvent, path: string) {
     e.preventDefault();
@@ -165,41 +138,16 @@ export default function TabBar() {
     });
   }
 
-  function ctxCloseThis() {
-    if (!ctx) return;
-    const next = close(ctx.path);
-    setCtx(null);
-    if (next) navigate(next);
-  }
-
-  function ctxCloseOthers() {
-    if (!ctx) return;
-    closeOthers(ctx.path);
-    setCtx(null);
-  }
-
-  function ctxCloseRight() {
-    if (!ctx) return;
-    const next = closeRight(ctx.path);
-    setCtx(null);
-    if (next) navigate(next);
-  }
-
-  function ctxCloseAll() {
-    if (!ctx) return;
-    const home = closeAll();
-    setCtx(null);
-    if (activePath !== home) navigate(home);
-  }
+  const ctxIdx = ctx ? tabs.findIndex((x) => x.path === ctx.path) : -1;
 
   return (
-    <div className="tabbar" role="tablist" aria-label={t('rms.shell.tabs.label')}>
+    <div className="tabbar" role="tablist" aria-label={labels.label}>
       {canLeft && (
         <button
           type="button"
           className="icon-btn tab-nav"
-          aria-label={t('rms.shell.tabs.scrollLeft')}
-          title={t('rms.shell.tabs.scrollLeft')}
+          aria-label={labels.scrollLeft}
+          title={labels.scrollLeft}
           onClick={() => scrollByDir(-1)}
         >
           <span className="rot-l">
@@ -221,27 +169,28 @@ export default function TabBar() {
           />
           {tabs.map((tab) => {
             const active = tab.path === activePath;
-            const pinned = tab.path === HOME_PATH;
-            const title = titleOf(tab.path, tab.i18nCode);
             return (
               <div
                 key={tab.path}
                 role="tab"
                 aria-selected={active}
                 data-active={active}
-                className={'tab-item' + (active ? ' active' : '') + (pinned ? ' pinned' : '')}
-                title={title}
-                onClick={() => onTab(tab.path)}
+                className={'tab-item' + (active ? ' active' : '') + (tab.pinned ? ' pinned' : '')}
+                title={tab.label}
+                onClick={() => handlers.onSelect(tab.path)}
                 onContextMenu={(e) => onTabCtx(e, tab.path)}
               >
-                <span className="tab-label">{title}</span>
-                {!pinned && (
+                <span className="tab-label">{tab.label}</span>
+                {!tab.pinned && (
                   <button
                     type="button"
                     className="tab-x"
-                    aria-label={t('rms.shell.tabs.close')}
-                    title={t('rms.shell.tabs.close')}
-                    onClick={(e) => onCloseBtn(e, tab.path)}
+                    aria-label={labels.close}
+                    title={labels.close}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlers.onClose(tab.path);
+                    }}
                   >
                     <IconX width={8} height={8} />
                   </button>
@@ -256,8 +205,8 @@ export default function TabBar() {
         <button
           type="button"
           className="icon-btn tab-nav"
-          aria-label={t('rms.shell.tabs.scrollRight')}
-          title={t('rms.shell.tabs.scrollRight')}
+          aria-label={labels.scrollRight}
+          title={labels.scrollRight}
           onClick={() => scrollByDir(1)}
         >
           <IconChevron width={14} height={14} />
@@ -269,24 +218,47 @@ export default function TabBar() {
           <button
             type="button"
             role="menuitem"
-            disabled={ctx.path === HOME_PATH}
-            onClick={ctxCloseThis}
+            disabled={!!tabs.find((x) => x.path === ctx.path)?.pinned}
+            onClick={() => {
+              const p = ctx.path;
+              setCtx(null);
+              handlers.onClose(p);
+            }}
           >
-            {t('rms.shell.tabs.closeThis')}
-          </button>
-          <button type="button" role="menuitem" onClick={ctxCloseOthers}>
-            {t('rms.shell.tabs.closeOthers')}
+            {labels.closeThis}
           </button>
           <button
             type="button"
             role="menuitem"
-            disabled={tabs.findIndex((x) => x.path === ctx.path) >= tabs.length - 1}
-            onClick={ctxCloseRight}
+            onClick={() => {
+              const p = ctx.path;
+              setCtx(null);
+              handlers.onCloseOthers(p);
+            }}
           >
-            {t('rms.shell.tabs.closeRight')}
+            {labels.closeOthers}
           </button>
-          <button type="button" role="menuitem" onClick={ctxCloseAll}>
-            {t('rms.shell.tabs.closeAll')}
+          <button
+            type="button"
+            role="menuitem"
+            disabled={ctxIdx >= tabs.length - 1}
+            onClick={() => {
+              const p = ctx.path;
+              setCtx(null);
+              handlers.onCloseRight(p);
+            }}
+          >
+            {labels.closeRight}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setCtx(null);
+              handlers.onCloseAll();
+            }}
+          >
+            {labels.closeAll}
           </button>
         </div>
       )}

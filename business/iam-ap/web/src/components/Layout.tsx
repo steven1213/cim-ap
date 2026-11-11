@@ -1,36 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import { useTabStore } from '@/store/tabStore';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { hasPermission, CONSOLE_ADMIN } from '@/lib/permissions';
 import { resolveIcon } from '@/lib/iconRegistry';
-import { IconLogout, IconMoon, IconShield, IconSidebar, IconSun, IconChevron } from '@/components/Icons';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import TabBar from '@/components/TabBar';
 import type { MenuTreeNode, SysMenuDto } from '@/types';
 
-const SIDEBAR_KEY = 'iam-sidebar-collapsed';
-const SIDEBAR_GROUPS_KEY = 'iam-sidebar-groups';
-
-/** 侧栏分组（目录节点升格为分组标题；顶级菜单自成一档且不显示标题）。 */
-interface NavGroup {
-  key: string;
-  cap: string;
-  items: SysMenuDto[];
-}
-
 /**
- * 控制台外壳：顶部 header + 可收缩左侧菜单 + 内容区 + 底部 footer。
+ * 控制台外壳。
+ *
+ * <p>框架来自 {@link ConsoleShell}，本文件只保留 IAM 自己的两件事：
+ * <b>菜单从哪来</b>、<b>顶栏多放什么</b>。</p>
  *
  * <p><b>菜单完全由后端驱动</b>：结构来自 {@link useMenuStore}（`GET /sys/me/menus`，
- * 已按角色过滤），文案来自 i18n（`t(i18nCode)`），图标来自
- * {@link resolveIcon}。前端不再有任何「菜单清单」常量——改菜单/改文案/改图标
- * 都只需要动库（或管理端界面），无需发版。</p>
- *
- * <p>侧栏收缩状态与主题选择持久化到 localStorage；≤900px 时侧栏改为抽屉式。</p>
+ * 已按角色过滤），文案来自 i18n（`t(i18nCode)`），图标来自 {@link resolveIcon}。
+ * 前端没有任何「菜单清单」常量——改菜单/改文案/改图标都只需要动库（或管理端界面）。</p>
  */
 export default function Layout() {
   const { t } = useTranslation();
@@ -46,29 +35,13 @@ export default function Layout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1');
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => readTheme());
-  /** 收起的分组 key 集合（持久化；侧栏整体收起为图标态时不生效）。 */
-  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem(SIDEBAR_GROUPS_KEY);
-      return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      return new Set<string>();
-    }
-  });
-
   const consoleAdmin = hasPermission(permissions, CONSOLE_ADMIN);
+  const isProd = import.meta.env.MODE === 'production';
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  // 路由切换时收起移动端抽屉
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   // 路由切换 → 打开/激活对应页签（仅可路由的菜单项；404 等未知路径不开签）
   useEffect(() => {
@@ -77,212 +50,133 @@ export default function Layout() {
     if (m?.path) openTab({ path: m.path, i18nCode: m.i18nCode ?? '' });
   }, [pathname, flat, openTab]);
 
-  // 后端树 → 侧栏分组：DIR 节点成为分组（cap），其子 MENU 为条目；
-  // 顶级 MENU（如概览 / 我的）自成一档，不显示分组标题。
-  const groups = useMemo<NavGroup[]>(() => {
+  /**
+   * 后端树 → 外壳的菜单模型：DIR 节点成为分组标题，其子 MENU 为条目；
+   * 顶级 MENU（如概览 / 我的）自成一档，不显示分组标题。
+   */
+  const groups = useMemo<ShellNavGroup[]>(() => {
     const visibleMenus = (node: MenuTreeNode): SysMenuDto[] =>
       (node.children ?? [])
         .filter((c) => c.menu.type === 'MENU' && c.menu.visible)
         .map((c) => c.menu);
 
-    const result: NavGroup[] = [];
+    const result: ShellNavGroup[] = [];
     for (const node of menuTree) {
       if (node.menu.type === 'BUTTON' || !node.menu.visible) continue;
       if (node.menu.type === 'DIR') {
         const items = visibleMenus(node);
         if (items.length > 0) {
-          result.push({ key: node.menu.id, cap: t(node.menu.i18nCode ?? ''), items });
+          result.push({
+            key: node.menu.id,
+            cap: t(node.menu.i18nCode ?? ''),
+            items: items.map((m) => {
+              const Icon = resolveIcon(m.icon);
+              const code = m.i18nCode ?? '';
+              return {
+                key: m.id,
+                path: m.path as string,
+                label: t(code),
+                // 副标题是 IAM 独有：菜单库给每个页面配一句说明，缺键时回退空串
+                desc: t(`${code}.desc`, { defaultValue: '' }),
+                Icon,
+              };
+            }),
+          });
         }
       } else if (node.menu.type === 'MENU') {
-        result.push({ key: node.menu.id, cap: '', items: [node.menu] });
+        const code = node.menu.i18nCode ?? '';
+        const Icon = resolveIcon(node.menu.icon);
+        result.push({
+          key: node.menu.id,
+          items: [
+            {
+              key: node.menu.id,
+              path: node.menu.path as string,
+              label: t(code),
+              desc: t(`${code}.desc`, { defaultValue: '' }),
+              Icon,
+            },
+          ],
+        });
       }
     }
     return result;
   }, [menuTree, t]);
 
-  // 路由所在分组自动展开（折叠分组后点侧栏入口仍要能看到当前位置）
-  useEffect(() => {
-    const active = groups.find((g) => g.items.some((m) => m.path === pathname));
-    if (!active) return;
-    setHiddenGroups((prev) => {
-      if (!prev.has(active.key)) return prev;
-      const next = new Set(prev);
-      next.delete(active.key);
-      localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]));
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, groups]);
+  const labels = useMemo<ShellLabels>(
+    () => ({
+      toggleNav: t('iam.shell.toggleNav'),
+      toggleGroup: t('iam.shell.toggleGroup'),
+      toggleTheme: t('iam.shell.toggleTheme'),
+      themeToDark: t('iam.shell.theme.dark'),
+      themeToLight: t('iam.shell.theme.light'),
+      logout: t('iam.shell.logout'),
+      tabs: {
+        label: t('iam.shell.tabs.label'),
+        scrollLeft: t('iam.shell.tabs.scrollLeft'),
+        scrollRight: t('iam.shell.tabs.scrollRight'),
+        close: t('iam.shell.tabs.close'),
+        closeThis: t('iam.shell.tabs.closeThis'),
+        closeOthers: t('iam.shell.tabs.closeOthers'),
+        closeRight: t('iam.shell.tabs.closeRight'),
+        closeAll: t('iam.shell.tabs.closeAll'),
+      },
+    }),
+    [t],
+  );
 
-  function toggleSidebar() {
-    if (window.matchMedia('(max-width: 900px)').matches) {
-      setMobileOpen((v) => !v);
-      return;
-    }
-    setCollapsed((v) => {
-      const next = !v;
-      localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0');
-      return next;
-    });
-  }
-
-  function toggleTheme() {
-    const next: Theme = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    persistTheme(next);
-  }
-
-  /** 收起/展开一个导航分组（持久化；图标态下不折叠）。 */
-  function toggleGroup(key: string) {
-    setHiddenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }
-
-  async function onLogout() {
-    await logout();
-    clearMenus(); // 下一个登录者不应看到上一个人的菜单残留
-    clearTabs(); // 页签同理
-    navigate('/login');
-  }
-
-  const initial = (user?.username || '?').charAt(0).toUpperCase();
-  const isProd = import.meta.env.MODE === 'production';
+  // 标题解析优先取菜单库的 i18nCode（随授权即时更新），回退到开签时快照
+  const tabs = useShellTabs(useTabStore, {
+    titleOf: (path, code) => {
+      const i18n = flat.find((m) => m.path === path)?.i18nCode ?? code;
+      return i18n ? t(i18n) : path;
+    },
+  });
 
   return (
-    <div className={'shell' + (collapsed ? ' collapsed' : '') + (mobileOpen ? ' mobile-open' : '')}>
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="logo">IA</div>
-          <div className="brand-text">
-            <span className="brand-title">CIM IAM</span>
-            <span className="brand-sub">{t('iam.shell.brandSub')}</span>
-          </div>
-        </div>
-
-        <nav className="side-nav">
-          {groups.map((g, gi) => {
-            const hide = !collapsed && !mobileOpen && hiddenGroups.has(g.key);
-            return (
-              <div className="side-group" key={g.key || `g${gi}`}>
-                {g.cap ? (
-                  <button
-                    type="button"
-                    className="side-cap nav-tog"
-                    title={t('iam.shell.toggleGroup')}
-                    aria-expanded={!hide}
-                    onClick={() => toggleGroup(g.key)}
-                  >
-                    <span className="nav-tog-text">{g.cap}</span>
-                    <span className={'tree-toggle' + (hide ? '' : ' open')}>
-                      <IconChevron width={11} height={11} />
-                    </span>
-                  </button>
-                ) : null}
-                {!hide &&
-                  g.items.map((m) => {
-                    const Icon = resolveIcon(m.icon);
-                    return (
-                      <NavLink
-                        key={m.id}
-                        to={m.path as string}
-                        end={m.path === '/'}
-                        title={t(m.i18nCode ?? '')}
-                        className={({ isActive }) => 'side-link' + (isActive ? ' active' : '')}
-                        onClick={() => requestScroll()}
-                      >
-                        <span className="side-ico">
-                          <Icon width={18} height={18} />
-                        </span>
-                        <span className="side-text">
-                          <span className="side-label">{t(m.i18nCode ?? '')}</span>
-                          <span className="side-desc">
-                            {t(`${m.i18nCode ?? ''}.desc`, { defaultValue: '' })}
-                          </span>
-                        </span>
-                      </NavLink>
-                    );
-                  })}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-foot">
-          <div className="side-note">
-            <IconShield width={14} height={14} />
-            <span>{t('iam.shell.crypto')}</span>
-          </div>
-        </div>
-      </aside>
-
-      {mobileOpen && <div className="scrim" onClick={() => setMobileOpen(false)} />}
-
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn" onClick={toggleSidebar} title={t('iam.shell.toggleNav')}
-            aria-label={t('iam.shell.toggleNav')}>
-            <IconSidebar width={18} height={18} />
-          </button>
-
-          {/* 当前页名已由页签栏承载，header 不再重复显示菜单/路径 */}
-
-          <div className="topbar-right">
-            {consoleAdmin && (
-              <span className="role-chip" title={t('iam.shell.adminHint')}>
-                {t('iam.shell.adminBadge')}
-              </span>
-            )}
-
-            <span className="env-chip" title={`构建模式：${import.meta.env.MODE}`}>
-              <i className={'led ' + (isProd ? 'ok' : 'warn')} />
-              {isProd ? 'PRODUCTION' : 'DEVELOPMENT'}
-            </span>
-
-            <LanguageSwitcher />
-
-            <button
-              className="icon-btn"
-              onClick={toggleTheme}
-              title={theme === 'light' ? t('iam.shell.theme.dark') : t('iam.shell.theme.light')}
-              aria-label={t('iam.shell.toggleTheme')}
-            >
-              {theme === 'light' ? <IconMoon width={17} height={17} /> : <IconSun width={17} height={17} />}
-            </button>
-
-            <div className="user-chip" title={user?.username}>
-              <span className="avatar">{initial}</span>
-              <span className="user-meta">
-                <b>{user?.username ?? t('iam.common.notLoggedIn')}</b>
-                <small>{user?.tenantId ? `tenant:${user.tenantId}` : 'local'}</small>
-              </span>
-            </div>
-
-            <button className="icon-btn danger" onClick={onLogout} title={t('iam.shell.logout')}
-              aria-label={t('iam.shell.logout')}>
-              <IconLogout width={17} height={17} />
-            </button>
-          </div>
-        </header>
-
-        <TabBar />
-
-        <main className="content">
-          <Outlet />
-        </main>
-
-        <footer className="footer">
-          <span>CIM-AP / IAM-AP</span>
-          <span className="dot" />
-          <span>{t('iam.shell.tagline')}</span>
-          <span className="dot" />
-          <span>{isProd ? 'production' : 'development'}</span>
-        </footer>
-      </div>
-    </div>
+    <ConsoleShell
+      storageKey="iam"
+      brand={{ logo: 'IA', title: 'CIM IAM', subtitle: t('iam.shell.brandSub') }}
+      groups={groups}
+      labels={labels}
+      sidebarNote={t('iam.shell.crypto')}
+      user={{
+        name: user?.username ?? t('iam.common.notLoggedIn'),
+        meta: user?.tenantId ? `tenant:${user.tenantId}` : 'local',
+      }}
+      roleBadge={
+        consoleAdmin ? (
+          <span className="role-chip" title={t('iam.shell.adminHint')}>
+            {t('iam.shell.adminBadge')}
+          </span>
+        ) : undefined
+      }
+      env={{
+        label: isProd ? 'PRODUCTION' : 'DEVELOPMENT',
+        tone: isProd ? 'ok' : 'warn',
+        title: `构建模式：${import.meta.env.MODE}`,
+      }}
+      topbarExtra={<LanguageSwitcher />}
+      footerApp="CIM-AP / IAM-AP"
+      footerTagline={t('iam.shell.tagline')}
+      theme={theme}
+      onToggleTheme={() => {
+        const next: Theme = theme === 'light' ? 'dark' : 'light';
+        setTheme(next);
+        persistTheme(next);
+      }}
+      onLogout={async () => {
+        await logout();
+        clearMenus(); // 下一个登录者不应看到上一个人的菜单残留
+        clearTabs(); // 页签同理
+        navigate('/login');
+      }}
+      collapsibleGroups
+      mobileBreakpoint={900}
+      onNavSelect={() => requestScroll()}
+      tabs={tabs}
+    >
+      <Outlet />
+    </ConsoleShell>
   );
 }
