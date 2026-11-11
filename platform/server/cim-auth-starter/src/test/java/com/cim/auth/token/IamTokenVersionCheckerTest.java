@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +24,10 @@ class IamTokenVersionCheckerTest {
     private String baseUrl;
     private final AtomicLong currentVersion = new AtomicLong(1);
     private final AtomicLong calls = new AtomicLong(0);
+    /** true = 以统一信封响应（升级后形态）；false = 旧纯文本。 */
+    private final AtomicBoolean envelope = new AtomicBoolean(false);
+    /** 非 0 时响应业务失败码。 */
+    private final AtomicLong failCode = new AtomicLong(0);
 
     @BeforeEach
     void startServer() throws Exception {
@@ -31,7 +36,11 @@ class IamTokenVersionCheckerTest {
             calls.incrementAndGet();
             String query = exchange.getRequestURI().getQuery(); // uid=xxx
             String uid = query != null && query.startsWith("uid=") ? query.substring(4) : "";
-            String body = String.valueOf(currentVersion.get());
+            String body = envelope.get()
+                    ? (failCode.get() != 0
+                        ? "{\"code\":" + failCode.get() + ",\"msg\":\"boom\",\"data\":null}"
+                        : "{\"code\":0,\"msg\":\"success\",\"data\":" + currentVersion.get() + "}")
+                    : String.valueOf(currentVersion.get());
             byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, bytes.length);
             exchange.getResponseBody().write(bytes);
@@ -87,6 +96,26 @@ class IamTokenVersionCheckerTest {
         TokenClaims legacy = new TokenClaims("u1", "u1", null, null, null, null, null,
                 null, Instant.now().plusSeconds(60), Map.of());
         assertThat(checker.isAcceptable(legacy)).isTrue();
+    }
+
+    @Test
+    @DisplayName("统一信封响应（{code,data}）同样被正确解析")
+    void envelopeResponseSupported() {
+        envelope.set(true);
+        IamTokenVersionChecker checker =
+                new IamTokenVersionChecker(baseUrl, "/api/v1/internal/token-version", Duration.ZERO);
+        assertThat(checker.isAcceptable(claims(1))).isTrue();
+        assertThat(checker.isAcceptable(claims(2))).isFalse();
+    }
+
+    @Test
+    @DisplayName("信封里是业务失败码 → fail-open 放行（不因 IAM 报错拒绝全站）")
+    void envelopeFailureCodeFailsOpen() {
+        envelope.set(true);
+        failCode.set(9000);
+        IamTokenVersionChecker checker =
+                new IamTokenVersionChecker(baseUrl, "/api/v1/internal/token-version", Duration.ZERO);
+        assertThat(checker.isAcceptable(claims(99))).isTrue();
     }
 
     @Test

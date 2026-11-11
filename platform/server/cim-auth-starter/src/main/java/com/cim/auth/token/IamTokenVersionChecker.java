@@ -1,5 +1,7 @@
 package com.cim.auth.token;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +21,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * 通过本地缓存 + TTL 避免每请求回查 IAM（§8.1(a)）。</p>
  *
  * <p>端点约定（由 {@code business/iam-ap} 提供）：<br>
- * {@code GET {iamBaseUrl}{endpoint}?uid={uid}} → 响应体为该用户当前版本号（纯文本 long）。</p>
+ * {@code GET {iamBaseUrl}{endpoint}?uid={uid}} → 统一信封 {@code {"code":0,"data":<long>}}。</p>
+ *
+ * <p><b>兼容期</b>：同时接受旧版纯文本响应（{@code 1}）。IAM 与本 starter 分别部署时，先升级任一侧
+ * 都不会让版本校验静默退化成 fail-open；两种形态都解析失败才判为「不可达」。</p>
  *
  * <p><b>降级策略（fail-open）</b>：端点不可达 / 用户无版本记录 / 令牌无 {@code ver}（旧令牌），
  * 一律放行。版本机制是「主动作废已签发令牌」的增强，不应因 IAM 抖动导致全站拒登；
@@ -28,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IamTokenVersionChecker implements TokenVersionChecker {
 
     private static final Logger log = LoggerFactory.getLogger(IamTokenVersionChecker.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final String baseUrl;
     private final String endpoint;
@@ -90,7 +96,7 @@ public class IamTokenVersionChecker implements TokenVersionChecker {
                     .build();
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isBlank()) {
-                return Long.parseLong(resp.body().trim());
+                return parseVersion(resp.body().trim());
             }
             log.warn("[token-version] IAM 版本端点返回 {}，按 fail-open 处理", resp.statusCode());
             return -1;
@@ -98,6 +104,28 @@ public class IamTokenVersionChecker implements TokenVersionChecker {
             log.warn("[token-version] 拉取 IAM 版本失败（{}），按 fail-open 处理", e.getMessage());
             return -1;
         }
+    }
+
+    /** 解析版本号：优先按统一信封取 {@code data}，失败则按旧纯文本解析。 */
+    private static long parseVersion(String body) {
+        if (!body.startsWith("{")) {
+            return Long.parseLong(body);
+        }
+        JsonNode node;
+        try {
+            node = MAPPER.readTree(body);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("无法解析版本响应：" + body, e);
+        }
+        int code = node.path("code").asInt(-1);
+        if (code != 0) {
+            throw new IllegalArgumentException("版本端点返回业务失败码 " + code);
+        }
+        JsonNode data = node.path("data");
+        if (data.isMissingNode() || data.isNull()) {
+            throw new IllegalArgumentException("版本响应缺少 data");
+        }
+        return data.asLong();
     }
 
     private static String uriEncode(String s) {

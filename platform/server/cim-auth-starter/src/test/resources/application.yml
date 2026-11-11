@@ -7,3 +7,8 @@ cim:
       app-code: mds-ap
       enabled: true
     authorities-claim: authorities
+  # 集成测试夹具 TestApi 刻意返回裸字符串（用于验证安全过滤链，不关心响应契约），
+  # 故测试上下文关闭统一响应契约校验；生产应用不受影响（见 api-convention.md §6）。
+  api:
+    response:
+      verify: false

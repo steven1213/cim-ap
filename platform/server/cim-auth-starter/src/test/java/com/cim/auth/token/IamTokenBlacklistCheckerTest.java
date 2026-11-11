@@ -23,6 +23,8 @@ class IamTokenBlacklistCheckerTest {
     private String baseUrl;
     private final AtomicBoolean revoked = new AtomicBoolean(false);
     private final AtomicBoolean called = new AtomicBoolean(false);
+    /** true = 以统一信封响应（升级后形态）；false = 旧纯文本。 */
+    private final AtomicBoolean envelope = new AtomicBoolean(false);
 
     @BeforeEach
     void startServer() throws Exception {
@@ -33,7 +35,9 @@ class IamTokenBlacklistCheckerTest {
             String jti = query != null && query.startsWith("jti=") ? query.substring(4) : "";
             // 约定：端点返回该 jti 是否已被拉黑（true/false）
             boolean isRevoked = "bad-jti".equals(jti) || revoked.get();
-            String body = String.valueOf(isRevoked);
+            String body = envelope.get()
+                    ? "{\"code\":0,\"msg\":\"success\",\"data\":" + isRevoked + "}"
+                    : String.valueOf(isRevoked);
             byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, bytes.length);
             exchange.getResponseBody().write(bytes);
@@ -68,6 +72,17 @@ class IamTokenBlacklistCheckerTest {
 
         revoked.set(true); // IAM 拉黑
         assertThat(checker.isAcceptable(claims("good-jti"))).isFalse();
+        assertThat(checker.isAcceptable(claims("bad-jti"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("统一信封响应（{code,data}）同样被正确解析")
+    void envelopeResponseSupported() {
+        envelope.set(true);
+        IamTokenBlacklistChecker checker =
+                new IamTokenBlacklistChecker(baseUrl, "/api/v1/internal/token-blacklist", Duration.ZERO);
+
+        assertThat(checker.isAcceptable(claims("good-jti"))).isTrue();
         assertThat(checker.isAcceptable(claims("bad-jti"))).isFalse();
     }
 
