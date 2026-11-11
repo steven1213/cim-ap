@@ -514,6 +514,64 @@
 
 - **验证**：三应用 `tsc --noEmit` 零错 + `vite build` 通过（9.49 / 9.71 / 9.50s）；IAM 渲染契约 **33/33**；`StatusTag` 业务引用 0→17、`LocaleSwitcher` 3→1 份、`NotificationBell` 2→1 份、`.split` 6→0 处手写、`ToneTag` 删除。
 
+## 2026-11-12（续 2）待办残留复扫与再收敛
+
+### 33. 全量复扫：`KpiGrid` 能力缺口、路由守卫去重、以及一处**未经验证**的后端写法
+
+- **触发**：上一轮（§32）报的 6 项待办已清账，但「已组件化」的结论是按**具名函数**（`statusTone`）和**字符串字面量类名**统计的。本轮换判据重扫，发现统计口径漏了两类：① 容器类名（`kpi-grid` 不在上一轮的 `.kpi` 口径内）；② **内联三元**写的状态映射。
+- **复扫结果（脚本口径）**：
+
+  | 项 | 数量 | 判定 |
+  | --- | --- | --- |
+  | 裸 `<button>` | 0 | ✅ 上一轮已清零 |
+  | `className="field"` / `"split"` / `"alert"` | 0 / 0 / 0 | ✅ 已清零 |
+  | `className="kpi-grid"` | **12** | ❌ 本轮修（见 33.1） |
+  | 手写 `<table>` | 1（`RecipeDetailDrawer` 键值表） | 保留：两行 k/v，引 `DataTable` 不划算 |
+  | 裸 `input/select/textarea` | 6 / 0 / 0 | 保留：全为 `checkbox`/`radio`/`file`，`CimInput` 刻意不收 |
+  | 未用 `useResource` 的页面 | 13 / 54 | 保留：9 个状态页 + `DesignerPage`（画布）/ `ProfilePage`（单对象）/ `LoginPage` |
+  | 内联 `tone={x === 'A' ? 'ok' : 'warn'}` | **61** | 部分可入字典（见 33.4） |
+
+**33.1 `KpiGrid` 只收 `children`，页面只能手写**
+
+`KpiCard.tsx` 里 `KpiGrid({ children })` 没有 `className` / `style`，而 12 处手写里有 3 处要压外边距（`DeviceRecipePage` 嵌在 `Panel` 内 `margin: '10px 14px 0'`、`IntegrationPage` / `SignoffPage` 的 `marginBottom: 10`）。组件既不能透传，页面就只能绕开——这跟 `CimField` 当年「组件在、样式没上来」是同一类根因：**组件能力不足，不是页面偷懒**。
+
+补 `className`（与 `kpi-grid` 合并而非覆盖）与 `style` 后，8 文件 12 处全部替换，`<KpiGrid>` 采用 2 → **14**，`className="kpi-grid"` 归零。
+⚠️ 批量脚本第一版把配对闭合标签的下标写错了（深度归零时 `q` 没指向那个 `</div>`），子元素被整体挪到 `</KpiGrid>` 之后，且 `style={{…}}` 少了一层花括号。**已 `git checkout` 回滚重做**——这类脚本改完必须先看 diff，不能只看替换计数。
+
+**33.2 `ProtectedRoute` 两份 md5 相同 → `@cim/shell`**
+
+`iam` 与 `rms` 的 `components/ProtectedRoute.tsx` md5 **完全一致**（`f5911ec3`），却各存一份。上提为 `@cim/shell` 的 `ProtectedRoute`，收 `authenticated: boolean` + `loginPath`，token 由应用从自己的 `authStore` 取——与 `LocaleSwitcher` / `NotificationBell` 同口径（**组件收事实，不收状态库**）。两应用文件退化为 7 行薄壳。
+
+**33.3 `RequirePerm` 与权限判定：结构收敛，行为差异显式化**
+
+两应用的 `RequirePerm` 原本是同一概念的两种写法：IAM 用 `useHasPermission` + `<Navigate to="/403" replace>`，RMS 直接读 store + 渲染 `<ForbiddenPage/>`。收敛为：
+- 新增 `@cim/shell` 的 `RequirePermission({ allowed, fallback, children })`——判定由应用算好，**未授权呈现走 `fallback` 注入**；
+- RMS 改走 `useHasPermission`，与 IAM 同一条读取路径（两应用的 `lib/usePermission.ts` 本就 md5 相同）；
+- ⚠️ **两种 403 呈现继续并存，且这是有意的**：跳转 `/403` 会改 URL，就地渲染不改（权限补上后刷新即达原页）。它影响「刷新 / 后退 / 分享」，属产品决策，组件层不替应用统一。若要统一，建议统一到**就地渲染**（可分享、可刷新），需另开一项。
+- `permissions.ts` 的三个纯函数（`hasPermission` / `hasAnyPermission` / `hasAllPermissions`）上提 `@cim/ui`：两应用该文件 39 行 ×2，**除末尾应用专属常量外逐字节相同**（IAM `CONSOLE_ADMIN`、RMS `SUPER_ADMIN`）。应用侧文件保留为「re-export + 本地常量」，6 处引用零改动。
+
+**33.4 未修的两项，附边界**
+
+- **61 处内联 `tone=` 三元**：按字段频次 `status`×4、`result`×3、`versionStatus`×2、`qualificationStatus`×2，其余各 1。重复 ≥2 的可入 `STATUS_TONES`（`qualificationStatus` / `versionStatus` / `auditResult`）；只出现 1 次的是页面局部判定（`reconcileResult === 'DRIFT'`、`severity === 'CRITICAL'`），进字典反而制造无人复用的键。**判据：同一枚举跨页出现 ≥2 次才入字典**。
+- **`approval` 的 `Icons.tsx`（235 行 / 32 图标）全在本地**：其中 14 个与 `@cim/ui` **同名**（`IconBell`/`IconChevron`/`IconInbox`/`IconLogout`/`IconMoon`/`IconPlus`/`IconRefresh`/`IconSearch`/`IconShield`/`IconSidebar`/`IconSun`/`IconTrash`/`IconUser`/`IconX`），但逐个比对 `d` 属性**全部不同**——approval 是 24×24 stroke 画法，平台是另一套网格。按「逐字节相同才上提」的判据**不该合并**，合并会改 approval 的图标观感。这是**视觉一致性问题**，不是组件化问题，需单独决策。
+
+**33.5 后端：三处 `@RestController` 与 `@Bean` 双注册（本轮改到一半回退）**
+
+`cim-i18n-starter` 的 `I18nController`、`cim-jpa-starter` 的 `SqlLogAdminController`、`cim-notify-starter` 的 `SseController` 都有两类装配身份：auto-config 里的 `@Bean`（带 `@ConditionalOnProperty`）**加上**类级 `@RestController`（即 `@Component`）。宿主 `scanBasePackages="com.cim"` 时（`cim-bootstrap` 就是）组件扫描会把它们无条件注册，绕过条件——`SseController` 自己的 javadoc 写着「以 `@Bean` 注册（库 jar 不依赖宿主组件扫描）」，注释与实现相反。
+
+按 `CimDispatchController` 的写法（类型级 `@RequestMapping` + `@ResponseBody`，不带 `@Component`）改掉后**实测挂了**：
+- `SqlLogAdminControllerTest` 3 例 `404`（`standaloneSetup` 下 `@RequestMapping` 未被当处理器）；
+- `NotifyEndToEndTest` 5s 内收不到 SSE 推送（真实 HTTP `/sys/notify/stream` 未注册）。
+回退后两者立即恢复（`BUILD SUCCESS`）。
+
+由此得出一条更要紧的结论：**`CimDispatchController` 用的正是这种写法，而它全仓无测试、默认关闭（`cim.api.dispatch.enabled=false`）、无任何调用方**——该「规避扫描」的写法在本仓**从未被 HTTP 级验证过**。
+⚠️ 同时更正 §29 / `PROCESS.md` 里「bootstrap 5/5 证明分发入口未被宿主扫描」的表述：`BootstrapAssemblyTest` 实际只断言 `cim-system` 的仓储与控制器被扫描到（第 42–57 行），**未涉及 dispatch**。这句话不成立。
+
+- **结论**：本轮**不动**这三处。正确做法不是换注解，而是先把该写法补上一个「真实上下文 + HTTP 打通」的测试，再逐个迁移；否则等于用未验证的模式替换正在工作的实现。
+- **影响面（当前为潜在风险，未触发）**：`iam` / `rms` / `approval` 的 `scanBasePackages` 都是具体包（不含 `com.cim.i18n` / `com.cim.jpa` / `com.cim.notify`），靠 imports 装配，故三 ap 无影响；`cim-bootstrap` 只引入了 `cim-jpa-starter`，是最可能第一个踩到的宿主。
+
+- **验证**：三应用 `tsc --noEmit` 零错；`vite build` 通过（9.85 / 9.96 / 9.75s）；IAM 渲染契约 **33/33**；后端回退后 `SqlLogAdminControllerTest` 4/4、`NotifyEndToEndTest` 1/1 绿。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

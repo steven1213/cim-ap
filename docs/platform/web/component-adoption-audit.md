@@ -173,3 +173,60 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 
 **坑二（数字口径）**：`className="kpi` 这类**前缀**匹配会把子元素算进容器数。凡是要报"容器有几处"，正则必须带 `("|\s)` 边界。这条错误已经污染过一版审计表（`.kpi` 40→被数成 171、`.field` 49→被数成 101），更正记录见 §1。
 
+
+---
+
+## 7. 复扫与再收敛（2026-11-12 续 2）
+
+上一轮按「具名 `statusTone` 函数」和「字符串字面量类名」清完，本轮换判据重扫，补掉两类统计盲区。
+
+### 7.1 复扫结果
+
+| 项 | 数量 | 处理 |
+| --- | --- | --- |
+| `className="kpi-grid"` | 12 | ✅ 本轮收敛（见 7.2） |
+| 内联 `tone={x === 'A' ? 'ok' : …}` | 61 | 部分入字典（见 7.4） |
+| 手写 `<table>` | 1 | 保留：`RecipeDetailDrawer` 的两行 k/v 表 |
+| 裸 `<input>` | 6 | 保留：`checkbox`/`radio`/`file`，`CimInput` 刻意不收 |
+| 未用 `useResource` 的页面 | 13 / 54 | 保留：9 个状态页 + `DesignerPage`/`ProfilePage`/`LoginPage` |
+
+### 7.2 组件能力不足 = 页面绕开的真正原因
+
+`KpiGrid` 早就有，但签名是 `({ children })`——**没有 `className`/`style`**。而 12 处手写里有 3 处要压外边距：
+
+```tsx
+// DeviceRecipePage:358 嵌在 Panel 内，要吃掉网格默认外边距
+<div className="kpi-grid" style={{ margin: '10px 14px 0' }}>
+```
+
+页面不是不知道有组件，是**组件接不住这个用法**。补 `className`（合并而非覆盖）与 `style` 后 12 处全部替换，采用 2 → **14**。
+
+> 判据补充：替换受阻时先问「组件能不能表达这个用法」，再问「页面为什么不用组件」。
+> 同 `CimField` 当年的「组件在、`.cim-field` 样式没上来」，都是能力缺口而非纪律问题。
+
+### 7.3 跨应用重复（本轮上提）
+
+| 对象 | 证据 | 处理 |
+| --- | --- | --- |
+| `components/ProtectedRoute.tsx` | iam/rms **md5 相同**（`f5911ec3`） | → `@cim/shell`，收 `authenticated` + `loginPath`；应用给 token |
+| `lib/permissions.ts` | 39 行 ×2，除末尾应用专属常量外**逐字节相同** | 三纯函数 → `@cim/ui`；应用侧留 re-export + 本地常量 |
+| `components/RequirePerm.tsx` | 同概念两种写法（跳 `/403` vs 渲染 403 页） | → `@cim/shell` `RequirePermission`，呈现走 `fallback` 注入 |
+
+⚠️ `RequirePermission` **保留**两种 403 呈现：跳转会改 URL，就地渲染不改（权限补上后刷新即达原页）。
+这是「刷新/后退/分享」的产品决策，不进组件层。若要统一，倾向**就地渲染**。
+
+### 7.4 内联状态映射：入字典的判据
+
+61 处 `tone=` 三元按字段频次：`status`×4、`result`×3、`versionStatus`×2、`qualificationStatus`×2，其余各 1。
+
+- **入字典**：同一枚举**跨页出现 ≥2 次**（`qualificationStatus`、`versionStatus`、`auditResult`）。
+- **不入**：只出现 1 次的页面局部判定（`reconcileResult === 'DRIFT'`、`severity === 'CRITICAL'`、`cmpResult`）——进 `STATUS_TONES` 只会造出**无人复用的键**，反而让字典失真。
+
+### 7.5 `approval` 的图标：同名但不同画法
+
+`approval-ap/web/src/components/Icons.tsx` 仍是 235 行 / 32 个本地图标，其中 14 个与 `@cim/ui` **同名**
+（`IconBell`/`IconChevron`/`IconInbox`/`IconLogout`/`IconMoon`/`IconPlus`/`IconRefresh`/`IconSearch`/`IconShield`/`IconSidebar`/`IconSun`/`IconTrash`/`IconUser`/`IconX`），
+但逐个比对 `d` 属性**全部不同**——approval 是 24×24 stroke 画法，平台是另一套网格。
+
+按「逐字节相同才上提」的判据**不合并**（合并会改 approval 图标观感）。这属于**视觉一致性**议题，
+需要一次统一图标的独立决策，不能顺手做。
