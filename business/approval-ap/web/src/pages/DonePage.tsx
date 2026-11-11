@@ -1,135 +1,110 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Panel from '@/components/Panel';
+import { useResource } from '@cim/data';
+import { CimButton, DataTable, Page, Panel, type DataTableColumn } from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
-import { IconCheck, IconRefresh, IconSearch } from '@/components/Icons';
-import { listDonePaged, type PageResult } from '@/lib/api';
+import { IconSearch } from '@/components/Icons';
+import { listDone } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
 import { fmtDate } from '@/lib/format';
 import type { TaskView } from '@/types';
 
+const PAGE_SIZE = 20;
+
 export default function DonePage() {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
-  const PAGE_SIZE = 10;
-  const [paged, setPaged] = useState<PageResult<TaskView> | null>(null);
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [detailId, setDetailId] = useState<string | null>(null);
-  /** 关键字过滤（标题/业务单号/节点名） */
+
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(PAGE_SIZE);
   const [q, setQ] = useState('');
+  const [detailId, setDetailId] = useState<string | null>(null);
 
-  const tasks = paged?.records ?? [];
-  const totalPages = paged ? Math.max(1, Math.ceil(paged.total / PAGE_SIZE)) : 1;
-  const filtered = tasks.filter((tk) => {
-    if (!q.trim()) return true;
+  /**
+   * 取**全量**再在本地分页，不用 `/tasks/done/page`。
+   *
+   * <p>改造前是服务端分 10 条 + 客户端按关键字过滤当前页：搜「BK-2026-012」时
+   * 如果它落在第 3 页就永远搜不到，而界面看起来「搜过了、就是没有」——比报错更误导。
+   * 要么把关键字下推给后端（后端没有该参数），要么本地分页；选后者，并把每页放到 20 条。</p>
+   */
+  const doneRes = useResource<TaskView[]>(
+    ({ signal }) => listDone(undefined, undefined, { signal }),
+    { deps: [userId] },
+  );
+
+  const all = doneRes.data ?? [];
+  const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return [tk.title, tk.businessKey, tk.name]
-      .some((v) => v && v.toLowerCase().includes(kw));
-  });
+    if (!kw) return all;
+    return all.filter((tk) =>
+      [tk.title, tk.businessKey, tk.name, tk.assignee].some((v) => v && v.toLowerCase().includes(kw)),
+    );
+  }, [all, q]);
 
-  async function load(p = 0) {
-    setLoading(true);
-    try {
-      setPaged(await listDonePaged(p + 1, PAGE_SIZE));
-    } catch (e) {
-      // 保留旧列表
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    load(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  const pageRows = filtered.slice((page - 1) * size, page * size);
 
-  function goto(p: number) {
-    setPage(p);
-    load(p);
-  }
+  const columns: Array<DataTableColumn<TaskView>> = [
+    { key: 'name', titleKey: 'done.colName', width: 150 },
+    { key: 'title', titleKey: 'common.colTitle', ellipsis: true, render: (tk) => tk.title || '—' },
+    { key: 'businessKey', titleKey: 'done.colBusinessKey', width: 170, mono: true },
+    { key: 'assignee', titleKey: 'done.colAssignee', width: 120, render: (tk) => tk.assignee ?? '—' },
+    {
+      key: 'endedAt',
+      titleKey: 'done.colEnded',
+      width: 160,
+      mono: true,
+      render: (tk) => fmtDate(tk.dueDate ?? tk.createdAt),
+    },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 96,
+      render: (tk) => (
+        <CimButton size="small" icon={<IconSearch width={13} height={13} />} onClick={() => setDetailId(tk.processInstanceId)}>
+          {t('common.detail')}
+        </CimButton>
+      ),
+    },
+  ];
 
   return (
-    <div className="page">
-      <Panel
-        title={t('done.title')}
-        sub={t('done.sub')}
-        actions={
-          <>
-            <span className="search-inline">
-              <IconSearch width={13} height={13} />
-              <input
-                className="text-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t('common.searchPlaceholder')}
-              />
-            </span>
-            <button className="icon-btn" onClick={() => load(page)} title={t('common.refresh')} aria-label={t('common.refresh')}>
-              <IconRefresh width={16} height={16} />
-            </button>
-          </>
-        }
-      >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('done.colName')}</th>
-                <th>{t('common.colTitle')}</th>
-                <th>{t('done.colBusinessKey')}</th>
-                <th>{t('done.colAssignee')}</th>
-                <th>{t('done.colEnded')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={6} className="dim" style={{ textAlign: 'center' }}>{t('common.loading')}</td>
-                </tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6}>
-                    <div className="empty">
-                      <IconCheck width={26} height={26} />
-                      <span>{t('common.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {filtered.map((tk) => (
-                <tr key={tk.taskId}>
-                  <td>{tk.name}</td>
-                  <td>{tk.title || '—'}</td>
-                  <td className="mono">{tk.businessKey}</td>
-                  <td>{tk.assignee ?? '—'}</td>
-                  <td className="mono">{fmtDate(tk.dueDate ?? tk.createdAt)}</td>
-                  <td>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDetailId(tk.processInstanceId)}>
-                      <IconSearch width={13} height={13} /> {t('common.detail')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {paged && paged.total > PAGE_SIZE && (
-          <div className="pager">
-            <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => goto(page - 1)}>
-              {t('page.prev')}
-            </button>
-            <span className="dim">{t('page.info').replace('{page}', String(page + 1)).replace('{total}', String(totalPages))}</span>
-            <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => goto(page + 1)}>
-              {t('page.next')}
-            </button>
-          </div>
-        )}
+    <Page>
+      <Panel titleKey="done.title" subKey="done.sub" flush>
+        <DataTable<TaskView>
+          flat
+          columns={columns}
+          rows={pageRows}
+          rowKey={(tk) => tk.taskId}
+          loading={doneRes.loading}
+          error={doneRes.error ? doneRes.error.message : null}
+          onRetry={doneRes.refresh}
+          onRefresh={doneRes.refresh}
+          search={{
+            value: q,
+            onChange: (v) => {
+              setQ(v);
+              // 过滤条件变了还停在第 3 页会看到「空页 + 明明有数据」，回第一页
+              setPage(1);
+            },
+            placeholderKey: 'common.searchPlaceholder',
+            width: 240,
+          }}
+          pagination={{
+            page,
+            size,
+            total: filtered.length,
+            onChange: (p, s) => {
+              setPage(s === size ? p : 1);
+              setSize(s);
+            },
+            sizeOptions: [10, 20, 50, 100],
+          }}
+          emptyTitleKey="common.empty"
+          scrollX="max-content"
+        />
       </Panel>
 
-      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={load} />}
-    </div>
+      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={doneRes.refresh} />}
+    </Page>
   );
 }

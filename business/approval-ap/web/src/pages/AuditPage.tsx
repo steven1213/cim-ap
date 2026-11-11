@@ -1,137 +1,153 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import Panel from '@/components/Panel';
-import { IconShield, IconSearch, IconCheck } from '@/components/Icons';
+import { useResource } from '@cim/data';
+import {
+  CimButton,
+  CimInput,
+  CimTag,
+  DataTable,
+  Page,
+  Panel,
+  type DataTableColumn,
+} from '@cim/ui';
+import type { StatusTone } from '@cim/theme';
+import { IconShield } from '@/components/Icons';
 import { listAudit } from '@/lib/api';
-import { toast } from '@/store/toastStore';
 import { fmtDate, shortHash } from '@/lib/format';
 import type { AuditView } from '@/types';
 
-function actionTag(action: string): string {
+/**
+ * 审计动作 → 语义档。
+ *
+ * <p>刻意只落 5 档（`StatusTone`）：改造前用 `.tag info`（第 6 种颜色）表达「常规事件」，
+ * 与「进行中」共用蓝色会让值守的人误以为还有流程在跑。信息类事件归 `run`、无关注价值的
+ * 归 `idle`——这里没有「任意颜色」的口子。</p>
+ */
+function actionTone(action: string): StatusTone {
   if (action.startsWith('COMPLETE_APPROVE') || action === 'START') return 'ok';
   if (action.startsWith('COMPLETE_REJECT') || action.startsWith('CALLBACK_FAILED')) return 'err';
-  if (action === 'RETURN' || action === 'REASSIGN') return 'warn';
-  return 'info';
+  if (action === 'RETURN' || action === 'REASSIGN' || action === 'WITHDRAW') return 'warn';
+  return 'run';
 }
 
 export default function AuditPage() {
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
-  const [key, setKey] = useState(params.get('businessKey') ?? '');
-  const [rows, setRows] = useState<AuditView[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [chainOk, setChainOk] = useState<boolean | null>(null);
 
-  async function search(k: string) {
-    if (!k.trim()) {
-      toast(t('audit.businessKey') + ' ?', 'warn');
-      return;
+  /** 输入框是草稿；`applied` 是真正查询的单号（分离，避免「一打字就发请求」）。 */
+  const [key, setKey] = useState(params.get('businessKey') ?? '');
+  const [applied, setApplied] = useState(params.get('businessKey') ?? '');
+
+  const auditRes = useResource<AuditView[]>(
+    ({ signal }) => listAudit(applied, { signal }),
+    { deps: [applied], enabled: !!applied, keepPreviousData: true },
+  );
+
+  const rows = auditRes.data ?? [];
+
+  /** 哈希链校验：每条 `prevHash` 应等于上一条的 `hash`。纯派生，不进 state。 */
+  const chain = useMemo(() => {
+    if (!applied || auditRes.loading || auditRes.error) return null;
+    if (rows.length === 0) return null;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].prevHash !== rows[i - 1].hash) return 'broken' as const;
     }
-    setLoading(true);
-    setParams({ businessKey: k.trim() });
-    try {
-      const data = await listAudit(k.trim());
-      setRows(data);
-      // 校验哈希链：每条 prevHash 应等于上一条的 hash
-      let ok = data.length > 0;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i].prevHash !== data[i - 1].hash) {
-          ok = false;
-          break;
-        }
-      }
-      setChainOk(ok);
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    } finally {
-      setLoading(false);
-    }
+    return 'ok' as const;
+  }, [applied, rows, auditRes.loading, auditRes.error]);
+
+  function search() {
+    const next = key.trim();
+    if (!next) return;
+    setApplied(next);
+    setParams({ businessKey: next });
   }
 
-  // 通过导航（我发起 → 审计追溯）带参进入时自动查询
-  useEffect(() => {
-    const k = params.get('businessKey');
-    if (k) {
-      setKey(k);
-      void search(k);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const columns: Array<DataTableColumn<AuditView>> = [
+    { key: 'seq', titleKey: 'audit.colSeq', width: 56, align: 'right', mono: true },
+    {
+      key: 'action',
+      titleKey: 'audit.colAction',
+      width: 110,
+      render: (a) => <CimTag tone={actionTone(a.action)}>{t('audit.action.' + a.action)}</CimTag>,
+    },
+    { key: 'actor', titleKey: 'audit.colActor', width: 110 },
+    { key: 'beforeState', titleKey: 'audit.colBefore', width: 110, mono: true },
+    { key: 'afterState', titleKey: 'audit.colAfter', width: 110, mono: true },
+    { key: 'detail', titleKey: 'audit.colDetail', ellipsis: true },
+    {
+      key: 'createdAt',
+      titleKey: 'audit.colTime',
+      width: 160,
+      mono: true,
+      render: (a) => fmtDate(a.createdAt),
+    },
+    {
+      key: 'hash',
+      titleKey: 'audit.colHash',
+      width: 130,
+      mono: true,
+      render: (a) => <span title={a.hash}>{shortHash(a.hash, 12)}</span>,
+    },
+    {
+      key: 'prevHash',
+      titleKey: 'audit.colPrevHash',
+      width: 130,
+      mono: true,
+      render: (a) => <span title={a.prevHash}>{shortHash(a.prevHash, 12)}</span>,
+    },
+  ];
 
   return (
-    <div className="page">
-      <Panel title={t('audit.title')} sub={t('audit.sub')}>
-        <div className="row">
-          <div className="field" style={{ flex: '1 1 280px' }}>
-            <label className="field-label">{t('audit.businessKey')}</label>
-            <input
-              className="mono"
+    <Page>
+      <Panel
+        titleKey="audit.title"
+        subKey="audit.sub"
+        actions={
+          <>
+            <CimInput
+              id="audit-bk"
+              mono
               value={key}
-              onChange={(e) => setKey(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && search(key)}
+              onChange={setKey}
+              onEnter={search}
               placeholder="BK-2026-001"
+              width={240}
             />
-          </div>
-          <button className="btn btn-sm" onClick={() => search(key)} disabled={loading}>
-            <IconSearch width={14} height={14} /> {t('audit.search')}
-          </button>
-        </div>
-
-        {chainOk === true && (
-          <div className="alert ok" style={{ marginTop: 12 }}>
-            <IconCheck width={15} height={15} />
-            {t('audit.chainOk')}
-          </div>
-        )}
-        {chainOk === false && (
-          <div className="alert err" style={{ marginTop: 12 }}>
-            {t('audit.chainBroken')}
+            <CimButton size="small" onClick={search} loading={auditRes.loading}>
+              {t('audit.search')}
+            </CimButton>
+          </>
+        }
+        flush
+      >
+        {/* 链校验结论放表格上方：它是「这批数据整体可不可信」的判断，不是某一行的属性，
+            塞进表格列会让人以为逐行判定。 */}
+        {chain && (
+          <div className={'alert ' + (chain === 'ok' ? 'ok' : 'err')} style={{ margin: '10px 12px 0' }}>
+            {chain === 'ok' ? t('audit.chainOk') : t('audit.chainBroken')}
           </div>
         )}
 
-        {rows.length > 0 && (
-          <div className="table-wrap" style={{ marginTop: 12 }}>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th className="num">#</th>
-                  <th>{t('audit.colAction')}</th>
-                  <th>{t('audit.colActor')}</th>
-                  <th>{t('audit.colBefore')}</th>
-                  <th>{t('audit.colAfter')}</th>
-                  <th>{t('audit.colDetail')}</th>
-                  <th>{t('audit.colTime')}</th>
-                  <th>{t('audit.colHash')}</th>
-                  <th>{t('audit.colPrevHash')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((a) => (
-                  <tr key={a.id}>
-                    <td className="num">{a.seq}</td>
-                    <td><span className={'tag ' + actionTag(a.action)}>{t('audit.action.' + a.action)}</span></td>
-                    <td>{a.actor}</td>
-                    <td className="mono">{a.beforeState}</td>
-                    <td className="mono">{a.afterState}</td>
-                    <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.detail}>{a.detail}</td>
-                    <td className="mono">{fmtDate(a.createdAt)}</td>
-                    <td className="mono" title={a.hash}>{shortHash(a.hash, 12)}</td>
-                    <td className="mono" title={a.prevHash}>{shortHash(a.prevHash, 12)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {!loading && rows.length === 0 && chainOk === null && (
-          <div className="empty" style={{ marginTop: 16 }}>
+        {applied ? (
+          <DataTable<AuditView>
+            flat
+            columns={columns}
+            rows={rows}
+            rowKey={(a) => a.id}
+            loading={auditRes.loading}
+            error={auditRes.error ? auditRes.error.message : null}
+            onRetry={auditRes.refresh}
+            emptyTitleKey="common.empty"
+            scrollX="max-content"
+          />
+        ) : (
+          <div className="empty" style={{ padding: '28px 0' }}>
             <IconShield width={26} height={26} />
             <span>{t('audit.empty')}</span>
           </div>
         )}
       </Panel>
-    </div>
+    </Page>
   );
 }

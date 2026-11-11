@@ -126,6 +126,7 @@ export const zhCN: Record<string, string> = {
   'dash.gotoTodo': '去处理待办',
   'dash.gotoStart': '发起审批',
   'dash.gotoCallbacks': '查看回调',
+  'dash.partial': '其中 {{n}} / {{total}} 项数据未取到（已显示为 —）',
 
   // 流程模板
   'def.title': '流程模板',
@@ -565,6 +566,7 @@ export const enUS: Record<string, string> = {
   'dash.gotoTodo': 'Process todo',
   'dash.gotoStart': 'Start approval',
   'dash.gotoCallbacks': 'View callbacks',
+  'dash.partial': '{{n}} of {{total}} blocks could not be loaded (shown as —)',
 
   'def.title': 'Process Templates',
   'def.sub': 'Deployed approval process definitions',

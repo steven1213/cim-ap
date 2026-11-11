@@ -41,6 +41,13 @@
   gap: 6px;
   align-items: center;
 }
+/* 单元格内的「文字 + 徽标」同一行（状态列的多个 tag 不再靠 marginLeft 手调） */
+.cell-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
 /* 表头内的紧凑下拉（审计筛选等） */
 .select-sm {
   height: 26px;

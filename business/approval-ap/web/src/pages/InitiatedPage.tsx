@@ -1,19 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import Panel from '@/components/Panel';
+import { useResource } from '@cim/data';
+import {
+  CimButton,
+  CimTag,
+  DataTable,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
+import type { StatusTone } from '@cim/theme';
 import DetailModal from '@/components/DetailModal';
-import { IconOutbox, IconRefresh, IconShield, IconSearch, IconBell, IconUndo } from '@/components/Icons';
-import { listInitiatedPaged, urgeInstance, withdrawInstance, type PageResult } from '@/lib/api';
-import { useIdentityStore } from '@/store/identityStore';
-import { toast } from '@/store/toastStore';
-import { fmtDate, fmtOverdue } from '@/lib/format';
+import { IconBell, IconSearch, IconShield, IconUndo } from '@/components/Icons';
 import { DisplayFields } from '@/components/DisplayFields';
+import { listInitiated, urgeInstance, withdrawInstance } from '@/lib/api';
+import { useIdentityStore } from '@/store/identityStore';
+import { fmtDate, fmtOverdue } from '@/lib/format';
 import type { ProcessInstanceView } from '@/types';
 
-/** 实例状态 → 标签色。 */
-const STATUS_TAG: Record<string, string> = {
-  ACTIVE: 'info',
+const PAGE_SIZE = 20;
+
+/** 实例状态 → 语义档（4 档，没有「任意颜色」）。 */
+const STATUS_TONE: Record<string, StatusTone> = {
+  ACTIVE: 'run',
   COMPLETED: 'ok',
   WITHDRAWN: 'warn',
 };
@@ -21,195 +33,170 @@ const STATUS_TAG: Record<string, string> = {
 export default function InitiatedPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { userId } = useIdentityStore();
-  const [paged, setPaged] = useState<PageResult<ProcessInstanceView> | null>(null);
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const PAGE_SIZE = 10;
-  const list = paged?.records ?? [];
-  const totalPages = paged ? Math.max(1, Math.ceil(paged.total / PAGE_SIZE)) : 1;
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  /** 关键字过滤（标题/业务单号/流程 key） */
+
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(PAGE_SIZE);
   const [q, setQ] = useState('');
+  const [detailId, setDetailId] = useState<string | null>(null);
+  /** 逐行锁：只锁被点的那一行，别把整张表的按钮都变灰。 */
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const filtered = list.filter((pi) => {
-    if (!q.trim()) return true;
+  /** 全量取回、本地分页（理由同 DonePage：关键字只在当前页生效等于搜不到）。 */
+  const initRes = useResource<ProcessInstanceView[]>(
+    ({ signal }) => listInitiated(undefined, undefined, { signal }),
+    { deps: [userId] },
+  );
+
+  const all = initRes.data ?? [];
+  const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return [pi.title, pi.businessKey, pi.processKey]
-      .some((v) => v && v.toLowerCase().includes(kw));
-  });
+    if (!kw) return all;
+    return all.filter((pi) =>
+      [pi.title, pi.businessKey, pi.processKey].some((v) => v && v.toLowerCase().includes(kw)),
+    );
+  }, [all, q]);
 
-  async function load(p = 0) {
-    setLoading(true);
-    try {
-      setPaged(await listInitiatedPaged(p + 1, PAGE_SIZE));
-    } catch (e) {
-      // 保留旧列表
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => {
-    load(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  function goto(p: number) {
-    setPage(p);
-    load(p);
-  }
+  const pageRows = filtered.slice((page - 1) * size, page * size);
 
   async function onUrge(pi: ProcessInstanceView) {
     setBusyId(pi.processInstanceId);
     try {
       await urgeInstance(pi.processInstanceId);
-      toast(t('init.urgeSent'), 'ok');
+      toast.success(t('init.urgeSent'));
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusyId(null);
     }
   }
 
   async function onWithdraw(pi: ProcessInstanceView) {
-    if (!window.confirm(t('init.withdrawConfirm', { bk: pi.businessKey }))) return;
+    const ok = await confirm({
+      title: t('init.withdraw'),
+      content: t('init.withdrawConfirm', { bk: pi.businessKey }),
+      okKey: 'init.withdraw',
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(pi.processInstanceId);
     try {
       await withdrawInstance(pi.processInstanceId);
-      toast(t('init.withdrawDone'), 'ok');
-      await load();
+      toast.success(t('init.withdrawDone'));
+      initRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusyId(null);
     }
   }
 
+  const columns: Array<DataTableColumn<ProcessInstanceView>> = [
+    { key: 'businessKey', titleKey: 'init.colBusinessKey', width: 170, mono: true },
+    {
+      key: 'title',
+      titleKey: 'common.colTitle',
+      ellipsis: true,
+      render: (pi) => (
+        <>
+          {pi.title || '—'}
+          <DisplayFields fields={pi.displayFields} />
+        </>
+      ),
+    },
+    { key: 'processKey', titleKey: 'init.colProcess', width: 150, mono: true },
+    {
+      key: 'status',
+      titleKey: 'init.colStatus',
+      width: 220,
+      render: (pi) => (
+        <span className="cell-inline">
+          <CimTag tone={STATUS_TONE[pi.status] ?? 'run'}>{t('init.status.' + pi.status)}</CimTag>
+          {pi.round != null && pi.round > 1 && <CimTag tone="run">{t('init.roundBadge', { n: pi.round })}</CimTag>}
+          {pi.awaitingResubmit && <CimTag tone="warn">{t('init.awaitingResubmit')}</CimTag>}
+          {pi.overdueMinutes != null && (
+            <CimTag tone="err">
+              {t('init.overdue')} {fmtOverdue(pi.overdueMinutes)}
+            </CimTag>
+          )}
+        </span>
+      ),
+    },
+    { key: 'startedAt', titleKey: 'init.colStarted', width: 160, mono: true, render: (pi) => fmtDate(pi.startedAt) },
+    { key: 'endedAt', titleKey: 'init.colEnded', width: 160, mono: true, render: (pi) => fmtDate(pi.endedAt) },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 300,
+      render: (pi) => {
+        const busy = busyId === pi.processInstanceId;
+        return (
+          <span className="cell-actions">
+            <CimButton size="small" icon={<IconSearch width={13} height={13} />} onClick={() => setDetailId(pi.processInstanceId)}>
+              {t('common.detail')}
+            </CimButton>
+            {pi.status === 'ACTIVE' && (
+              <>
+                <CimButton size="small" disabled={busy} icon={<IconBell width={13} height={13} />} onClick={() => onUrge(pi)}>
+                  {t('init.urge')}
+                </CimButton>
+                <CimButton size="small" danger disabled={busy} icon={<IconUndo width={13} height={13} />} onClick={() => onWithdraw(pi)}>
+                  {t('init.withdraw')}
+                </CimButton>
+              </>
+            )}
+            <CimButton
+              size="small"
+              icon={<IconShield width={13} height={13} />}
+              onClick={() => navigate(`/audit?businessKey=${encodeURIComponent(pi.businessKey)}`)}
+            >
+              {t('init.viewAudit')}
+            </CimButton>
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
-    <div className="page">
-      <Panel
-        title={t('init.title')}
-        sub={t('init.sub')}
-        actions={
-          <>
-            <span className="search-inline">
-              <IconSearch width={13} height={13} />
-              <input
-                className="text-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t('common.searchPlaceholder')}
-              />
-            </span>
-            <button className="icon-btn" onClick={() => load(page)} title={t('common.refresh')} aria-label={t('common.refresh')}>
-              <IconRefresh width={16} height={16} />
-            </button>
-          </>
-        }
-      >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('init.colBusinessKey')}</th>
-                <th>{t('common.colTitle')}</th>
-                <th>{t('init.colProcess')}</th>
-                <th>{t('init.colStatus')}</th>
-                <th>{t('init.colStarted')}</th>
-                <th>{t('init.colEnded')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={7} className="dim" style={{ textAlign: 'center' }}>{t('common.loading')}</td>
-                </tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7}>
-                    <div className="empty">
-                      <IconOutbox width={26} height={26} />
-                      <span>{t('common.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {filtered.map((pi) => (
-                <tr key={pi.processInstanceId}>
-                  <td className="mono">{pi.businessKey}</td>
-                  <td>
-                    {pi.title || '—'}
-                    <DisplayFields fields={pi.displayFields} />
-                  </td>
-                  <td className="mono">{pi.processKey}</td>
-                  <td>
-                    <span className={'tag ' + (STATUS_TAG[pi.status] ?? '')}>
-                      {t('init.status.' + pi.status)}
-                    </span>
-                    {pi.round != null && pi.round > 1 && (
-                      <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: pi.round })}</span>
-                    )}
-                    {pi.awaitingResubmit && (
-                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
-                    )}
-                    {pi.overdueMinutes != null && (
-                      <span className="tag err" style={{ marginLeft: 6 }}>
-                        {t('init.overdue')} {fmtOverdue(pi.overdueMinutes)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="mono">{fmtDate(pi.startedAt)}</td>
-                  <td className="mono">{fmtDate(pi.endedAt)}</td>
-                  <td>
-                    <div className="cell-actions">
-                      <button className="btn btn-sm" onClick={() => setDetailId(pi.processInstanceId)}>
-                        <IconSearch width={13} height={13} /> {t('common.detail')}
-                      </button>
-                      {pi.status === 'ACTIVE' && (
-                        <>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            disabled={busyId === pi.processInstanceId}
-                            onClick={() => onUrge(pi)}
-                          >
-                            <IconBell width={13} height={13} /> {t('init.urge')}
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm btn-danger"
-                            disabled={busyId === pi.processInstanceId}
-                            onClick={() => onWithdraw(pi)}
-                          >
-                            <IconUndo width={13} height={13} /> {t('init.withdraw')}
-                          </button>
-                        </>
-                      )}
-                      <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/audit?businessKey=${encodeURIComponent(pi.businessKey)}`)}>
-                        <IconShield width={13} height={13} /> {t('init.viewAudit')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {paged && paged.total > PAGE_SIZE && (
-          <div className="pager">
-            <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => goto(page - 1)}>
-              {t('page.prev')}
-            </button>
-            <span className="dim">{t('page.info').replace('{page}', String(page + 1)).replace('{total}', String(totalPages))}</span>
-            <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => goto(page + 1)}>
-              {t('page.next')}
-            </button>
-          </div>
-        )}
+    <Page>
+      <Panel titleKey="init.title" subKey="init.sub" flush>
+        <DataTable<ProcessInstanceView>
+          flat
+          columns={columns}
+          rows={pageRows}
+          rowKey={(pi) => pi.processInstanceId}
+          loading={initRes.loading}
+          error={initRes.error ? initRes.error.message : null}
+          onRetry={initRes.refresh}
+          onRefresh={initRes.refresh}
+          search={{
+            value: q,
+            onChange: (v) => {
+              setQ(v);
+              setPage(1);
+            },
+            placeholderKey: 'common.searchPlaceholder',
+            width: 240,
+          }}
+          pagination={{
+            page,
+            size,
+            total: filtered.length,
+            onChange: (p, s) => {
+              setPage(s === size ? p : 1);
+              setSize(s);
+            },
+            sizeOptions: [10, 20, 50, 100],
+          }}
+          emptyTitleKey="common.empty"
+          scrollX="max-content"
+        />
       </Panel>
 
-      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={load} />}
-    </div>
+      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={initRes.refresh} />}
+    </Page>
   );
 }

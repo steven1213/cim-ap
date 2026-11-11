@@ -72,8 +72,13 @@ function currentIdentity(): { userId: string; tenantId: string; roles: string[] 
   return { userId, tenantId, roles: roles ?? [] };
 }
 
-async function apiGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  const r = await http.get<T>(url, { params });
+/** 请求可选项。`signal` 用于 `useResource` 的取消语义（不传则 abort 只是丢弃回包）。 */
+export interface RequestOptions {
+  signal?: AbortSignal;
+}
+
+async function apiGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
+  const r = await http.get<T>(url, { params, signal: opts?.signal });
   return r.data;
 }
 
@@ -84,12 +89,12 @@ async function apiPost<T>(url: string, body?: unknown, params?: Record<string, u
 
 // ---------- 流程定义 / 发起 ----------
 
-export function listDefinitions(): Promise<ProcessDefinitionView[]> {
-  return apiGet<ProcessDefinitionView[]>('/definitions');
+export function listDefinitions(opts?: RequestOptions): Promise<ProcessDefinitionView[]> {
+  return apiGet<ProcessDefinitionView[]>('/definitions', undefined, opts);
 }
 
-export function getDefinitionXml(definitionId: string): Promise<DefinitionXmlView> {
-  return apiGet<DefinitionXmlView>(`/processes/${encodeURIComponent(definitionId)}/xml`);
+export function getDefinitionXml(definitionId: string, opts?: RequestOptions): Promise<DefinitionXmlView> {
+  return apiGet<DefinitionXmlView>(`/processes/${encodeURIComponent(definitionId)}/xml`, undefined, opts);
 }
 
 export function startProcess(req: StartProcessRequest): Promise<{ processInstanceId: string }> {
@@ -124,33 +129,33 @@ export function deployProcess(req: DeployProcessRequest): Promise<ProcessDefinit
 
 // ---------- 任务 ----------
 
-export function listTodo(userId?: string, tenantId?: string): Promise<TaskView[]> {
+export function listTodo(userId?: string, tenantId?: string, opts?: RequestOptions): Promise<TaskView[]> {
   const { userId: id, tenantId: tn, roles } = currentIdentity();
-  return apiGet<TaskView[]>('/tasks/todo', { userId: userId ?? id, tenantId: tenantId ?? tn, roles });
+  return apiGet<TaskView[]>('/tasks/todo', { userId: userId ?? id, tenantId: tenantId ?? tn, roles }, opts);
 }
 
-export function listDone(userId?: string, tenantId?: string): Promise<TaskView[]> {
+export function listDone(userId?: string, tenantId?: string, opts?: RequestOptions): Promise<TaskView[]> {
   const { userId: id, tenantId: tn, roles } = currentIdentity();
-  return apiGet<TaskView[]>('/tasks/done', { userId: userId ?? id, tenantId: tenantId ?? tn, roles });
+  return apiGet<TaskView[]>('/tasks/done', { userId: userId ?? id, tenantId: tenantId ?? tn, roles }, opts);
 }
 
-export function listInitiated(userId?: string, tenantId?: string): Promise<ProcessInstanceView[]> {
+export function listInitiated(userId?: string, tenantId?: string, opts?: RequestOptions): Promise<ProcessInstanceView[]> {
   const id = userId ?? currentIdentity().userId;
   const tn = tenantId ?? currentIdentity().tenantId;
-  return apiGet<ProcessInstanceView[]>('/tasks/initiated', { userId: id, tenantId: tn });
+  return apiGet<ProcessInstanceView[]>('/tasks/initiated', { userId: id, tenantId: tn }, opts);
 }
 
-export function listTodoPaged(page1: number, size: number): Promise<PageResult<TaskView>> {
+export function listTodoPaged(page1: number, size: number, opts?: RequestOptions): Promise<PageResult<TaskView>> {
   const { userId, tenantId, roles } = currentIdentity();
-  return apiGet<PageResult<TaskView>>(`/tasks/todo/page?page=${page1}&size=${size}`, { userId, tenantId, roles });
+  return apiGet<PageResult<TaskView>>(`/tasks/todo/page?page=${page1}&size=${size}`, { userId, tenantId, roles }, opts);
 }
-export function listDonePaged(page1: number, size: number): Promise<PageResult<TaskView>> {
+export function listDonePaged(page1: number, size: number, opts?: RequestOptions): Promise<PageResult<TaskView>> {
   const { userId, tenantId, roles } = currentIdentity();
-  return apiGet<PageResult<TaskView>>(`/tasks/done/page?page=${page1}&size=${size}`, { userId, tenantId, roles });
+  return apiGet<PageResult<TaskView>>(`/tasks/done/page?page=${page1}&size=${size}`, { userId, tenantId, roles }, opts);
 }
-export function listInitiatedPaged(page1: number, size: number): Promise<PageResult<ProcessInstanceView>> {
+export function listInitiatedPaged(page1: number, size: number, opts?: RequestOptions): Promise<PageResult<ProcessInstanceView>> {
   const { userId, tenantId } = currentIdentity();
-  return apiGet<PageResult<ProcessInstanceView>>(`/processes/initiated/page?page=${page1}&size=${size}`, { userId, tenantId });
+  return apiGet<PageResult<ProcessInstanceView>>(`/processes/initiated/page?page=${page1}&size=${size}`, { userId, tenantId }, opts);
 }
 // 平台分页结构（cim-core PageResult：records/total/page/size）
 export interface PageResult<T> {
@@ -169,8 +174,8 @@ export function delegateTask(taskId: string, body: { assignee: string; reason?: 
 export function resolveTask(taskId: string, body: { comment?: string; actor: string }): Promise<void> {
   return apiPost(`/tasks/${encodeURIComponent(taskId)}/resolve`, body);
 }
-export function getStats(days = 30): Promise<StatsView> {
-  return apiGet(`/stats?days=${days}`);
+export function getStats(days = 30, opts?: RequestOptions): Promise<StatsView> {
+  return apiGet(`/stats?days=${days}`, undefined, opts);
 }
 export function suspendDefinition(definitionId: string, suspend: boolean): Promise<void> {
   return apiPost(`/processes/${encodeURIComponent(definitionId)}/suspend?suspend=${suspend}`, null);
@@ -178,8 +183,8 @@ export function suspendDefinition(definitionId: string, suspend: boolean): Promi
 export function duplicateDefinition(definitionId: string): Promise<ProcessDefinitionView> {
   return apiPost<ProcessDefinitionView>(`/processes/${encodeURIComponent(definitionId)}/duplicate`);
 }
-export function getOutboxStats(): Promise<Record<string, number>> {
-  return apiGet('/callbacks/outbox/stats');
+export function getOutboxStats(opts?: RequestOptions): Promise<Record<string, number>> {
+  return apiGet('/callbacks/outbox/stats', undefined, opts);
 }
 export function testCallback(appCode: string): Promise<{ messageId: string; status: string; lastError: string | null }> {
   return apiPost(`/callbacks/test/${encodeURIComponent(appCode)}`);
@@ -195,8 +200,8 @@ export function returnTask(taskId: string, req: ReturnRequest): Promise<void> {
 }
 
 /** 退回弹窗数据源：目标节点选项 + 轮次/上限 + 并行段状态。 */
-export function getReturnTargets(taskId: string): Promise<ReturnTargetsView> {
-  return apiGet<ReturnTargetsView>(`/tasks/${encodeURIComponent(taskId)}/return-targets`);
+export function getReturnTargets(taskId: string, opts?: RequestOptions): Promise<ReturnTargetsView> {
+  return apiGet<ReturnTargetsView>(`/tasks/${encodeURIComponent(taskId)}/return-targets`, undefined, opts);
 }
 
 /** 重新提交：发起人修改表单后重提（退回到发起人后的重提态），审批链从头重走。 */
@@ -227,15 +232,16 @@ export function registerCallback(req: CallbackRegistrationRequest): Promise<Call
   return apiPost<CallbackRegistrationView>(`/callbacks/register${qs}`, req);
 }
 
-export function listCallbacks(): Promise<CallbackRegistrationView[]> {
-  return apiGet<CallbackRegistrationView[]>('/callbacks');
+export function listCallbacks(opts?: RequestOptions): Promise<CallbackRegistrationView[]> {
+  return apiGet<CallbackRegistrationView[]>('/callbacks', undefined, opts);
 }
 
 export function queryOutbox(
   appCode?: string,
   businessKey?: string,
+  opts?: RequestOptions,
 ): Promise<OutboxView[]> {
-  return apiGet<OutboxView[]>('/callbacks/outbox', { appCode, businessKey });
+  return apiGet<OutboxView[]>('/callbacks/outbox', { appCode, businessKey }, opts);
 }
 
 export function deliverMessage(messageId: string): Promise<void> {
@@ -244,14 +250,20 @@ export function deliverMessage(messageId: string): Promise<void> {
 
 // ---------- 审批详情 / 附件 ----------
 
-export function getProcessDetail(processInstanceId: string, userId?: string): Promise<ProcessDetailView> {
-  return apiGet<ProcessDetailView>(`/processes/instances/${encodeURIComponent(processInstanceId)}/detail`, {
-    userId: userId ?? currentIdentity().userId,
-  });
+export function getProcessDetail(
+  processInstanceId: string,
+  userId?: string,
+  opts?: RequestOptions,
+): Promise<ProcessDetailView> {
+  return apiGet<ProcessDetailView>(
+    `/processes/instances/${encodeURIComponent(processInstanceId)}/detail`,
+    { userId: userId ?? currentIdentity().userId },
+    opts,
+  );
 }
 
-export function listAttachments(businessKey: string): Promise<AttachmentView[]> {
-  return apiGet<AttachmentView[]>('/attachments', { businessKey });
+export function listAttachments(businessKey: string, opts?: RequestOptions): Promise<AttachmentView[]> {
+  return apiGet<AttachmentView[]>('/attachments', { businessKey }, opts);
 }
 
 export async function uploadAttachment(
@@ -283,8 +295,8 @@ export function attachmentDownloadUrl(id: string): string {
 
 // ---------- 审计 ----------
 
-export function listAudit(businessKey: string): Promise<AuditView[]> {
-  return apiGet<AuditView[]>('/audit', { businessKey });
+export function listAudit(businessKey: string, opts?: RequestOptions): Promise<AuditView[]> {
+  return apiGet<AuditView[]>('/audit', { businessKey }, opts);
 }
 
 // ---------- SSE 通知 ----------

@@ -1,97 +1,150 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import Panel from '@/components/Panel';
-import { IconInbox, IconOutbox, IconFlow, IconCheck, IconWebhook } from '@/components/Icons';
+import { useResource } from '@cim/data';
+import { DataTable, Page, Panel, type DataTableColumn, CimButton } from '@cim/ui';
+import { IconCheck, IconFlow, IconInbox, IconOutbox, IconWebhook } from '@/components/Icons';
 import {
+  getStats,
   listDefinitions,
-  listTodoPaged,
   listDonePaged,
   listInitiatedPaged,
+  listTodoPaged,
   queryOutbox,
-  getStats,
 } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
-import type { StatsView } from '@/types';
+import type { ProcessDefinitionView, StatsView } from '@/types';
+
+interface Overview {
+  todo: number | null;
+  initiated: number | null;
+  definitions: number | null;
+  done: number | null;
+  outboxPending: number | null;
+  stats: StatsView | null;
+  /** 失败的路数（6 路里几路没回来）。0 表示全部成功。 */
+  failed: number;
+}
 
 interface Kpi {
-  label: string;
-  value: number;
+  key: string;
+  labelKey: string;
+  value: number | null;
   icon: ReactNode;
   to: string;
-  tone?: string;
+  tone?: 'ok' | 'warn' | 'err' | 'run' | 'idle';
 }
+
+const TOTAL_ROUTES = 6;
 
 export default function DashboardPage() {
   const { t } = useTranslation();
-  const [kpis, setKpis] = useState<Kpi[]>([]);
-  const [stats, setStats] = useState<StatsView | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  async function load() {
-    setLoading(true);
-    try {
-      const [todoP, doneP, initP, defs, outbox, st] = await Promise.all([
-        listTodoPaged(1, 1),
-        listDonePaged(1, 1),
-        listInitiatedPaged(1, 1),
-        listDefinitions(),
-        queryOutbox(undefined, undefined),
-        getStats(30).catch(() => null),
-      ]);
-      if (st) setStats(st);
-      const pending = outbox.filter((o) => o.status === 'PENDING').length;
-      setKpis([
-        { label: t('dash.kpi.todo'), value: todoP.total, icon: <IconInbox width={16} height={16} />, to: '/todo', tone: 'info' },
-        { label: t('dash.kpi.initiated'), value: initP.total, icon: <IconOutbox width={16} height={16} />, to: '/initiated' },
-        { label: t('dash.kpi.definitions'), value: defs.length, icon: <IconFlow width={16} height={16} />, to: '/definitions' },
-        { label: t('dash.kpi.done'), value: doneP.total, icon: <IconCheck width={16} height={16} />, to: '/done' },
-        { label: t('dash.kpi.outboxPending'), value: pending, icon: <IconWebhook width={16} height={16} />, to: '/callbacks', tone: 'warn' },
-      ]);
-    } catch (e) {
-      // 静默：页面会显示 0；错误由后端/网络提示兜底
-    } finally {
-      setLoading(false);
+  /**
+   * 六路请求合成**一个**资源。
+   *
+   * <p>改造前是 `Promise.all` + `try/catch` 吞掉全部错误：任意一路失败（比如回调服务没起）
+   * 整页 KPI 全停在 0，看不出是「真的没有」还是「没取到」。这里用 `allSettled`，
+   * 单路失败只让那一格显示 `—`，并统计失败路数；全挂才整页报错。</p>
+   */
+  const overviewRes = useResource<Overview>(async ({ signal }) => {
+    const opts = { signal };
+    const settled = await Promise.allSettled([
+      listTodoPaged(1, 1, opts),
+      listDonePaged(1, 1, opts),
+      listInitiatedPaged(1, 1, opts),
+      listDefinitions(opts),
+      queryOutbox(undefined, undefined, opts),
+      getStats(30, opts),
+    ]);
+    const pick = <T,>(i: number): T | null => {
+      const r = settled[i];
+      return r.status === 'fulfilled' ? (r.value as T) : null;
+    };
+    const completed = settled.filter((r) => r.status === 'fulfilled').length;
+    if (completed === 0) {
+      const first = settled.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      throw first?.reason ?? new Error('load failed');
     }
-  }
+    const todoP = pick<{ total: number }>(0);
+    const doneP = pick<{ total: number }>(1);
+    const initP = pick<{ total: number }>(2);
+    const defs = pick<ProcessDefinitionView[]>(3);
+    const outbox = pick<{ status: string }[]>(4);
+    return {
+      todo: todoP?.total ?? null,
+      done: doneP?.total ?? null,
+      initiated: initP?.total ?? null,
+      definitions: defs?.length ?? null,
+      outboxPending: outbox ? outbox.filter((o) => o.status === 'PENDING').length : null,
+      stats: pick<StatsView>(5),
+      failed: TOTAL_ROUTES - completed,
+    };
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const ov = overviewRes.data;
+  const stats = ov?.stats ?? null;
+
+  /** KPI 值：`null` = 这一路没取到，显示 `—` 而不是 0。 */
+  const kpis: Kpi[] = [
+    { key: 'todo', labelKey: 'dash.kpi.todo', value: ov?.todo ?? null, icon: <IconInbox width={16} height={16} />, to: '/todo', tone: 'run' },
+    { key: 'initiated', labelKey: 'dash.kpi.initiated', value: ov?.initiated ?? null, icon: <IconOutbox width={16} height={16} />, to: '/initiated' },
+    { key: 'definitions', labelKey: 'dash.kpi.definitions', value: ov?.definitions ?? null, icon: <IconFlow width={16} height={16} />, to: '/definitions' },
+    { key: 'done', labelKey: 'dash.kpi.done', value: ov?.done ?? null, icon: <IconCheck width={16} height={16} />, to: '/done' },
+    { key: 'outbox', labelKey: 'dash.kpi.outboxPending', value: ov?.outboxPending ?? null, icon: <IconWebhook width={16} height={16} />, to: '/callbacks', tone: 'warn' },
+  ];
 
   const maxTrend = stats ? Math.max(1, ...stats.trend.map((d) => Math.max(d.started, d.completed))) : 1;
 
+  const workloadColumns: Array<DataTableColumn<StatsView['workloads'][number]>> = [
+    { key: 'assignee', titleKey: 'dash.stats.assignee', width: 160 },
+    { key: 'done', titleKey: 'dash.stats.done', width: 120, align: 'right' },
+    { key: 'todo', titleKey: 'dash.stats.todo', width: 120, align: 'right' },
+  ];
+
   return (
-    <div className="page">
-      <Panel title={t('dash.title')} sub={t('dash.sub')}>
-        <div className="kpi-grid">
-          {kpis.map((k) => (
-            <Link
-              key={k.label}
-              to={k.to}
-              className={'kpi' + (k.tone ? ' ' + k.tone : '')}
-              style={{ textDecoration: 'none' }}
-            >
-              <span className="kpi-ico">{k.icon}</span>
-              <span className="kpi-main">
-                <span className="kpi-label">{k.label}</span>
-                <span className="kpi-val">{loading ? '…' : k.value}</span>
-              </span>
-            </Link>
-          ))}
-        </div>
+    <Page>
+      <Panel
+        titleKey="dash.title"
+        subKey="dash.sub"
+        actions={
+          <CimButton size="small" onClick={overviewRes.refresh} loading={overviewRes.loading}>
+            {t('common.refresh')}
+          </CimButton>
+        }
+      >
+        {overviewRes.error ? (
+          <div className="alert err">{overviewRes.error.message}</div>
+        ) : (
+          <>
+            <div className="kpi-grid">
+              {kpis.map((k) => (
+                <Link key={k.key} to={k.to} className={'kpi' + (k.tone ? ' ' + k.tone : '')} style={{ textDecoration: 'none' }}>
+                  <span className="kpi-ico">{k.icon}</span>
+                  <span className="kpi-main">
+                    <span className="kpi-label">{t(k.labelKey)}</span>
+                    <span className="kpi-val">{overviewRes.loading && !ov ? '…' : (k.value ?? '—')}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+            {ov && ov.failed > 0 && (
+              <p className="dim" style={{ marginTop: 8, fontSize: 11 }}>
+                {t('dash.partial', { n: ov.failed, total: TOTAL_ROUTES })}
+              </p>
+            )}
+          </>
+        )}
       </Panel>
 
       {stats && (
-        <Panel title={t('dash.stats.title')} sub={t('dash.stats.sub')}>
+        <Panel titleKey="dash.stats.title" subKey="dash.stats.sub">
           <div className="kpi-grid">
             <div className="kpi">
               <span className="kpi-ico"><IconFlow width={16} height={16} /></span>
               <span className="kpi-main">
                 <span className="kpi-label">{t('dash.stats.avgHours')}</span>
-                <span className="kpi-val">
-                  {stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'}
-                </span>
+                <span className="kpi-val">{stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'}</span>
               </span>
             </div>
             <div className={'kpi' + (stats.overdueCount > 0 ? ' warn' : '')}>
@@ -105,17 +158,19 @@ export default function DashboardPage() {
               <span className="kpi-ico"><IconCheck width={16} height={16} /></span>
               <span className="kpi-main">
                 <span className="kpi-label">{t('dash.stats.rejectRate')}</span>
-                <span className="kpi-val">
-                  {stats.rejectRate != null ? (stats.rejectRate * 100).toFixed(0) + '%' : '—'}
-                </span>
+                <span className="kpi-val">{stats.rejectRate != null ? (stats.rejectRate * 100).toFixed(0) + '%' : '—'}</span>
               </span>
             </div>
           </div>
 
-          {/* 近 30 天发起/完成趋势（纯 CSS 条形） */}
+          {/* 近 30 天发起/完成趋势（纯 CSS 条形；不引图表库，一面板里两根线不值得 200 KB） */}
           <div className="stats-trend">
             {stats.trend.map((d) => (
-              <div key={d.date} className="stats-trend-col" title={`${d.date} · ${t('dash.stats.started')} ${d.started} / ${t('dash.stats.completed')} ${d.completed}`}>
+              <div
+                key={d.date}
+                className="stats-trend-col"
+                title={`${d.date} · ${t('dash.stats.started')} ${d.started} / ${t('dash.stats.completed')} ${d.completed}`}
+              >
                 <div className="stats-bars">
                   <div className="bar started" style={{ height: `${(d.started / maxTrend) * 48 + 1}px` }} />
                   <div className="bar completed" style={{ height: `${(d.completed / maxTrend) * 48 + 1}px` }} />
@@ -129,33 +184,21 @@ export default function DashboardPage() {
             <span><i className="dot completed" /> {t('dash.stats.completed')}</span>
           </div>
 
-          {/* 审批人负载 TOP5 */}
           {stats.workloads.length > 0 && (
-            <div className="table-wrap" style={{ marginTop: 12 }}>
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>{t('dash.stats.assignee')}</th>
-                    <th>{t('dash.stats.done')}</th>
-                    <th>{t('dash.stats.todo')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.workloads.map((w) => (
-                    <tr key={w.assignee}>
-                      <td>{w.assignee}</td>
-                      <td>{w.done}</td>
-                      <td>{w.todo}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ marginTop: 12 }}>
+              <DataTable<StatsView['workloads'][number]>
+                flat
+                columns={workloadColumns}
+                rows={stats.workloads}
+                rowKey={(w) => w.assignee}
+                emptyTitleKey="common.empty"
+              />
             </div>
           )}
         </Panel>
       )}
 
-      <Panel title={t('dash.quick')}>
+      <Panel titleKey="dash.quick">
         <div className="grid-3">
           <Link to="/todo" className="btn btn-ghost">
             <IconInbox width={15} height={15} /> {t('dash.gotoTodo')}
@@ -169,6 +212,6 @@ export default function DashboardPage() {
         </div>
         <p className="hint">{fmtDate(new Date().toISOString())}</p>
       </Panel>
-    </div>
+    </Page>
   );
 }
