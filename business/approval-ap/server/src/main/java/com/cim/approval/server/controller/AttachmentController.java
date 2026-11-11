@@ -55,6 +55,9 @@ public class AttachmentController {
         return Result.ok(attachmentService.listByBusinessKey(businessKey));
     }
 
+    @com.cim.spring.support.web.RawResponse(
+            reason = com.cim.spring.support.web.RawResponse.Reason.DOWNLOAD,
+            value = "附件下载：Content-Disposition 二进制流，套信封会破坏文件")
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(@PathVariable String id,
                                              @RequestParam(required = false) String userId) {

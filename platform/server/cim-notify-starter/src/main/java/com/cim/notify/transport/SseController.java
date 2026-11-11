@@ -2,6 +2,7 @@ package com.cim.notify.transport;
 
 import com.cim.notify.config.NotifyProperties;
 import com.cim.spring.support.tenant.TenantContext;
+import com.cim.spring.support.web.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,8 @@ public class SseController {
         this.props = props;
     }
 
+    @RawResponse(reason = RawResponse.Reason.STREAM,
+            value = "SSE 长连接：连接期内持续推送事件帧，一次性信封不适用")
     @GetMapping(STREAM)
     public SseEmitter stream(HttpServletRequest request) {
         String tenantId = TenantContext.get();

@@ -50,6 +50,9 @@ public class RecipeController {
      * 返回 JSON 附件（不经 Result 包装，供浏览器直接下载）。
      */
     @GetMapping("/export")
+    @com.cim.spring.support.web.RawResponse(
+            reason = com.cim.spring.support.web.RawResponse.Reason.DOWNLOAD,
+            value = "配方导出附件：Content-Disposition 下载，套信封会破坏文件内容")
     public org.springframework.http.ResponseEntity<byte[]> export(
             @RequestParam(required = false) List<String> ids) {
         if (!com.cim.rms.server.security.AuthorityUtil.has(com.cim.rms.server.security.RmsPermissions.BODY_EXPORT)) {
