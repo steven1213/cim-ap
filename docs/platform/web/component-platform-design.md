@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P6 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）。
+> 状态：**P0–P7 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -447,6 +447,7 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | **P4** ✅ | `@cim/data`（`useResource` + `useDebounced`）+ RMS 首批 3 页迁到组件层 | 3 个真实页面 + 20 项断言，见 §10.6。**双实例传输层未合并**（决策见 §12-2） |
 | **P5** ✅ | `@cim/i18n`（`createI18n`）+ 三应用 `lib/i18n.ts` 收成声明式适配 | 包级 25 项 + 应用级 15 项断言，见 §10.7。**RMS/approval 仍走内置包**（原因见 §6.2） |
 | **P6** ✅ | 第二批页面迁移：SpecPage / DeviceAuthPage / ExperimentPage / QualificationPage + 共享 `SpecEditModal` | 真页面 + 8084 接口桩 + 6 个场景 33 项断言，见 §10.8 |
+| **P7** ✅ | 第三批页面迁移：DevicePage / BodyTemplatePage / SpecTemplatePage + `DeviceAreaPage` 对齐 `useResource` | 真页面 + 8084 接口桩 + 10 个场景 40 项断言 + `DeviceAdminTest` 6/6，见 §10.9。**设备搜索补上 IP 匹配**（唯一服务端改动） |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -863,6 +864,51 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 **产物**：三应用 `tsc + vite build` 全过。RMS `index` 95.03 → 95.34 KB（gzip 31.87）——四个页面各自在懒加载块里，主包只涨了 0.3 KB；IAM 22.46、approval 54.53 不变；无循环 chunk 警告。
 
 **⚠️ 未做的（别当成已做）**：RMS 23 个页面文件里仍有 16 个没迁，其中 `LoginPage` / `ForbiddenPage` / `NotFoundPage` / `SsoCallback` 没有列表，本不需要迁；真正待迁的 12 个里，`RecipeLibraryPage`(809 行) / `SignoffPage`(778) / `IntegrationPage`(1061) 三个大页交互形态各不相同，需要单独排期。IAM 21 页、approval 9 页未动。铁律不变：**新页面一律用 `@cim/*`**。
+
+---
+
+### 10.9 P7 实施记录：主数据三页 + 区域页对齐（2026-11-11）
+
+**选哪几页**：剩下 12 个真列表页里，`Device` / `BodyTemplate` / `SpecTemplate` 三页与 P6 那批同形度最高（列表 + 弹窗 + 二次确认），但各自的「难点」不同——设备页要处理**层级下拉 + 行点开抽屉**，Body 模板要处理**不定行数的键清单 + 只读详情**，规格模板要处理**子表条目 + 按类型变形的取值单元格**。另外把 P1 的样板页 `DeviceAreaPage` 补到 `useResource`：它是唯一还在手写防抖的已迁移页面，留着会变成「样板不样板」。
+
+| 文件 | 改前 | 改后 | 消失的写法 |
+| --- | --- | --- | --- |
+| `DevicePage` | 401 | 457 | 手写 `table.data` + `confirm()` + 无错误态的 `refresh` + 原生 `optgroup` |
+| `DeviceAreaPage` | 284 | 275 | 手写 `refresh` + `setTimeout` 防抖 + 重复的前端二次过滤 |
+| `BodyTemplatePage` | 259 | 470 | `modal-backdrop` 三件套 + **拿编辑弹窗当查看用** |
+| `SpecTemplatePage` | 290 | 432 | 同上 + 与列表并列的手写详情面板 + 空 catch 的条目加载 |
+
+行数 **1234 → 1634（+400）**，与 P4/P6 同因：列定义摊开、字段数组化、失败分支补齐、只读详情从「复用编辑弹窗」变成真的一份详情视图。减少的仍是**份数**。
+
+**这一批改掉的四处行为缺陷**（都是跑起来才看得见，读代码看不出来）：
+
+1. **设备搜索按 IP 搜不到，而且前端那段「兜底过滤」从来没生效过。** 列表里 IP 是一列，搜索框自然会被用来按 IP 找机台；但 `DeviceRepository.search` 的 keyword 只匹配 `code` / `name`，命中行在服务端就被丢掉，前端再按 `ip` 过滤也没有行可滤。现在把 `ip` 加进 JPQL，并在 `DeviceAdminTest` 里加了一条「按 IP 命中临时机台」的断言（用完即删，避免影响后续「列表为空」的断言）。**这是本轮唯一动到服务端的改动。**
+2. **`BodyTemplatePage` 的「查看」等于给了写权限。** 旧实现点查看后打开的是**编辑弹窗**（同一个组件），只有 `rms:btemplate:view` 的人也能点保存。改成 `CimDrawer` + `CimDescriptions` + 条目表（只读），编辑另设按钮挂 `rms:btemplate:manage`。顺带把骨架 Body 从 `<textarea>` 变成 `<pre>` 只读展示——查看态不该出现可编辑的输入框。
+3. **`SpecTemplatePage` 条目加载失败是静默的。** 旧 `listSpecTemplateItems(...).then(...)` 没有 catch：接口一挂，弹窗里条目为空，用户以为模板本来就没有条目，**一保存就把条目全删了**。现在失败有错误行，且加载中不渲染空行。
+4. **编辑保存后，下面的查看面板还是旧条目。** 旧实现里详情面板与列表并列，`viewing` 存的是打开时的快照，编辑保存只刷新列表。现在查看改抽屉、编辑保存时若正看着这条模板则一并 `refresh()`。
+
+**一处顺带的可用性改进**：设备归属区域从原生 `<optgroup>` 换成扁平选项（`CimSelect` 可搜索，`hint` 参与命中）。原生 select 的搜索只有「首字母跳转」，区域一多就得肉眼滚；现在按区域名、编码或工厂名都能命中。工厂本身保留为**禁用项**——后端本来就禁止把设备挂到工厂根，以前是靠「组头不可选」隐式表达，现在是显式的 `disabled`。
+
+**验证 40/40**（10 个场景，真页面 + 真 `lib/api` + 8084 契约桩 + 无头 Chrome `--dump-dom`。桩每次 `/api/__reset` 同时**恢复初始数据**：上个场景删掉的行会「代答」下个场景的断言，P6 只清了请求日志还不够）：
+
+| 场景 | 项数 | 代表断言 |
+| --- | --- | --- |
+| `device` | 5 | 2 行；区域列显示全路径「一厂 / 光刻区」；启用/停用两档语义色不同（`rgb(13,138,85)` vs `rgb(168,106,18)`）；输入 IP 后请求带 `keyword=10.20.30.42` 且只剩 1 行（**前端不再二次过滤**） |
+| `deviceDelete` | 3 | 确认框打开；危险态按钮文案「删除」（来自 `okKey`）；点取消 → **0 次 DELETE** |
+| `deviceDeleteOk` | 3 | 确定后 `DELETE /devices/d1`；列表剩 1 行；toast「已删除」 |
+| `deviceCreate` | 6 | 7 个字段；区域下拉 3 个选项且**工厂项 `ant-select-item-option-disabled`**；空提交 3 个字段级必填；提交 body `{code:'DV-99',deviceTypeId:'t1',areaId:null,status:'ENABLED'}` |
+| `devarea` | 3 | 3 行；输入「光刻」后请求带 `keyword=光刻` 且剩 1 行（滞后值同时用于取数与渲染） |
+| `btpl` | 2 | 2 行；「强制/提示」两种语义色不同（`rgb(207,47,36)` vs `rgb(125,136,153)`） |
+| `btplView` | 5 | 抽屉打开；5 个描述项；条目表 2 行；骨架明文可见；**抽屉里没有「保存」按钮**（只读） |
+| `btplEdit` | 4 | 7 个 `.cim-field`（6 个表单字段 + 1 个键清单块）；键清单 2 行且首行 `CHAMBER.TEMP`；骨架 textarea 带明文 |
+| `spectpl` | 4 | 版本列 `v3`；抽屉 3 行；RANGE 显示 `[1000,2000]`、LIST_IN 显示 `{N2,AR}`（按类型取值的渲染） |
+| `spectplEdit` | 5 | 3 个条目全部载入（回归缺陷 3）；首行键 `CHAMBER.TEMP`；把首行类型改成「范围」后 min 输入 1 → 2；PUT body 首行 `{specType:'RANGE',targetValue:null}`（切过类型不再带旧值）；toast「已保存」 |
+
+**服务端测试**：`DeviceAdminTest` 6/6 通过（`mvn -o -Dtest=DeviceAdminTest test`）。⚠️ 本机没有 Redis 时必须加 `-Dcim.notify.cluster.enabled=false`：`notifyFanoutContainer` 在上下文启动阶段就连 6379，缺它整类测试都起不来，报的却是「ApplicationContext failed」。**别关 `cim.notify.enabled`**——那会把 `NotifyPublisher` 一起关掉，`SseNotifyChannel` 注入失败，换一个更迷惑的错。
+
+**产物**：三应用 `tsc + vite build` 全过。RMS `index` 95.34 KB（gzip 31.86）不变——四页各自在懒加载块里（`DevicePage` 15.43、`BodyTemplatePage` 7.82、`SpecTemplatePage` 7.56、`DeviceAreaPage` 3.73 KB）；IAM 与 approval 源码未动，产物不变；无循环 chunk 警告。
+
+**⚠️ 未做的（别当成已做）**：RMS 仍剩 12 个页面文件没迁，其中 `RecipeLibraryPage`(809) / `SignoffPage`(778) / `IntegrationPage`(1061) 三个大页交互形态各不相同（抽屉套抽屉、签核轨迹、集成配置树），`EcSvPage`(359) 有 tab + KPI + 双表结构，都需要单独排期；`DashboardPage` 是看板不是列表。IAM 21 页、approval 9 页未动。铁律不变：**新页面一律用 `@cim/*`**。
 
 ---
 
