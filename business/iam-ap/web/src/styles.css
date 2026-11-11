@@ -611,8 +611,9 @@ button:disabled {
   }
 }
 
-/* 树节点内容：名称 + 编码/徽标同一行（CimTree 的 labelNode）。组织页与菜单页共用 */
-.tree-node-inline {
+/* 「名称 + 编码/徽标」同行：树节点（CimTree 的 labelNode）与表格单元格共用 */
+.tree-node-inline,
+.cell-inline {
   display: inline-flex;
   align-items: center;
   gap: 6px;
