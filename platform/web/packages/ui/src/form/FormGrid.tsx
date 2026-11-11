@@ -42,6 +42,8 @@ export type FormField<V> =
   | (FieldBase<V> & {
       kind: 'text';
       placeholderKey?: string;
+      /** 字面占位符：用于「格式示例」这类**不翻译**的内容（如参数键 `CHAMBER.TEMP`）。 */
+      placeholder?: string;
       maxLength?: number;
       mono?: boolean;
       /** 单位后缀（nm / ℃ / s）。 */
@@ -69,8 +71,12 @@ export type FormField<V> =
       showSearch?: boolean;
       placeholderKey?: string;
     })
-  | (FieldBase<V> & { kind: 'date'; placeholderKey?: string })
-  | (FieldBase<V> & { kind: 'datetime'; placeholderKey?: string })
+  // 日期三兄弟：`valueFormat` 是**发给后端的格式**，`displayFormat` 是**给人看的格式**。
+  // 这两个必须分开：后端一水儿 `Instant.parse` / `LocalDateTime.parse`，只认 ISO 的
+  // `T` 分隔（`2026-11-11T10:00`），而界面上显示 `2026-11-11 10:00` 才好读。
+  // 不传则按 mode 推导（见 DatePicker.tsx），默认口径 `YYYY-MM-DD HH:mm:ss`。
+  | (FieldBase<V> & { kind: 'date'; placeholderKey?: string; valueFormat?: string; displayFormat?: string })
+  | (FieldBase<V> & { kind: 'datetime'; placeholderKey?: string; valueFormat?: string; displayFormat?: string })
   | (FieldBase<V> & { kind: 'time'; placeholderKey?: string })
   | (FieldBase<V> & { kind: 'checkbox'; options: FormOption[] })
   | (FieldBase<V> & { kind: 'radio'; options: FormOption[]; button?: boolean })
@@ -172,7 +178,9 @@ function FieldControl<V>({
           maxLength={field.maxLength}
           mono={field.mono}
           unit={field.unit}
-          placeholder={placeholder(field.placeholderKey)}
+          placeholder={
+            field.placeholderKey ? placeholder(field.placeholderKey) : field.placeholder ?? ''
+          }
           onChange={(v) => patch(key, v)}
         />
       );
@@ -234,6 +242,8 @@ function FieldControl<V>({
           mode="date"
           value={(raw as string) ?? null}
           disabled={off}
+          valueFormat={field.valueFormat}
+          displayFormat={field.displayFormat}
           placeholder={placeholder(field.placeholderKey)}
           onChange={(v) => patch(key, v)}
         />
@@ -245,6 +255,8 @@ function FieldControl<V>({
           mode="datetime"
           value={(raw as string) ?? null}
           disabled={off}
+          valueFormat={field.valueFormat}
+          displayFormat={field.displayFormat}
           placeholder={placeholder(field.placeholderKey)}
           onChange={(v) => patch(key, v)}
         />

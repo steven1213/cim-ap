@@ -18,6 +18,7 @@ export default defineConfig({
       // docs/platform/web/component-platform-design.md §9。
       '@cim/theme': path.resolve(__dirname, '../../../platform/web/packages/theme/src'),
       '@cim/ui': path.resolve(__dirname, '../../../platform/web/packages/ui/src'),
+      '@cim/data': path.resolve(__dirname, '../../../platform/web/packages/data/src'),
       '@cim/shell': path.resolve(__dirname, '../../../platform/web/packages/shell/src'),
       // antd 装在**本应用**的 node_modules：@cim/ui 是源码直引，其内部的 `import 'antd'`
       // 会从 shared 包所在目录向上查找，找不到业务的 node_modules，故显式指向本地副本。
@@ -63,6 +64,9 @@ export default defineConfig({
             id.includes('/react/') ||
             id.includes('/react-dom/') ||
             id.includes('/react-router') ||
+            // react-router 6.4+ 把核心挪到 @remix-run/router；不一起归组会出现
+            // 「vendor → vendor-react → vendor」循环 chunk 警告
+            id.includes('/@remix-run/') ||
             id.includes('/scheduler/')
           ) {
             return 'vendor-react';

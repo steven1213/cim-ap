@@ -22,6 +22,8 @@
       "@cim/theme/*": ["../../../platform/web/packages/theme/src/*"],
       "@cim/ui": ["../../../platform/web/packages/ui/src/index.ts"],
       "@cim/ui/*": ["../../../platform/web/packages/ui/src/*"],
+      "@cim/data": ["../../../platform/web/packages/data/src/index.ts"],
+      "@cim/data/*": ["../../../platform/web/packages/data/src/*"],
       "@cim/shell": ["../../../platform/web/packages/shell/src/index.ts"],
       "@cim/shell/*": ["../../../platform/web/packages/shell/src/*"],
       "antd": ["node_modules/antd"],

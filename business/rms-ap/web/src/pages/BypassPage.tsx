@@ -1,178 +1,311 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimModal,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  PageHead,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
 import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import { BYPASS_MANAGE } from '@/lib/permCodes';
 import type { Bypass, Device, Recipe } from '@/types';
 
-/** Bypass 豁免页（FR-B1~B3，Req 22/23）。 */
+/**
+ * Bypass 豁免页（FR-B1~B3，Req 22/23）。
+ *
+ * 状态用 `CimTag` 的语义档表达（ok/err/warn），不再手写 `className="tag ok"`：
+ * 语义色只有平台那一份 tokens，切明暗主题时自动跟随。
+ */
 export default function BypassPage() {
   const { t } = useTranslation();
-  const [list, setList] = useState<Bypass[]>([]);
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const confirm = useConfirm();
   const [show, setShow] = useState(false);
 
-  async function refresh() {
-    setLoading(true);
+  const { data, loading, error, refresh } = useResource(() => api.listBypasses());
+  const rows = data ?? [];
+
+  const doToggle = async (x: Bypass) => {
     try {
-      setList(await api.listBypasses());
-    } finally {
-      setLoading(false);
+      await api.setBypassActive(x.id, !x.active);
+      toast.success(t(x.active ? 'rms.common.disabled' : 'rms.common.enabled'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
     }
-  }
-  useEffect(() => { refresh(); }, []);
-
-  async function toggle(x: Bypass) {
-    await api.setBypassActive(x.id, !x.active);
-    await refresh();
-  }
-  async function doDelete(x: Bypass) {
-    if (!confirm(t('rms.common.confirmDelete'))) return;
-    await api.deleteBypass(x.id);
-    await refresh();
-  }
-
-  const statusTag = (s: Bypass['status']) => {
-    const cls = s === 'ACTIVE' ? 'tag ok' : s === 'EXPIRED' || s === 'REVOKED' ? 'tag err' : 'tag warn';
-    return <span className={cls}>{t(`rms.bypass.status.${s}`)}</span>;
+    refresh();
   };
 
-  return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>{t('rms.bypass.title')}</h1><p className="muted">{t('rms.bypass.sub')}</p></div>
-        <Perms code={BYPASS_MANAGE}>
-          <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>+ {t('rms.bypass.create')}</button>
-        </Perms>
-      </div>
-      <div className="toolbar">{loading && <span className="muted">{t('rms.common.loading')}</span>}</div>
+  const doDelete = async (x: Bypass) => {
+    const ok = await confirm({
+      title: t('rms.common.delete'),
+      contentKey: 'rms.common.confirmDelete',
+      danger: true,
+      okKey: 'rms.common.delete',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBypass(x.id);
+      toast.success(t('rms.common.deleted'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    refresh();
+  };
 
-      <div className="panel">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('rms.bypass.scope')}</th>
-              <th>{t('rms.bypass.target')}</th>
-              <th>{t('rms.bypass.bypassType')}</th>
-              <th>{t('rms.bypass.reason')}</th>
-              <th>{t('rms.bypass.status')}</th>
-              <th>{t('rms.bypass.effectiveFrom')} ~ {t('rms.bypass.effectiveTo')}</th>
-              <th>{t('rms.common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((x) => (
-              <tr key={x.id}>
-                <td>{t(`rms.bypass.scope.${x.scope}`)}</td>
-                <td className="mono">{x.targetLabel ?? x.targetId}</td>
-                <td>{t(`rms.bypass.type.${x.bypassType}`)}</td>
-                <td className="muted">{x.reason}</td>
-                <td>{statusTag(x.status)}</td>
-                <td className="muted">{x.effectiveFrom ?? '—'} ~ {x.effectiveTo ?? '∞'}</td>
-                <td className="cell-actions">
-                  <Perms code={BYPASS_MANAGE}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => toggle(x)}>
-                      {x.active ? t('rms.common.disable') : t('rms.common.enable')}
-                    </button>
-                    <button className="btn btn-ghost btn-sm danger" onClick={() => doDelete(x)}>{t('rms.common.delete')}</button>
-                  </Perms>
-                </td>
-              </tr>
-            ))}
-            {!loading && list.length === 0 && <tr><td colSpan={7} className="empty-cell">{t('rms.bypass.empty')}</td></tr>}
-          </tbody>
-        </table>
-      </div>
+  const statusTone = (s: Bypass['status']) =>
+    s === 'ACTIVE' ? 'ok' : s === 'EXPIRED' || s === 'REVOKED' ? 'err' : 'warn';
 
-      {show && <BypassModal onClose={() => setShow(false)} onDone={async () => { setShow(false); await refresh(); }} />}
-    </div>
+  const columns = useMemo<Array<DataTableColumn<Bypass>>>(
+    () => [
+      {
+        key: 'scope',
+        titleKey: 'rms.bypass.scope',
+        width: 110,
+        render: (r) => t(`rms.bypass.scope.${r.scope}`),
+      },
+      {
+        key: 'target',
+        titleKey: 'rms.bypass.target',
+        width: 200,
+        render: (r) => <span className="cim-mono">{r.targetLabel ?? r.targetId}</span>,
+      },
+      {
+        key: 'bypassType',
+        titleKey: 'rms.bypass.bypassType',
+        width: 130,
+        render: (r) => t(`rms.bypass.type.${r.bypassType}`),
+      },
+      {
+        key: 'reason',
+        titleKey: 'rms.bypass.reason',
+        render: (r) => <span className="muted">{r.reason}</span>,
+      },
+      {
+        key: 'status',
+        titleKey: 'rms.bypass.status',
+        width: 100,
+        render: (r) => (
+          <CimTag tone={statusTone(r.status)}>{t(`rms.bypass.status.${r.status}`)}</CimTag>
+        ),
+      },
+      {
+        key: 'window',
+        titleKey: 'rms.bypass.effectiveFrom',
+        width: 260,
+        render: (r) => (
+          <span className="muted">
+            {r.effectiveFrom ?? '—'} ~ {r.effectiveTo ?? '∞'}
+          </span>
+        ),
+      },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 160,
+        render: (r) => (
+          <span className="cell-actions">
+            <Perms code={BYPASS_MANAGE}>
+              <button className="btn btn-ghost btn-sm" onClick={() => void doToggle(r)}>
+                {r.active ? t('rms.common.disable') : t('rms.common.enable')}
+              </button>
+              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+                {t('rms.common.delete')}
+              </button>
+            </Perms>
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
   );
+
+  return (
+    <Page>
+      <PageHead
+        titleKey="rms.bypass.title"
+        subtitleKey="rms.bypass.sub"
+        actions={
+          <Perms code={BYPASS_MANAGE}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
+              + {t('rms.bypass.create')}
+            </button>
+          </Perms>
+        }
+      />
+
+      <DataTable<Bypass>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        loading={loading}
+        error={error?.message}
+        onRetry={refresh}
+        onRefresh={refresh}
+        settingsKey="rms.bypass"
+        emptyTitleKey="rms.bypass.empty"
+      />
+
+      {show && (
+        <BypassModal
+          onClose={() => setShow(false)}
+          onDone={() => {
+            setShow(false);
+            toast.success(t('rms.common.created'));
+            refresh();
+          }}
+        />
+      )}
+    </Page>
+  );
+}
+
+interface BypassForm {
+  scope: string;
+  targetId: string;
+  bypassType: string;
+  reason: string;
+  effectiveFrom: string;
+  effectiveTo: string;
 }
 
 function BypassModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation();
-  const [scope, setScope] = useState<'DEVICE' | 'RECIPE'>('DEVICE');
-  const [targetId, setTargetId] = useState('');
-  const [bypassType, setBypassType] = useState<'COMPARE' | 'PARAM_CHECK' | 'BOTH'>('BOTH');
-  const [reason, setReason] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [form, setForm] = useState<BypassForm>({
+    scope: 'DEVICE',
+    targetId: '',
+    bypassType: 'BOTH',
+    reason: '',
+    effectiveFrom: '',
+    effectiveTo: '',
+  });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof BypassForm, string>>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
-    api.listDevices().then(setDevices);
-    api.listRecipes().then(setRecipes);
-  }, []);
+  // 两个下拉的数据源各自取一次；取数失败不阻塞弹窗（选不到就是空列表）
+  const { data: devices } = useResource(() => api.listDevices());
+  const { data: recipes } = useResource(() => api.listRecipes());
+
+  const targetOptions = useMemo(() => {
+    const source: Array<Device | Recipe> = form.scope === 'DEVICE' ? devices ?? [] : recipes ?? [];
+    return source.map((x) => ({ value: x.id, label: x.code }));
+  }, [form.scope, devices, recipes]);
+
+  const fields = useMemo<Array<FormField<BypassForm>>>(
+    () => [
+      {
+        kind: 'select',
+        key: 'scope',
+        labelKey: 'rms.bypass.scope',
+        required: true,
+        allowClear: false,
+        options: [
+          { value: 'DEVICE', labelKey: 'rms.bypass.scope.DEVICE' },
+          { value: 'RECIPE', labelKey: 'rms.bypass.scope.RECIPE' },
+        ],
+      },
+      {
+        kind: 'select',
+        key: 'targetId',
+        labelKey: 'rms.bypass.target',
+        required: true,
+        options: targetOptions,
+        placeholderKey: 'rms.common.select',
+      },
+      {
+        kind: 'select',
+        key: 'bypassType',
+        labelKey: 'rms.bypass.bypassType',
+        allowClear: false,
+        options: [
+          { value: 'COMPARE', labelKey: 'rms.bypass.type.COMPARE' },
+          { value: 'PARAM_CHECK', labelKey: 'rms.bypass.type.PARAM_CHECK' },
+          { value: 'BOTH', labelKey: 'rms.bypass.type.BOTH' },
+        ],
+      },
+      {
+        kind: 'datetime',
+        key: 'effectiveFrom',
+        labelKey: 'rms.bypass.effectiveFrom',
+        // 后端 `Instant.parse` / `LocalDateTime.parse` 只认 ISO 的 T 分隔；显示仍走空格
+        valueFormat: 'YYYY-MM-DDTHH:mm',
+        displayFormat: 'YYYY-MM-DD HH:mm',
+      },
+      {
+        kind: 'datetime',
+        key: 'effectiveTo',
+        labelKey: 'rms.bypass.effectiveTo',
+        valueFormat: 'YYYY-MM-DDTHH:mm',
+        displayFormat: 'YYYY-MM-DD HH:mm',
+      },
+      { kind: 'text', key: 'reason', labelKey: 'rms.bypass.reason', required: true, span: 2 },
+    ],
+    [targetOptions],
+  );
 
   async function submit() {
-    if (!targetId || !reason) { setErr(t('rms.bypass.target') + ' / ' + t('rms.bypass.reason') + ' *'); return; }
-    setBusy(true); setErr('');
+    const next: Partial<Record<keyof BypassForm, string>> = {};
+    if (!form.targetId) next.targetId = t('rms.common.required');
+    if (!form.reason) next.reason = t('rms.common.required');
+    setFieldErrors(next);
+    if (Object.keys(next).length) return;
+
+    setBusy(true);
+    setErr('');
     try {
       await api.createBypass({
-        scope, targetId, bypassType, reason,
-        effectiveFrom: from || null, effectiveTo: to || null,
+        scope: form.scope as 'DEVICE' | 'RECIPE',
+        targetId: form.targetId,
+        bypassType: form.bypassType as 'COMPARE' | 'PARAM_CHECK' | 'BOTH',
+        reason: form.reason,
+        effectiveFrom: form.effectiveFrom || null,
+        effectiveTo: form.effectiveTo || null,
       });
       onDone();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head"><h3>{t('rms.bypass.create')}</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
-        <div className="modal-body">
-          <div className="form-grid">
-            <div className="field">
-              <label className="field-label">{t('rms.bypass.scope')}</label>
-              <select className="text-input" value={scope} onChange={(e) => { setScope(e.target.value as any); setTargetId(''); }}>
-                <option value="DEVICE">{t('rms.bypass.scope.DEVICE')}</option>
-                <option value="RECIPE">{t('rms.bypass.scope.RECIPE')}</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.bypass.target')} *</label>
-              <select className="text-input" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-                <option value="">{t('rms.common.select')}</option>
-                {(scope === 'DEVICE' ? devices : recipes).map((x: any) => (
-                  <option key={x.id} value={x.id}>{x.code}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.bypass.bypassType')}</label>
-              <select className="text-input" value={bypassType} onChange={(e) => setBypassType(e.target.value as any)}>
-                <option value="COMPARE">{t('rms.bypass.type.COMPARE')}</option>
-                <option value="PARAM_CHECK">{t('rms.bypass.type.PARAM_CHECK')}</option>
-                <option value="BOTH">{t('rms.bypass.type.BOTH')}</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.bypass.effectiveFrom')}</label>
-              <input type="datetime-local" className="text-input" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.bypass.effectiveTo')}</label>
-              <input type="datetime-local" className="text-input" value={to} onChange={(e) => setTo(e.target.value)} />
-            </div>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.bypass.reason')} *</label>
-            <input className="text-input" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-          {err && <div className="form-error">{err}</div>}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.cancel')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={submit}>{t('rms.common.save')}</button>
-        </div>
-      </div>
-    </div>
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="rms.bypass.create"
+      onOk={() => void submit()}
+      okKey="rms.common.save"
+      cancelKey="rms.common.cancel"
+      okLoading={busy}
+      width={640}
+    >
+      <FormGrid<BypassForm>
+        fields={fields}
+        value={form}
+        // 切 scope 必须清空 targetId：不清会带着上一种目标类型的 id 提交，后端按另一张表查不到
+        onChange={(patch) =>
+          setForm((prev) => ({ ...prev, ...patch, ...(patch.scope ? { targetId: '' } : {}) }))
+        }
+        errors={fieldErrors}
+        columns={2}
+      />
+      {err ? (
+        <p className="cim-field-error" style={{ marginTop: 10 }}>
+          {err}
+        </p>
+      ) : null}
+    </CimModal>
   );
 }

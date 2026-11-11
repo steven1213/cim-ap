@@ -11,8 +11,10 @@ import './styles.css';
 function Root() {
   const { t, i18n } = useTranslation();
   const uiT = useCallback((key: string) => String(t(key)), [t]);
+  // 「键是否存在」交给 i18n 判断：各组件的内置文案兜底只在真的缺键时才生效
+  const uiHas = useCallback((key: string) => i18n.exists(key), [i18n]);
   return (
-    <UiLocaleProvider t={uiT} locale={i18n.language}>
+    <UiLocaleProvider t={uiT} locale={i18n.language} hasKey={uiHas}>
       <CimProvider>
         <UiToastProvider>
           <App />
