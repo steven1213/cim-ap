@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0 已落地（2026-11-11）**，P1–P3 未开始。实现细节与实测数据见 [§10](#10-落地批次与验收标准)。
+> 状态：**P0–P3 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -109,10 +109,10 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 @cim/ui      ← 依赖 theme + antd(peer)（严禁依赖 data / i18n）
 @cim/data    ← 依赖 axios + zustand（读 token）
 @cim/i18n    ← 依赖 i18next + @cim/data（拉译文/字典）+ theme（EnumTag 用色）
-@cim/shell   ← 依赖以上全部
+@cim/shell   ← 依赖 theme + ui + react-router-dom(peer) + zustand(peer)
 ```
 
-> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 在 `@cim/ui` 内落地组件层（DataTable / FormGrid / CimModal / Page 骨架 / StatusTag），交互原语基于 **antd 5**（决策见 §10.2）。其余包待 P2/P3。`shell.css` 暂放在 `@cim/ui` 内（原因见 §10.1 偏差表），P3 建 `@cim/shell` 时按段迁移。
+> **落地进度**：P0 建了 `@cim/theme` 与 `@cim/ui`（样式）；P1 落地组件层；P2 消息层 + 虚拟滚动 + 路由拆包；**P3 建了 `@cim/shell`**（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs`），三个应用的外壳改为薄适配层，`shell.css` 仍留在 `@cim/ui`（样式与组件同源，见 §10.1 偏差表）。`@cim/data` / `@cim/i18n` 仍未建——现状是各 ap 的请求层与 i18n 各自保留（见 §11 非目标）。
 
 **依赖规则（CI 可校验）**：
 
@@ -122,7 +122,9 @@ const { rows, loading, error, refresh, lastUpdated } = useResource(
 | `ui` 可依赖 antd，**业务代码不得直接 import antd** | antd 是组件的内部实现细节：换掉它只需改 `@cim/ui`，页面不动 |
 | `theme` 不得 import 任何包 | tokens 是最底层，反向依赖会造成循环 |
 | `data` / `i18n` 不得 import `ui` | 数据/翻译层不应感知组件 |
-| 业务 ap 只 import `shell`（其已 re-export 其余四包） | 单点入口，减少各 ap 的 import 噪音 |
+| `shell` 只依赖 `ui` + `theme`，**不依赖 data / i18n** | 外壳的菜单是数据模型、文案是注入字符串（见 §8），不需要请求层与翻译层 |
+| `shell` **不 re-export `@cim/ui`** | 原计划「业务只 import shell」已放弃：re-export 会让「只要外壳」的入口被迫静态加载全部组件（含 antd）。现在两个入口各司其职：结构用 `@cim/shell`，控件用 `@cim/ui` |
+| 业务 ap 不 import `TabStrip` 之外的外壳内部文件 | 单点入口，避免绕过 `ConsoleShell` 自己拼 DOM 造成二次分叉 |
 
 ---
 
@@ -325,14 +327,50 @@ interface DataTableProps<T> {
 
 `Layout` 三份已分叉（288/178/156），且**菜单结构本身不同**（IAM 四段 / RMS 三组 / approval 四组）。所以先做组件、后做外壳。
 
-外壳模型必须在动手前二选一：
+### 8.1 定稿：配置驱动 + 插槽兜底（2026-11-11，关闭 §12-1）
 
-| 模型 | 做法 | 适合 |
+动手前实测三份 `Layout` 的差异，结论比预想的干净——**骨架逐行相同，差异只有两处**：
+
+| 差异点 | IAM | RMS | approval | 归属 |
+| --- | --- | --- | --- | --- |
+| 菜单来源 | 后端 `sys_menu` 树 | 前端静态 `GROUPS` | 前端静态 `NAV_GROUPS` | **数据** → 映射成 `ShellNavGroup[]` |
+| 菜单项形态 | 图标 + 文案 + 副标题（`.desc`） | 图标 + 文案 | 图标 + 文案 | 数据（`desc?` 可选） |
+| 分组头 | 可折叠（持久化） | 静态 | 静态 | `collapsibleGroups` 开关 |
+| 顶栏右侧 | 超管徽标 + 语言 | 超管徽标 + 通知铃 + 语言 | 身份切换 + 通知铃 + 语言 | **插槽** → `roleBadge` + `topbarExtra` |
+| 用户块 | 有 | 有 | 无 | `user?: null` |
+| 窄屏 | ≤900px 抽屉 | 收缩图标态 | 收缩图标态 | `mobileBreakpoint?` |
+| 登出 | 清菜单+页签→/login | 清页签→/login | 清身份→/ | 回调 `onLogout` |
+
+判据一句话：**结构性差异进模型，内容性差异进插槽**。菜单的「怎么来」是结构、菜单的「长什么样」也是结构（五家都一样），只有顶栏右侧那块是真·内容（每家放的东西不同），所以模型 + 一个插槽就够，不需要整套 `<Shell.Side>` 组合件。
+
+**为什么组合件在这里是错的**：组合件意味着每个 ap 自己写「遍历分组 → 过滤权限 → 判激活态 → 渲染图标/文案/副标题」这段循环，三份还是三份，只是把 `<div>` 换成了 `<Shell.Side>`。§10.3 记录的 antd `Splitter.Panel` 缺陷是同一个道理的另一面：**组合件的隐式契约（子元素 props）比配置的显式契约更容易出错**。
+
+### 8.2 落地形态
+
+| 导出 | 文件 | 职责 | 明确不做 |
+| --- | --- | --- | --- |
+| `ConsoleShell` | `ConsoleShell.tsx` | 四段式框架：侧栏（品牌/菜单/分组/底部提示）+ 顶栏（开关/徽标/环境/插槽/主题/用户/登出）+ 页签区 + 内容 + footer | 不取数、不认识路由表、不持有登录态 |
+| `TabStrip` | `TabStrip.tsx` | 页签条：滑动胶囊指示器、溢出滚动箭头、右键菜单 | 不持有页签状态（`tabs` 从外部进） |
+| `createTabStore` | `createTabStore.ts` | 页签 store 工厂（打开/关闭/关闭右侧/关全部 + 选中相邻签语义） | 不含 UI |
+| `useShellTabs` | `useShellTabs.ts` | 把 store 绑成 `TabStrip` 要的回调组（含关闭后 `navigate` 到哪） | 不解析标题（`titleOf` 由应用注入） |
+| `ShellNavGroup` / `ShellNavItem` / `ShellLabels` / `ShellTabs` | `types.ts` | 契约 | — |
+| 7 个 chrome 图标 | `icons.tsx` | 侧栏开关/主题/登出/盾牌/chevron/关闭 | 不做业务图标集 |
+
+**存储键沿用原样**：`storageKey="iam"` → `iam-sidebar-collapsed` / `iam-sidebar-groups`，与改造前逐字一致，用户升级后侧栏状态不丢。
+
+**文案走注入字符串而不是 key**（详见 `types.ts` 头部注释）：数据组件的 `titleKey` 是为了「切语言表头重算」；外壳的 label 在 `Layout` 每次 render 时重建（`Layout` 本身订阅了 i18n），传字符串不会出现不重算的问题，反而免去让外壳认识五个 ap 的键空间。
+
+### 8.3 体量对比
+
+| 项 | 改造前 | 改造后 |
 | --- | --- | --- |
-| **配置驱动** | 菜单来自 `sys_menu`（平台已有），外壳只渲染 + 过滤权限 | 五个系统菜单同源、菜单由运营维护 |
-| **组合件** | 外壳只提供 `<Shell.Header>` / `<Shell.Side>` / `<Shell.Content>` 插槽，各 ap 自己拼 | 各 ap 菜单结构差异大、需自定义区域 |
+| `Layout.tsx` ×3 | 622 | 443（各自只留「菜单映射 + 插槽 + 主题/登出绑定」） |
+| `TabBar.tsx` ×3 | 848 | **0**（→ `TabStrip` 290） |
+| `tabStore.ts` ×3 | 353 | 45（各 15 行，只定固定签） |
+| `@cim/shell` | — | 992 |
+| 外壳逻辑份数 | **3** | **1** |
 
-倾向**配置驱动 + 插槽兜底**：菜单来自 `sys_menu`，但允许某一段用插槽覆盖（如 RMS 的机台树侧栏）。
+净减 343 行不是重点——重点是「侧栏塌陷、页签联动、关闭后跳哪」这些**易错的交互语义**从三份变成一份。P3 期间就抓到一个只在共享包里才暴露的坑：`useShellTabs` 每次 render 都 `.map` 出新数组，若 `TabStrip` 的 effect 依赖这个数组，`setIndicator` 会触发 render → effect 再跑 → 无限循环；改成依赖**内容签名**（`path + label` 拼接）才正确。
 
 ---
 
@@ -606,6 +644,44 @@ antd 虚拟表格的两个硬约束已内建处理：`scroll.x` 必须是数字�
 
 ---
 
+### 10.5 P3 实施记录：`@cim/shell` 外壳层落地（2026-11-11）
+
+**新增**：`platform/web/packages/shell/` 7 文件 992 行（`ConsoleShell` / `TabStrip` / `createTabStore` / `useShellTabs` / `types` / `icons` / `index`）。
+
+**三应用改造**（每个都是 5 处改动，形状完全一致）：
+
+| 改动 | 说明 |
+| --- | --- |
+| `components/Layout.tsx` | 改为薄适配层：菜单源 → `ShellNavGroup[]`（含各自的权限过滤/树展开）、`labels` 映射、`topbarExtra` 插槽、主题与登出的绑定 |
+| `components/TabBar.tsx` | **删除**（296/295/257 行），实现进 `TabStrip` |
+| `store/tabStore.ts` | 15 行：`createTabStore(HOME_PATH)`，对外导出不变 |
+| `vite.config.ts` | 加 `@cim/shell` alias，另加 `react-router-dom` / `zustand` alias（同 antd 的跨目录解析问题） |
+| `tsconfig.json` | 加 `@cim/shell`、`react-router-dom`、`zustand` 的 `paths` |
+
+**踩到的 4 个坑**：
+
+1. **`useShellTabs` 的返回对象每次 render 都是新的** → `tabs` 数组引用永远变 → `TabStrip` 的 effect 每次都跑 → `setIndicator` 触发 render → **无限循环**。修法：effect 依赖改「内容签名」`path + '\u0001' + label`，既区分「真的变了」也覆盖切语言（label 变 → 宽度变 → 需重测）。
+2. **图标组件类型互不可赋值**：IAM `ComponentType<SVGProps>`（width 是 `string | number`）、RMS `(p:{width?:number}) => JSX.Element`、approval 两者交叉。唯一共同上界是 `any`，收窄只会逼调用方写 `as unknown as`；外壳对图标的用法只有「传两个数字」，故 `ShellIconCmp = ComponentType<any>` 并在此记录理由。
+3. **副标题必须按 `undefined` 判断而非真假值**：IAM 的 `.side-desc` 在缺翻译时渲染空串占位，用 `m.desc ?` 会少一个节点。
+4. **`@cim/shell` 依赖 `react-router-dom` / `zustand`**：和 antd 一样，共享包在 `platform/web` 下向上解析不到业务 `node_modules`，必须 alias + tsconfig paths 双配置（§10.3 已记过一次，这是第二次复发）。
+
+**验证：75 项断言全过**（自驱动探针 + 无头 Chrome `--dump-dom` 读回 DOM）：
+
+| 组 | 项数 | 覆盖 |
+| --- | --- | --- |
+| 外壳组件（`@cim/shell` 本身） | **31/31** | 菜单模型→DOM（19/6 条目计数、可折叠分组头 vs 静态头）、激活态、副标题渲染与缺失、顶栏插槽顺序 `role-chip>env-chip>extra>theme>user>logout`、环境灯 ok/warn、用户首字母、footer 环境、分组折叠+持久化+自动展开、侧栏塌陷+持久化、抽屉开合（`mobile-open` + `.scrim`）、主题按钮标题切换、页签计数/固定签无关闭钮/激活态/指示器（`w=100px`）、页签点击与关闭回调、右键菜单 4 项 + 固定签首项禁用 + 动作回调 |
+| 真实 RMS Layout | **16/16** | 19 个导航项、3 个静态分组头、激活 `/devices`、无副标题、品牌/环境/用户块（`tester` / `tenant:t1`）、无超管徽标、6 个顶栏槽位、页签 2 个（固定签 + 当前页）、footer、侧栏提示取注入值、Outlet 渲染 |
+| 真实 IAM Layout | **16/16** | 后端菜单树→6 项/2 个可折叠头、不可见菜单被跳过、副标题 6 个、`/users` 激活、超管徽标、6 槽位、页签 2 个、分组折叠后剩 3 项 + `iam-sidebar-groups` 落盘、塌陷 + `iam-sidebar-collapsed` 落盘 |
+| 真实 approval Layout | **12/12** | 8 项/4 个静态头、`/todo` 激活、无外壳用户块（身份切换器复用 `.user-chip` 样式但是 `<button>`）、6 槽位、2 个页签、footer、壳高 801px（`ToastHost` 在壳外未顶坏布局） |
+
+**为什么用「直接渲染 Layout + 假 store」而不是开真应用**：真应用要过 `ProtectedRoute` → `BootGate` → 后端 `/me`+`/permissions`，本机没有后端；而且这台机器的无头 Chrome 对 SPA 回退路径（`/`、`/index.html`）的**导航**稳定 `ERR_CONNECTION_REFUSED`（同为静态的 `/probe.html` 正常），绕不开那次导航。直接渲染 `Layout` 反而是更聚焦的验证——它的职责就是把 GROUPS/菜单树/权限映射成外壳。
+
+**两端 assert 写错的两次留痕**：① 把 IAM 顶栏槽位当 5 个（漏了超管徽标）→ 实际 6；② approval 断言「没有 `.user-chip`」失败，因为 dev 态身份切换器复用了这个类名 → 改断 `div.user-chip`。两次都是**探针的预期写错，产品是对的**——所以断言失败时必须先看实际值再改断言，不能反过来改代码。
+
+**产物**：RMS `index` 95.77 KB（gzip 32.10，改前 103）、IAM `index` 24.03 KB（改前 33）、approval `index` 55.13 KB；三应用 `tsc + vite build` 全过。
+
+---
+
 
 
 ## 11. 非目标
@@ -621,7 +697,7 @@ antd 虚拟表格的两个硬约束已内建处理：`scroll.x` 必须是数字�
 
 | # | 事项 | 现状 | 定稿时点 |
 | --- | --- | --- | --- |
-| 1 | 外壳模型（配置驱动 vs 组合件） | 倾向配置驱动 + 插槽兜底 | P3 动手前 |
+| 1 | 外壳模型（配置驱动 vs 组合件） | **已定稿（§8.1）**：配置驱动（`ShellNavGroup[]`）+ 两个插槽（`roleBadge` / `topbarExtra`）；`@cim/shell` 已落地，§10.5 | 已定稿 |
 | 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
 | 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
 | 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
