@@ -73,3 +73,4 @@
   - 整改口径：实跑校验器抓出 9 个非 `Result` 端点 → 4 个改信封（`token-version.current`/`bump`、`blacklist.isRevoked`、`issue`）、5 个标例外（JWKS / `/login` / recipe export / approval attachment download / SSE）。静态正则初版只找到 7 个，漏的 2 个正是校验器实跑抓到的——这条差异本身即「规约要长牙」的证据。
   - 连带：内部 S2S 端点改形态 → `IamTokenVersionChecker`/`IamTokenBlacklistChecker` 新旧双兼容（否则滚动发布期间版本/黑名单校验静默 fail-open）；IAM 前端 `postRaw()` 旁路与两处 `api.ts` 的 `postRaw` 一并删除。
   - 纪律执行：本批次 6 个提交全部**按逻辑单元显式列路径**暂存，台账（本表 + AUDIT §29）随末个提交同批更新，未再出现「先提交、文档后补」。
+  - 同日补完两项：① `cim.api.response` / `cim.api.dispatch` 写入 4 份 `application.yml.example`（SnakeYAML 实解析验证 + 确认 6 个键在 `spring-configuration-metadata.json`）；② IAM 渲染契约恢复 **33/33**——12 条"中文残留"实为测试未挂 `UiLocaleProvider` 导致组件走内置中文兜底，产品代码无泄漏；两条结构断言按组件层类名（`.cim-empty` / `.cim-tree`）重置。

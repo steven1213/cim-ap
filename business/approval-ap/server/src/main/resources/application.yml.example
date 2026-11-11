@@ -25,6 +25,19 @@ spring:
 
 # CIM 平台框架配置键（契约见各 starter *Properties javadoc）
 cim:
+  # HTTP 响应契约（cim-spring-support；规约见 docs/platform/server/api-convention.md）
+  # 本 ap 现有一处正当例外（附件下载），已在代码里标 @RawResponse
+  api:
+    response:
+      verify: true
+      strict: true                       # false = 违规只记 ERROR 不阻断启动（仅过渡期）
+      include-packages:
+        - com.cim
+    dispatch:
+      enabled: false
+      base-path: /api/v1/messages
+      base-packages: []
+
   auth:
     # 开发态默认关闭，便于无 IAM 联调；生产须置 true 并提供 JWKS 与准入 app-code。
     enabled: false

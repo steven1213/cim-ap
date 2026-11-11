@@ -30,6 +30,20 @@ spring:
 # 认证/准入契约见 docs/platform/server/design.md §8.1）
 # =============================================================================
 cim:
+  # HTTP 响应契约（cim-spring-support；规约见 docs/platform/server/api-convention.md）
+  api:
+    response:
+      # 启动收尾期反射校验：控制器方法返回非 Result 时必须标 @RawResponse，否则启动失败
+      verify: true
+      strict: true                       # false = 违规只记 ERROR 不阻断启动（仅过渡期）
+      include-packages:                  # 只校验本仓控制器；框架 BasicErrorController 不参与
+        - com.cim
+    # 消息分发入口（受控例外，默认关闭；结构与差异见 api-convention.md §6）
+    dispatch:
+      enabled: false
+      base-path: /api/v1/messages        # 实际入口 = {base-path}/{请求名}
+      base-packages: []                  # 留空取应用主类所在包
+
   # 多租户（cim-spring-support，默认关闭）
   tenant:
     enabled: false

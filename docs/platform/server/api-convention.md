@@ -142,6 +142,18 @@ cim:
 - `IamTokenVersionChecker` / `IamTokenBlacklistChecker` 已同时接受信封与旧纯文本；
 - 解析失败才判为"不可达"→ fail-open（版本/黑名单是增强，不应因 IAM 抖动拒登）。
 
+### 5.4 前端闸门：渲染契约
+
+后端契约保证"返回什么形状"，前端还得保证"在给定权限集下画出什么"。`business/iam-ap/web/test/render-contract.tsx` 用 `renderToStaticMarkup` 把页面渲成静态 HTML（零浏览器、零测试框架），断言三件事：**双闸门**（IAM 控制台码 ∧ 平台码）生效、无权限时写按钮**不挂载**、存量页无中文残留。
+
+三个坑（都真踩过）：
+
+1. **必须挂 `UiLocaleProvider`**（与 `main.tsx` 的 `Root` 同构）。`@cim/ui` 的组件文案走 `useUiLabel(key, fallback)`，未挂 Provider 时全部回落到组件内置中文兜底——12 个页面会同时报"含中文残留"，而产品代码并没有泄漏（2026-11-12 修）。
+2. **`hasKey` 应恒为 `true`**。本测试断言的是"页面请求了哪些键"，缺键处理器已把 `t(key)` 变成 `⟪key⟫` 标记；若让 `hasKey` 如实返回 `false`，`useUiLabel` 会取中文兜底，标记永远出不来。
+3. **页面迁到 `@cim/*` 后要给 `test/run.mjs` 补 `@cim/*` + `antd` 别名与 `nodePaths`**，否则 esbuild 报 `Could not resolve "react"`，闸门静默空转（看起来有测试，实际从未跑通）。
+
+断言本身也要随组件层更新：空态类名已由旧手写页的 `.empty` 变为 `@cim/ui` 的 `.cim-empty`，树为 `.cim-tree`——按类名/文案写死的断言会随迁移失效，改的时候要对齐组件层的真实 DOM。
+
 ---
 
 ## 6. 消息分发模式（可选，默认关闭）
@@ -214,8 +226,10 @@ cim:
 | 消息分发（`CimMessage` / `CimMessageProcessor` / `Registry` / `Dispatcher` / `Controller`） | `cim-spring-support/dispatch` | ✅ 新增（默认关闭） |
 | 9 个非 `Result` 端点整改（4 改信封 / 5 标例外） | `iam-ap` / `rms-ap` / `approval-ap` / `cim-notify-starter` | ✅ 已完成，见 §4 例外表 |
 | 前端 `postRaw()` 旁路 | `iam-ap` / `rms-ap` 的 `lib/api.ts` | ✅ 已删除 |
+| `cim.api.response` / `cim.api.dispatch` 写入配置模板 | `cim-bootstrap` + `iam-ap` / `rms-ap` / `approval-ap` 的 `application.yml.example` | ✅ 已补（6 个键均已在 `spring-configuration-metadata.json` 中） |
+| 前端渲染契约闸门 | `business/iam-ap/web/test/render-contract.tsx` | ✅ 33/33（已按组件层现状重置，见 §5.4） |
 
 ### 待办
 
-- `cim.api.response` 与 `cim.api.dispatch` 尚未写入各 ap 的 `application.yml.example`（默认值即推荐值，暂不必显式配置）。
-- IAM 前端 `test/run.mjs`（渲染契约 33 断言）在页面迁到 `@cim/*` 后失去 `@cim/*` 别名，长期处于"打包即失败"的空转状态；已补别名恢复可运行，但**仍有 12 条断言按旧标记/旧文案写死**（如 `.empty`、`placeholder="⟪iam.common.search⟧"`），需按组件层现状更新——属独立任务。
+- 消息分发三应用均未启用：等出现「一类报文 N 个近似端点」的真实场景再开，避免为模式而模式。
+- 内部 S2S 端点（`/api/v1/internal/**`）下次改形态时，记得同步检查消费侧的双兼容分支是否还需要保留（旧版客户端下线后可删）。

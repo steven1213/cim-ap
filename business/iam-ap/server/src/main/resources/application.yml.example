@@ -33,6 +33,19 @@ spring:
 # 认证/准入契约见 docs/platform/server/design.md §8）
 # =============================================================================
 cim:
+  # HTTP 响应契约（cim-spring-support；规约见 docs/platform/server/api-convention.md）
+  # 本 ap 现有两处正当例外（JWKS / 统一登录页），已在代码里标 @RawResponse
+  api:
+    response:
+      verify: true
+      strict: true                       # false = 违规只记 ERROR 不阻断启动（仅过渡期）
+      include-packages:
+        - com.cim
+    dispatch:
+      enabled: false
+      base-path: /api/v1/messages
+      base-packages: []
+
   # 认证（cim-auth-starter）：IAM 是签发方，自身也基于 platform 框架实现
   auth:
     enabled: true

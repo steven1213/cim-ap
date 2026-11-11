@@ -395,10 +395,10 @@
   - **静态解析不可靠，靠启动期校验兜底**：我按正则扫 150 个映射方法得出「7 个非 Result」，实跑校验器抓出第 8 个 `AttachmentController#download`（签名跨行 + 文件名不匹配 `*Controller`），复核后为 9 个。这条本身就是「规约要长牙」的证据。
   - **滚动发布**：内部 S2S 端点改形态时消费侧必须双兼容，否则先升级任一侧都会让版本/黑名单校验**静默 fail-open**——`IamTokenVersionChecker`/`IamTokenBlacklistChecker` 按响应首字符分流，`code != 0` 视为失败而非放行。
   - **测试夹具不套例外**：`cim-auth-starter` 的 `TestApi` 六个端点故意裸返回以验证安全过滤链，给它们写 `@RawResponse` 理由不成立 → 改在该测试 `application.yml` 关 `verify`。同文件原已有一个顶层 `cim:` 块，追加会造成 SnakeYAML 重复键报错，已并块重写。
-- **风险 / 待办**：
-  - `cim.api.response` / `cim.api.dispatch` 未写入各 ap 的 `application.yml.example`（默认值即推荐值）。
-  - IAM 前端渲染契约（33 断言）在页面迁到 `@cim/*` 后长期「打包即失败」：本次补 `@cim/*` + `antd` 别名与 `nodePaths` 恢复可运行，随即暴露 **12 条既有失败**（`.empty` 类名、写死的 `placeholder="⟪iam.common.search⟧"`、多页中文残留）——属组件层迁移遗留，需单独按现状重置断言。
-  - 消息分发默认关闭、**三应用均未启用**：待出现「一类报文 N 个近似端点」的真实场景再开，避免为模式而模式。
+- **补完（同日）**：
+  - `cim.api.response` / `cim.api.dispatch` 已写入 4 个配置模板（`cim-bootstrap` + `iam`/`rms`/`approval` 的 `application.yml.example`），并用 SnakeYAML 实解析验证四份 YAML 均合法；6 个键确认都在 `spring-configuration-metadata.json` 里（键不在元数据里 = 没被 `@ConfigurationProperties` 承载）。
+  - **IAM 渲染契约恢复 33/33**：两条结构性断言随组件层迁移失效（空态类名 `.empty` → `.cim-empty`、树 `.tree` → `.cim-tree`）；12 条"含中文残留"其实是**测试装配缺陷**——未挂 `UiLocaleProvider` 时 `useUiLabel` 全部回落到 `@cim/ui` 内置中文兜底，产品代码并无泄漏。修法：按 `main.tsx` 同构挂 Provider、`t` 走缺键处理器（`⟪key⟫` 标记）+ `hasKey` 恒为 `true`（本测试断言的是"请求了哪些键"，不是"键有没有译文"）；失败信息也从"含中文：共"升级为带上下文片段，便于定位是哪个组件漏键。`api-convention.md §5.4` 记录三个坑。
+- **风险 / 待办**：消息分发三应用均未启用（等真实场景再开）；内部 S2S 端点的双兼容分支待旧客户端下线后清理；MDS/MES 两 ap 前端仍是空脚手架，暂无渲染契约闸门。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
