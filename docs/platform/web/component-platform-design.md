@@ -239,17 +239,45 @@ IAM 的 `lib/i18n.ts`（230 行）是三个实现里唯一完整的，直接上�
 
 ## 7. @cim/ui：组件清单与分批
 
-**已落地（P1，2026-11-11）**
+**已落地（P1 + 补齐批次，2026-11-11）**
 
-| 组件 | 文件 | 职责 | 明确不做 |
-| --- | --- | --- | --- |
-| `Page` / `PageHead` / `Panel` / `Toolbar` / `EmptyState` | `content/Page.tsx` | 页面骨架（等价现有 `.page` / `.page-head` / `.panel` / `.toolbar`） | 不做布局系统，不接管路由 |
-| `DataTable` | `data/DataTable.tsx` | 渲染 + 工具栏 + 列设置 + 服务端分页 + 选择 + 三态 | **不取数、不导出、不做单元格编辑** |
-| `useColumns` | `data/useColumns.ts` | 列显示/顺序 + localStorage 持久化 | 不碰服务端列定义（见 §12 待定 4） |
-| `StatusTag` / `ToneTag` | `data/StatusTag.tsx` | 枚举值 → 5 档语义色 | 调用方不能自选颜色 |
-| `FormGrid` | `form/FormGrid.tsx` | 配置驱动表单（判别联合 `kind`） | 不做校验规则 DSL |
-| `CimModal` | `feedback/CimModal.tsx` | 弹窗（焦点/Esc/滚动锁由 antd 保证） | 不做抽屉/气泡确认（P2） |
-| `CimProvider` / `UiLocaleProvider` | `provider.tsx` / `locale.tsx` | antd 主题映射 + 语言注入 | 组件不感知 i18n 实例 |
+命名：组件一律 `Cim` 前缀（参考项目用 `Goat`，本项目不沿用）；已占用语义名的领域组件直接用领域名（`Page` / `Panel` / `DataTable` / `StatusTag` / `FormGrid`），不加前缀以免读起来像第三方。
+
+| 类目 | 组件 | 文件 | 职责 | 明确不做 |
+| --- | --- | --- | --- | --- |
+| 注入器 | `CimProvider` | `provider.tsx` | 读 `tokens.css` 变量生成 antd `ThemeConfig`，跟随 `data-theme`/`data-cim-density` | 不自立色板 |
+| 注入器 | `UiLocaleProvider` / `useUiLabel` / `useUiT` | `locale.tsx` | 翻译函数注入，组件拿 `translate(key)` | 不 import `@cim/i18n` |
+| 注入器 | `UiPermissionProvider` / `useCan` / `Can` | `perm.tsx` | 权限判定注入 | 不读各 ap 的 store |
+| 注入器 | `UiDictProvider` / `useDict` / `EnumTag` | `dict.tsx` | 字典缓存（按 `code` 拉一次），`EnumTag` 值→标签 | 不直连后端（由调用方给 fetcher） |
+| basic | `CimButton` | `basic/Button.tsx` | 按钮（primary/ghost/danger/尺寸/加载） | 不做权限包装（用 `Can`） |
+| basic | `CimTag` / `CimCheckTag` | `basic/Tag.tsx` | 标签 / 可选中标签（筛选条） | 不做颜色自选 |
+| content | `Page` / `PageHead` / `Panel` / `Toolbar` / `EmptyState` | `content/Page.tsx` | 页面骨架（等价 `.page`/`.page-head`/`.panel`/`.toolbar`） | 不做布局系统，不接管路由 |
+| content | `CimDivider` | `content/Divider.tsx` | 分隔线（水平/垂直/带文字） | — |
+| content | `CimDrawer` | `content/Drawer.tsx` | 侧滑面板 | 不内置表单 |
+| content | `CimScrollArea` | `content/ScrollArea.tsx` | 定高滚动容器（统一滚动条样式） | 不做虚拟滚动 |
+| data | `DataTable` | `data/DataTable.tsx` | 渲染 + 工具栏 + 列设置 + 服务端分页 + 选择 + 三态 | **不取数、不导出、不做单元格编辑** |
+| data | `useColumns` | `data/useColumns.ts` | 列显示/顺序 + localStorage 持久化 | 不碰服务端列定义（见 §12-4） |
+| data | `StatusTag` / `ToneTag` | `data/StatusTag.tsx` | 枚举值 → 5 档语义色 | 调用方不能自选颜色 |
+| data | `CimDescriptions` | `data/Descriptions.tsx` | 详情栅格（列数/跨列/空值占位） | 不做可编辑详情 |
+| data | `CimInfoTable` | `data/InfoTable.tsx` | 紧凑键值表（配方参数/审计明细这类） | 不做分页 |
+| data | `CimSteps` | `data/Steps.tsx` | 阶段流转条（当前/完成/失败） | 不做流程编排 |
+| data | `CimTabs` | `data/Tabs.tsx` | 页签（受控/非受控） | 不做路由联动 |
+| data | `CimTree` | `data/Tree.tsx` | 组织树/菜单树（展开、勾选、拖拽排序） | 不加载数据 |
+| data | `CimCollapse` | `data/Collapse.tsx` | 折叠面板（分组表单/日志段） | — |
+| form | `FormGrid` | `form/FormGrid.tsx` | 配置驱动表单，判别联合 `kind`：text/password/textarea/number/select/switch/date/custom | 不做校验规则 DSL |
+| form | `CimField` | `form/Field.tsx` | 单字段外壳（标签/必填/错误/提示/单位） | 不做布局 |
+| form | `CimInput` | `form/Input.tsx` | 输入框（前后缀、单位、清除） | — |
+| form | `CimInputNumber` | `form/InputNumber.tsx` | 数字输入（精度/步进/单位/空值） | — |
+| form | `CimSelect` | `form/Select.tsx` | 下拉（可搜索/多选/清空/分组） | 不内置字典（用 `useDict` 传 options） |
+| form | `CimDatePicker` / `CimDateRangePicker` / `CimTimePicker` | `form/DatePicker.tsx` | 日期/区间/时间，值统一为 ISO 字符串 | 不暴露 dayjs 对象给业务 |
+| form | `CimSwitch` | `form/Switch.tsx` | 开关（带文案位） | — |
+| form | `CimChoice` | `form/Choice.tsx` | 单选/多选组（按钮式/卡片式） | 不做联动 |
+| form | `CimUpload` | `form/Upload.tsx` | 上传（手动/自动、大小与类型限制、进度） | 不决定存储位置，由调用方给 action |
+| feedback | `CimModal` | `feedback/CimModal.tsx` | 弹窗（焦点/Esc/滚动锁由 antd 保证） | 不内置表单 |
+| feedback | `CimTooltip` | `feedback/Tooltip.tsx` | 文字提示（超长省略号场景） | — |
+| feedback | `CimPopconfirm` | `feedback/Popconfirm.tsx` | 气泡确认（危险动作） | 不做异步 loading 编排 |
+| feedback | `CimPopover` | `feedback/Popover.tsx` | 气泡卡片 | — |
+| layout | `CimSplitter` | `layout/Splitter.tsx` | 可拖拽分栏，**配置驱动** `panels` | 不用 children（antd `Splitter.Panel` 是 `() => null`，隔层即失效） |
 
 `DataTable` 的实际契约：
 
@@ -286,8 +314,8 @@ interface DataTableProps<T> {
 
 | 批次 | 组件 | 说明 |
 | --- | --- | --- |
-| P2 | `useDict` / `EnumTag`（字典驱动）、`Toast`、`Confirm`、`Drawer` | 依赖 `@cim/i18n` 的字典能力 |
 | P2 | `DataTable` 虚拟滚动 | antd `virtual` + 固定行高；千行以上再开 |
+| P2 | `Toast` / `Confirm` | 现各 ap 用 `useState` 自管提示条；统一到注入式 message/notification |
 | P3 | `Layout`、`TabBar`、`MenuTree`、`LanguageSwitcher`、`NotificationBell` | 见 §8，最后做 |
 
 ---
@@ -445,8 +473,73 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 **遗留**
 
 1. 产物体积：RMS 1.3 MB，需路由级 `lazy()`（P2）。
-2. `FormGrid` 暂缺 `date` 字段（需 dayjs 值转换口径，避免与后端 ISO 字符串语义打架）。
+2. `FormGrid` 暂缺 `date` 字段（需 dayjs 值转换口径，避免与后端 ISO 字符串语义打架）—— **已在 §10.3 补齐**（对外只进出 ISO 字符串）。
 3. 其余 22 个 RMS 页面、21 个 IAM 页面未迁移，仍用旧的手写结构（两套并存期需明确"新页面一律用组件"）。
+
+### 10.3 P1 补齐批次：6 类目组件全量落地（2026-11-11）
+
+§10.2 只交了首批 9 个文件（`DataTable` / `FormGrid` / `CimModal` / `Page` 骨架 / `StatusTag` / `useColumns` / 注入器）。参考实现有 75 个组件，光"表格 + 弹窗"远不够页面直接用，故本批按类目补齐。
+
+**新增体量**
+
+| 类目 | 新增文件 | 行数 |
+| --- | --- | --- |
+| basic | `Button` / `Tag` | 202 |
+| content | `Divider` / `Drawer` / `ScrollArea`（`Page` 已于 P1 交） | 189 |
+| data | `Descriptions` / `InfoTable` / `Steps` / `Tabs` / `Tree` / `Collapse` | 669 |
+| form | `Field` / `Input` / `InputNumber` / `Select` / `DatePicker` / `Switch` / `Choice` / `Upload` | 928 |
+| feedback | `Tooltip` / `Popconfirm` / `Popover`（`CimModal` 已于 P1 交） | 162 |
+| layout | `Splitter` | 122 |
+| 注入器 | `perm.tsx` / `dict.tsx` | 262 |
+| 样式 | `components.css` 追加 | +182 |
+| 入口 | `index.ts` 统一导出 | +61 |
+| **合计** | 24 个新文件 + 3 个改动 | **约 +2 900 行**（含注释与类型） |
+
+**本批修掉的设计缺陷**
+
+| 缺陷 | 现象 | 处理 |
+| --- | --- | --- |
+| `CimSplitter` 用 children 传面板 | antd `Splitter.Panel` 实现是 `() => null`，`Splitter` 只读直接子元素的 props 来摆布局；中间隔一层自定义组件后左面板**完全不渲染** | 改为**配置驱动**：`panels: SplitterPanelConfig[]`，面板内容走 `render`。这是配置驱动优于组合件的一个硬证据（对应 §12-1 的倾向） |
+| `FormGrid` 缺 `date` 字段 | P1 遗留（怕与后端 ISO 字符串语义打架） | 本批补：内部 `dayjs` ↔ ISO 字符串双向转换，对外**只进出字符串**，`CimDatePicker` 同理，业务侧永不接触 dayjs 对象 |
+| `CimInputNumber` formatter/parser 类型不匹配 | antd `formatter` 返回 `string` 但 `value` 是 `number`，TS 报错 | 去掉自定义 formatter，改 `onChange: (v: number \| null)`，精度交给 `precision` |
+| `CimTree` 拖拽落点语义推错 | `onDrop` 的 `dropPosition` 正负与 `dropToGap` 组合有四种含义 | 按 `info.dropToGap` + `dropPosition` 正负判定 before / after / inside 三态 |
+
+**验证（45 项运行时断言，全过）**
+
+同 §10.2 手法：临时探针页（已删除）渲染真实组件 + 假数据，无头 Chrome 经 CDP 读 DOM 与 `getComputedStyle`。断言按 6 个类目组织，每项含「渲染成功 / 关键计算样式等于 token / 交互结果符合预期」三类检查之一或多条。
+
+下表列出其中可量化、有确定数值的代表项：
+
+| 断言 | 结果 |
+| --- | --- |
+| 主色 `--primary` 透传到 antd | `#1f5fe0`（亮）/ `rgb(79,131,247)`（暗）✓ |
+| 语义 ok 色 | `#0d8a55` → `rgb(13,138,85)` ✓ |
+| 面板背景 `--bg` | 亮 `#eef1f6` / 暗 `#06090f` ✓ |
+| 表头背景 `--panel-2` | 亮 `rgb(246,248,251)` / 暗 `rgb(18,28,47)` ✓ |
+| `table.data` 单元格字号 `--fs-sm` | `12.5px` ✓ |
+| 密度 `touch` 档 | 字号 `16px`、行高 `40px` ✓ |
+| 计数文案 | 「共 3」✓（走 `UiLocaleProvider` 注入，非硬编码） |
+| 搜索受控过滤 | 3 行 → 2 行 ✓ |
+| 列设置 | 4 列 → 取消一列后表头 3 列，偏好写入 `cim.columns.*` ✓ |
+| 列顺序调整 | 首列由「编码」变「名称」，刷新后保持 ✓ |
+| `CimModal` + `FormGrid` | 弹窗打开、字段齐全、标签大写、标题走注入翻译 ✓ |
+| 三应用 `tsc + vite build` | 全部通过（RMS 3198+ / IAM 3211 / approval 3206 模块） ✓ |
+
+断言数演进：42/44（`Splitter` 左面板未渲染 + 拖拽无效）→ 修 `Splitter` 后 44/44 → 补 `Upload` 后 **45/45**。这个"先不过再修"的过程留在结论里，是因为 `Splitter` 那个坑（`Panel` 是空组件）在全网文档里几乎没有提示，属易复发的类型。
+
+**产物体积（本批后）**
+
+| 应用 | JS（minify） | gzip |
+| --- | --- | --- |
+| RMS（用全部组件） | 1.47 MB | 437 KB |
+| IAM（只用 Provider） | 538 KB | 164 KB |
+| approval（只用 Provider） | 543 KB | 176 KB |
+
+RMS 因新增 `DatePicker` 把 dayjs 全量 locale 拉进来涨了约 170 KB。仍走 §10.2 的结论：用路由级 `lazy()` 拆，不为此删组件。
+
+**工程接线补充**
+
+approval 侧 `tsconfig.json` 漏了 `dayjs` 的 `paths`（`vite.config.ts` 已加 alias），表现为 `tsc` 报 `Cannot find module 'dayjs'` 而 `vite build` 与 dev 均正常 —— 说明 **tsc 的 `paths` 与 vite `alias` 是两套配置，必须同时改**。
 
 ---
 
@@ -469,5 +562,6 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | 2 | 字典条目 i18n 化：`itemValue` 单列多语言，还是复用 `sys_i18n` 键 | `sys_dict_item` 当前只有 `itemValue` | P2 前 |
 | 3 | 是否需要「高对比」第三套主题（车间大屏） | 已列需求，未定是否独立档 | P1 后按现场反馈 |
 | 4 | 列定义是否由后端下发（参考实现的 `viewId` → 视图模型） | 现为前端声明 + 本地偏好；后端无视图模型表 | 视"不同角色看不同列"是否为真需求 |
-| 5 | 路由级拆包以抵消 antd 体积 | RMS 单 chunk 1.3 MB，未拆 | P2 |
-| 4 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | 固定行高可满足产线表格 | P1 实现时 |
+| 5 | 路由级拆包以抵消 antd 体积 | RMS 单 chunk 1.47 MB，未拆 | P2 |
+| 6 | `DataTable` 虚拟滚动的行高策略（固定行高 vs 动态测量） | 固定行高可满足产线表格 | P1 实现时 |
+| 7 | `--bg/--panel/--primary` 等基础变量无 `--cim-` 前缀 | 改名要动约 4000 处引用（各 ap styles.css 全在引用） | 暂缓，等外壳层统一时一并改 |

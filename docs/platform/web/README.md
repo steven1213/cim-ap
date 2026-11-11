@@ -804,7 +804,7 @@ server {
 | 能力 | 状态 | 优先级 | 建议方向 |
 | --- | --- | --- | --- |
 | 微前端（qiankun / Module Federation，未来 `apps/` 多应用） | `✗` | P-Prod-C | 出现第三个前端应用时启动（目录约定见总文档），与后端服务发现对齐 |
-| 设计系统 / 组件库 + 可访问性（a11y） | `△` 已设计 | P-Prod-C | 见 [`component-platform-design.md`](./component-platform-design.md)：P0（tokens + 同构文件）→ P1（`useResource` + `DataTable`）→ P2（i18n + 字典）→ P3（组件全集 + 外壳）；a11y 按 WCAG 2.1 AA 基线 |
+| 设计系统 / 组件库 + 可访问性（a11y） | `△` 已落地（组件层） | P-Prod-C | 见 [`component-platform-design.md`](./component-platform-design.md)：P0 tokens（已完成）→ P1 组件层（已完成，35 个组件 / 6 类目）→ P2 虚拟滚动 + 消息层 → P3 外壳；a11y 按 WCAG 2.1 AA 基线，尚未做自动断言 |
 | 前端契约测试（consumer-driven，对齐后端 OpenAPI） | `✗` | P-Prod-B | 用 Pact/OpenAPI 生成 mock，与后端 §17 双向校验 |
 | 前端可观测（RUM / Sentry / 性能预算） | `✗` | P-Prod-B | 对齐后端 §14：错误、首屏、长任务、Core Web Vitals 入统一监控 |
 
