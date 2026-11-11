@@ -1,180 +1,281 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounced, useResource } from '@cim/data';
+import {
+  CimModal,
+  DataTable,
+  FormGrid,
+  Page,
+  PageHead,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
 import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import { DEVICE_AUTH_MANAGE } from '@/lib/permCodes';
-import type { DeviceAuth, Device, DeviceType, DeviceArea } from '@/types';
+import type { Device, DeviceAuth, DeviceArea, DeviceType } from '@/types';
 
-/** 设备授权页（FR-P4，Req 11/12）。 */
+const NO_AUTHS: DeviceAuth[] = [];
+// 模块级空数组：`data ?? []` 每次渲染都会造新引用，会让下面的 columns / fields 依赖恒变
+const NO_DEVICES: Device[] = [];
+const NO_TYPES: DeviceType[] = [];
+const NO_AREAS: DeviceArea[] = [];
+
+/**
+ * 设备授权页（FR-P4，Req 11/12）。
+ *
+ * 迁移要点：授权主体搜索加 200ms 防抖（原来每敲一个字符发一次请求），取数交给 `useResource`
+ * 并保留旧数据，输入过程中表格不会闪空态；弹窗的「设备/机型/区域至少一项」校验从页顶一条
+ * 错误行改为字段级 + 表单级两处提示。
+ */
 export default function DeviceAuthPage() {
   const { t } = useTranslation();
-  const [list, setList] = useState<DeviceAuth[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [types, setTypes] = useState<DeviceType[]>([]);
-  const [areas, setAreas] = useState<DeviceArea[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [show, setShow] = useState(false);
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [subject, setSubject] = useState('');
+  const debouncedSubject = useDebounced(subject, 200);
+  const [show, setShow] = useState(false);
 
-  async function refresh() {
-    setLoading(true);
-    try {
-      setList(await api.listDeviceAuth({ subject: subject || undefined }));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data, loading, error, refresh } = useResource(
+    () => api.listDeviceAuth({ subject: debouncedSubject || undefined }),
+    { deps: [debouncedSubject], keepPreviousData: true },
+  );
+  const rows = data ?? NO_AUTHS;
 
-  useEffect(() => {
-    api.listDevices().then(setDevices);
-    api.listDeviceTypes().then(setTypes);
-    api.listDeviceAreas().then(setAreas);
-  }, []);
-
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [subject]);
-
-  async function revoke(x: DeviceAuth) {
-    if (!confirm(t('rms.common.confirmDelete'))) return;
-    await api.revokeDeviceAuth(x.id);
-    await refresh();
-  }
+  // 弹窗用的参照数据：一次取齐，开关弹窗不重复请求
+  const devices = useResource(() => api.listDevices()).data ?? NO_DEVICES;
+  const types = useResource(() => api.listDeviceTypes()).data ?? NO_TYPES;
+  const areas = useResource(() => api.listDeviceAreas()).data ?? NO_AREAS;
 
   const label = (x: DeviceAuth) => {
     if (x.deviceId) return `${t('rms.deviceAuth.device')}: ${x.deviceLabel ?? x.deviceId}`;
-    if (x.deviceTypeId) return `${t('rms.deviceAuth.deviceType')}: ${types.find((z) => z.id === x.deviceTypeId)?.name ?? x.deviceTypeId}`;
-    if (x.areaId) return `${t('rms.deviceAuth.area')}: ${areas.find((z) => z.id === x.areaId)?.name ?? x.areaId}`;
+    if (x.deviceTypeId)
+      return `${t('rms.deviceAuth.deviceType')}: ${
+        types.find((z) => z.id === x.deviceTypeId)?.name ?? x.deviceTypeId
+      }`;
+    if (x.areaId)
+      return `${t('rms.deviceAuth.area')}: ${areas.find((z) => z.id === x.areaId)?.name ?? x.areaId}`;
     return t('rms.common.dash');
   };
 
+  const revoke = async (x: DeviceAuth) => {
+    const ok = await confirm({
+      title: t('rms.common.revoke'),
+      contentKey: 'rms.common.confirmDelete',
+      danger: true,
+      okKey: 'rms.common.revoke',
+    });
+    if (!ok) return;
+    try {
+      await api.revokeDeviceAuth(x.id);
+      toast.success(t('rms.common.deleted'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    refresh();
+  };
+
+  const columns = useMemo<Array<DataTableColumn<DeviceAuth>>>(
+    () => [
+      { key: 'subject', titleKey: 'rms.deviceAuth.subject', mono: true, width: 200 },
+      { key: 'target', titleKey: 'rms.deviceAuth.target', render: (r) => label(r) },
+      {
+        key: 'canOperate',
+        titleKey: 'rms.deviceAuth.canOperate',
+        width: 110,
+        align: 'center',
+        render: (r) => (r.canOperate ? t('rms.common.yes') : t('rms.common.no')),
+      },
+      {
+        key: 'createTime',
+        titleKey: 'rms.common.createTime',
+        width: 180,
+        render: (r) => <span className="muted">{r.createTime ?? t('rms.common.dash')}</span>,
+      },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 120,
+        render: (r) => (
+          <span className="cell-actions">
+            <Perms code={DEVICE_AUTH_MANAGE}>
+              <button className="btn btn-ghost btn-sm danger" onClick={() => void revoke(r)}>
+                {t('rms.common.revoke')}
+              </button>
+            </Perms>
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, types, areas],
+  );
+
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>{t('rms.deviceAuth.title')}</h1><p className="muted">{t('rms.deviceAuth.sub')}</p></div>
-        <Perms code={DEVICE_AUTH_MANAGE}>
-          <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>+ {t('rms.deviceAuth.grant')}</button>
-        </Perms>
-      </div>
+    <Page>
+      <PageHead
+        titleKey="rms.deviceAuth.title"
+        subtitleKey="rms.deviceAuth.sub"
+        actions={
+          <Perms code={DEVICE_AUTH_MANAGE}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShow(true)}>
+              + {t('rms.deviceAuth.grant')}
+            </button>
+          </Perms>
+        }
+      />
 
-      <div className="toolbar">
-        <div className="search-inline">
-          <input className="text-input" placeholder={t('rms.deviceAuth.subject')} value={subject}
-            onChange={(e) => setSubject(e.target.value)} />
-        </div>
-        {loading && <span className="muted">{t('rms.common.loading')}</span>}
-      </div>
-
-      <div className="panel">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('rms.deviceAuth.subject')}</th>
-              <th>{t('rms.deviceAuth.target')}</th>
-              <th>{t('rms.deviceAuth.canOperate')}</th>
-              <th>{t('rms.common.createTime')}</th>
-              <th>{t('rms.common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((x) => (
-              <tr key={x.id}>
-                <td className="mono">{x.subject}</td>
-                <td>{label(x)}</td>
-                <td>{x.canOperate ? t('rms.common.yes') : t('rms.common.no')}</td>
-                <td className="muted">{x.createTime ?? t('rms.common.dash')}</td>
-                <td className="cell-actions">
-                  <Perms code={DEVICE_AUTH_MANAGE}>
-                    <button className="btn btn-ghost btn-sm danger" onClick={() => revoke(x)}>{t('rms.common.revoke')}</button>
-                  </Perms>
-                </td>
-              </tr>
-            ))}
-            {!loading && list.length === 0 && <tr><td colSpan={5} className="empty-cell">{t('rms.deviceAuth.empty')}</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<DeviceAuth>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        loading={loading}
+        error={error?.message}
+        onRetry={refresh}
+        onRefresh={refresh}
+        settingsKey="rms.device-auth"
+        search={{
+          value: subject,
+          onChange: setSubject,
+          placeholderKey: 'rms.deviceAuth.subject',
+        }}
+        emptyTitleKey="rms.deviceAuth.empty"
+      />
 
       {show && (
-        <AuthModal devices={devices} types={types} areas={areas}
+        <AuthModal
+          devices={devices}
+          types={types}
+          areas={areas}
           onClose={() => setShow(false)}
-          onDone={async () => { setShow(false); await refresh(); }} />
+          onDone={() => {
+            setShow(false);
+            toast.success(t('rms.common.created'));
+            refresh();
+          }}
+        />
       )}
-    </div>
+    </Page>
   );
 }
 
-function AuthModal({ devices, types, areas, onClose, onDone }: {
-  devices: Device[]; types: DeviceType[]; areas: DeviceArea[];
-  onClose: () => void; onDone: () => void;
+interface AuthForm {
+  subject: string;
+  deviceId: string;
+  deviceTypeId: string;
+  areaId: string;
+  canOperate: boolean;
+}
+
+function AuthModal({
+  devices,
+  types,
+  areas,
+  onClose,
+  onDone,
+}: {
+  devices: Device[];
+  types: DeviceType[];
+  areas: DeviceArea[];
+  onClose: () => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
-  const [subject, setSubject] = useState('');
-  const [deviceId, setDeviceId] = useState('');
-  const [deviceTypeId, setDeviceTypeId] = useState('');
-  const [areaId, setAreaId] = useState('');
-  const [canOperate, setCanOperate] = useState(true);
+  const [form, setForm] = useState<AuthForm>({
+    subject: '',
+    deviceId: '',
+    deviceTypeId: '',
+    areaId: '',
+    canOperate: true,
+  });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof AuthForm, string>>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  const fields = useMemo<Array<FormField<AuthForm>>>(
+    () => [
+      { kind: 'text', key: 'subject', labelKey: 'rms.deviceAuth.subject', required: true, mono: true, span: 2 },
+      {
+        kind: 'select',
+        key: 'deviceId',
+        labelKey: 'rms.deviceAuth.device',
+        options: devices.map((d) => ({ value: d.id, label: d.code, hint: d.name })),
+      },
+      {
+        kind: 'select',
+        key: 'deviceTypeId',
+        labelKey: 'rms.deviceAuth.deviceType',
+        options: types.map((d) => ({ value: d.id, label: d.name })),
+      },
+      {
+        kind: 'select',
+        key: 'areaId',
+        labelKey: 'rms.deviceAuth.area',
+        options: areas.map((d) => ({ value: d.id, label: d.name })),
+      },
+      { kind: 'switch', key: 'canOperate', labelKey: 'rms.deviceAuth.canOperate' },
+    ],
+    [devices, types, areas],
+  );
+
   async function submit() {
-    if (!subject) { setErr(t('rms.deviceAuth.subject') + ' *'); return; }
-    if (!deviceId && !deviceTypeId && !areaId) { setErr(t('rms.deviceAuth.targetRequired')); return; }
-    setBusy(true); setErr('');
+    const next: Partial<Record<keyof AuthForm, string>> = {};
+    if (!form.subject) next.subject = t('rms.common.required');
+    if (Object.keys(next).length) {
+      setFieldErrors(next);
+      return;
+    }
+    setFieldErrors({});
+    if (!form.deviceId && !form.deviceTypeId && !form.areaId) {
+      setErr(t('rms.deviceAuth.targetRequired'));
+      return;
+    }
+    setBusy(true);
+    setErr('');
     try {
       await api.grantDeviceAuth({
-        subject, subjectType: 'USER',
-        deviceId: deviceId || null, deviceTypeId: deviceTypeId || null, areaId: areaId || null, canOperate,
+        subject: form.subject,
+        subjectType: 'USER',
+        deviceId: form.deviceId || null,
+        deviceTypeId: form.deviceTypeId || null,
+        areaId: form.areaId || null,
+        canOperate: form.canOperate,
       });
       onDone();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head"><h3>{t('rms.deviceAuth.grant')}</h3><button className="icon-btn" onClick={onClose}>✕</button></div>
-        <div className="modal-body">
-          <div className="field">
-            <label className="field-label">{t('rms.deviceAuth.subject')} *</label>
-            <input className="text-input" value={subject} placeholder="username" onChange={(e) => setSubject(e.target.value)} />
-          </div>
-          <div className="form-grid">
-            <div className="field">
-              <label className="field-label">{t('rms.deviceAuth.device')}</label>
-              <select className="text-input" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-                <option value="">{t('rms.common.select')}</option>
-                {devices.map((d) => <option key={d.id} value={d.id}>{d.code}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.deviceAuth.deviceType')}</label>
-              <select className="text-input" value={deviceTypeId} onChange={(e) => setDeviceTypeId(e.target.value)}>
-                <option value="">{t('rms.common.select')}</option>
-                {types.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.deviceAuth.area')}</label>
-              <select className="text-input" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-                <option value="">{t('rms.common.select')}</option>
-                {areas.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.deviceAuth.canOperate')}</label>
-              <input type="checkbox" checked={canOperate} onChange={(e) => setCanOperate(e.target.checked)} />
-            </div>
-          </div>
-          {err && <div className="form-error">{err}</div>}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.cancel')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={submit}>{t('rms.common.save')}</button>
-        </div>
-      </div>
-    </div>
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="rms.deviceAuth.grant"
+      onOk={() => void submit()}
+      okKey="rms.common.save"
+      cancelKey="rms.common.cancel"
+      okLoading={busy}
+      width={600}
+    >
+      <FormGrid<AuthForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+        errors={fieldErrors}
+        columns={2}
+      />
+      {err ? (
+        <p className="cim-field-error" style={{ marginTop: 10 }}>
+          {err}
+        </p>
+      ) : null}
+    </CimModal>
   );
 }

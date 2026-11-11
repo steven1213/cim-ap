@@ -1,182 +1,308 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimInput,
+  CimSelect,
+  CimSwitch,
+  CimTag,
+  DataTable,
+  EmptyState,
+  Page,
+  PageHead,
+  Toolbar,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
 import Perms from '@/components/Perms';
 import SpecEditModal from '@/components/SpecEditModal';
 import * as api from '@/lib/rmsApi';
 import { SPEC_MANAGE } from '@/lib/permCodes';
 import type { ParamSpec, Recipe } from '@/types';
 
-/** 参数规格页（FR-S1~S4，Req 29/32/34/35/36）：四类规格 + 双轨容差 + 比对开关 + 模板应用/继承。 */
+/** 模块级空数组：`data ?? []` 会每次渲染造新引用，进依赖数组后触发无谓的 effect。 */
+const NO_RECIPES: Recipe[] = [];
+const NO_SPECS: ParamSpec[] = [];
+
+/**
+ * 参数规格页（FR-S1~S4，Req 29/32/34/35/36）：四类规格 + 双轨容差 + 比对开关 + 模板应用/继承。
+ *
+ * 迁移要点：
+ *   - 取数交给 `useResource`（切配方时的竞态与取消由 hook 保证；旧实现快速切配方会串数据）；
+ *   - 「应用模板 / 继承规格」的结果从页顶一条常驻提示条改为 toast —— 提示条原来不会消失，
+ *     下一次操作前一直挂在页面上，看起来像当前状态；
+ *   - 比对开关从手写 `.led` 按钮改为 `CimSwitch`，并保留无权限时的纯文本回退。
+ */
 export default function SpecPage() {
   const { t } = useTranslation();
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [recipeId, setRecipeId] = useState('');
-  const [list, setList] = useState<ParamSpec[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState<ParamSpec | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
   const [tplCode, setTplCode] = useState('');
   const [srcId, setSrcId] = useState('');
-  const [msg, setMsg] = useState('');
+  const [editing, setEditing] = useState<ParamSpec | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
+  const recipesRes = useResource(() => api.listRecipes());
+  const recipes = recipesRes.data ?? NO_RECIPES;
+
+  // 默认选中第一个配方：配方列表回来后才有值
   useEffect(() => {
-    api.listRecipes().then((r) => {
-      setRecipes(r);
-      if (r.length && !recipeId) setRecipeId(r[0].id);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!recipeId && recipes.length) setRecipeId(recipes[0].id);
+  }, [recipes, recipeId]);
 
-  async function refresh() {
-    if (!recipeId) {
-      setList([]);
+  const { data, loading, error, refresh } = useResource(
+    () => (recipeId ? api.listSpecs(recipeId) : Promise.resolve(NO_SPECS)),
+    { deps: [recipeId], enabled: !!recipeId, keepPreviousData: true },
+  );
+  const rows = data ?? NO_SPECS;
+
+  const recipeOptions = useMemo(
+    () => recipes.map((r) => ({ value: r.id, label: `${r.code} · ${r.name}` })),
+    [recipes],
+  );
+
+  const toggle = async (x: ParamSpec) => {
+    try {
+      await api.setSpecEnabled(x.id, !x.enabled);
+      toast.success(t(x.enabled ? 'rms.common.disabled' : 'rms.common.enabled'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
       return;
     }
-    setLoading(true);
-    try {
-      setList(await api.listSpecs(recipeId));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipeId]);
+  };
 
-  async function toggle(x: ParamSpec) {
-    await api.setSpecEnabled(x.id, !x.enabled);
-    await refresh();
-  }
+  const doDelete = async (x: ParamSpec) => {
+    const ok = await confirm({
+      title: t('rms.common.delete'),
+      contentKey: 'rms.spec.deleteConfirm',
+      danger: true,
+      okKey: 'rms.common.delete',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteSpec(x.id);
+      toast.success(t('rms.common.deleted'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    refresh();
+  };
 
-  async function doDelete(x: ParamSpec) {
-    if (!confirm(t('rms.common.confirmDelete'))) return;
-    await api.deleteSpec(x.id);
-    await refresh();
-  }
-
-  async function applyTpl() {
+  const applyTpl = async () => {
     if (!tplCode) return;
-    const n = await api.applySpecTemplate(recipeId, tplCode);
-    setMsg(t('rms.spec.templateApplied', { n }));
-    await refresh();
-  }
+    try {
+      const n = await api.applySpecTemplate(recipeId, tplCode);
+      toast.success(t('rms.spec.templateApplied', { n }));
+      setTplCode('');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    refresh();
+  };
 
-  async function inherit() {
+  const inherit = async () => {
     if (!srcId) return;
-    const n = await api.inheritSpec(recipeId, srcId);
-    setMsg(t('rms.spec.inherited', { n }));
-    await refresh();
-  }
+    try {
+      const n = await api.inheritSpec(recipeId, srcId);
+      toast.success(t('rms.spec.inherited', { n }));
+      setSrcId('');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    refresh();
+  };
 
-  const recipe = useMemo(() => recipes.find((r) => r.id === recipeId), [recipes, recipeId]);
+  const columns = useMemo<Array<DataTableColumn<ParamSpec>>>(
+    () => [
+      { key: 'paramKey', titleKey: 'rms.spec.paramKey', mono: true, width: 170 },
+      {
+        key: 'paramName',
+        titleKey: 'rms.spec.paramName',
+        width: 150,
+        render: (r) => r.paramName ?? t('rms.common.dash'),
+      },
+      {
+        key: 'specType',
+        titleKey: 'rms.spec.specType',
+        width: 100,
+        render: (r) => <CimTag labelKey={`rms.spec.type.${r.specType}`} />,
+      },
+      {
+        key: 'specValue',
+        titleKey: 'rms.spec.value',
+        mono: true,
+        width: 160,
+        render: (r) => specValue(r),
+      },
+      {
+        key: 'tolerance',
+        titleKey: 'rms.spec.type.TOLERANCE',
+        mono: true,
+        width: 150,
+        render: (r) => tolText(r),
+      },
+      {
+        key: 'unit',
+        titleKey: 'rms.spec.unit',
+        width: 80,
+        render: (r) => r.unit ?? t('rms.common.dash'),
+      },
+      {
+        key: 'enabled',
+        titleKey: 'rms.spec.enabled',
+        width: 96,
+        align: 'center',
+        render: (r) => (
+          <Perms
+            code={SPEC_MANAGE}
+            fallback={<span className="muted">{r.enabled ? t('rms.common.yes') : t('rms.common.no')}</span>}
+          >
+            <CimSwitch size="small" checked={r.enabled} onChange={() => void toggle(r)} />
+          </Perms>
+        ),
+      },
+      {
+        key: 'templateCode',
+        titleKey: 'rms.spec.template',
+        width: 130,
+        render: (r) => <span className="muted">{r.templateCode ?? t('rms.common.dash')}</span>,
+      },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 140,
+        render: (r) => (
+          <span className="cell-actions">
+            <Perms code={SPEC_MANAGE}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditing(r)}>
+                {t('rms.common.edit')}
+              </button>
+              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+                {t('rms.common.delete')}
+              </button>
+            </Perms>
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
+
+  const toolbarInput = { width: 150 } as const;
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{t('rms.spec.title')}</h1>
-          <p className="muted">{t('rms.spec.sub')}</p>
-        </div>
-        <Perms code={SPEC_MANAGE}>
-          <button className="btn btn-primary btn-sm" disabled={!recipeId} onClick={() => setShowCreate(true)}>
-            + {t('rms.spec.add')}
-          </button>
-        </Perms>
-      </div>
+    <Page>
+      <PageHead
+        titleKey="rms.spec.title"
+        subtitleKey="rms.spec.sub"
+        actions={
+          <Perms code={SPEC_MANAGE}>
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={!recipeId}
+              onClick={() => setShowCreate(true)}
+            >
+              + {t('rms.spec.add')}
+            </button>
+          </Perms>
+        }
+      />
 
-      <div className="toolbar">
-        <label className="muted">{t('rms.spec.pickRecipe')}</label>
-        <select className="text-input" value={recipeId} onChange={(e) => setRecipeId(e.target.value)}>
-          {recipes.map((r) => (
-            <option key={r.id} value={r.id}>{r.code} · {r.name}</option>
-          ))}
-        </select>
-        {loading && <span className="muted">{t('rms.common.loading')}</span>}
-        <span style={{ flex: 1 }} />
-        <Perms code={SPEC_MANAGE}>
-          <input className="text-input" style={{ width: 160 }} placeholder={t('rms.spec.applyTemplatePh')}
-            value={tplCode} onChange={(e) => setTplCode(e.target.value)} />
-          <button className="btn btn-ghost btn-sm" onClick={applyTpl}>{t('rms.spec.applyTemplate')}</button>
-          <input className="text-input" style={{ width: 160 }} placeholder={t('rms.spec.inheritPh')}
-            value={srcId} onChange={(e) => setSrcId(e.target.value)} />
-          <button className="btn btn-ghost btn-sm" onClick={inherit}>{t('rms.spec.inherit')}</button>
-        </Perms>
-      </div>
-
-      {msg && <div className="alert info">{msg}</div>}
+      <Toolbar
+        left={
+          <>
+            <span className="muted">{t('rms.spec.pickRecipe')}</span>
+            <CimSelect
+              value={recipeId || null}
+              onChange={(v) => setRecipeId(typeof v === 'string' ? v : '')}
+              options={recipeOptions}
+              allowClear={false}
+              width={320}
+            />
+          </>
+        }
+        right={
+          <Perms code={SPEC_MANAGE}>
+            <div style={toolbarInput}>
+              <CimInput
+                value={tplCode}
+                onChange={setTplCode}
+                placeholderKey="rms.spec.applyTemplatePh"
+                mono
+              />
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => void applyTpl()}>
+              {t('rms.spec.applyTemplate')}
+            </button>
+            <div style={toolbarInput}>
+              <CimInput
+                value={srcId}
+                onChange={setSrcId}
+                placeholderKey="rms.spec.inheritPh"
+                mono
+              />
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => void inherit()}>
+              {t('rms.spec.inherit')}
+            </button>
+          </Perms>
+        }
+      />
 
       {!recipeId ? (
-        <div className="empty"><b>{t('rms.spec.noRecipe')}</b></div>
+        <EmptyState titleKey="rms.spec.noRecipe" />
       ) : (
-        <div className="panel">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('rms.spec.paramKey')}</th>
-                <th>{t('rms.spec.paramName')}</th>
-                <th>{t('rms.spec.specType')}</th>
-                <th>{t('rms.spec.target')} / {t('rms.spec.rangeMin')}</th>
-                <th>{t('rms.spec.type.TOLERANCE')}</th>
-                <th>{t('rms.spec.unit')}</th>
-                <th>{t('rms.spec.enabled')}</th>
-                <th>{t('rms.spec.template')}</th>
-                <th>{t('rms.common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((x) => (
-                <tr key={x.id}>
-                  <td className="mono">{x.paramKey}</td>
-                  <td>{x.paramName ?? t('rms.common.dash')}</td>
-                  <td><span className="tag">{t(`rms.spec.type.${x.specType}`)}</span></td>
-                  <td className="mono">{specValue(x)}</td>
-                  <td className="mono">{tolText(x)}</td>
-                  <td>{x.unit ?? t('rms.common.dash')}</td>
-                  <td>
-                    <Perms code={SPEC_MANAGE} fallback={<span>{x.enabled ? t('rms.common.yes') : t('rms.common.no')}</span>}>
-                      <button className={`led ${x.enabled ? 'ok' : 'off'}`} onClick={() => toggle(x)}>
-                        {x.enabled ? t('rms.common.yes') : t('rms.common.no')}
-                      </button>
-                    </Perms>
-                  </td>
-                  <td className="muted">{x.templateCode ?? t('rms.common.dash')}</td>
-                  <td className="cell-actions">
-                    <Perms code={SPEC_MANAGE}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setEditing(x)}>{t('rms.common.edit')}</button>
-                      <button className="btn btn-ghost btn-sm danger" onClick={() => doDelete(x)}>{t('rms.common.delete')}</button>
-                    </Perms>
-                  </td>
-                </tr>
-              ))}
-              {!loading && list.length === 0 && (
-                <tr><td colSpan={9} className="empty-cell">{t('rms.spec.empty')}</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<ParamSpec>
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          loading={loading}
+          error={error?.message}
+          onRetry={refresh}
+          onRefresh={refresh}
+          settingsKey="rms.spec"
+          scrollX="max-content"
+          emptyTitleKey="rms.spec.empty"
+        />
       )}
-
-      {recipe && <p className="muted">{recipe.code} · {t('rms.spec.sub')}</p>}
 
       {(showCreate || editing) && (
         <SpecEditModal
           recipeId={recipeId}
           initial={editing}
-          onClose={() => { setShowCreate(false); setEditing(null); }}
-          onDone={async () => { setShowCreate(false); setEditing(null); await refresh(); }}
+          onClose={() => {
+            setShowCreate(false);
+            setEditing(null);
+          }}
+          onDone={() => {
+            const wasEdit = !!editing;
+            setShowCreate(false);
+            setEditing(null);
+            toast.success(t(wasEdit ? 'rms.common.updated' : 'rms.common.created'));
+            refresh();
+          }}
         />
       )}
-    </div>
+    </Page>
   );
 }
 
 function specValue(x: ParamSpec): string {
   switch (x.specType) {
-    case 'RANGE': return `[${x.rangeMin ?? '-'}, ${x.rangeMax ?? '-'}]`;
-    case 'LIST_IN': return `{${x.listValues ?? '-'}}`;
-    default: return x.targetValue ?? '-';
+    case 'RANGE':
+      return `[${x.rangeMin ?? '-'}, ${x.rangeMax ?? '-'}]`;
+    case 'LIST_IN':
+      return `{${x.listValues ?? '-'}}`;
+    default:
+      return x.targetValue ?? '-';
   }
 }
 

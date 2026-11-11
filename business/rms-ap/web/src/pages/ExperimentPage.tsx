@@ -1,216 +1,402 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimModal,
+  CimSelect,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  PageHead,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
 import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import { EXPERIMENT_MANAGE } from '@/lib/permCodes';
 import type { Device, Experiment, Recipe, RecipeVersion } from '@/types';
 
+const NO_ROWS: Experiment[] = [];
+const NO_DEVICES: Device[] = [];
+const NO_RECIPES: Recipe[] = [];
+const NO_VERSIONS: RecipeVersion[] = [];
+const STATUSES: Array<Experiment['status']> = ['REQUESTED', 'APPROVED', 'REJECTED', 'CLOSED'];
+
+/** 待办动作：批准/拒绝带审批意见，提前结束带结束原因。 */
+type PendingAction = { kind: 'approve' | 'reject' | 'close'; row: Experiment };
+
 /**
  * 实验配方通道页（W11）：DOE 临时配方受控通道——审批后在「机台 × 版本 × 窗口」内
  * 放行 IF-E2 下发，绕开「仅 ACTIVE 可下发」闸门；过期/关闭自动失效，全程留痕。
+ *
+ * 迁移要点：`window.prompt` 两处（审批意见、结束原因）换成带 `CimModal` 的意见框——
+ * prompt 会阻塞主线程、无法带默认值与多行输入，且在有审批记录的页面上无法审计是「点了取消」
+ * 还是「留了空意见」。现在取消即不发请求，空意见仍可提交，与旧行为一致但语义明确。
  */
 export default function ExperimentPage() {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<Experiment[]>([]);
+  const toast = useToast();
   const [status, setStatus] = useState('');
-  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
-  async function refresh() {
-    setLoading(true);
+  const { data, loading, error, refresh } = useResource(
+    () => api.listExperiments(status || undefined),
+    { deps: [status], keepPreviousData: true },
+  );
+  const rows = data ?? NO_ROWS;
+
+  const statusOptions = useMemo(
+    () => [
+      { value: '', labelKey: 'rms.exp.allStatus' },
+      ...STATUSES.map((s) => ({ value: s, labelKey: `rms.exp.status.${s}` })),
+    ],
+    [],
+  );
+
+  const submitAction = async (text: string) => {
+    if (!pending) return;
+    const { kind, row } = pending;
     try {
-      setRows(await api.listExperiments(status || undefined));
-    } finally {
-      setLoading(false);
+      if (kind === 'close') {
+        // 传空串而非 undefined：后端区分 null 与空串（旧实现的 prompt 未填时就是空串）
+        await api.closeExperiment(row.id, text);
+        toast.success(t('rms.exp.close'));
+      } else {
+        await api.decideExperiment(row.id, kind, text);
+        toast.success(t(kind === 'approve' ? 'rms.common.approved' : 'rms.common.rejected'));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
     }
-  }
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [status]);
+    setPending(null);
+    refresh();
+  };
 
-  async function decide(x: Experiment, action: 'approve' | 'reject') {
-    const comment = window.prompt(t('rms.exp.commentPrompt')) ?? '';
-    await api.decideExperiment(x.id, action, comment);
-    await refresh();
-  }
-
-  async function close(x: Experiment) {
-    const reason = window.prompt(t('rms.exp.closeReasonPrompt'));
-    if (reason === null) return;
-    await api.closeExperiment(x.id, reason);
-    await refresh();
-  }
-
-  function statusTag(x: Experiment) {
-    if (x.status === 'APPROVED' && x.expired) return <span className="tag warn">{t('rms.exp.expired')}</span>;
-    const cls = x.status === 'APPROVED' ? 'ok' : x.status === 'REJECTED' || x.status === 'CLOSED' ? 'err' : 'warn';
-    return <span className={'tag ' + cls}>{t('rms.exp.status.' + x.status)}</span>;
-  }
+  const columns = useMemo<Array<DataTableColumn<Experiment>>>(
+    () => [
+      { key: 'code', titleKey: 'rms.exp.code', mono: true, width: 150 },
+      {
+        key: 'recipe',
+        titleKey: 'rms.exp.recipe',
+        mono: true,
+        width: 180,
+        render: (r) => `${r.recipeCode ?? r.recipeId} v${r.versionNo ?? '—'}`,
+      },
+      {
+        key: 'device',
+        titleKey: 'rms.exp.device',
+        mono: true,
+        width: 130,
+        render: (r) => r.deviceCode ?? r.deviceId,
+      },
+      {
+        key: 'window',
+        titleKey: 'rms.exp.window',
+        width: 320,
+        render: (r) => (
+          <span className="muted">
+            {r.validFrom ?? '—'} ~ {r.validUntil ?? '—'}
+          </span>
+        ),
+      },
+      {
+        key: 'status',
+        titleKey: 'rms.exp.statusLabel',
+        width: 100,
+        render: (r) => (
+          <CimTag
+            tone={
+              r.status === 'APPROVED'
+                ? r.expired
+                  ? 'warn'
+                  : 'ok'
+                : r.status === 'REJECTED' || r.status === 'CLOSED'
+                  ? 'err'
+                  : 'warn'
+            }
+            labelKey={r.status === 'APPROVED' && r.expired ? 'rms.exp.expired' : `rms.exp.status.${r.status}`}
+          />
+        ),
+      },
+      {
+        key: 'requestedBy',
+        titleKey: 'rms.exp.requestedBy',
+        width: 110,
+        render: (r) => <span className="muted">{r.requestedBy ?? '—'}</span>,
+      },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 190,
+        render: (r) => (
+          <span className="cell-actions">
+            <Perms code={EXPERIMENT_MANAGE}>
+              {r.status === 'REQUESTED' && (
+                <>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setPending({ kind: 'approve', row: r })}
+                  >
+                    {t('rms.exp.approve')}
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm danger"
+                    onClick={() => setPending({ kind: 'reject', row: r })}
+                  >
+                    {t('rms.exp.reject')}
+                  </button>
+                </>
+              )}
+              {r.status === 'APPROVED' && !r.expired && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPending({ kind: 'close', row: r })}
+                >
+                  {t('rms.exp.close')}
+                </button>
+              )}
+            </Perms>
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>{t('rms.exp.title')}</h1><p className="muted">{t('rms.exp.sub')}</p></div>
-        <div className="toolbar">
+    <Page>
+      <PageHead
+        titleKey="rms.exp.title"
+        subtitleKey="rms.exp.sub"
+        actions={
           <Perms code={EXPERIMENT_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
               + {t('rms.exp.create')}
             </button>
           </Perms>
-          <select className="text-input text-input-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">{t('rms.exp.allStatus')}</option>
-            {['REQUESTED', 'APPROVED', 'REJECTED', 'CLOSED'].map((s) => (
-              <option key={s} value={s}>{t('rms.exp.status.' + s)}</option>
-            ))}
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={refresh}>{t('rms.common.refresh')}</button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="panel">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('rms.exp.code')}</th>
-              <th>{t('rms.exp.recipe')}</th>
-              <th>{t('rms.exp.device')}</th>
-              <th>{t('rms.exp.window')}</th>
-              <th>{t('rms.exp.statusLabel')}</th>
-              <th>{t('rms.exp.requestedBy')}</th>
-              <th>{t('rms.common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((x) => (
-              <tr key={x.id}>
-                <td className="mono">{x.code}</td>
-                <td className="mono">{x.recipeCode} v{x.versionNo}</td>
-                <td className="mono">{x.deviceCode}</td>
-                <td className="muted">{x.validFrom} ~ {x.validUntil}</td>
-                <td>{statusTag(x)}</td>
-                <td className="muted">{x.requestedBy}</td>
-                <td className="cell-actions">
-                  <Perms code={EXPERIMENT_MANAGE}>
-                    {x.status === 'REQUESTED' && (
-                      <>
-                        <button className="btn btn-ghost btn-sm" onClick={() => decide(x, 'approve')}>{t('rms.exp.approve')}</button>
-                        <button className="btn btn-ghost btn-sm danger" onClick={() => decide(x, 'reject')}>{t('rms.exp.reject')}</button>
-                      </>
-                    )}
-                    {x.status === 'APPROVED' && !x.expired && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => close(x)}>{t('rms.exp.close')}</button>
-                    )}
-                  </Perms>
-                </td>
-              </tr>
-            ))}
-            {!loading && rows.length === 0 && (
-              <tr><td colSpan={7} className="empty-cell">{t('rms.exp.empty')}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<Experiment>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        loading={loading}
+        error={error?.message}
+        onRetry={refresh}
+        onRefresh={refresh}
+        settingsKey="rms.experiment"
+        scrollX="max-content"
+        actions={
+          <CimSelect
+            value={status || null}
+            onChange={(v) => setStatus(typeof v === 'string' ? v : '')}
+            options={statusOptions}
+            width={180}
+            showSearch={false}
+          />
+        }
+        emptyTitleKey="rms.exp.empty"
+      />
 
       {showCreate && (
-        <CreateModal onClose={() => setShowCreate(false)} onCreated={refresh} />
+        <CreateModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            toast.success(t('rms.common.created'));
+            refresh();
+          }}
+        />
       )}
-    </div>
+
+      {pending && (
+        <ActionModal
+          kind={pending.kind}
+          onClose={() => setPending(null)}
+          onSubmit={(text) => void submitAction(text)}
+        />
+      )}
+    </Page>
   );
+}
+
+interface CreateForm {
+  deviceId: string;
+  recipeId: string;
+  versionId: string;
+  reason: string;
+  validUntil: string;
 }
 
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { t } = useTranslation();
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [versions, setVersions] = useState<RecipeVersion[]>([]);
-  const [deviceId, setDeviceId] = useState('');
-  const [recipeId, setRecipeId] = useState('');
-  const [versionId, setVersionId] = useState('');
-  const [reason, setReason] = useState('');
-  const [validUntil, setValidUntil] = useState('');
+  const [form, setForm] = useState<CreateForm>({
+    deviceId: '',
+    recipeId: '',
+    versionId: '',
+    reason: '',
+    validUntil: '',
+  });
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof CreateForm, string>>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
-    api.listDevices().then(setDevices).catch(() => setDevices([]));
-    api.listRecipes().then(setRecipes).catch(() => setRecipes([]));
-  }, []);
+  const devices = useResource(() => api.listDevices()).data ?? NO_DEVICES;
+  const recipes = useResource(() => api.listRecipes()).data ?? NO_RECIPES;
+  const versions =
+    useResource(
+      () => (form.recipeId ? api.listVersions(form.recipeId) : Promise.resolve(NO_VERSIONS)),
+      { deps: [form.recipeId], enabled: !!form.recipeId, keepPreviousData: true },
+    ).data ?? NO_VERSIONS;
 
-  useEffect(() => {
-    if (!recipeId) { setVersions([]); setVersionId(''); return; }
-    api.listVersions(recipeId).then(setVersions).catch(() => setVersions([]));
-  }, [recipeId]);
+  const fields = useMemo<Array<FormField<CreateForm>>>(
+    () => [
+      {
+        kind: 'select',
+        key: 'deviceId',
+        labelKey: 'rms.exp.device',
+        required: true,
+        options: devices.map((d) => ({ value: d.id, label: d.code, hint: d.name })),
+      },
+      {
+        kind: 'select',
+        key: 'recipeId',
+        labelKey: 'rms.exp.recipe',
+        required: true,
+        options: recipes.map((r) => ({ value: r.id, label: r.code, hint: r.name })),
+      },
+      {
+        kind: 'select',
+        key: 'versionId',
+        labelKey: 'rms.exp.version',
+        required: true,
+        hintKey: 'rms.exp.versionHint',
+        options: versions.map((v) => ({
+          value: v.id,
+          label: `v${v.versionNo} · ${v.status}`,
+        })),
+      },
+      {
+        kind: 'datetime',
+        key: 'validUntil',
+        labelKey: 'rms.exp.validUntil',
+        required: true,
+        // 后端收 ISO 串再转 Instant；界面显示照旧是本地时间
+        valueFormat: 'YYYY-MM-DDTHH:mm',
+      },
+      { kind: 'textarea', key: 'reason', labelKey: 'rms.exp.reason', span: 2, rows: 2 },
+    ],
+    [devices, recipes, versions],
+  );
 
   async function submit() {
-    if (!deviceId || !recipeId || !versionId || !validUntil) {
-      setErr(t('rms.common.confirm'));
-      return;
-    }
+    const next: Partial<Record<keyof CreateForm, string>> = {};
+    if (!form.deviceId) next.deviceId = t('rms.common.required');
+    if (!form.recipeId) next.recipeId = t('rms.common.required');
+    if (!form.versionId) next.versionId = t('rms.common.required');
+    if (!form.validUntil) next.validUntil = t('rms.common.required');
+    setFieldErrors(next);
+    if (Object.keys(next).length) return;
+
     setBusy(true);
     setErr('');
     try {
       await api.createExperiment({
-        recipeId, versionId, deviceId,
-        reason: reason || undefined,
-        validUntil: new Date(validUntil).toISOString(),
+        recipeId: form.recipeId,
+        versionId: form.versionId,
+        deviceId: form.deviceId,
+        reason: form.reason || undefined,
+        validUntil: new Date(form.validUntil).toISOString(),
       });
       onCreated();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>{t('rms.exp.create')}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="field">
-            <label className="field-label">{t('rms.exp.device')} *</label>
-            <select className="text-input" value={deviceId} onChange={(e) => setDeviceId(e.target.value)}>
-              <option value="">—</option>
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>{d.code} · {d.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.exp.recipe')} *</label>
-            <select className="text-input" value={recipeId} onChange={(e) => setRecipeId(e.target.value)}>
-              <option value="">—</option>
-              {recipes.map((r) => (
-                <option key={r.id} value={r.id}>{r.code} · {r.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.exp.version')} *（{t('rms.exp.versionHint')}）</label>
-            <select className="text-input" value={versionId} onChange={(e) => setVersionId(e.target.value)}>
-              <option value="">—</option>
-              {versions.map((v) => (
-                <option key={v.id} value={v.id}>v{v.versionNo} · {v.status}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.exp.reason')}</label>
-            <input className="text-input" value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.exp.validUntil')} *</label>
-            <input className="text-input" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
-          </div>
-          <p className="muted">{t('rms.exp.hint')}</p>
-          {err && <div className="form-error">{err}</div>}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.cancel')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={submit}>{t('rms.common.save')}</button>
-        </div>
-      </div>
-    </div>
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="rms.exp.create"
+      onOk={() => void submit()}
+      okKey="rms.common.save"
+      cancelKey="rms.common.cancel"
+      okLoading={busy}
+      width={640}
+    >
+      <FormGrid<CreateForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+        errors={fieldErrors}
+        columns={2}
+      />
+      <p className="muted" style={{ marginTop: 10 }}>
+        {t('rms.exp.hint')}
+      </p>
+      {err ? (
+        <p className="cim-field-error" style={{ marginTop: 6 }}>
+          {err}
+        </p>
+      ) : null}
+    </CimModal>
+  );
+}
+
+function ActionModal({
+  kind,
+  onClose,
+  onSubmit,
+}: {
+  kind: PendingAction['kind'];
+  onClose: () => void;
+  onSubmit: (text: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState('');
+
+  const fields: Array<FormField<{ text: string }>> = [
+    {
+      kind: 'textarea',
+      key: 'text',
+      labelKey: kind === 'close' ? 'rms.exp.closeReason' : 'rms.exp.comment',
+      span: 1,
+      rows: 3,
+    },
+  ];
+
+  return (
+    <CimModal
+      open
+      onClose={onClose}
+      title={
+        kind === 'approve'
+          ? t('rms.exp.approve')
+          : kind === 'reject'
+            ? t('rms.exp.reject')
+            : t('rms.exp.close')
+      }
+      onOk={() => onSubmit(text)}
+      okKey="rms.common.submit"
+      cancelKey="rms.common.cancel"
+      okDanger={kind === 'reject'}
+      width={480}
+    >
+      <FormGrid<{ text: string }>
+        fields={fields}
+        value={{ text }}
+        onChange={(patch) => setText(patch.text ?? '')}
+        columns={1}
+      />
+    </CimModal>
   );
 }

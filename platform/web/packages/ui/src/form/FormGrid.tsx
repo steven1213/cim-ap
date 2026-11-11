@@ -24,6 +24,8 @@ export interface FormOption {
   value: string;
   labelKey?: string;
   label?: string;
+  /** 右侧补充说明（如编码后面跟名称），同时参与搜索命中。 */
+  hint?: string;
   disabled?: boolean;
 }
 
