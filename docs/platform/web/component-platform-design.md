@@ -1,6 +1,6 @@
 # 前端组件中台设计（多 ap 共享组件 · 主题 · 数据 · 翻译）
 
-> 状态：**P0–P13 全部落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；IAM 21 页、approval 9 页按各自节奏排期。
+> 状态：**P0–P16a 落地（2026-11-11）**。实现细节与实测数据见 [§10](#10-落地批次与验收标准)：P0 主题/样式、P1 组件层、P2 消息层与拆包、P3 外壳层（`@cim/shell`）、P4 数据层（`@cim/data`）+ 首批页面迁移、P5 文案层（`@cim/i18n`）+ 三应用适配层收薄、P6 第二批页面迁移（RMS 4 页 + 1 个共享弹窗）、P7 主数据三页 + 区域页对齐（RMS 4 页，含一处服务端查询修正）、P8 中页三张（+ 台组件三个缺口）、P9 特型两页、P10 配方库 + 详情抽屉、P11 签核页、P12 集成页 + 批量弹窗、P13 两个页面级取数组件、P14–P16a IAM 十三页（含 `signal` 透传、`CimInput.autoComplete`、手写树 → `CimTree`）。**RMS 页面 19/19 迁移完毕**（余 4 页为登录/错误页，无列表无表单），页面级取数组件 5/5；**IAM 13/16**（余 3 页为配置型重页）；approval 9 页按自己的节奏排期。
 > 关系：[`README.md`](./README.md) 是**单应用**的前端基础框架设计（请求层/认证/权限/状态/i18n/主题的分章详述），本文是**多 ap 共享**视角的组件中台设计，两者不冲突：README 讲「一个应用内部怎么搭」，本文讲「五个应用的公共部分怎么抽、怎么发、怎么用」。
 > 冲突时以本文为准的情形：包边界、依赖方向、跨应用契约。README 的 §1–§13 仍是请求层/i18n/权限的**实现细节权威源**。
 
@@ -454,6 +454,9 @@ server:  { fs: { allow: ['.', '../../../platform/web/packages'] } },   // 允许
 | **P11** ✅ | SignoffPage：受控多选 + 批量条 + 四个弹窗 + 详情抽屉 | 真页面 + 8084 接口桩 + 6 项断言，见 §10.13。时间线**刻意不换 `CimSteps`**（语义会失真） |
 | **P12** ✅ | IntegrationPage（七面板）+ `BatchOpsModal`：基础字典顶层一次下发、`window.prompt` → 原因弹窗 | 真页面 + 8084 接口桩 + 14 项断言，见 §10.14。**字典请求 15 → 10 条** |
 | **P13** ✅ | 两个页面级取数组件：`ChamberPanel` / `DeviceDetailDrawer`（这是本轮唯一减行的一批） | 真页面 + 8084 接口桩 + 8 项断言，见 §10.15。顺带修掉「请先选择机台」的误导文案 |
+| **P14** ✅ | IAM 首批五页：AuditLog / Lockouts / Sessions / Roles / Admissions（另有 `api.get` 补 `signal` 透传） | 真页面 + 8081 契约桩 + 11 场景，见 §10.16。修「表格显示 A、写操作发给 B」 |
+| **P15** ✅ | IAM 第二批六页：Dashboard / Settings / AppMgmt / OrgGrants / PermissionsAdmin / Profile（另有 `CimInput.autoComplete`） | 真页面 + 8081 契约桩 + 13 场景（累计 24），见 §10.17。字典请求合成一次 |
+| **P16a** ✅ | IAM 用户页与组织页：`UsersPage`（归属面板按需取数）/ `OrgPage`（手写递归树 → `CimTree`） | 真页面 + 8081 契约桩 + 7 场景，见 §10.18。`labelNode` + `searchText` 成对使用 |
 
 ### 10.1 P0 实施记录（2026-11-11）
 
@@ -1057,12 +1060,88 @@ useEffect(() => { const id = setTimeout(refresh, 200); return () => clearTimeout
 
 ---
 
+### 10.16 P14 实施记录：IAM 首批五页（审计 / 锁定 / 会话 / 角色组 / 准入）（2026-11-11）
+
+**为什么 IAM 值得单独一批而不是「顺手迁」**：IAM 是控制面，它的页面几乎全是「切筛选看最新」——审计按类型筛、会话看在线、锁定看当前被锁。这类页面**最容易被慢回包盖掉新结果**，而肉眼看不出（数据都合法）。所以 IAM 的第一批不追求覆盖面，先把 `useResource` 的四个语义（竞态 / 取消 / 去重 / 可见性轮询）落到最典型的五个列表上。
+
+**先补的一处基建**：`lib/api.ts` 的 `get` / `rootGet` 原本没有 `signal` 入参。不给的话 `useResource` 的 abort 只是摆设——`deps` 变化时它调 `controller.abort()`，但 axios 收不到，旧请求照样跑完、照样占连接。这一批顺手把 `signal` 透到 axios config，两个实例（`/api/v1` 与无前缀的平台端点）都覆盖。
+
+**五页的改动与实测**：
+
+| 页面 | 行数 | 关键改动 | 实测证据 |
+| --- | --- | --- | --- |
+| `AuditPage` | 143→196 | 手写表 + 空态 + 错误条 → `DataTable`；类型/条数两处筛选进 `deps` | 切类型发 `type=LOGIN_SUCCESS`；切条数发 `limit=500` |
+| `LockoutsPage` | 130→150 | 解锁按钮**逐行锁**（只禁当前行） | 点解锁发 `DELETE /admin/lockouts/bob` 后刷新 |
+| `SessionsPage` | 196→219 | `window.confirm` → `useConfirm`（danger + 用户名插值） | 确认后发 `DELETE /admin/sessions/u1` 后刷新 |
+| `RolesPage` | 109→106 | 角色组标签 + 人数角标（`CimTag` 不收 `title`，悬停提示包一层 `span`） | 2 组渲染，空角色组显示占位文案 |
+| `AdmissionsPage` | 198→240 | **拆 `draft` / `applied`** | 「填 zoe → 查询 → 授予」POST 体为 `{"userId":"zoe"}` |
+
+**`info` 档怎么落**：`auditTone()` 返回 4 档（ok/warn/err/info），平台语义只有 5 档（ok/warn/err/run/idle）。`info` 一律映射到 `run`（蓝）——用 `idle`（灰）表达「常规事件」语义是反的，灰被读成「无状态」。
+
+**`AdmissionsPage` 的真缺陷**：原实现 `query()` 读的是输入框里的 `userId`，也就是「表格显示的是 A 的用户、写操作却发给 B」。截图上看不出来（表格里角色都在），只有点了授予才会把角色授错人。现在表格与写操作一律读 `applied`，草稿只影响输入框。
+
+**验证 11 场景**：五页静态渲染 + 切换筛选 + 解锁 + 强制下线 + 准入授予/撤销/换人查询，**0 未捕获异常**；请求序列逐条核对（含 DELETE 后的刷新、POST 体、筛选参数）。
+
+---
+
+### 10.17 P15 实施记录：IAM 第二批六页（看板 / 设置 / 应用 / 组织授权 / 权限点 / 个人资料）（2026-11-11）
+
+这批的共同点是**读多写少 + 表单**，所以重点从「表格」转到三处语义：加载与失败的分离、写动作的反馈分档、表单控件的默认宽度。
+
+**逐页**：
+
+| 页面 | 行数 | 关键改动 |
+| --- | --- | --- |
+| `DashboardPage` | 319→386 | 双视角各自 `useResource`；最近审计 + 个人准入矩阵 → `DataTable flat`；KPI 与 `dl.meta` 保留 |
+| `SettingsPage` | 197→244 | 只读六组参数 + 一个同步动作；同步结果从「按钮旁一行小字」改 `toast` 分档；状态标签全换 `CimTag` |
+| `AppMgmtPage` | 220→232 | 注册表单 → `FormGrid`（3 列，含 `number`）；停用确认 → `useConfirm(danger)`；启停逐行锁 |
+| `OrgGrantsPage` | 314→341 | 三份字典合成**一个** `useResource`（并发）；受影响人数单独一个 `enabled` 绑 `orgId` |
+| `PermissionsAdminPage` | 352→383 | 列表与菜单树各一个 `useResource`；菜单树失败**不算**页面错误（保留按 module 分组的降级） |
+| `ProfilePage` | 181→204 | 三个口令框 → `CimInput` + `status=error` 标不一致；orgs 标签 → `CimTag` |
+
+**看板为什么保留 `dl.meta` 与自绘 KPI**：`CimDescriptions` 是 antd Descriptions，行高比 `dl.meta` 大一圈——设置页 6 组参数原本一屏读完，换过去要滚动。迁移的口径是「取数与交互走组件层」，不是「把每个视觉细节都换成 antd」；`dl.meta` 是纯展示，没有状态、没有取数，换它只损失密度。
+
+**组织授权为什么必须合成一个请求**：拆成三个 `useResource` 会得到这样的中间态——表格先画出来（授权行已到），下拉还是空的（组织/应用未到），于是「当前选中值」在下拉里找不见，antd 会显示原始值。合成一个 `Promise.all` 之后，三者同进同出。**受影响人数**则相反，必须单独拆：它依赖 `orgId`，用 `enabled: !!orgId` 绑住，没选组织就不发请求。
+
+**`CimInput` 补 `autoComplete`**（本批唯一的台组件改动）：改密/登录必须显式给 `current-password` / `new-password`。不给的话密码管理器分不清「旧口令」与「设置新口令」，会把新口令填进旧口令框，表现为「提示旧口令错误」——这类问题只在真机上出现，构建与类型检查都发现不了。
+
+**验证 24 场景**：P14 的 11 个 + 本批 13 个（含停用发 `PUT body {"status":"DISABLED"}`、注册发 `POST body {"appCode":"new-ap",...}`、选中组织才发 `/admin/orgs/o3/users`、权限搜索 3→1 条），**0 未捕获异常**。
+
+---
+
+### 10.18 P16a 实施记录：用户页与组织页（含手写树 → `CimTree`）（2026-11-11）
+
+**`UsersPage`（660→约 700）**：三个值得说的点。
+
+1. **「归属」面板的取数时机**：原实现在 `openOrgs()` 里 `await` 取当前组织，面板先画出来是空的、数据到了再勾上——中间态会闪一下「一个都没选」。改成 `useResource` + `enabled: panel === 'orgs'` 之后，面板打开即进入 loading，回包直接决定勾选态。
+2. **服务端回包 → 可编辑副本**：勾选态是用户可改的本地 state，服务端只提供初值。这里用一条 `useEffect` 依赖「回包 + 面板标识」落地，属于「外部数据落到可编辑副本」这个模式的最小写法；不要在 `render` 里派生，否则用户取消勾选会被立刻重置。
+3. **`<datalist>` → `CimSelect`**：原来挂人输入用 `datalist` 提示用户 id。Safari 不支持 `datalist`，且它只能按 id 前缀匹配、搜不到姓名。换成可选可搜的下拉后，用户按姓名也能找到人。
+
+**`OrgPage`（576→约 560）**：手写递归树换 `CimTree`。
+
+| 消失的写法 | 替代 |
+| --- | --- |
+| 30 行 `renderTree(list, depth)` + `paddingLeft: 8 + depth * 17` | `CimTree` 自带层级缩进与连线（`showLine`） |
+| 自维护 `Set<string>` 展开态 + `toggle()` | `expandedKeys` / `onExpand` 受控 |
+| `.tree-row` / `.tree-toggle` / `.tree-row.on` 三段私有 CSS | 选中态由 antd 的 `selectedKeys` 承担（保留 `.org-tree-node` 一条 inline-flex） |
+
+`labelNode` 与 `searchText` **必须成对给**：节点标题是「名称 + 编码 + 类型/AD/停用标签」的 ReactNode，而过滤函数只能读字符串，`searchText` 就是给它准备的（写成 `名称 编码`）。只给 `labelNode` 的话，搜索会漏掉整棵树。
+
+**首屏展开只做一次**：`seeded` ref 守住第一批数据到达这一刻，之后 `bundleRes.refresh()` 不会把用户折叠好的树重新全展开。这与 RMS `DeviceRecipePage` 的做法一致。
+
+**顺手修的一处**：右侧表单的灌值原本依赖 `[selected, nodes.length]`——节点数不变但内容变了（改名后刷新）时不会重新灌值，表现为「保存后输入框还显示旧名字」。改为依赖 `selectedNode` 本身。
+
+**验证 7 场景**：用户表 3 行；点「组织归属」才发 `/admin/users/u1/orgs`（未打开不发）；点「档案」不发额外请求（用行数据）；停用发 `PUT .../status body {"enabled":false}` 后刷新；组织树 3 节点；点树节点才发 `/admin/orgs/o2/users`；「新建节点」展开表单。
+
+---
+
 **迁移收尾结论（P0–P13，2026-11-11）**
 
 - **RMS 页面 19/19 迁移完毕**：23 个 `pages/*.tsx` 里 19 个已用 `useResource`；剩余 4 个是 `LoginPage` / `SsoCallback` / `ForbiddenPage` / `NotFoundPage`——没有列表也没有表单骨架，本不需要迁。
 - **页面级取数组件 5/5**：`RecipeDetailDrawer` / `DeviceDetailDrawer` / `BatchOpsModal` / `ChamberPanel` / `DiffTable`。
 - **刻意没动的**：`NotificationBell`（180 行）。它是**外壳 chrome**，不用 `Panel`/`DataTable`/`CimModal` 任何一个页面原语；它的取数是「30s 轮询未读数 + SSE 事件触发回拉」，`useResource` 的 `pollInterval` 能覆盖轮询那一半，但另一半是 SSE 回调里的命令式 `poll()`，混进来会让「通知通道」与「组件层迁移」两件事互相牵扯。留待通知能力单独排期。
-- **IAM 21 页、approval 9 页仍未动**：这两个应用先享受组件层（外壳 / 消息 / 文案 / 数据层已接入），页面迁移按各自节奏推进。铁律不变：**新页面一律用 `@cim/*`**。
+- **IAM 13/16 页迁移完毕（P14–P16a）**：`Audit` / `Lockouts` / `Sessions` / `Roles` / `Admissions` / `Dashboard` / `Settings` / `AppMgmt` / `OrgGrants` / `PermissionsAdmin` / `Profile` / `Users` / `Org`。剩 3 页（`RolesAdmin` / `MenusAdmin` / `I18nAdmin`）是**配置型重页**，各自带一棵树或一张可编辑表格，单独排期。
+- **approval 9 页仍未动**：它已享受组件层（外壳 / 消息 / 文案 / 数据层已接入），页面迁移按自己的节奏推进。铁律不变：**新页面一律用 `@cim/*`**。
 
 ---
 
