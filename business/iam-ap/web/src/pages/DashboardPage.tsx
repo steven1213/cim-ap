@@ -7,6 +7,9 @@ import {
   CimTag,
   DataTable,
   EmptyState,
+  InlineAlert,
+  KpiCard,
+  KpiGrid,
   Page,
   Panel,
   type DataTableColumn,
@@ -107,10 +110,7 @@ function AdminOverview() {
     return (
       <Page>
         <Panel title={t('iam.dashboard.platformTitle')}>
-          <div className="alert err">
-            <IconAlert width={15} height={15} />
-            <span>{ovRes.error.message || t('iam.dashboard.errLoad')}</span>
-          </div>
+          <InlineAlert tone="err">{ovRes.error.message || t('iam.dashboard.errLoad')}</InlineAlert>
           <button className="btn-sm" style={{ marginTop: 12 }} onClick={ovRes.refresh}>
             {t('iam.common.refresh')}
           </button>
@@ -134,16 +134,16 @@ function AdminOverview() {
 
   return (
     <Page>
-      <div className="kpi-grid">
-        <Kpi icon={<IconUsers width={16} height={16} />} label={t('iam.dashboard.kpiUser')} value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={t('iam.dashboard.kpiUserSub', { n: ov.disabledUserCount })} />
-        <Kpi icon={<IconUser width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiProfile')} value={ov.profileCount} sub={t('iam.dashboard.kpiProfileSub', { n: ov.adProfileCount })} />
-        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrg')} value={ov.orgCount} sub={t('iam.dashboard.kpiOrgSub', { n: ov.orgManagedCount })} />
-        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApp')} value={`${ov.enabledAppCount} / ${ov.appCount}`} sub={t('iam.dashboard.kpiAppSub')} />
-        <Kpi icon={<IconMonitor width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiSession')} value={ov.activeSessionCount} sub={t('iam.dashboard.kpiSessionSub')} />
-        <Kpi icon={<IconLock width={16} height={16} />} tone={ov.lockedCount > 0 ? 'warn' : 'ok'} label={t('iam.dashboard.kpiLock')} value={ov.lockedCount} sub={t('iam.dashboard.kpiLockSub')} />
-        <Kpi icon={<IconShield width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiLoginOk')} value={ov.loginSuccessCount} sub={t('iam.dashboard.kpiCumulative')} />
-        <Kpi icon={<IconAlert width={16} height={16} />} tone={failTone} label={t('iam.dashboard.kpiLoginFail')} value={ov.loginFailureCount} sub={t('iam.dashboard.kpiLoginFailSub')} />
-      </div>
+      <KpiGrid>
+        <KpiCard icon={<IconUsers width={16} height={16} />} label={t('iam.dashboard.kpiUser')} value={`${ov.enabledUserCount} / ${ov.userCount}`} sub={t('iam.dashboard.kpiUserSub', { n: ov.disabledUserCount })} />
+        <KpiCard icon={<IconUser width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiProfile')} value={ov.profileCount} sub={t('iam.dashboard.kpiProfileSub', { n: ov.adProfileCount })} />
+        <KpiCard icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrg')} value={ov.orgCount} sub={t('iam.dashboard.kpiOrgSub', { n: ov.orgManagedCount })} />
+        <KpiCard icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApp')} value={`${ov.enabledAppCount} / ${ov.appCount}`} sub={t('iam.dashboard.kpiAppSub')} />
+        <KpiCard icon={<IconMonitor width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiSession')} value={ov.activeSessionCount} sub={t('iam.dashboard.kpiSessionSub')} />
+        <KpiCard icon={<IconLock width={16} height={16} />} tone={ov.lockedCount > 0 ? 'warn' : 'ok'} label={t('iam.dashboard.kpiLock')} value={ov.lockedCount} sub={t('iam.dashboard.kpiLockSub')} />
+        <KpiCard icon={<IconShield width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiLoginOk')} value={ov.loginSuccessCount} sub={t('iam.dashboard.kpiCumulative')} />
+        <KpiCard icon={<IconAlert width={16} height={16} />} tone={failTone} label={t('iam.dashboard.kpiLoginFail')} value={ov.loginFailureCount} sub={t('iam.dashboard.kpiLoginFailSub')} />
+      </KpiGrid>
 
       <Panel
         title={t('iam.dashboard.recentAudit')}
@@ -254,12 +254,12 @@ function PersonalOverview() {
 
   return (
     <Page>
-      <div className="kpi-grid">
-        <Kpi icon={<IconUser width={16} height={16} />} label={t('iam.dashboard.kpiUserId')} value={user.userId} />
-        <Kpi icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApps')} value={apps.length} />
-        <Kpi icon={<IconShield width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiRoles')} value={roleCount} />
-        <Kpi icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrgs')} value={orgs.length} sub={orgs.filter((o) => o.primary).map((o) => o.name).join(', ') || undefined} />
-      </div>
+      <KpiGrid>
+        <KpiCard icon={<IconUser width={16} height={16} />} label={t('iam.dashboard.kpiUserId')} value={user.userId} />
+        <KpiCard icon={<IconApps width={16} height={16} />} tone="ok" label={t('iam.dashboard.kpiApps')} value={apps.length} />
+        <KpiCard icon={<IconShield width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiRoles')} value={roleCount} />
+        <KpiCard icon={<IconTree width={16} height={16} />} tone="info" label={t('iam.dashboard.kpiOrgs')} value={orgs.length} sub={orgs.filter((o) => o.primary).map((o) => o.name).join(', ') || undefined} />
+      </KpiGrid>
 
       <div className="grid-2">
         <Panel title={t('iam.dashboard.identityTitle')} sub={t('iam.dashboard.identitySub')}>
@@ -328,27 +328,3 @@ function PersonalOverview() {
   );
 }
 
-function Kpi({
-  icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  tone?: 'ok' | 'info' | 'warn';
-}) {
-  return (
-    <div className={'kpi' + (tone ? ' ' + tone : '')}>
-      <div className="kpi-ico">{icon}</div>
-      <div className="kpi-main">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-val">{value}</div>
-        {sub && <div className="kpi-sub">{sub}</div>}
-      </div>
-    </div>
-  );
-}
