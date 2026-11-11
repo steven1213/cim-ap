@@ -66,17 +66,17 @@ class IamApIntegrationTest {
         String token1 = issue("u1", "u1", null);
         assertClaims(token1, "u1", Set.of("mds-ap"), 1L);
 
-        // 4) 版本端点下发当前版本（纯文本）
+        // 4) 版本端点下发当前版本（统一信封：data 为版本号）
         mvc.perform(get("/api/v1/internal/token-version").param("uid", "u1"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("1"));
+                .andExpect(content().json("{\"code\":0,\"data\":1}"));
 
         // 5) bump → 版本递增
         mvc.perform(post("/api/v1/internal/token-version/bump").param("uid", "u1"))
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/internal/token-version").param("uid", "u1"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("2"));
+                .andExpect(content().json("{\"code\":0,\"data\":2}"));
 
         // 6) 重新签发，ver 同步为 2
         String token2 = issue("u1", "u1", null);
@@ -97,7 +97,8 @@ class IamApIntegrationTest {
                         .content(json(Map.of("userId", userId, "username", username))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        return objectMapper.readValue(body, IssuedToken.class).token();
+        // 统一信封：令牌在 data.token
+        return objectMapper.treeToValue(objectMapper.readTree(body).path("data"), IssuedToken.class).token();
     }
 
     @SuppressWarnings("unchecked")

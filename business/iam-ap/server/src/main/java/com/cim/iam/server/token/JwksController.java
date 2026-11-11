@@ -1,5 +1,6 @@
 package com.cim.iam.server.token;
 
+import com.cim.spring.support.web.RawResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,8 @@ public class JwksController {
     private final RsaKeyService rsaKeyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @RawResponse(reason = RawResponse.Reason.STANDARD_PROTOCOL,
+            value = "RFC 7517 JWKS：报文体由各 ap 的 cim-auth-starter 按规范解析，套信封即不兼容")
     @GetMapping(value = "/.well-known/jwks.json", produces = "application/json")
     public Map<String, Object> jwks() {
         RSAPublicKey pub = (RSAPublicKey) rsaKeyService.getPublicKey();

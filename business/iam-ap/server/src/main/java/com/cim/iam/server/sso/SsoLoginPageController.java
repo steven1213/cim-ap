@@ -5,6 +5,7 @@ import com.cim.iam.server.config.SsoProperties;
 import com.cim.iam.server.sso.SsoSessionService;
 import com.cim.iam.server.token.TokenIssueRequest;
 import com.cim.iam.server.token.TokenIssuerService;
+import com.cim.spring.support.web.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -319,6 +320,8 @@ public class SsoLoginPageController {
      *
      * <p>无有效会话时才渲染登录表单（原有行为不变）。</p>
      */
+    @RawResponse(reason = RawResponse.Reason.HTML,
+            value = "统一登录页：渲染 HTML 表单或 302 回跳业务 ap，不是数据接口")
     @GetMapping(value = "/login")
     public ResponseEntity<String> loginPage(HttpServletRequest request,
                                             HttpServletResponse response,

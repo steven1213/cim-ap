@@ -146,10 +146,15 @@ class SessionIntegrationTest {
         return resp.getStatusCode().value();
     }
 
+    /** 黑名单查询返回统一信封，这里取 data 并转成 "true"/"false" 以便断言直读。 */
     private String blacklistOf(String jti) {
         ResponseEntity<String> resp = rest.getForEntity("/api/v1/internal/token-blacklist?jti=" + jti, String.class);
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
-        return resp.getBody();
+        try {
+            return Boolean.toString(objectMapper().readTree(resp.getBody()).path("data").asBoolean());
+        } catch (Exception e) {
+            throw new IllegalStateException("黑名单响应无法解析：" + resp.getBody(), e);
+        }
     }
 
     private int protectedStatusWithBearer(String token) {
