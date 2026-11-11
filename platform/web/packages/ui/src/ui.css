@@ -571,3 +571,43 @@
 .dim {
   color: var(--muted);
 }
+
+/* ---------- 提示块（InlineAlert）----------
+   原样搬自三个应用 styles.css 的 `.alert` 段（三份实现逐字节相同，2026-11-12 实测）。
+   放在这里后各应用只需 `import '@cim/ui/index.css'` 即可用，组件见 feedback/InlineAlert.tsx。 */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  border: 1px solid transparent;
+}
+.alert + .alert {
+  margin-top: 8px;
+}
+.alert svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.alert.err {
+  color: var(--err);
+  background: var(--err-soft);
+  border-color: color-mix(in srgb, var(--err) 24%, transparent);
+}
+.alert.ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 24%, transparent);
+}
+.alert.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 26%, transparent);
+}
+.alert.info {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: color-mix(in srgb, var(--info) 26%, transparent);
+}

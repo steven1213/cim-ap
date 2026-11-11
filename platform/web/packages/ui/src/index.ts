@@ -47,6 +47,7 @@ export { CimScrollArea, type CimScrollAreaProps } from './content/ScrollArea';
 // ── data 数据展示 ───────────────────────────────────────────────
 export { DataTable, type DataTableColumn, type DataTableProps, type SortDir } from './data/DataTable';
 export { StatusTag, ToneTag } from './data/StatusTag';
+export { KpiCard, KpiGrid, type KpiCardProps, type KpiTone } from './data/KpiCard';
 export { useColumns, type ColumnMeta, type ColumnState } from './data/useColumns';
 export { CimDescriptions, type DescItem, type CimDescriptionsProps } from './data/Descriptions';
 export { CimInfoTable, type InfoItem, type CimInfoTableProps } from './data/InfoTable';
@@ -82,6 +83,7 @@ export {
   type CimConfirm,
   type CimConfirmOptions,
 } from './feedback/message';
+export { InlineAlert, type AlertTone, type InlineAlertProps } from './feedback/InlineAlert';
 export { CimTooltip, type CimTooltipProps } from './feedback/Tooltip';
 export { CimPopconfirm, type CimPopconfirmProps } from './feedback/Popconfirm';
 export { CimPopover, type CimPopoverProps } from './feedback/Popover';
@@ -93,3 +95,41 @@ export {
   type SplitterPanelConfig,
   type SplitterPanelSize,
 } from './layout/Splitter';
+
+// ── 通用图标（内联 SVG，跨应用共用）─────────────────────────────
+export {
+  IconGauge,
+  IconApps,
+  IconKick,
+  IconUser,
+  IconSidebar,
+  IconSun,
+  IconMoon,
+  IconLogout,
+  IconShield,
+  IconKey,
+  IconAlert,
+  IconCheckCircle,
+  IconInbox,
+  IconRefresh,
+  IconEye,
+  IconEyeOff,
+  IconSearch,
+  IconUsers,
+  IconLock,
+  IconLink,
+  IconMonitor,
+  IconList,
+  IconSliders,
+  IconPlus,
+  IconTrash,
+  IconBan,
+  IconPower,
+  IconTree,
+  IconOrgGrant,
+  IconChevron,
+  IconX,
+  IconEdit,
+  IconSync,
+  IconSave,
+} from './icons';
