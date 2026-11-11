@@ -1,18 +1,23 @@
-// 主题（浅色 / 深色）读写：落 localStorage，作用在 <html data-theme>。
-// index.html 内联脚本会在首屏渲染前抢先应用，避免主题闪烁（FOUC）。
-export type Theme = 'light' | 'dark';
+// 主题读写——实现已上提至 `@cim/theme`，本文件只负责绑定本 ap 的存储键。
+//
+// ⚠️ 存储键修正：本文件此前是从 IAM 整体拷贝的，键沿用 `iam-theme`。
+// 各 ap 若部署在同一域名的不同路径下（如 /iam、/rms），localStorage 同源共享，
+// 会导致两个应用的明暗偏好互相覆盖。改为 `rms-theme` 后前缀隔离。
+import {
+  applyTheme,
+  persistTheme as persist,
+  readTheme as read,
+  type Theme,
+} from '@cim/theme';
 
-const KEY = 'iam-theme';
+/** 本 ap 的偏好存储键（各 ap 前缀隔离，互不串味）。 */
+const KEY = 'rms-theme';
 
-export function readTheme(): Theme {
-  return localStorage.getItem(KEY) === 'dark' ? 'dark' : 'light';
-}
+export type { Theme };
+export { applyTheme };
 
-export function applyTheme(theme: Theme): void {
-  document.documentElement.setAttribute('data-theme', theme);
-}
+/** 读主题偏好（缺省 light）。 */
+export const readTheme = (): Theme => read(KEY);
 
-export function persistTheme(theme: Theme): void {
-  localStorage.setItem(KEY, theme);
-  applyTheme(theme);
-}
+/** 落盘并立即生效。 */
+export const persistTheme = (theme: Theme): void => persist(KEY, theme);

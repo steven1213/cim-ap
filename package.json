@@ -1,0 +1,17 @@
+{
+  "name": "cim-ap-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "CIM 平台前端 monorepo 根：只声明 workspaces，不承载应用代码。各应用仍是独立可构建的 vite 工程。",
+  "workspaces": [
+    "platform/web/packages/*",
+    "platform/web/cim-notify-client",
+    "platform/web",
+    "business/*/web"
+  ],
+  "scripts": {
+    "build:iam": "npm run build -w cim-iam-ap-web",
+    "build:rms": "npm run build -w cim-rms-ap-web",
+    "build:approval": "npm run build -w cim-approval-ap-web"
+  }
+}

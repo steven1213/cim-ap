@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { bootstrapI18n } from './lib/i18n';
+import '@cim/ui/index.css';
 import './styles.css';
 
 // 先初始化 i18n（用本地缓存的译文包同步渲染，避免中文/英文切换时首屏闪烁），

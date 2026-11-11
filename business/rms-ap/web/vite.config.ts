@@ -8,10 +8,17 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      // 平台共享包：源码直引（不经 dist）。见 docs/platform/web/component-platform-design.md §9。
+      '@cim/theme': path.resolve(__dirname, '../../../platform/web/packages/theme/src'),
+      '@cim/ui': path.resolve(__dirname, '../../../platform/web/packages/ui/src'),
     },
   },
   server: {
     port: 5174,
+    fs: {
+      // dev server 默认只允许读工程根，共享包在根之外，需显式放行
+      allow: ['.', path.resolve(__dirname, '../../../platform/web/packages')],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8084',

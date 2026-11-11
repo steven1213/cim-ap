@@ -1,0 +1,5 @@
+/* @cim/ui 样式入口：按 tokens → base → shell → ui 的顺序引入，勿调换。 */
+@import '@cim/theme/tokens.css';
+@import './base.css';
+@import './shell.css';
+@import './ui.css';

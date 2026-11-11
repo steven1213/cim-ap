@@ -17,7 +17,11 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@cim/theme": ["../../../platform/web/packages/theme/src/index.ts"],
+      "@cim/theme/*": ["../../../platform/web/packages/theme/src/*"],
+      "@cim/ui": ["../../../platform/web/packages/ui/src/index.ts"],
+      "@cim/ui/*": ["../../../platform/web/packages/ui/src/*"]
     }
   },
   "include": ["src"]

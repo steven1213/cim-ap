@@ -1,0 +1,573 @@
+/* CIM 通用组件样式（@cim/ui）——页面容器 / 分栏 / 树 / KPI / 面板 / 分页 / 状态 / 标签。
+ * 由三个前端 styles.css 的公共前缀抽取，逐字节等价。 */
+/* ---------- 页面容器 ---------- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 0 auto; /* 撑满 .content 可视高度（内容超出时正常滚动） */
+  /* 初始顶部间距（.content 不能给 padding-top，会破坏 sticky 对齐，见 .content 注释） */
+  padding-top: 12px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* ---------- 分栏（左树 / 右详情） ---------- */
+.split {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  /* flex-grow 撑满 .page 剩余高度（替代旧 min-height 魔法常数，不再产生 footer 前留白） */
+  flex: 1 1 auto;
+}
+/* 分栏面板：面板体弹性填充，超高时面板内滚动（主从式管理页标准形态） */
+.split > .panel {
+  min-height: 0;
+}
+.split .panel-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.split .panel-body > * {
+  flex-shrink: 0; /* 防长表格/表单被 flex 压缩 */
+}
+.split .panel-body > .empty:only-child {
+  margin: auto; /* 空态在面板体内垂直水平居中 */
+}
+@media (max-width: 1000px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 分栏左列（树/清单）限高内部滚动：内容过长时自身滚动 + 吸顶，右侧编辑不随树高被顶走 */
+.panel.scroll-y {
+  position: sticky;
+  top: 0; /* 必须=0：否则页面滚动后左列钉在 12px、右列被滚动口裁到 0，左右顶部错 12px */
+  max-height: calc(100vh - var(--header-h) - 114px); /* topbar56 + tabbar 38 + footer ~40 + 内容底距 20 */
+}
+.panel.scroll-y .panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (max-width: 1000px) {
+  .panel.scroll-y {
+    position: static;
+  }
+}
+
+/* 分组清单的层级感：组头（side-cap）与其成员行缩进区分（权限点清单/角色授权组） */
+.tree-group > .tree-row {
+  margin-left: 22px;
+}
+.tree-group > .grid-3 {
+  padding-left: 18px;
+}
+
+/* ---------- 组织树 ---------- */
+.tree {
+  padding: 6px 0 10px;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  font-size: var(--fs-sm);
+}
+.tree-row:hover {
+  background: var(--panel-2);
+}
+.tree-row.on {
+  background: var(--panel-3);
+  border-left-color: var(--primary);
+}
+.tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transform: rotate(0deg);
+  transition: transform 0.14s ease;
+}
+.tree-toggle.open {
+  transform: rotate(90deg);
+}
+.tree-toggle.hollow {
+  visibility: hidden;
+}
+.tree-name {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-code {
+  font-size: var(--fs-micro);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 权限点树（权限管理/角色授权共用；与菜单树同构 DIR→MENU→BUTTON） ---------- */
+.ptree {
+  padding: 4px 0 8px;
+}
+.ptree-node {
+  min-width: 0;
+}
+/* 层级引导线：子级缩进 + 左边线，从属关系一眼可读 */
+.ptree-kids {
+  margin-left: 13px;
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+/* 五列网格：折叠钮 / 复选框 / 名称 / 权限码 / 动作——码列同列对齐，名称吃剩余空间。
+   ⚠️ 名称与码都走 fr：若码列用 minmax(固定,固定) 这类非 fr 轨道，track 最大化阶段
+   会先于 fr 抢占空闲空间，窄容器（权限管理左列 ≈250px）下名称列被挤成 0。 */
+.ptree-row {
+  display: grid;
+  grid-template-columns: 18px 16px minmax(64px, 1.5fr) minmax(70px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 10px 2px 4px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+}
+.ptree-row > * {
+  min-width: 0;
+}
+.ptree-row:hover {
+  background: var(--panel-2);
+}
+.ptree-row.on {
+  background: var(--panel-3);
+}
+.ptree-row.clickable {
+  cursor: pointer;
+}
+.ptree-row.is-off .ptree-name,
+.ptree-row.is-off .tree-code {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.ptree-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ptree-name .tag {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+.ptree-row.is-leaf .ptree-name {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.ptree-count {
+  font-size: var(--fs-micro);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ptree-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ptree-entry {
+  min-width: 0;
+}
+.ptree .clickable {
+  cursor: pointer;
+}
+
+/* 键值对（详情面板） */
+.kv {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+.kv dt {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 2px;
+}
+.kv dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* 子区块标题（组织成员等） */
+.sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: var(--fs-sm);
+}
+
+/* 可移除标签 */
+.chip-x {
+  margin-left: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.chip-x:hover {
+  opacity: 1;
+}
+
+/* 用户单元格（用户名 + 姓名 + 岗位标签） */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* 组织多选（用户归属） */
+.org-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px 14px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+/* ---------- KPI 指标块 ---------- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 10px;
+}
+.kpi {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.kpi.ok {
+  border-left-color: var(--ok);
+}
+.kpi.warn {
+  border-left-color: var(--warn);
+}
+.kpi.info {
+  border-left-color: var(--info);
+}
+.kpi-ico {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  background: var(--panel-3);
+  color: var(--text-2);
+}
+.kpi-main {
+  min-width: 0;
+}
+.kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.kpi-val {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kpi-sub {
+  margin-top: 1px;
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- 面板 ---------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-heading {
+  min-width: 0;
+}
+.panel-title {
+  font-size: var(--fs-base);
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-sub {
+  margin: 1px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.panel-body {
+  padding: 14px;
+}
+.panel-body.flush {
+  padding: 0;
+}
+
+/* 面板内嵌分区 */
+.sub-block {
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.sub-block:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+.sub-title {
+  margin-bottom: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- 分页条（大表客户端分页） ---------- */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+.pager .tag-count {
+  margin-right: 2px;
+}
+
+/* ---------- 面板内标签页（角色管理：基本信息/权限授权/菜单授权） ---------- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line-strong);
+  margin-bottom: 12px;
+}
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 8px 14px 7px;
+  font: inherit;
+  font-size: var(--fs-base);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.on {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+.tab .tag-count {
+  margin-left: 4px;
+}
+
+/* ---------- 键值矩阵 ---------- */
+.meta {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+}
+.meta-k,
+.meta-v {
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: var(--fs-sm);
+}
+.meta > :nth-last-child(-n + 2) {
+  border-bottom: none;
+}
+.meta-k {
+  color: var(--muted);
+  padding-right: 14px;
+  white-space: nowrap;
+}
+.meta-v {
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ---------- 状态指示 ---------- */
+.led {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 3px var(--panel-3);
+}
+.led.ok {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+.led.err {
+  background: var(--err);
+  box-shadow: 0 0 0 3px var(--err-soft);
+}
+.led.warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+.led.info {
+  background: var(--info);
+  box-shadow: 0 0 0 3px var(--info-soft);
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.status b {
+  font-weight: 600;
+}
+
+/* ---------- 标签 ---------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.tag.pri {
+  background: var(--primary-soft);
+  border-color: transparent;
+  color: var(--primary);
+}
+.tag.ok {
+  background: var(--ok-soft);
+  border-color: transparent;
+  color: var(--ok);
+}
+.tag.warn {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
+.tag.err {
+  background: var(--err-soft);
+  border-color: transparent;
+  color: var(--err);
+}
+.tag.info {
+  background: var(--info-soft);
+  border-color: transparent;
+  color: var(--info);
+}
+.tag-count {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  font-weight: 700;
+  font-size: 10px;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.dim {
+  color: var(--muted);
+}

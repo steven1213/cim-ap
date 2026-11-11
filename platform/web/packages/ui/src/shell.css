@@ -1,0 +1,605 @@
+/* CIM 外壳样式（@cim/ui，P3 将迁至 @cim/shell）——外壳 / 侧栏 / 主区 / 顶栏 / 页脚 / 页签栏。
+ * 由三个前端 styles.css 的公共前缀抽取，逐字节等价。 */
+/* ---------- 外壳 ---------- */
+.shell {
+  display: flex;
+  height: 100vh; /* 定高：内容区自身滚动，footer 常驻可见（与 header 一致） */
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ---------- 侧栏 ---------- */
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%);
+  color: var(--sidebar-fg);
+  border-right: 1px solid rgba(0, 0, 0, 0.4);
+  transition: width 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--header-h);
+  padding: 0 16px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--sidebar-line);
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(135deg, #2f6ae5, #5b4bd8);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.brand-title {
+  color: #fff;
+  font-size: var(--fs-base);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.brand-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--sidebar-fg);
+  white-space: nowrap;
+}
+
+.side-nav {
+  flex: 1 1 auto;
+  padding: 12px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.side-cap {
+  display: block;
+  padding: 2px 10px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(142, 155, 177, 0.6);
+}
+
+/* 菜单分组：组间细分隔线，成组感更清晰 */
+.side-group + .side-group {
+  margin-top: 6px;
+  border-top: 1px solid var(--sidebar-line);
+}
+.side-group + .side-group > .side-cap {
+  padding-top: 10px;
+}
+
+/* 可点击折叠的侧栏分组头：静默灰、chevron 右置，悬停才浮出底色 */
+button.side-cap {
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+button.side-cap:hover {
+  background: var(--sidebar-hover);
+  color: #dfe6f3;
+}
+button.side-cap .nav-tog-text,
+button.side-cap .cap-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.side-cap .tree-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: 0.6;
+}
+/* 页面名分组（权限/角色授权）：正文色、略大，与组内行协调 */
+button.side-cap.page-cap {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 8px;
+  color: var(--text);
+}
+
+.side-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-fg);
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.side-link:hover {
+  background: var(--sidebar-hover);
+  color: #dfe6f3;
+}
+.side-link.active {
+  background: var(--sidebar-active-bg);
+  color: #fff;
+}
+.side-link.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 2px 2px 0;
+  background: #6f9cff;
+}
+
+.side-ico {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  flex: 0 0 auto;
+}
+
+.side-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.side-label {
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  white-space: nowrap;
+}
+.side-desc {
+  font-size: 10px;
+  color: rgba(142, 155, 177, 0.72);
+  white-space: nowrap;
+}
+.side-link.active .side-desc {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.sidebar-foot {
+  flex: 0 0 auto;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--sidebar-line);
+}
+.side-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: rgba(142, 155, 177, 0.78);
+}
+.side-note svg {
+  flex: 0 0 auto;
+  color: #6f9cff;
+}
+
+.shell.collapsed .sidebar {
+  width: var(--sidebar-w-collapsed);
+}
+.shell.collapsed .brand-text,
+.shell.collapsed .side-text,
+.shell.collapsed .side-cap,
+.shell.collapsed .side-note span {
+  display: none;
+}
+.shell.collapsed .sidebar-brand {
+  justify-content: center;
+  padding: 0;
+}
+.shell.collapsed .side-link {
+  justify-content: center;
+  padding: 9px 0;
+}
+.shell.collapsed .side-link.active::before {
+  left: 0;
+}
+.shell.collapsed .sidebar-foot {
+  display: flex;
+  justify-content: center;
+}
+
+/* ---------- 主区 ---------- */
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--sidebar-w);
+  transition: margin-left 0.2s ease;
+}
+.shell.collapsed .main {
+  margin-left: var(--sidebar-w-collapsed);
+}
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--header-h);
+  flex-shrink: 0; /* flex 列布局内禁止被挤压：短视口页面不得压缩 header */
+  padding: 0 18px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-right {
+  margin-left: auto; /* crumb 已移除，右侧控件组自行靠右 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: 0.14s ease;
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+.icon-btn.danger:hover:not(:disabled) {
+  background: var(--err-soft);
+  color: var(--err);
+  border-color: transparent;
+}
+
+/* 语言切换（顶栏 / 登录页）。全局 select 的下拉箭头定位按整行宽计算，此处重置为紧凑尺寸。 */.lang-select {
+  width: auto;
+  height: 32px;
+  padding: 0 26px 0 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  background-position: calc(100% - 12px) 13px, calc(100% - 7px) 13px;
+  background-size: 5px 5px, 5px 5px;
+}
+.lang-select:disabled {
+  opacity: 0.6;
+}
+
+.env-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+}
+
+/* 管理员标识（具备 IAM 管理面权限时显示） */
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #2f6ae5, #5b4bd8);
+}
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.user-meta b {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.user-meta small {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+}
+
+/* ---------- 内容 / 页脚 ---------- */
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  /* ⚠️ 顶部不得加 padding：sticky 约束矩形按滚动容器 padding 内缩，
+     会把吸顶左列钉在裁切线之下（与右列顶部错位）。初始间距由 .page 自己给 */
+  padding: 0 14px 20px;
+  /* flex 纵向链：.page 撑满可视高度，.split 再撑满 .page——页面不再在 footer 前留大白条 */
+  display: flex;
+  flex-direction: column;
+}
+
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+.footer .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+/* ---------- 页签栏（tags-view） ---------- */
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  flex: 0 0 38px;
+  padding: 0 8px;
+  background: var(--panel); /* 与内容区同色：扁平，仅靠底部分隔线分界，色染签才有干净落点 */
+  border-bottom: 1px solid var(--line);
+}
+
+/* 左右滚动箭头：不溢出时禁用淡出；箭头本体用 chevron 旋转 */
+.tab-nav {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+.tab-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.tab-nav:not(:disabled):hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.rot-l {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+
+/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；顶部留白给右上角关闭徽标探出 */
+.tabbar-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 5px 8px 0 4px;
+}
+.tabbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 轨道：指示器与页签的共同定位容器（指示器 content 坐标随滚动自然平移） */
+.tab-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* 滑动色染签：激活态 = 主题色淡染圆角矩形 + 内描边发丝线。
+   无外投影、无描边框——扁平克制，高级感来自色彩而非阴影堆砌；
+   从上一个签平滑滑来（ease-out-quint） */
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+/* 就绪后才开启动画：避免首次挂载时从左上角 (0,0) 滑入 */
+.tab-indicator.on {
+  opacity: 1;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 页签 chip：幽灵签——无边框无底色，仅文字；等宽 100px；
+   激活态由滑动胶囊承载（文字变色加重即可），相对定位承载右上角关闭徽标 */
+.tab-item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 10px;
+  width: 100px;
+  flex: 0 0 100px;
+  border-radius: 8px; /* 与选中态色染签同形（999px 全圆胶囊会与 8px 指示器不一致） */
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tab-item:not(.active):hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.tab-item.active {
+  color: var(--primary-d);
+  font-weight: 600;
+}
+
+.tab-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+/* 关闭徽标：骑在右上角的小圆钮（Chrome 页签风格）；悬停所在签时浮现。
+   必须完整重置全局 button 的蓝底白字，否则图标被色块吞掉 */
+.tab-x {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-2);
+  box-shadow: 0 1px 3px rgba(13, 22, 38, 0.15);
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.tab-item:hover .tab-x {
+  opacity: 1;
+}
+/* 三段类名压过全局 button:hover:not(:disabled) 的 (0,2,1) */
+.tab-item .tab-x:hover {
+  background: var(--panel-3);
+  color: var(--text);
+}
+
+/* 页签右键菜单：跟随鼠标的固定定位浮层（关闭标签页 / 关闭其它 / 关闭右侧 / 关闭全部） */
+.tab-ctx {
+  position: fixed;
+  z-index: 80;
+  min-width: 152px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(13, 22, 38, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.tab-ctx button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  font-family: inherit;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.tab-ctx button:hover:not(:disabled) {
+  background: var(--panel-3);
+  color: var(--text);
+}
+.tab-ctx button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
