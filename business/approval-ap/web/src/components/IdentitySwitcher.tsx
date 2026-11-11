@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useIdentityStore, PRESET_USERS } from '@/store/identityStore';
 import { IconChevron } from '@/components/Icons';
 
+import { CimSelect, CimInput, CimField, CimButton } from '@cim/ui';
 // dev 态身份切换器：以 userId / tenantId 标识当前操作人。
 export default function IdentitySwitcher() {
   const { t } = useTranslation();
@@ -32,16 +33,24 @@ export default function IdentitySwitcher() {
 
   const initial = (userId || '?').charAt(0).toUpperCase();
 
+  // 用户下拉的选项：预置账号 + 当前账号（若不在预置里，说明是手工输入的，也保留）
+  const userOptions = [
+    ...PRESET_USERS.map((u) => ({ value: u, label: u })),
+    ...(PRESET_USERS.includes(nextUser as (typeof PRESET_USERS)[number])
+      ? []
+      : [{ value: nextUser, label: nextUser }]),
+  ];
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button className="user-chip" onClick={() => setOpen((v) => !v)} title={t('identity.change')}>
+      <CimButton bare className="user-chip" onClick={() => setOpen((v) => !v)} title={t('identity.change')}>
         <span className="avatar">{initial}</span>
         <span className="user-meta">
           <b>{userId}</b>
           <small>tenant:{tenantId}</small>
         </span>
         <IconChevron width={14} height={14} />
-      </button>
+      </CimButton>
 
       {open && (
         <div
@@ -52,25 +61,20 @@ export default function IdentitySwitcher() {
           <div style={{ padding: '10px 10px 4px', fontSize: 11, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             {t('identity.change')}
           </div>
-          <div className="field" style={{ padding: '0 10px' }}>
-            <label className="field-label">{t('identity.userId')}</label>
-            <select value={nextUser} onChange={(e) => setNextUser(e.target.value)}>
-              {PRESET_USERS.map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-              {!PRESET_USERS.includes(nextUser as (typeof PRESET_USERS)[number]) && (
-                <option value={nextUser}>{nextUser}</option>
-              )}
-            </select>
-          </div>
-          <div className="field" style={{ padding: '8px 10px' }}>
-            <label className="field-label">{t('identity.tenantId')}</label>
-            <input value={nextTenant} onChange={(e) => setNextTenant(e.target.value)} placeholder="default" />
-          </div>
+          <CimField label={t('identity.userId')} style={{ padding: '0 10px' }}>
+            <CimSelect
+              value={nextUser}
+              onChange={(v) => setNextUser(typeof v === 'string' ? v : '')}
+              options={userOptions}
+            />
+          </CimField>
+          <CimField label={t('identity.tenantId')} style={{ padding: '8px 10px' }}>
+            <CimInput value={nextTenant} onChange={setNextTenant} placeholder="default" />
+          </CimField>
           <div style={{ display: 'flex', gap: 6, padding: 10 }}>
-            <button className="btn btn-block btn-sm" onClick={apply}>
+            <CimButton type="primary" size="small" block onClick={apply}>
               {t('identity.apply')}
-            </button>
+            </CimButton>
           </div>
           <div style={{ padding: '0 10px 10px', fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.5 }}>
             {t('identity.hint')}

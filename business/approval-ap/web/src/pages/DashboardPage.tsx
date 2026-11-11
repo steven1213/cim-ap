@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useResource } from '@cim/data';
-import { DataTable, Page, Panel, type DataTableColumn, CimButton } from '@cim/ui';
+import { KpiCard, InlineAlert, DataTable, Page, Panel, type DataTableColumn, CimButton } from '@cim/ui';
 import { IconCheck, IconFlow, IconInbox, IconOutbox, IconWebhook } from '@/components/Icons';
 import {
   getStats,
@@ -114,17 +114,19 @@ export default function DashboardPage() {
         }
       >
         {overviewRes.error ? (
-          <div className="alert err">{overviewRes.error.message}</div>
+          <InlineAlert tone="err">{overviewRes.error.message}</InlineAlert>
         ) : (
           <>
             <div className="kpi-grid">
               {kpis.map((k) => (
                 <Link key={k.key} to={k.to} className={'kpi' + (k.tone ? ' ' + k.tone : '')} style={{ textDecoration: 'none' }}>
-                  <span className="kpi-ico">{k.icon}</span>
-                  <span className="kpi-main">
-                    <span className="kpi-label">{t(k.labelKey)}</span>
-                    <span className="kpi-val">{overviewRes.loading && !ov ? '…' : (k.value ?? '—')}</span>
-                  </span>
+                  {/* 整卡是链接：外壳与跳转归 <Link>，卡片内容由 KpiCard bare 输出 */}
+                  <KpiCard
+                    bare
+                    icon={k.icon}
+                    label={t(k.labelKey)}
+                    value={overviewRes.loading && !ov ? '…' : (k.value ?? '—')}
+                  />
                 </Link>
               ))}
             </div>
@@ -140,27 +142,16 @@ export default function DashboardPage() {
       {stats && (
         <Panel titleKey="dash.stats.title" subKey="dash.stats.sub">
           <div className="kpi-grid">
-            <div className="kpi">
-              <span className="kpi-ico"><IconFlow width={16} height={16} /></span>
-              <span className="kpi-main">
-                <span className="kpi-label">{t('dash.stats.avgHours')}</span>
-                <span className="kpi-val">{stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'}</span>
-              </span>
-            </div>
+            <KpiCard icon={<IconFlow width={16} height={16} />} label={t('dash.stats.avgHours')} value={stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'} />
             <div className={'kpi' + (stats.overdueCount > 0 ? ' warn' : '')}>
-              <span className="kpi-ico"><IconInbox width={16} height={16} /></span>
-              <span className="kpi-main">
-                <span className="kpi-label">{t('dash.stats.overdue')}</span>
-                <span className="kpi-val">{stats.overdueCount}</span>
-              </span>
+              <KpiCard
+                bare
+                icon={<IconInbox width={16} height={16} />}
+                label={t('dash.stats.overdue')}
+                value={stats.overdueCount}
+              />
             </div>
-            <div className="kpi">
-              <span className="kpi-ico"><IconCheck width={16} height={16} /></span>
-              <span className="kpi-main">
-                <span className="kpi-label">{t('dash.stats.rejectRate')}</span>
-                <span className="kpi-val">{stats.rejectRate != null ? (stats.rejectRate * 100).toFixed(0) + '%' : '—'}</span>
-              </span>
-            </div>
+            <KpiCard icon={<IconCheck width={16} height={16} />} label={t('dash.stats.rejectRate')} value={stats.rejectRate != null ? (stats.rejectRate * 100).toFixed(0) + '%' : '—'} />
           </div>
 
           {/* 近 30 天发起/完成趋势（纯 CSS 条形；不引图表库，一面板里两根线不值得 200 KB） */}

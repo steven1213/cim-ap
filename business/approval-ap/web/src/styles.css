@@ -133,12 +133,6 @@ table.data .cell-actions {
   text-transform: none;
   color: var(--muted);
 }
-.field-hint {
-  margin: 5px 0 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--muted);
-}
 
 input,
 select,
@@ -192,72 +186,6 @@ input.mono {
 }
 .form-grid .field + .field {
   margin-top: 0;
-}
-
-/* ---------- 按钮 ---------- */
-button,
-/* `.btn`：链接式按钮（`<a>`/`<Link>` 需要与 button 同观感，如 403/404 页的「返回概览」） */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 14px;
-  font-family: inherit;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: #fff;
-  background: var(--primary);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: 0.14s ease;
-  text-decoration: none;
-}
-button:hover:not(:disabled),
-.btn:hover {
-  background: var(--primary-d);
-}
-button:active:not(:disabled),
-.btn:active {
-  transform: translateY(1px);
-}
-button:focus-visible,
-.btn:focus-visible {
-  outline: none;
-  box-shadow: var(--ring);
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-ghost {
-  background: var(--panel);
-  color: var(--text-2);
-  border-color: var(--line-strong);
-}
-.btn-ghost:hover:not(:disabled) {
-  background: var(--panel-3);
-  color: var(--text);
-}
-.btn-danger {
-  background: transparent;
-  color: var(--err);
-  border-color: var(--line-strong);
-}
-.btn-danger:hover:not(:disabled) {
-  background: var(--err-soft);
-  border-color: transparent;
-}
-.btn-sm {
-  padding: 4px 9px;
-  font-size: var(--fs-xs);
-  border-radius: 4px;
-}
-.btn-block {
-  width: 100%;
 }
 
 /* 行内表单 */
@@ -643,43 +571,7 @@ button:disabled {
  * RMS 补充工具类（W2 新增；与 iam 设计系统同源，统一复用令牌）
  * ========================================================================== */
 
-.btn-primary {
-  background: var(--primary);
-  color: #fff;
-  border: 1px solid var(--primary);
-}
-.btn-primary:hover:not(:disabled) {
-  background: var(--primary-d);
-  border-color: var(--primary-d);
-}
-.btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
 /* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 64px 16px;
-  color: var(--muted);
-  text-align: center;
-}
-.empty-state .empty-icon {
-  font-size: 40px;
-  opacity: 0.7;
-}
-.empty-state h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  color: var(--text-2);
-}
-.empty-state p {
-  margin: 0;
-  font-size: var(--fs-sm);
-}
 .empty-cell {
   text-align: center;
   color: var(--muted);
@@ -731,22 +623,6 @@ button:disabled {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-.text-input {
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  resize: vertical;
-}
-.text-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: var(--ring);
 }
 
 /* 模态框 */
@@ -1398,17 +1274,6 @@ tr.diff-changed > td {
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--muted);
-}
-.search-inline .text-input {
-  border: none;
-  padding: 0;
-  height: auto;
-  min-width: 150px;
-  background: transparent;
-}
-.search-inline .text-input:focus {
-  outline: none;
-  box-shadow: none;
 }
 input[type='checkbox'] {
   appearance: none;

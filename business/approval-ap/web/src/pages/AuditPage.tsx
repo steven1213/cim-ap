@@ -10,6 +10,7 @@ import {
   Page,
   Panel,
   type DataTableColumn,
+  InlineAlert,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { IconShield } from '@/components/Icons';
@@ -124,9 +125,9 @@ export default function AuditPage() {
         {/* 链校验结论放表格上方：它是「这批数据整体可不可信」的判断，不是某一行的属性，
             塞进表格列会让人以为逐行判定。 */}
         {chain && (
-          <div className={'alert ' + (chain === 'ok' ? 'ok' : 'err')} style={{ margin: '10px 12px 0' }}>
+          <InlineAlert tone={(chain === 'ok' ? 'ok' : 'err')} style={{ margin: '10px 12px 0' }}>
             {chain === 'ok' ? t('audit.chainOk') : t('audit.chainBroken')}
-          </div>
+          </InlineAlert>
         )}
 
         {applied ? (

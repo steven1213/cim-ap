@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useIdentityStore } from '@/store/identityStore';
 import { notificationsStreamUrl } from '@/lib/api';
 import { SseClient } from '@cim/notify-client';
-import { useToast } from '@cim/ui';
+import { CimButton, useToast } from '@cim/ui';
 import { IconBell, IconInbox } from '@/components/Icons';
 import type { NotificationEvent } from '@/types';
 
@@ -66,7 +66,8 @@ export default function NotificationBell() {
 
   return (
     <div style={{ position: 'relative' }}>
-      <button
+      <CimButton
+        bare
         className="icon-btn"
         onClick={() => setOpen((v) => !v)}
         title={connected ? t('notify.connected') : t('notify.disconnected')}
@@ -93,7 +94,7 @@ export default function NotificationBell() {
             {items.length}
           </span>
         )}
-      </button>
+      </CimButton>
 
       {open && (
         <div className="tab-ctx" style={{ top: 40, right: 0, minWidth: 260 }}>

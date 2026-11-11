@@ -12,6 +12,7 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
+  KpiCard,
 } from '@cim/ui';
 import type { StatusTone } from '@cim/theme';
 import { IconSend } from '@/components/Icons';
@@ -252,38 +253,15 @@ export default function CallbacksPage() {
       {stats && (
         <Panel titleKey="cb.stats.title" subKey="cb.stats.sub">
           <div className="kpi-grid">
-            <div className="kpi">
-              <span className="kpi-main">
-                <span className="kpi-label">{t('cb.stats.sent')}</span>
-                <span className="kpi-val">{stats.sent ?? '—'}</span>
-              </span>
-            </div>
-            <div className="kpi warn">
-              <span className="kpi-main">
-                <span className="kpi-label">{t('cb.stats.pending')}</span>
-                <span className="kpi-val">{stats.pending ?? '—'}</span>
-              </span>
-            </div>
-            <div className={'kpi' + (stats.dead > 0 ? ' err' : '')}>
-              <span className="kpi-main">
-                <span className="kpi-label">{t('cb.stats.dead')}</span>
-                <span className="kpi-val">{stats.dead ?? '—'}</span>
-              </span>
-            </div>
-            <div className="kpi">
-              <span className="kpi-main">
-                <span className="kpi-label">{t('cb.stats.rate')}</span>
-                <span className="kpi-val">
-                  {stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'}
-                </span>
-              </span>
-            </div>
-            <div className="kpi">
-              <span className="kpi-main">
-                <span className="kpi-label">{t('cb.stats.cost')}</span>
-                <span className="kpi-val">{stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'}</span>
-              </span>
-            </div>
+            <KpiCard label={t('cb.stats.sent')} value={stats.sent ?? '—'} />
+            <KpiCard tone="warn" label={t('cb.stats.pending')} value={stats.pending ?? '—'} />
+            <KpiCard
+              tone={stats.dead > 0 ? 'err' : undefined}
+              label={t('cb.stats.dead')}
+              value={stats.dead ?? '—'}
+            />
+            <KpiCard label={t('cb.stats.rate')} value={stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'} />
+            <KpiCard label={t('cb.stats.cost')} value={stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'} />
           </div>
         </Panel>
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CimButton, CimModal, PageHead, useToast } from '@cim/ui';
+import { CimSelect, CimInputNumber, CimInput, CimField, CimButton, CimModal, PageHead, useToast } from '@cim/ui';
 import api from '@/lib/api';
 import {
   KIND_LABEL,
@@ -418,25 +418,11 @@ export default function DesignerPage() {
           <div className="designer-meta">
             <label className="field field-inline">
               <span className="field-label">{t('def.colKey')}</span>
-              <input
-                className="text-input"
-                style={{ width: 180 }}
-                value={processKey}
-                onChange={(e) => setProcessKey(e.target.value)}
-                placeholder="customApproval"
-                disabled={readonly}
-              />
+              <CimInput width={180} value={processKey} onChange={setProcessKey} placeholder="customApproval" disabled={readonly} />
             </label>
             <label className="field field-inline">
               <span className="field-label">{t('def.colName')}</span>
-              <input
-                className="text-input"
-                style={{ width: 200 }}
-                value={processName}
-                onChange={(e) => setProcessName(e.target.value)}
-                placeholder="自定义审批"
-                disabled={readonly}
-              />
+              <CimInput width={200} value={processName} onChange={setProcessName} placeholder="自定义审批" disabled={readonly} />
             </label>
             <div className="designer-actions">
               {!readonly && (
@@ -605,14 +591,15 @@ export default function DesignerPage() {
                 <span className="node-kind">{KIND_LABEL[n.kind]}</span>
                 <span className="node-label">{n.label}</span>
                 {n.kind !== 'start' && n.kind !== 'end' && (
-                  <button
+                  <CimButton
+                    bare
                     className="node-del"
                     title={t('common.delete')}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); setSelectedNode(n.id); deleteSelected(); }}
                   >
                     <IconTrash width={12} height={12} />
-                  </button>
+                  </CimButton>
                 )}
                 {n.kind !== 'end' && (
                   <span
@@ -717,18 +704,16 @@ function NodeProps({ node, onChange, onDelete }: {
   return (
     <div className="props-form">
       <div className="props-title">{KIND_LABEL[node.kind]}</div>
-      <div className="field">
-        <label className="field-label">{t('designer.field.label')}</label>
-        <input value={node.label} onChange={(e) => onChange({ label: e.target.value })} />
-      </div>
+      <CimField label={t('designer.field.label')}>
+        <CimInput value={node.label} onChange={(v) => onChange({ label: v })} />
+      </CimField>
 
       {node.kind === 'gateway' && (
         <>
-          <div className="field">
-            <label className="field-label">{t('designer.field.condition')}</label>
-            <input value={node.condition || ''} onChange={(e) => onChange({ condition: e.target.value })} placeholder="${amount > 1000}" />
+          <CimField label={t('designer.field.condition')}>
+            <CimInput value={node.condition || ''} onChange={(v) => onChange({ condition: v })} placeholder="${amount > 1000}" />
             <small>{t('designer.field.conditionHint')}</small>
-          </div>
+          </CimField>
           <p className="props-note">{t('designer.gateway.hint')}</p>
         </>
       )}
@@ -737,26 +722,25 @@ function NodeProps({ node, onChange, onDelete }: {
       {node.kind === 'join' && <p className="props-note">{t('designer.join.hint')}</p>}
 
       {node.kind === 'end' && (
-        <div className="field">
-          <label className="field-label">{t('designer.field.endResult')}</label>
-          <select
+        <CimField label={t('designer.field.endResult')}>
+          <CimSelect
             value={node.result === 'REJECTED' ? 'REJECTED' : 'APPROVED'}
-            onChange={(e) => onChange({ result: e.target.value as 'APPROVED' | 'REJECTED' })}
-          >
-            <option value="APPROVED">{t('designer.endResult.approved')}</option>
-            <option value="REJECTED">{t('designer.endResult.rejected')}</option>
-          </select>
+            onChange={(v) => onChange({ result: (v === 'REJECTED' ? 'REJECTED' : 'APPROVED') as 'APPROVED' | 'REJECTED' })}
+            options={[
+              { value: 'APPROVED', label: t('designer.endResult.approved') },
+              { value: 'REJECTED', label: t('designer.endResult.rejected') },
+            ]}
+          />
           <small>{t('designer.field.endResultHint')}</small>
-        </div>
+        </CimField>
       )}
 
       {node.kind === 'approval' && (
-        <div className="field">
-          <label className="field-label">{t('designer.field.candidateType')}</label>
-          <select
+        <CimField label={t('designer.field.candidateType')}>
+          <CimSelect
             value={candidateTypeVal()}
-            onChange={(e) => {
-              const v = e.target.value as 'assignee' | 'user' | 'role';
+            onChange={(raw) => {
+              const v = (raw ?? 'assignee') as 'assignee' | 'user' | 'role';
               onChange({
                 candidateType: v,
                 candidateUsers: v === 'role' ? '' : node.candidateUsers,
@@ -764,100 +748,93 @@ function NodeProps({ node, onChange, onDelete }: {
                 assigneeVar: v === 'assignee' ? (node.assigneeVar || 'assignee') : '',
               });
             }}
-          >
-            <option value="assignee">{t('designer.candidateType.assignee')}</option>
-            <option value="user">{t('designer.candidateType.user')}</option>
-            <option value="role">{t('designer.candidateType.role')}</option>
-          </select>
+            options={[
+              { value: 'assignee', label: t('designer.candidateType.assignee') },
+              { value: 'user', label: t('designer.candidateType.user') },
+              { value: 'role', label: t('designer.candidateType.role') },
+            ]}
+          />
           <small>{t('designer.field.candidateTypeHint')}</small>
-        </div>
+        </CimField>
       )}
 
       {node.kind === 'approval' && candidateTypeVal() === 'assignee' && (
-        <div className="field">
-          <label className="field-label">{t('designer.field.assigneeVar')}</label>
-          <input value={node.assigneeVar || ''} onChange={(e) => onChange({ assigneeVar: e.target.value })} placeholder="assignee" />
+        <CimField label={t('designer.field.assigneeVar')}>
+          <CimInput value={node.assigneeVar || ''} onChange={(v) => onChange({ assigneeVar: v })} placeholder="assignee" />
           <small>{t('designer.field.assigneeVarHint')}</small>
-        </div>
+        </CimField>
       )}
 
       {node.kind === 'approval' && candidateTypeVal() === 'user' && (
-        <div className="field">
-          <label className="field-label">{t('designer.field.candidateUsers')}</label>
-          <input value={node.candidateUsers || ''} onChange={(e) => onChange({ candidateUsers: e.target.value })} placeholder="alice, bob" />
+        <CimField label={t('designer.field.candidateUsers')}>
+          <CimInput value={node.candidateUsers || ''} onChange={(v) => onChange({ candidateUsers: v })} placeholder="alice, bob" />
           <small>{t('designer.field.candidateUsersHint')}</small>
-        </div>
+        </CimField>
       )}
 
       {node.kind === 'approval' && candidateTypeVal() === 'role' && (
-        <div className="field">
-          <label className="field-label">{t('designer.field.candidateGroups')}</label>
-          <input value={node.candidateGroups || ''} onChange={(e) => onChange({ candidateGroups: e.target.value })} placeholder="manager, finance" />
+        <CimField label={t('designer.field.candidateGroups')}>
+          <CimInput value={node.candidateGroups || ''} onChange={(v) => onChange({ candidateGroups: v })} placeholder="manager, finance" />
           <small>{t('designer.field.candidateGroupsHint')}</small>
-        </div>
+        </CimField>
       )}
 
       {isMulti && (
         <>
-          <div className="field">
-            <label className="field-label">{t('designer.field.approversVar')}</label>
-            <input value={node.approversVar || ''} onChange={(e) => onChange({ approversVar: e.target.value })} placeholder="approvers" />
+          <CimField label={t('designer.field.approversVar')}>
+            <CimInput value={node.approversVar || ''} onChange={(v) => onChange({ approversVar: v })} placeholder="approvers" />
             <small>{t('designer.field.approversVarHint')}</small>
-          </div>
-          <div className="field">
-            <label className="field-label">{t('designer.field.threshold')}</label>
+          </CimField>
+          <CimField label={t('designer.field.threshold')}>
             <div className="field-row">
-              <select
+              <CimSelect
                 value={thresholdSelectVal()}
                 disabled={node.kind === 'anyone'}
-                onChange={(e) => {
-                  const v = e.target.value;
+                onChange={(raw) => {
+                  const v = String(raw ?? 'one');
                   onChange({ threshold: v === '__num__' ? (typeof node.threshold === 'number' ? node.threshold : 1) : (v as 'one' | 'half' | 'all') });
                 }}
-              >
-                <option value="one">{t('designer.threshold.one')}</option>
-                <option value="half">{t('designer.threshold.half')}</option>
-                <option value="all">{t('designer.threshold.all')}</option>
-                <option value="__num__">{t('designer.threshold.num')}</option>
-              </select>
+                options={[
+                  { value: 'one', label: t('designer.threshold.one') },
+                  { value: 'half', label: t('designer.threshold.half') },
+                  { value: 'all', label: t('designer.threshold.all') },
+                  { value: '__num__', label: t('designer.threshold.num') },
+                ]}
+              />
               {thresholdSelectVal() === '__num__' && (
-                <input
-                  type="number"
+                <CimInputNumber
                   min={1}
+                  width={80}
                   value={typeof node.threshold === 'number' ? node.threshold : 1}
-                  onChange={(e) => onChange({ threshold: thresholdOption(e.target.value) })}
-                  style={{ width: 80 }}
+                  onChange={(v) => onChange({ threshold: thresholdOption(String(v ?? 1)) })}
                 />
               )}
             </div>
             <small>{t('designer.field.thresholdHint')}</small>
-          </div>
+          </CimField>
         </>
       )}
 
       {isApprovalKind && (
         <div className="field-row">
-          <div className="field" style={{ flex: 1 }}>
-            <label className="field-label">{t('designer.field.dueDate')}</label>
-            <input value={node.dueDate || ''} onChange={(e) => onChange({ dueDate: e.target.value })} placeholder="PT2H" />
-          </div>
-          <div className="field" style={{ width: 90 }}>
-            <label className="field-label">{t('designer.field.priority')}</label>
-            <input
-              type="number"
+          <CimField label={t('designer.field.dueDate')} style={{ flex: 1 }}>
+            <CimInput value={node.dueDate || ''} onChange={(v) => onChange({ dueDate: v })} placeholder="PT2H" />
+          </CimField>
+          <CimField label={t('designer.field.priority')} style={{ width: 90 }}>
+            <CimInputNumber
               min={0}
               max={100}
-              value={node.priority ?? ''}
-              onChange={(e) => onChange({ priority: e.target.value === '' ? undefined : Number(e.target.value) })}
+              value={node.priority ?? null}
+              onChange={(v) => onChange({ priority: v ?? undefined })}
             />
-          </div>
+          </CimField>
         </div>
       )}
 
       {node.kind !== 'start' && node.kind !== 'end' && (
-        <button className="btn btn-danger btn-block btn-sm" onClick={onDelete}>
+        <CimButton danger size="small" block onClick={onDelete}>
           <IconTrash width={14} height={14} /> {t('common.delete')}
-        </button>
+        </CimButton>
       )}
     </div>
   );
@@ -883,8 +860,7 @@ function EdgeProps({ edge, sourceNode, targetNode, onEditSource, onChange, onDel
       </div>
       {sourceKind === 'gateway' ? (
         <>
-          <div className="field">
-            <label className="field-label">{t('designer.edge.branch')}</label>
+          <CimField label={t('designer.edge.branch')}>
             <label className={`branch-option branch-yes${edge.branch === 'no' ? '' : ' active'}`}>
               <input
                 type="radio"
@@ -911,12 +887,12 @@ function EdgeProps({ edge, sourceNode, targetNode, onEditSource, onChange, onDel
                 <small>{t('designer.branch.noDesc')}</small>
               </span>
             </label>
-          </div>
+          </CimField>
           <p className="props-note">{t('designer.edge.conditionOnNode')}</p>
           {onEditSource && (
-            <button className="btn btn-block btn-sm" onClick={onEditSource}>
+            <CimButton type="primary" size="small" block onClick={onEditSource}>
               <IconPencil width={13} height={13} /> {t('designer.edge.editCondition')}
-            </button>
+            </CimButton>
           )}
         </>
       ) : sourceKind === 'parallel' ? (
@@ -926,9 +902,9 @@ function EdgeProps({ edge, sourceNode, targetNode, onEditSource, onChange, onDel
       ) : (
         <p className="props-note">{t('designer.edge.autoApprove')}</p>
       )}
-      <button className="btn btn-danger btn-block btn-sm" onClick={onDelete}>
+      <CimButton danger size="small" block onClick={onDelete}>
         <IconTrash width={14} height={14} /> {t('common.delete')}
-      </button>
+      </CimButton>
     </div>
   );
 }

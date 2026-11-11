@@ -13,6 +13,9 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
+  CimField,
+  CimInput,
+  CimSelect,
 } from '@cim/ui';
 import { IconPencil, IconPlay, IconPlus, IconX } from '@/components/Icons';
 import {
@@ -456,76 +459,80 @@ function StartModal({
       {/* G6 角色选人：每个角色型审批节点收集一组角色 key（逗号分隔）。
           节点数是后端 BPMN 决定的，没法写成 FormGrid 的静态字段数组。 */}
       {roleNodes.length > 0 && (
-        <div className="field" style={{ marginTop: 10 }}>
-          <label className="field-label">{t('def.form.roleCandidates')}</label>
+        <CimField label={t('def.form.roleCandidates')} style={{ marginTop: 10 }}>
           <p className="cim-field-hint" style={{ marginBottom: 6 }}>{t('def.form.roleCandidatesHint')}</p>
           <div className="role-node-list">
             {roleNodes.map((rn) => (
               <div className="field-row" key={rn.nodeId}>
                 <span className="role-node-name">{rn.name}</span>
-                <input
-                  className="mono"
+                <CimInput
+                  mono
                   value={roleInput[rn.nodeId] ?? ''}
-                  onChange={(e) => setRoleInput((p) => ({ ...p, [rn.nodeId]: e.target.value }))}
+                  onChange={(v) => setRoleInput((p) => ({ ...p, [rn.nodeId]: v }))}
                   placeholder="manager,finance"
                 />
               </div>
             ))}
           </div>
-        </div>
+        </CimField>
       )}
 
       {/* 业务表单字段：行数由用户增删，同样不适合静态字段数组 */}
-      <div className="field" style={{ marginTop: 10 }}>
-        <label className="field-label">
-          {t('def.form.formData')} <span className="opt">{t('def.form.formDataHint')}</span>
-        </label>
+      <CimField
+        label={
+          <>
+            {t('def.form.formData')} <span className="opt">{t('def.form.formDataHint')}</span>
+          </>
+        }
+        style={{ marginTop: 10 }}
+      >
         {formRows.map((row, i) => (
           <div className="field-row form-data-row" key={i}>
-            <input
+            <CimInput
               value={row.key}
               placeholder={t('def.form.fieldName')}
-              onChange={(e) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)))}
+              onChange={(v) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, key: v } : r)))}
             />
-            <input
+            <CimInput
               value={row.label}
               placeholder={t('def.form.fieldLabel')}
-              onChange={(e) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))}
+              onChange={(v) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, label: v } : r)))}
             />
-            <select
+            <CimSelect
               value={row.type}
-              title={t('def.form.fieldType')}
-              onChange={(e) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, type: e.target.value } : r)))}
-            >
-              <option value="text">{t('def.form.type.text')}</option>
-              <option value="textarea">{t('def.form.type.textarea')}</option>
-              <option value="number">{t('def.form.type.number')}</option>
-              <option value="money">{t('def.form.type.money')}</option>
-              <option value="boolean">{t('def.form.type.boolean')}</option>
-              <option value="date">{t('def.form.type.date')}</option>
-            </select>
-            <input
+              onChange={(v) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, type: String(v ?? '') } : r)))}
+              options={[
+                { value: 'text', label: t('def.form.type.text') },
+                { value: 'textarea', label: t('def.form.type.textarea') },
+                { value: 'number', label: t('def.form.type.number') },
+                { value: 'money', label: t('def.form.type.money') },
+                { value: 'boolean', label: t('def.form.type.boolean') },
+                { value: 'date', label: t('def.form.type.date') },
+              ]}
+            />
+            <CimInput
               value={row.value}
               placeholder={t('def.form.fieldValue')}
-              onChange={(e) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))}
+              onChange={(v) => setFormRows((rs) => rs.map((r, j) => (j === i ? { ...r, value: v } : r)))}
             />
-            <button
+            <CimButton
+              bare
               className="icon-btn"
-              type="button"
+              htmlType="button"
               title={t('common.delete')}
               onClick={() =>
                 setFormRows((rs) => (rs.length === 1 ? [EMPTY_ROW] : rs.filter((_, j) => j !== i)))
               }
             >
               <IconX width={13} height={13} />
-            </button>
+            </CimButton>
           </div>
         ))}
         <CimButton size="small" icon={<IconPlus width={13} height={13} />} onClick={() => setFormRows((rs) => [...rs, EMPTY_ROW])}>
           {t('def.form.addField')}
         </CimButton>
         <p className="cim-field-hint">{t('def.form.formSchemaHint')}</p>
-      </div>
+      </CimField>
     </CimModal>
   );
 }
