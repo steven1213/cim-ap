@@ -114,7 +114,7 @@ class DeviceAdminTest {
 
     @Test
     @Order(3)
-    void keywordSearchMatchesCodeAndName() throws Exception {
+    void keywordSearchMatchesCodeNameAndIp() throws Exception {
         mvc.perform(get("/api/v1/rms/devices").param("keyword", "*ETCH*"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
@@ -122,6 +122,21 @@ class DeviceAdminTest {
         mvc.perform(get("/api/v1/rms/devices").param("keyword", "*刻蚀*"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1));
+
+        // 列表里 IP 是一列，搜索框自然会被用来按 IP 找机台；查询原先只匹配 code/name，
+        // 前端那段按 ip 的客户端过滤因此从来没生效过（命中行已被服务端丢弃）。
+        // 用一台临时机台验证后立刻删掉——后续用例断言的是「列表为空」与「ETCH-02 可创建」。
+        String ipDeviceId = deviceAdminService
+                .createDevice("IP-PROBE-01", "IP 探针机台", typeId, areaId, "10.20.30.40", null)
+                .id();
+        try {
+            mvc.perform(get("/api/v1/rms/devices").param("keyword", "*10.20.30.40*"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].code").value("IP-PROBE-01"));
+        } finally {
+            deviceAdminService.deleteDevice(ipDeviceId);
+        }
     }
 
     @Test

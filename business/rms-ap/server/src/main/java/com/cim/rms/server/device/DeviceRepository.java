@@ -19,11 +19,13 @@ public interface DeviceRepository extends JpaRepository<Device, String> {
 
     List<Device> findByAreaIdAndDeletedFalse(String areaId);
 
-    /** 关键字（编码/名称模糊）+ 机型/区域过滤的台账查询。 */
+    /** 关键字（编码/名称/IP 模糊）+ 机型/区域过滤的台账查询。 */
     @Query("""
             select d from Device d
             where d.deleted = false
-              and (:keyword is null or lower(d.code) like lower(:keyword) escape '\\' or lower(d.name) like lower(:keyword) escape '\\')
+              and (:keyword is null or lower(d.code) like lower(:keyword) escape '\\'
+                   or lower(d.name) like lower(:keyword) escape '\\'
+                   or lower(d.ip) like lower(:keyword) escape '\\')
               and (:deviceTypeId is null or d.deviceTypeId = :deviceTypeId)
               and (:areaId is null or d.areaId = :areaId)
               and (:status is null or d.status = :status)

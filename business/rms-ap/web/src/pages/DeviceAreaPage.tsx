@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounced, useResource } from '@cim/data';
 import {
   CimModal,
   DataTable,
@@ -15,6 +16,9 @@ import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import type { DeviceArea } from '@/types';
 
+/** 模块级空数组：`data ?? []` 每次渲染都会造新引用。 */
+const NO_AREAS: DeviceArea[] = [];
+
 /**
  * 区域维护。
  *
@@ -27,37 +31,26 @@ import type { DeviceArea } from '@/types';
  *   - 手写 `.page-head`/`.toolbar`                                       → PageHead / DataTable 工具栏
  *   - `window.confirm()` 阻塞式确认 + 页顶 `useState` 提示条            → useConfirm / useToast
  * 页面里只剩「取数 + 业务动作」。
+ *
+ * <p>P7 补齐一处：P1 时 `@cim/data` 还没建，取数是手写 `refresh` + `setTimeout` 防抖，
+ * 且「后端已按 keyword 过滤、前端又按**即时值**滤一遍」——两套值不同步会闪一行空态。
+ * 现在走 `useResource` + `useDebounced`，取数与渲染用同一个滞后值。</p>
  */
 export default function DeviceAreaPage() {
   const { t } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
-  const [list, setList] = useState<DeviceArea[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounced(keyword, 200);
 
   const [editing, setEditing] = useState<DeviceArea | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.listDeviceAreas({ keyword: keyword || undefined });
-      setList(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [keyword]);
-
-  useEffect(() => {
-    // 输入防抖 200ms，避免每个字符打一次接口
-    const id = setTimeout(() => void refresh(), 200);
-    return () => clearTimeout(id);
-  }, [refresh]);
+  const { data, loading, error, refresh } = useResource(
+    () => api.listDeviceAreas({ keyword: debouncedKeyword || undefined }),
+    { deps: [debouncedKeyword], keepPreviousData: true },
+  );
+  const areas = data ?? NO_AREAS;
 
   const doDelete = useCallback(
     async (x: DeviceArea) => {
@@ -76,17 +69,15 @@ export default function DeviceAreaPage() {
         toast.error(e instanceof Error ? e.message : String(e));
         return;
       }
-      await refresh();
+      refresh();
     },
-    [t, refresh, confirm, toast],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, confirm, toast],
   );
 
-  // 后端已按 keyword 过滤；前端再滤一遍兜底（后端忽略参数时仍可用），与旧行为一致
-  const rows = useMemo(() => {
-    if (!keyword) return list;
-    const k = keyword.toLowerCase();
-    return list.filter((x) => x.code.toLowerCase().includes(k) || x.name.toLowerCase().includes(k));
-  }, [list, keyword]);
+  // 不再前端二次过滤：`useResource` 的 deps 是防抖后的关键字，渲染也用它，
+  // 两套值同步；旧写法「服务端按防抖值过滤 + 前端按即时值再滤」会闪一行空态
+  const rows = data ?? NO_AREAS;
 
   const columns = useMemo<Array<DataTableColumn<DeviceArea>>>(
     () => [
@@ -144,27 +135,27 @@ export default function DeviceAreaPage() {
         rows={rows}
         rowKey={(r) => r.id}
         loading={loading}
-        error={error}
-        onRetry={() => void refresh()}
-        onRefresh={() => void refresh()}
+        error={error?.message}
+        onRetry={refresh}
+        onRefresh={refresh}
         settingsKey="rms.device-area"
         search={{ value: keyword, onChange: setKeyword, placeholderKey: 'rms.common.search' }}
       />
 
       {(showCreate || editing) && (
         <AreaModal
-          areas={list}
+          areas={areas}
           initial={editing}
           onClose={() => {
             setShowCreate(false);
             setEditing(null);
           }}
-          onDone={async () => {
+          onDone={() => {
             const wasEdit = !!editing;
             setShowCreate(false);
             setEditing(null);
             toast.success(t(wasEdit ? 'rms.common.updated' : 'rms.common.created'));
-            await refresh();
+            refresh();
           }}
         />
       )}

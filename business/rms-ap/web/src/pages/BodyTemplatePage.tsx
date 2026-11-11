@@ -1,115 +1,307 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimDescriptions,
+  CimDrawer,
+  CimInput,
+  CimModal,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  PageHead,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
 import Perms from '@/components/Perms';
 import * as api from '@/lib/rmsApi';
 import { BODY_TEMPLATE_MANAGE, BODY_TEMPLATE_VIEW } from '@/lib/permCodes';
 import type { BodyTemplate, BodyTemplateDetail, DeviceType, TemplateUpsertItem } from '@/types';
 
+const NO_TEMPLATES: BodyTemplate[] = [];
+const NO_TYPES: DeviceType[] = [];
+
+const BODY_FORMATS = ['JSON_STRUCTURED', 'TEXT'];
+
 /**
  * Body 模板页（W10，对齐 camLine ROBDEF）：强制键 + 默认值 + 骨架 Body。
  * 新建配方时向导从这里取骨架；enforced 模板在校验时把缺键记为错误。
+ *
+ * <p>迁移要点：</p>
+ * <ul>
+ *   <li>「查看」改为只读抽屉（`CimDrawer` + `CimDescriptions` + 条目表）。旧实现是
+ *       **拿编辑弹窗当查看用**——只有 `rms:btemplate:view` 权限的人打开后也能点保存，
+ *       等于查看权限顺手给了写权限；现在查看与编辑分开，编辑挂 manage 权限。</li>
+ *   <li>取数交给 `useResource`，删除走 `useConfirm` + toast（旧实现删除失败时静默，
+ *       列表不动也不说话）。</li>
+ *   <li>编码在编辑时可改——后端 update 会做「排除自身」的重名校验，这条能力不收紧。</li>
+ * </ul>
  */
 export default function BodyTemplatePage() {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<BodyTemplate[]>([]);
-  const [types, setTypes] = useState<DeviceType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<BodyTemplateDetail | null>(null);
-  const [creating, setCreating] = useState(false);
+  const toast = useToast();
+  const confirm = useConfirm();
 
-  async function refresh() {
-    setLoading(true);
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<BodyTemplateDetail | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
+  // 编辑前要拉完整详情（含条目与骨架明文）
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const listRes = useResource(() => api.listBodyTemplates());
+  const typesRes = useResource(() => api.listDeviceTypes());
+  const rows = listRes.data ?? NO_TEMPLATES;
+  const types = typesRes.data ?? NO_TYPES;
+
+  const viewRes = useResource(
+    () => (viewId ? api.getBodyTemplate(viewId) : Promise.resolve(null)),
+    { deps: [viewId], enabled: !!viewId },
+  );
+  const viewing = viewRes.data;
+
+  const typeName = useMemo(() => Object.fromEntries(types.map((x) => [x.id, x.name])), [types]);
+
+  const openEdit = async (x: BodyTemplate) => {
+    setLoadingDetail(true);
     try {
-      setRows(await api.listBodyTemplates());
+      setEditing(await api.getBodyTemplate(x.id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      setLoadingDetail(false);
     }
-  }
-  useEffect(() => {
-    refresh();
-    api.listDeviceTypes().then(setTypes).catch(() => setTypes([]));
-  }, []);
+  };
+
+  const doDelete = async (x: BodyTemplate) => {
+    const ok = await confirm({
+      title: t('rms.common.delete'),
+      contentKey: 'rms.btpl.deleteConfirm',
+      danger: true,
+      okKey: 'rms.common.delete',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteBodyTemplate(x.id);
+      toast.success(t('rms.common.deleted'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    if (viewId === x.id) setViewId(null);
+    listRes.refresh();
+  };
+
+  const columns = useMemo<Array<DataTableColumn<BodyTemplate>>>(
+    () => [
+      { key: 'code', titleKey: 'rms.btpl.code', mono: true, width: 180 },
+      { key: 'name', titleKey: 'rms.btpl.name', width: 220 },
+      {
+        key: 'bodyFormat',
+        titleKey: 'rms.recipe.bodyFormat',
+        width: 160,
+        render: (r) => <CimTag tone="run">{r.bodyFormat}</CimTag>,
+      },
+      {
+        key: 'scopeDeviceTypeId',
+        titleKey: 'rms.btpl.scope',
+        width: 180,
+        render: (r) =>
+          r.scopeDeviceTypeId ? (
+            typeName[r.scopeDeviceTypeId] ?? r.scopeDeviceTypeId
+          ) : (
+            <span className="muted">{t('rms.btpl.scopeGeneric')}</span>
+          ),
+      },
+      {
+        key: 'enforced',
+        titleKey: 'rms.btpl.enforced',
+        width: 110,
+        render: (r) => (
+          <CimTag
+            labelKey={r.enforced ? 'rms.btpl.enforcedYes' : 'rms.btpl.enforcedNo'}
+            tone={r.enforced ? 'err' : 'idle'}
+          />
+        ),
+      },
+      {
+        key: '__ops',
+        titleKey: 'rms.common.actions',
+        width: 190,
+        render: (r) => (
+          <span className="cell-actions">
+            <Perms code={BODY_TEMPLATE_VIEW}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setViewId(r.id)}>
+                {t('rms.common.view')}
+              </button>
+            </Perms>
+            <Perms code={BODY_TEMPLATE_MANAGE}>
+              <button className="btn btn-ghost btn-sm" onClick={() => void openEdit(r)}>
+                {t('rms.common.edit')}
+              </button>
+              <button className="btn btn-ghost btn-sm danger" onClick={() => void doDelete(r)}>
+                {t('rms.common.delete')}
+              </button>
+            </Perms>
+          </span>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, typeName, viewId],
+  );
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div><h1>{t('rms.btpl.title')}</h1><p className="muted">{t('rms.btpl.sub')}</p></div>
-        <div className="toolbar">
+    <Page>
+      <PageHead
+        titleKey="rms.btpl.title"
+        subtitleKey="rms.btpl.sub"
+        actions={
           <Perms code={BODY_TEMPLATE_MANAGE}>
             <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>
               + {t('rms.btpl.create')}
             </button>
           </Perms>
-          <button className="btn btn-ghost btn-sm" onClick={refresh}>{t('rms.common.refresh')}</button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="panel">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>{t('rms.btpl.code')}</th>
-              <th>{t('rms.btpl.name')}</th>
-              <th>{t('rms.recipe.bodyFormat')}</th>
-              <th>{t('rms.btpl.scope')}</th>
-              <th>{t('rms.btpl.enforced')}</th>
-              <th>{t('rms.common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((x) => (
-              <tr key={x.id}>
-                <td className="mono">{x.code}</td>
-                <td>{x.name}</td>
-                <td><span className="tag">{x.bodyFormat}</span></td>
-                <td className="muted">
-                  {x.scopeDeviceTypeId
-                    ? types.find((tp) => tp.id === x.scopeDeviceTypeId)?.name ?? x.scopeDeviceTypeId
-                    : t('rms.btpl.scopeGeneric')}
-                </td>
-                <td>
-                  <span className={'tag ' + (x.enforced ? 'err' : '')}>
-                    {x.enforced ? t('rms.btpl.enforcedYes') : t('rms.btpl.enforcedNo')}
-                  </span>
-                </td>
-                <td className="cell-actions">
-                  <Perms code={BODY_TEMPLATE_VIEW}>
-                    <button className="btn btn-ghost btn-sm" onClick={async () => setEditing(await api.getBodyTemplate(x.id))}>
-                      {t('rms.common.view')}
-                    </button>
-                  </Perms>
-                  <Perms code={BODY_TEMPLATE_MANAGE}>
-                    <button
-                      className="btn btn-ghost btn-sm danger"
-                      onClick={async () => {
-                        if (!window.confirm(t('rms.btpl.deleteConfirm'))) return;
-                        await api.deleteBodyTemplate(x.id);
-                        await refresh();
-                      }}
-                    >
-                      {t('rms.common.delete')}
-                    </button>
-                  </Perms>
-                </td>
-              </tr>
-            ))}
-            {!loading && rows.length === 0 && (
-              <tr><td colSpan={6} className="empty-cell">{t('rms.btpl.empty')}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<BodyTemplate>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        loading={listRes.loading || loadingDetail}
+        error={listRes.error?.message}
+        onRetry={listRes.refresh}
+        onRefresh={listRes.refresh}
+        settingsKey="rms.body-template"
+        emptyTitleKey="rms.btpl.empty"
+      />
+
+      <CimDrawer
+        open={!!viewId}
+        onClose={() => setViewId(null)}
+        title={viewing ? `${viewing.code} · ${viewing.name}` : t('rms.common.view')}
+        width={680}
+      >
+        {viewRes.loading ? <p className="muted">{t('rms.common.loading')}</p> : null}
+        {viewRes.error ? <p className="cim-field-error">{viewRes.error.message}</p> : null}
+        {viewing ? (
+          <>
+            <CimDescriptions<BodyTemplateDetail>
+              record={viewing}
+              items={[
+                { key: 'code', labelKey: 'rms.btpl.code', dataIndex: 'code', render: (r) => <span className="cim-mono">{r.code}</span> },
+                { key: 'name', labelKey: 'rms.btpl.name', dataIndex: 'name' },
+                { key: 'bodyFormat', labelKey: 'rms.recipe.bodyFormat', render: (r) => <CimTag tone="run">{r.bodyFormat}</CimTag> },
+                {
+                  key: 'scope',
+                  labelKey: 'rms.btpl.scope',
+                  render: (r) =>
+                    r.scopeDeviceTypeId ? typeName[r.scopeDeviceTypeId] ?? r.scopeDeviceTypeId : t('rms.btpl.scopeGeneric'),
+                },
+                {
+                  key: 'enforced',
+                  labelKey: 'rms.btpl.enforced',
+                  render: (r) => (
+                    <CimTag
+                      labelKey={r.enforced ? 'rms.btpl.enforcedYes' : 'rms.btpl.enforcedNo'}
+                      tone={r.enforced ? 'err' : 'idle'}
+                    />
+                  ),
+                },
+              ]}
+            />
+
+            <p className="cim-field-hint" style={{ marginTop: 14 }}>
+              {t('rms.btpl.skeleton')}
+            </p>
+            <pre
+              className="cim-mono"
+              style={{
+                margin: '4px 0 14px',
+                padding: 10,
+                borderRadius: 6,
+                background: 'var(--panel-2, rgba(0,0,0,.03))',
+                maxHeight: 200,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              }}
+            >
+              {viewing.templateBody || '—'}
+            </pre>
+
+            <DataTable<TemplateRow>
+              columns={itemColumns}
+              rows={viewing.items.map((i) => ({
+                key: i.paramKey,
+                required: i.required,
+                defaultValue: i.defaultValue,
+                unit: i.unit,
+              }))}
+              rowKey={(r) => r.key}
+              settingsKey="rms.body-template.items"
+              emptyTitleKey="rms.common.noData"
+            />
+          </>
+        ) : null}
+      </CimDrawer>
 
       {(creating || editing) && (
         <TemplateModal
           types={types}
           initial={editing}
-          onClose={() => { setCreating(false); setEditing(null); }}
-          onSaved={async () => { setCreating(false); setEditing(null); await refresh(); }}
+          onClose={() => {
+            setCreating(false);
+            setEditing(null);
+          }}
+          onSaved={() => {
+            const wasEdit = !!editing;
+            setCreating(false);
+            setEditing(null);
+            toast.success(t(wasEdit ? 'rms.common.updated' : 'rms.common.created'));
+            listRes.refresh();
+          }}
         />
       )}
-    </div>
+    </Page>
   );
+}
+
+interface TemplateRow {
+  key: string;
+  required: boolean;
+  defaultValue: string | null;
+  unit: string | null;
+}
+
+const itemColumns: Array<DataTableColumn<TemplateRow>> = [
+  { key: 'key', titleKey: 'rms.spec.paramKey', mono: true, width: 220 },
+  {
+    key: 'required',
+    titleKey: 'rms.btpl.required',
+    width: 90,
+    render: (r) => (r.required ? '✓' : '—'),
+  },
+  {
+    key: 'defaultValue',
+    titleKey: 'rms.btpl.defaultValue',
+    mono: true,
+    width: 160,
+    render: (r) => r.defaultValue ?? '—',
+  },
+  { key: 'unit', titleKey: 'rms.spec.unit', width: 90, render: (r) => r.unit ?? '—' },
+];
+
+interface TemplateForm {
+  code: string;
+  name: string;
+  bodyFormat: string;
+  scopeDeviceTypeId: string;
+  enforced: boolean;
+  templateBody: string;
 }
 
 function TemplateModal({
@@ -124,136 +316,155 @@ function TemplateModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [code, setCode] = useState(initial?.code ?? '');
-  const [name, setName] = useState(initial?.name ?? '');
-  const [bodyFormat, setBodyFormat] = useState(initial?.bodyFormat ?? 'JSON_STRUCTURED');
-  const [scope, setScope] = useState(initial?.scopeDeviceTypeId ?? '');
-  const [enforced, setEnforced] = useState(initial?.enforced ?? true);
-  const [templateBody, setTemplateBody] = useState(initial?.templateBody ?? '');
+  const [form, setForm] = useState<TemplateForm>({
+    code: initial?.code ?? '',
+    name: initial?.name ?? '',
+    bodyFormat: initial?.bodyFormat ?? 'JSON_STRUCTURED',
+    scopeDeviceTypeId: initial?.scopeDeviceTypeId ?? '',
+    enforced: initial?.enforced ?? true,
+    templateBody: initial?.templateBody ?? '',
+  });
   const [items, setItems] = useState<TemplateUpsertItem[]>(
-    (initial?.items ?? []).map((i) => ({ paramKey: i.paramKey, required: i.required, defaultValue: i.defaultValue, unit: i.unit })),
+    (initial?.items ?? []).map((i) => ({
+      paramKey: i.paramKey,
+      required: i.required,
+      defaultValue: i.defaultValue,
+      unit: i.unit,
+    })),
   );
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof TemplateForm, string>>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  const scopeOptions = useMemo(
+    () => [
+      { value: '', labelKey: 'rms.btpl.scopeGeneric' },
+      ...types.map((x) => ({ value: x.id, label: x.name, hint: x.code })),
+    ],
+    [types],
+  );
+
+  const fields = useMemo<Array<FormField<TemplateForm>>>(
+    () => [
+      { kind: 'text', key: 'code', labelKey: 'rms.btpl.code', required: true, mono: true },
+      { kind: 'text', key: 'name', labelKey: 'rms.btpl.name', required: true },
+      {
+        kind: 'select',
+        key: 'bodyFormat',
+        labelKey: 'rms.recipe.bodyFormat',
+        options: BODY_FORMATS.map((f) => ({ value: f, label: f })),
+        allowClear: false,
+      },
+      { kind: 'select', key: 'scopeDeviceTypeId', labelKey: 'rms.btpl.scope', options: scopeOptions },
+      { kind: 'switch', key: 'enforced', labelKey: 'rms.btpl.enforced', hintKey: 'rms.btpl.enforcedHint' },
+      { kind: 'textarea', key: 'templateBody', labelKey: 'rms.btpl.skeleton', rows: 7, span: 2 },
+    ],
+    [scopeOptions],
+  );
 
   function setItem(i: number, patch: Partial<TemplateUpsertItem>) {
     setItems((list) => list.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   }
 
   async function save() {
-    if (!code || !name) {
-      setErr(t('rms.common.confirm'));
-      return;
-    }
+    const next: Partial<Record<keyof TemplateForm, string>> = {};
+    if (!form.code) next.code = t('rms.common.required');
+    if (!form.name) next.name = t('rms.common.required');
+    setFieldErrors(next);
+    if (Object.keys(next).length) return;
+
     setBusy(true);
     setErr('');
     try {
       const body = {
-        code,
-        name,
-        bodyFormat,
-        scopeDeviceTypeId: scope || null,
-        enforced,
-        templateBody: templateBody || null,
+        code: form.code,
+        name: form.name,
+        bodyFormat: form.bodyFormat,
+        scopeDeviceTypeId: form.scopeDeviceTypeId || null,
+        enforced: form.enforced,
+        templateBody: form.templateBody || null,
         items: items.filter((i) => i.paramKey?.trim()),
       };
-      if (initial) {
-        await api.updateBodyTemplate(initial.id, body);
-      } else {
-        await api.createBodyTemplate(body);
-      }
+      if (initial) await api.updateBodyTemplate(initial.id, body);
+      else await api.createBodyTemplate(body);
       onSaved();
-    } catch (e: any) {
-      setErr(e?.message || 'error');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>{initial ? t('rms.btpl.edit') : t('rms.btpl.create')}</h3>
-          <button className="icon-btn" onClick={onClose}>✕</button>
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey={initial ? 'rms.btpl.edit' : 'rms.btpl.create'}
+      onOk={() => void save()}
+      okKey="rms.common.save"
+      cancelKey="rms.common.cancel"
+      okLoading={busy}
+      width={720}
+    >
+      <FormGrid<TemplateForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+        errors={fieldErrors}
+        columns={2}
+      />
+
+      {/* 强制键清单是「不定行数的子表」，不是单个字段，故不进 FormGrid，仍手写这一块 */}
+      <div className="cim-field" style={{ marginTop: 14 }}>
+        <label className="cim-field-label">{t('rms.btpl.keys')}</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+          {items.map((it, i) => (
+            <div
+              key={i}
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 96px 32px', gap: 8, alignItems: 'center' }}
+            >
+              <CimInput
+                value={it.paramKey}
+                mono
+                placeholder="PARAM_KEY"
+                onChange={(v) => setItem(i, { paramKey: v })}
+              />
+              <CimInput
+                value={it.defaultValue ?? ''}
+                placeholder={t('rms.btpl.defaultValue')}
+                onChange={(v) => setItem(i, { defaultValue: v })}
+              />
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={it.required !== false}
+                  onChange={(e) => setItem(i, { required: e.target.checked })}
+                />
+                {t('rms.btpl.required')}
+              </label>
+              <button
+                className="btn btn-ghost btn-sm danger"
+                onClick={() => setItems((l) => l.filter((_, idx) => idx !== i))}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
         </div>
-        <div className="modal-body">
-          <div className="grid-2">
-            <div className="field">
-              <label className="field-label">{t('rms.btpl.code')} *</label>
-              <input className="text-input mono" value={code} onChange={(e) => setCode(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.btpl.name')} *</label>
-              <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.recipe.bodyFormat')}</label>
-              <select className="text-input" value={bodyFormat} onChange={(e) => setBodyFormat(e.target.value)}>
-                <option value="JSON_STRUCTURED">JSON_STRUCTURED</option>
-                <option value="TEXT">TEXT</option>
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label">{t('rms.btpl.scope')}</label>
-              <select className="text-input" value={scope} onChange={(e) => setScope(e.target.value)}>
-                <option value="">{t('rms.btpl.scopeGeneric')}</option>
-                {types.map((tp) => (
-                  <option key={tp.id} value={tp.id}>{tp.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <label className="check">
-            <input type="checkbox" checked={enforced} onChange={(e) => setEnforced(e.target.checked)} />
-            {t('rms.btpl.enforcedHint')}
-          </label>
-          <div className="field">
-            <label className="field-label">{t('rms.btpl.skeleton')}</label>
-            <textarea className="text-input mono" rows={6} value={templateBody} onChange={(e) => setTemplateBody(e.target.value)} />
-          </div>
-          <div className="field">
-            <label className="field-label">{t('rms.btpl.keys')}</label>
-            <div className="pick-list">
-              {items.map((it, i) => (
-                <div className="grid-2" key={i}>
-                  <div className="field">
-                    <input
-                      className="text-input mono"
-                      placeholder="PARAM_KEY"
-                      value={it.paramKey}
-                      onChange={(e) => setItem(i, { paramKey: e.target.value })}
-                    />
-                  </div>
-                  <div className="field">
-                    <div className="inline-row">
-                      <input
-                        className="text-input"
-                        placeholder={t('rms.btpl.defaultValue')}
-                        value={it.defaultValue ?? ''}
-                        onChange={(e) => setItem(i, { defaultValue: e.target.value })}
-                      />
-                      <label className="check">
-                        <input type="checkbox" checked={it.required !== false} onChange={(e) => setItem(i, { required: e.target.checked })} />
-                        {t('rms.btpl.required')}
-                      </label>
-                      <button className="icon-btn danger" onClick={() => setItems((l) => l.filter((_, idx) => idx !== i))}>✕</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setItems((l) => [...l, { paramKey: '', required: true }])}>
-              + {t('rms.btpl.addKey')}
-            </button>
-          </div>
-          {err && <div className="form-error">{err}</div>}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose}>{t('rms.common.cancel')}</button>
-          <button className="btn btn-primary" disabled={busy} onClick={save}>{t('rms.common.save')}</button>
-        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          style={{ marginTop: 8 }}
+          onClick={() => setItems((l) => [...l, { paramKey: '', required: true }])}
+        >
+          + {t('rms.btpl.addKey')}
+        </button>
       </div>
-    </div>
+
+      {err ? (
+        <p className="cim-field-error" style={{ marginTop: 10 }}>
+          {err}
+        </p>
+      ) : null}
+    </CimModal>
   );
 }
