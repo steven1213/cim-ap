@@ -1,267 +1,341 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Panel from '@/components/Panel';
-import { IconWebhook, IconPlus, IconSend, IconRefresh } from '@/components/Icons';
-import { listCallbacks, registerCallback, queryOutbox, deliverMessage, getOutboxStats, testCallback } from '@/lib/api';
-import { toast } from '@/store/toastStore';
+import { useResource } from '@cim/data';
+import {
+  CimButton,
+  CimModal,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  Panel,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
+import type { StatusTone } from '@cim/theme';
+import { IconSend } from '@/components/Icons';
+import {
+  deliverMessage,
+  getOutboxStats,
+  listCallbacks,
+  queryOutbox,
+  registerCallback,
+  testCallback,
+} from '@/lib/api';
 import { fmtDate } from '@/lib/format';
 import type { CallbackRegistrationRequest, CallbackRegistrationView, OutboxView } from '@/types';
 
-function statusTag(status: string): string {
+/** 投递状态 → 语义档。 */
+function deliveryTone(status: string): StatusTone {
   if (status === 'SENT') return 'ok';
   if (status === 'DEAD') return 'err';
   return 'warn';
 }
 
+interface Bundle {
+  regs: CallbackRegistrationView[];
+  outbox: OutboxView[];
+  /** 统计是「锦上添花」，取不到就整块不显示，不该拖垮两个主表。 */
+  stats: Record<string, number> | null;
+}
+
+interface RegisterForm {
+  appCode: string;
+  baseUrl: string;
+  secret: string;
+}
+
+const EMPTY_FORM: RegisterForm = { appCode: '', baseUrl: '', secret: '' };
+
 export default function CallbacksPage() {
   const { t } = useTranslation();
-  const [regs, setRegs] = useState<CallbackRegistrationView[]>([]);
-  const [outbox, setOutbox] = useState<OutboxView[]>([]);
-  const [stats, setStats] = useState<Record<string, number> | null>(null);
-  const [testing, setTesting] = useState<string | null>(null);
-  const [appCode, setAppCode] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [secret, setSecret] = useState('');
+  const toast = useToast();
+
+  const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<Record<keyof RegisterForm, string>>>({});
   const [busy, setBusy] = useState(false);
+  /** 逐行锁：只锁被点的那行，别把整张表变灰。 */
+  const [testing, setTesting] = useState<string | null>(null);
   const [delivering, setDelivering] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<{ appCode: string; baseUrl: string; secret: string; token: string; existingUrl: string } | null>(null);
+  const [overwrite, setOverwrite] = useState<
+    { appCode: string; baseUrl: string; secret: string; token: string; existingUrl: string } | null
+  >(null);
 
-  async function load() {
-    try {
-      const [r, o] = await Promise.all([listCallbacks(), queryOutbox()]);
-      getOutboxStats().then(setStats).catch(() => {});
-      setRegs(r);
-      setOutbox(o);
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    }
+  /**
+   * 三份数据合成**一个**资源。
+   *
+   * <p>注册 / 重投 / 测试之后都要同时刷新三块；拆三个 `useResource` 就会出现
+   * 「表格已刷新、监控还没动」的中间态，且要写三次 refresh。三者也是同一屏出现的，
+   * 分成三个 loading 只会让页面分三次闪。</p>
+   */
+  const cbRes = useResource<Bundle>(async ({ signal }) => {
+    const [regs, outbox, stats] = await Promise.all([
+      listCallbacks({ signal }),
+      queryOutbox(undefined, undefined, { signal }),
+      getOutboxStats({ signal }).catch(() => null),
+    ]);
+    return { regs, outbox, stats };
+  });
+
+  const regs = cbRes.data?.regs ?? [];
+  const outbox = cbRes.data?.outbox ?? [];
+  const stats = cbRes.data?.stats ?? null;
+
+  const fields: Array<FormField<RegisterForm>> = [
+    { key: 'appCode', labelKey: 'cb.form.appCode', kind: 'text', required: true, placeholder: 'rms-ap', mono: true },
+    {
+      key: 'baseUrl',
+      labelKey: 'cb.form.baseUrl',
+      kind: 'text',
+      required: true,
+      placeholder: 'http://localhost:8084/api/v1/rms/callback',
+      mono: true,
+    },
+    { key: 'secret', labelKey: 'cb.form.secret', kind: 'text', mono: true, hintKey: 'cb.secretHint' },
+  ];
+
+  function validate(): boolean {
+    const next: Partial<Record<keyof RegisterForm, string>> = {};
+    if (!form.appCode.trim()) next.appCode = t('cb.form.appCode');
+    if (!form.baseUrl.trim()) next.baseUrl = t('cb.form.baseUrl');
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
-  useEffect(() => {
-    load();
-  }, []);
 
-  async function register() {
-    if (!appCode.trim() || !baseUrl.trim()) {
-      toast(t('common.confirm') + '：' + t('cb.form.appCode') + ' / ' + t('cb.form.baseUrl'), 'warn');
-      return;
-    }
-    await doRegister({ appCode: appCode.trim(), baseUrl: baseUrl.trim(), secret: secret.trim() || null }, null);
-  }
-
-  // G2 二次确认：重复注册同 appCode 时首调仅签发令牌（confirmRequired=true），回填令牌后再次提交才覆盖。
   async function doRegister(req: CallbackRegistrationRequest, token: string | null) {
     setBusy(true);
     try {
       const v = await registerCallback({ ...req, confirmToken: token ?? undefined });
+      // G2 二次确认：同 appCode 首调只签发令牌（confirmRequired），回填令牌后再提交才覆盖
       if (v.confirmRequired && v.confirmToken) {
-        setConfirm({ appCode: req.appCode, baseUrl: req.baseUrl, secret: req.secret ?? '', token: v.confirmToken, existingUrl: v.baseUrl });
-        setBusy(false);
+        setOverwrite({
+          appCode: req.appCode,
+          baseUrl: req.baseUrl,
+          secret: req.secret ?? '',
+          token: v.confirmToken,
+          existingUrl: v.baseUrl,
+        });
         return;
       }
-      toast(`${t('cb.register')} ✓ ${v.appCode} → ${v.baseUrl}`, 'ok');
-      setAppCode('');
-      setBaseUrl('');
-      setSecret('');
-      setConfirm(null);
-      await load();
+      toast.success(`${t('cb.register')} ✓ ${v.appCode} → ${v.baseUrl}`);
+      setForm(EMPTY_FORM);
+      setErrors({});
+      setOverwrite(null);
+      cbRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
-  async function confirmOverwrite() {
-    if (!confirm) return;
-    await doRegister({ appCode: confirm.appCode, baseUrl: confirm.baseUrl, secret: confirm.secret || null }, confirm.token);
+  function register() {
+    if (!validate()) return;
+    void doRegister(
+      { appCode: form.appCode.trim(), baseUrl: form.baseUrl.trim(), secret: form.secret.trim() || null },
+      null,
+    );
   }
 
   async function redeliver(messageId: string) {
     setDelivering(messageId);
     try {
       await deliverMessage(messageId);
-      toast(t('cb.deliver') + ' ✓', 'ok');
-      await load();
+      toast.success(t('cb.deliver') + ' ✓');
+      cbRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setDelivering(null);
     }
   }
 
+  async function runTest(appCode: string) {
+    setTesting(appCode);
+    try {
+      const res = await testCallback(appCode);
+      if (res.status === 'SENT') toast.success(t('cb.testOk'));
+      else toast.error(`${t('cb.testFail')}：${res.lastError ?? res.status}`);
+      cbRes.refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setTesting(null);
+    }
+  }
+
+  const regColumns: Array<DataTableColumn<CallbackRegistrationView>> = [
+    { key: 'appCode', titleKey: 'cb.colAppCode', width: 140, mono: true },
+    { key: 'baseUrl', titleKey: 'cb.colBaseUrl', mono: true, ellipsis: true },
+    {
+      key: 'enabled',
+      titleKey: 'common.status',
+      width: 100,
+      render: (r) => (
+        <CimTag tone={r.enabled ? 'ok' : 'err'}>{t(r.enabled ? 'status.enabled' : 'status.disabled')}</CimTag>
+      ),
+    },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 100,
+      render: (r) => (
+        <CimButton size="small" loading={testing === r.appCode} onClick={() => runTest(r.appCode)}>
+          {t('cb.test')}
+        </CimButton>
+      ),
+    },
+    { key: 'updatedAt', titleKey: 'cb.colUpdated', width: 170, mono: true, render: (r) => fmtDate(r.updatedAt) },
+  ];
+
+  const outboxColumns: Array<DataTableColumn<OutboxView>> = [
+    { key: 'messageId', titleKey: 'cb.colMessageId', width: 130, mono: true },
+    { key: 'appCode', titleKey: 'cb.colAppCode', width: 110, mono: true },
+    { key: 'businessKey', titleKey: 'audit.colBusinessKey', width: 150, mono: true },
+    {
+      key: 'eventType',
+      titleKey: 'cb.colEventType',
+      width: 130,
+      render: (o) => <CimTag>{t('cb.event.' + o.eventType)}</CimTag>,
+    },
+    {
+      key: 'status',
+      titleKey: 'cb.colStatus',
+      width: 110,
+      render: (o) => <CimTag tone={deliveryTone(o.status)}>{t('cb.status.' + o.status)}</CimTag>,
+    },
+    { key: 'attempts', titleKey: 'cb.colAttempts', width: 90, align: 'right' },
+    { key: 'sentAt', titleKey: 'cb.colSentAt', width: 170, mono: true, render: (o) => fmtDate(o.sentAt) },
+    {
+      key: 'lastError',
+      titleKey: 'cb.colLastError',
+      mono: true,
+      ellipsis: true,
+      render: (o) => o.lastError ?? '—',
+    },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 110,
+      render: (o) =>
+        o.status === 'PENDING' || o.status === 'DEAD' ? (
+          <CimButton
+            size="small"
+            icon={<IconSend width={13} height={13} />}
+            loading={delivering === o.messageId}
+            onClick={() => redeliver(o.messageId)}
+          >
+            {t('cb.deliver')}
+          </CimButton>
+        ) : null,
+    },
+  ];
+
   return (
-    <div className="page">
-      <Panel title={t('cb.registerTitle')}>
-        <div className="grid-3">
-          <div className="field">
-            <label className="field-label">{t('cb.form.appCode')}</label>
-            <input className="mono" value={appCode} onChange={(e) => setAppCode(e.target.value)} placeholder="rms-ap" />
-          </div>
-          <div className="field">
-            <label className="field-label">{t('cb.form.baseUrl')}</label>
-            <input className="mono" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://localhost:8084/api/v1/rms/callback" />
-          </div>
-          <div className="field">
-            <label className="field-label">
-              {t('cb.form.secret')} <span className="opt">HMAC</span>
-            </label>
-            <input className="mono" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={t('common.empty')} />
-            <p className="field-hint">{t('cb.secretHint')}</p>
-          </div>
-        </div>
-        <div className="row" style={{ marginTop: 4 }}>
-          <button className="btn btn-sm" disabled={busy} onClick={register}>
-            <IconPlus width={14} height={14} /> {t('cb.register')}
-          </button>
+    <Page>
+      <Panel titleKey="cb.registerTitle">
+        <FormGrid<RegisterForm>
+          fields={fields}
+          value={form}
+          errors={errors}
+          columns={3}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+        />
+        <div className="row" style={{ marginTop: 10 }}>
+          <CimButton type="primary" size="small" loading={busy} onClick={register}>
+            {t('cb.register')}
+          </CimButton>
         </div>
       </Panel>
 
       {stats && (
-        <Panel title={t('cb.stats.title')} sub={t('cb.stats.sub')}>
+        <Panel titleKey="cb.stats.title" subKey="cb.stats.sub">
           <div className="kpi-grid">
-            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.sent')}</span><span className="kpi-val">{stats.sent}</span></span></div>
-            <div className="kpi warn"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.pending')}</span><span className="kpi-val">{stats.pending}</span></span></div>
-            <div className={'kpi' + (stats.dead > 0 ? ' err' : '')}><span className="kpi-main"><span className="kpi-label">{t('cb.stats.dead')}</span><span className="kpi-val">{stats.dead}</span></span></div>
-            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.rate')}</span><span className="kpi-val">{stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'}</span></span></div>
-            <div className="kpi"><span className="kpi-main"><span className="kpi-label">{t('cb.stats.cost')}</span><span className="kpi-val">{stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'}</span></span></div>
+            <div className="kpi">
+              <span className="kpi-main">
+                <span className="kpi-label">{t('cb.stats.sent')}</span>
+                <span className="kpi-val">{stats.sent ?? '—'}</span>
+              </span>
+            </div>
+            <div className="kpi warn">
+              <span className="kpi-main">
+                <span className="kpi-label">{t('cb.stats.pending')}</span>
+                <span className="kpi-val">{stats.pending ?? '—'}</span>
+              </span>
+            </div>
+            <div className={'kpi' + (stats.dead > 0 ? ' err' : '')}>
+              <span className="kpi-main">
+                <span className="kpi-label">{t('cb.stats.dead')}</span>
+                <span className="kpi-val">{stats.dead ?? '—'}</span>
+              </span>
+            </div>
+            <div className="kpi">
+              <span className="kpi-main">
+                <span className="kpi-label">{t('cb.stats.rate')}</span>
+                <span className="kpi-val">
+                  {stats.successRate != null ? (stats.successRate * 100).toFixed(0) + '%' : '—'}
+                </span>
+              </span>
+            </div>
+            <div className="kpi">
+              <span className="kpi-main">
+                <span className="kpi-label">{t('cb.stats.cost')}</span>
+                <span className="kpi-val">{stats.avgCostMs > 0 ? (stats.avgCostMs / 1000).toFixed(1) + ' s' : '—'}</span>
+              </span>
+            </div>
           </div>
         </Panel>
       )}
 
-      <Panel
-        title={t('cb.title')}
-        sub={t('cb.sub')}
-        actions={
-          <button className="icon-btn" onClick={load} title={t('common.refresh')} aria-label={t('common.refresh')}>
-            <IconRefresh width={16} height={16} />
-          </button>
-        }
+      <Panel titleKey="cb.title" subKey="cb.sub" flush>
+        <DataTable<CallbackRegistrationView>
+          flat
+          columns={regColumns}
+          rows={regs}
+          rowKey={(r) => r.id}
+          loading={cbRes.loading}
+          error={cbRes.error ? cbRes.error.message : null}
+          onRetry={cbRes.refresh}
+          onRefresh={cbRes.refresh}
+          emptyTitleKey="cb.empty"
+          scrollX="max-content"
+        />
+      </Panel>
+
+      <Panel titleKey="cb.outbox" flush>
+        <DataTable<OutboxView>
+          flat
+          columns={outboxColumns}
+          rows={outbox}
+          rowKey={(o) => o.id}
+          loading={cbRes.loading}
+          emptyTitleKey="common.empty"
+          scrollX="max-content"
+        />
+      </Panel>
+
+      <CimModal
+        open={!!overwrite}
+        onClose={() => setOverwrite(null)}
+        title={t('cb.confirmOverwrite')}
+        onOk={() => {
+          if (!overwrite) return;
+          void doRegister(
+            { appCode: overwrite.appCode, baseUrl: overwrite.baseUrl, secret: overwrite.secret || null },
+            overwrite.token,
+          );
+        }}
+        okLoading={busy}
+        okKey="common.confirm"
+        cancelKey="common.cancel"
       >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('cb.colAppCode')}</th>
-                <th>{t('cb.colBaseUrl')}</th>
-                <th>{t('common.status')}</th>
-                <th>{t('cb.colUpdated')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {regs.length === 0 && (
-                <tr>
-                  <td colSpan={4}>
-                    <div className="empty">
-                      <IconWebhook width={26} height={26} />
-                      <span>{t('cb.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {regs.map((r) => (
-                <tr key={r.id}>
-                  <td className="mono">{r.appCode}</td>
-                  <td className="mono">{r.baseUrl}</td>
-                  <td>
-                    <span className={'tag ' + (r.enabled ? 'ok' : 'err')}>
-                      {r.enabled ? t('status.enabled') : t('status.disabled')}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      disabled={testing === r.appCode}
-                      onClick={async () => {
-                        setTesting(r.appCode);
-                        try {
-                          const res = await testCallback(r.appCode);
-                          toast(res.status === 'SENT' ? t('cb.testOk') : `${t('cb.testFail')}：${res.lastError ?? res.status}`,
-                            res.status === 'SENT' ? 'ok' : 'err');
-                          await load();
-                        } catch (e) {
-                          toast((e as Error).message, 'err');
-                        } finally {
-                          setTesting(null);
-                        }
-                      }}
-                    >
-                      {t('cb.test')}
-                    </button>
-                  </td>
-                  <td className="mono">{fmtDate(r.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
-      <Panel title={t('cb.outbox')}>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>{t('cb.colMessageId')}</th>
-                <th>{t('cb.colAppCode')}</th>
-                <th>{t('audit.colBusinessKey')}</th>
-                <th>{t('cb.colEventType')}</th>
-                <th>{t('cb.colStatus')}</th>
-                <th className="num">{t('cb.colAttempts')}</th>
-                <th>{t('cb.colSentAt')}</th>
-                <th>{t('cb.colLastError')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {outbox.length === 0 && (
-                <tr>
-                  <td colSpan={9}>
-                    <div className="empty">
-                      <span>{t('common.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {outbox.map((o) => (
-                <tr key={o.id}>
-                  <td className="mono">{o.messageId}</td>
-                  <td className="mono">{o.appCode}</td>
-                  <td className="mono">{o.businessKey}</td>
-                  <td><span className="tag">{t('cb.event.' + o.eventType)}</span></td>
-                  <td><span className={'tag ' + statusTag(o.status)}>{t('cb.status.' + o.status)}</span></td>
-                  <td className="num">{o.attempts}</td>
-                  <td className="mono">{fmtDate(o.sentAt)}</td>
-                  <td className="mono" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.lastError ?? ''}>{o.lastError ?? '—'}</td>
-                  <td>
-                    <div className="cell-actions">
-                      {(o.status === 'PENDING' || o.status === 'DEAD') && (
-                        <button className="btn btn-ghost btn-sm" disabled={delivering === o.messageId} onClick={() => redeliver(o.messageId)}>
-                          <IconSend width={13} height={13} /> {delivering === o.messageId ? t('cb.delivering') : t('cb.deliver')}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-
-      {confirm && (
-        <div className="modal-scrim" onClick={() => setConfirm(null)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">{t('cb.confirmOverwrite')}</div>
-            <div className="modal-body">
-              <p>{t('cb.confirmOverwriteBody', { appCode: confirm.appCode, baseUrl: confirm.existingUrl })}</p>
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>{t('common.cancel')}</button>
-              <button className="btn btn-sm" disabled={busy} onClick={confirmOverwrite}>{t('common.confirm')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        <p>
+          {overwrite
+            ? t('cb.confirmOverwriteBody', { appCode: overwrite.appCode, baseUrl: overwrite.existingUrl })
+            : ''}
+        </p>
+      </CimModal>
+    </Page>
   );
 }

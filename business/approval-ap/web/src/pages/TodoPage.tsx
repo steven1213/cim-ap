@@ -1,481 +1,616 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Panel from '@/components/Panel';
-import Modal from '@/components/Modal';
+import { useResource } from '@cim/data';
+import {
+  CimButton,
+  CimModal,
+  CimTag,
+  DataTable,
+  FormGrid,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+  type FormField,
+} from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
 import CompleteModal from '@/components/CompleteModal';
 import ResubmitModal from '@/components/ResubmitModal';
-import { IconInbox, IconCheck, IconReturn, IconAddUser, IconSwap, IconRefresh, IconSearch, IconUser, IconWeCom } from '@/components/Icons';
+import { DisplayFields } from '@/components/DisplayFields';
 import {
-  listTodoPaged, completeTask, returnTask, getReturnTargets, addSignTask, reassignTask,
-  batchComplete, delegateTask, resolveTask, createWeComLink, type PageResult,
+  IconAddUser,
+  IconCheck,
+  IconRefresh,
+  IconReturn,
+  IconSearch,
+  IconSwap,
+  IconUser,
+  IconWeCom,
+} from '@/components/Icons';
+import {
+  addSignTask,
+  batchComplete,
+  completeTask,
+  createWeComLink,
+  delegateTask,
+  getReturnTargets,
+  listTodo,
+  reassignTask,
+  resolveTask,
+  returnTask,
 } from '@/lib/api';
 import { useIdentityStore } from '@/store/identityStore';
-import { toast } from '@/store/toastStore';
 import { fmtDate, fmtOverdue } from '@/lib/format';
-import { DisplayFields } from '@/components/DisplayFields';
-import type { TaskView } from '@/types';
+import type { AddSignRequest, ReassignRequest, ReturnRequest, TaskView } from '@/types';
 
 type ModalType = 'complete' | 'return' | 'addsign' | 'reassign' | 'delegate';
 
 /** 重提态任务名（与后端 ApprovalReturnService.RESUBMIT_TASK_NAME 对齐）。 */
 const RESUBMIT_TASK_NAME = '修改并重新提交';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 export default function TodoPage() {
   const { t } = useTranslation();
+  const toast = useToast();
+  const confirm = useConfirm();
   const { userId } = useIdentityStore();
-  const [paged, setPaged] = useState<PageResult<TaskView> | null>(null);
-  const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
+
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(PAGE_SIZE);
+  const [q, setQ] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
   const [active, setActive] = useState<{ type: ModalType; task: TaskView } | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  /** 重提态任务的重新提交弹窗（按流程实例）。 */
   const [resubmitId, setResubmitId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** 勾选批量通过 */
-  const [checked, setChecked] = useState<Set<string>>(new Set());
-  /** 关键字过滤（标题/业务单号/节点名/办理人），客户端过滤即可 */
-  const [q, setQ] = useState('');
 
-  const tasks = paged?.records ?? [];
-  const filtered = tasks.filter((tk) => {
-    if (!q.trim()) return true;
-    const kw = q.trim().toLowerCase();
-    return [tk.title, tk.businessKey, tk.name, tk.assignee]
-      .some((v) => v && v.toLowerCase().includes(kw));
+  /** 全量取回 + 本地分页（与已办页同口径，理由见 DonePage 注释）。 */
+  const todoRes = useResource<TaskView[]>(({ signal }) => listTodo(undefined, undefined, { signal }), {
+    deps: [userId],
   });
-  const totalPages = paged ? Math.max(1, Math.ceil(paged.total / PAGE_SIZE)) : 1;
 
-  async function load(p = page) {
-    setLoading(true);
-    try {
-      const res = await listTodoPaged(p + 1, PAGE_SIZE);
-      setPaged(res);
-      setChecked(new Set());
-    } catch (e) {
-      toast((e as Error).message, 'err');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const all = todoRes.data ?? [];
+  const filtered = useMemo(() => {
+    const kw = q.trim().toLowerCase();
+    if (!kw) return all;
+    return all.filter((tk) =>
+      [tk.title, tk.businessKey, tk.name, tk.assignee].some((v) => v && v.toLowerCase().includes(kw)),
+    );
+  }, [all, q]);
+
+  const pageRows = filtered.slice((page - 1) * size, page * size);
+
+  // 刷新后清空勾选：任务可能已经不在了，留着旧 key 会让「批量通过 3 条」通过 0 条
   useEffect(() => {
-    load(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+    setSelected([]);
+  }, [todoRes.lastUpdated]);
 
-  function goto(p: number) {
-    setPage(p);
-    load(p);
-  }
-
-  async function run(fn: () => Promise<void>) {
+  async function run(fn: () => Promise<void>, okMsg?: string) {
     setBusy(true);
     try {
       await fn();
       setActive(null);
-      toast(t('common.confirm') + ' ✓', 'ok');
-      await load();
+      toast.success(okMsg ?? t('common.operationOk'));
+      todoRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }
-
-  function toggleCheck(taskId: string) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
   }
 
   async function copyWeComLink(taskId: string) {
     try {
       const { link } = await createWeComLink(taskId, userId);
-      const url = `${location.origin}${link}`;
-      await navigator.clipboard.writeText(url).catch(() => {});
-      toast(t('wecom.linkCopied'), 'ok');
+      await navigator.clipboard.writeText(`${location.origin}${link}`).catch(() => {});
+      toast.success(t('wecom.linkCopied'));
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     }
   }
 
   async function runBatch() {
-    if (checked.size === 0) return;
-    if (!window.confirm(t('todo.batchConfirm').replace('{n}', String(checked.size)))) return;
+    if (selected.length === 0) return;
+    const ok = await confirm({
+      title: t('todo.batchApprove'),
+      content: t('todo.batchConfirm').replace('{n}', String(selected.length)),
+      okKey: 'todo.batchApprove',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
-      const results = await batchComplete({ taskIds: [...checked], outcome: 'APPROVE', actor: userId });
+      const results = await batchComplete({ taskIds: selected, outcome: 'APPROVE', actor: userId });
       const fail = results.filter((r) => !r.ok);
       if (fail.length === 0) {
-        toast(t('todo.batchOk').replace('{n}', String(results.length)), 'ok');
+        toast.success(t('todo.batchOk').replace('{n}', String(results.length)));
       } else {
-        toast(t('todo.batchPartial').replace('{ok}', String(results.length - fail.length)).replace('{fail}', String(fail.length)), 'warn');
+        toast.warning(
+          t('todo.batchPartial')
+            .replace('{ok}', String(results.length - fail.length))
+            .replace('{fail}', String(fail.length)),
+        );
       }
-      setChecked(new Set());
-      await load();
+      setSelected([]);
+      todoRes.refresh();
     } catch (e) {
-      toast((e as Error).message, 'err');
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
 
+  const columns: Array<DataTableColumn<TaskView>> = [
+    {
+      key: 'name',
+      titleKey: 'todo.colName',
+      width: 200,
+      render: (tk) => (
+        <span className="cell-inline">
+          {tk.name}
+          {tk.name === RESUBMIT_TASK_NAME && <CimTag tone="warn">{t('init.awaitingResubmit')}</CimTag>}
+          {tk.round != null && tk.round > 1 && <CimTag tone="run">{t('init.roundBadge', { n: tk.round })}</CimTag>}
+          {tk.delegationState === 'PENDING' && <CimTag tone="warn">{t('todo.delegatedToMe')}</CimTag>}
+          {tk.overdueMinutes != null && (
+            <CimTag tone="err">
+              {t('todo.overdue')} {fmtOverdue(tk.overdueMinutes)}
+            </CimTag>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'title',
+      titleKey: 'common.colTitle',
+      ellipsis: true,
+      render: (tk) => (
+        <>
+          {tk.title || '—'}
+          <DisplayFields fields={tk.displayFields} />
+        </>
+      ),
+    },
+    { key: 'businessKey', titleKey: 'todo.colBusinessKey', width: 160, mono: true },
+    { key: 'assignee', titleKey: 'todo.colAssignee', width: 110, render: (tk) => tk.assignee ?? '—' },
+    {
+      key: 'candidates',
+      titleKey: 'todo.colCandidates',
+      width: 160,
+      render: (tk) => (
+        <span className="cell-inline">
+          {tk.candidateUsers.length === 0 ? '—' : tk.candidateUsers.map((c) => <CimTag key={c}>{c}</CimTag>)}
+        </span>
+      ),
+    },
+    { key: 'createdAt', titleKey: 'todo.colCreated', width: 160, mono: true, render: (tk) => fmtDate(tk.createdAt) },
+    {
+      key: 'ops',
+      titleKey: 'common.actions',
+      width: 400,
+      render: (tk) => (
+        <span className="cell-actions">
+          {tk.name === RESUBMIT_TASK_NAME ? (
+            <CimButton
+              size="small"
+              type="primary"
+              icon={<IconRefresh width={13} height={13} />}
+              onClick={() => setResubmitId(tk.processInstanceId)}
+            >
+              {t('init.resubmit')}
+            </CimButton>
+          ) : tk.delegationState === 'PENDING' ? (
+            <CimButton
+              size="small"
+              type="primary"
+              icon={<IconReturn width={13} height={13} />}
+              disabled={busy}
+              onClick={() => run(() => resolveTask(tk.taskId, { actor: userId }))}
+            >
+              {t('todo.resolveBack')}
+            </CimButton>
+          ) : (
+            <CimButton
+              size="small"
+              type="primary"
+              icon={<IconCheck width={13} height={13} />}
+              onClick={() => setActive({ type: 'complete', task: tk })}
+            >
+              {t('todo.approve')}/{t('todo.reject')}
+            </CimButton>
+          )}
+          <CimButton size="small" icon={<IconSearch width={13} height={13} />} onClick={() => setDetailId(tk.processInstanceId)}>
+            {t('common.detail')}
+          </CimButton>
+          <CimButton size="small" icon={<IconUser width={13} height={13} />} onClick={() => setActive({ type: 'delegate', task: tk })}>
+            {t('todo.delegate')}
+          </CimButton>
+          <CimButton size="small" icon={<IconReturn width={13} height={13} />} onClick={() => setActive({ type: 'return', task: tk })}>
+            {t('todo.return')}
+          </CimButton>
+          <CimButton size="small" icon={<IconAddUser width={13} height={13} />} onClick={() => setActive({ type: 'addsign', task: tk })}>
+            {t('todo.addSign')}
+          </CimButton>
+          <CimButton size="small" icon={<IconSwap width={13} height={13} />} onClick={() => setActive({ type: 'reassign', task: tk })}>
+            {t('todo.reassign')}
+          </CimButton>
+          <CimButton
+            size="small"
+            icon={<IconWeCom width={13} height={13} />}
+            tooltipKey="wecom.copyLink"
+            onClick={() => copyWeComLink(tk.taskId)}
+          >
+            {t('wecom.copyLink')}
+          </CimButton>
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="page">
-      <Panel
-        title={t('todo.title')}
-        sub={t('todo.sub')}
-        actions={
-          <>
-            <span className="search-inline">
-              <IconSearch width={13} height={13} />
-              <input
-                className="text-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t('common.searchPlaceholder')}
-              />
-            </span>
-            {checked.size > 0 && (
-              <button className="btn btn-sm" disabled={busy} onClick={runBatch}>
-                <IconCheck width={13} height={13} /> {t('todo.batchApprove')} ({checked.size})
-              </button>
-            )}
-            <button className="icon-btn" onClick={() => load()} title={t('common.refresh')} aria-label={t('common.refresh')}>
-              <IconRefresh width={16} height={16} />
-            </button>
-          </>
-        }
-      >
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th style={{ width: 32 }} />
-                <th>{t('todo.colName')}</th>
-                <th>{t('common.colTitle')}</th>
-                <th>{t('todo.colBusinessKey')}</th>
-                <th>{t('todo.colAssignee')}</th>
-                <th>{t('todo.colCandidates')}</th>
-                <th>{t('todo.colCreated')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={8} className="dim" style={{ textAlign: 'center' }}>{t('common.loading')}</td>
-                </tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="empty">
-                      <IconInbox width={26} height={26} />
-                      <span>{t('todo.empty')}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              {filtered.map((tk) => (
-                <tr key={tk.taskId}>
-                  <td>
-                    {tk.delegationState !== 'PENDING' && (
-                      <input type="checkbox" checked={checked.has(tk.taskId)} onChange={() => toggleCheck(tk.taskId)} />
-                    )}
-                  </td>
-                  <td>
-                    {tk.name}
-                    {tk.name === RESUBMIT_TASK_NAME && (
-                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('init.awaitingResubmit')}</span>
-                    )}
-                    {tk.round != null && tk.round > 1 && (
-                      <span className="tag info" style={{ marginLeft: 6 }}>{t('init.roundBadge', { n: tk.round })}</span>
-                    )}
-                    {tk.delegationState === 'PENDING' && (
-                      <span className="tag warn" style={{ marginLeft: 6 }}>{t('todo.delegatedToMe')}</span>
-                    )}
-                    {tk.overdueMinutes != null && (
-                      <span className="tag err" style={{ marginLeft: 6 }}>
-                        {t('todo.overdue')} {fmtOverdue(tk.overdueMinutes)}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {tk.title || '—'}
-                    <DisplayFields fields={tk.displayFields} />
-                  </td>
-                  <td className="mono">{tk.businessKey}</td>
-                  <td>{tk.assignee ?? '—'}</td>
-                  <td className="tag-list">
-                    {tk.candidateUsers.map((c) => (
-                      <span key={c} className="tag">{c}</span>
-                    ))}
-                    {tk.candidateUsers.length === 0 && '—'}
-                  </td>
-                  <td className="mono">{fmtDate(tk.createdAt)}</td>
-                  <td>
-                    <div className="cell-actions">
-                      {tk.name === RESUBMIT_TASK_NAME ? (
-                        <button className="btn btn-sm" onClick={() => setResubmitId(tk.processInstanceId)}>
-                          <IconRefresh width={13} height={13} /> {t('init.resubmit')}
-                        </button>
-                      ) : tk.delegationState === 'PENDING' ? (
-                        <button className="btn btn-sm" onClick={() => run(() => resolveTask(tk.taskId, { actor: userId }))}>
-                          <IconReturn width={13} height={13} /> {t('todo.resolveBack')}
-                        </button>
-                      ) : (
-                        <button className="btn btn-sm" onClick={() => setActive({ type: 'complete', task: tk })}>
-                          <IconCheck width={13} height={13} /> {t('todo.approve')}/{t('todo.reject')}
-                        </button>
-                      )}
-                      <button className="btn btn-ghost btn-sm" onClick={() => setDetailId(tk.processInstanceId)} title={tk.title || tk.businessKey}>
-                        <IconSearch width={13} height={13} /> {t('common.detail')}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'delegate', task: tk })}>
-                        <IconUser width={13} height={13} /> {t('todo.delegate')}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'return', task: tk })}>
-                        <IconReturn width={13} height={13} /> {t('todo.return')}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => copyWeComLink(tk.taskId)} title={t('wecom.copyLink')}>
-                        <IconWeCom width={13} height={13} /> {t('wecom.copyLink')}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'addsign', task: tk })}>
-                        <IconAddUser width={13} height={13} /> {t('todo.addSign')}
-                      </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setActive({ type: 'reassign', task: tk })}>
-                        <IconSwap width={13} height={13} /> {t('todo.reassign')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {paged && paged.total > PAGE_SIZE && (
-          <div className="pager">
-            <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => goto(page - 1)}>
-              {t('page.prev')}
-            </button>
-            <span className="dim">{t('page.info').replace('{page}', String(page + 1)).replace('{total}', String(totalPages))}</span>
-            <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => goto(page + 1)}>
-              {t('page.next')}
-            </button>
-          </div>
-        )}
+    <Page>
+      <Panel titleKey="todo.title" subKey="todo.sub" flush>
+        <DataTable<TaskView>
+          flat
+          columns={columns}
+          rows={pageRows}
+          rowKey={(tk) => tk.taskId}
+          loading={todoRes.loading}
+          error={todoRes.error ? todoRes.error.message : null}
+          onRetry={todoRes.refresh}
+          onRefresh={todoRes.refresh}
+          actions={
+            selected.length > 0 ? (
+              <CimButton
+                size="small"
+                type="primary"
+                icon={<IconCheck width={13} height={13} />}
+                disabled={busy}
+                onClick={runBatch}
+              >
+                {t('todo.batchApprove')} ({selected.length})
+              </CimButton>
+            ) : null
+          }
+          search={{
+            value: q,
+            onChange: (v) => {
+              setQ(v);
+              setPage(1);
+            },
+            placeholderKey: 'common.searchPlaceholder',
+            width: 240,
+          }}
+          selectedKeys={selected}
+          onSelectionChange={setSelected}
+          // 受托待归还的任务不能批量通过（要先归还），复选框置灰而不是允许勾选后静默失败
+          selectable={(tk) => tk.delegationState !== 'PENDING'}
+          pagination={{
+            page,
+            size,
+            total: filtered.length,
+            onChange: (p, s) => {
+              setPage(s === size ? p : 1);
+              setSize(s);
+            },
+            sizeOptions: [10, 20, 50, 100],
+          }}
+          emptyTitleKey="todo.empty"
+          scrollX="max-content"
+        />
       </Panel>
 
-      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={() => load()} />}
+      {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={todoRes.refresh} />}
 
       {resubmitId && (
-        <ResubmitModal
-          processInstanceId={resubmitId}
-          onClose={() => setResubmitId(null)}
-          onDone={() => load()}
-        />
+        <ResubmitModal processInstanceId={resubmitId} onClose={() => setResubmitId(null)} onDone={todoRes.refresh} />
       )}
 
       {active?.type === 'complete' && (
-        <CompleteModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => completeTask(active.task.taskId, { ...r, actor: userId }))} />
+        <CompleteModal
+          task={active.task}
+          busy={busy}
+          onClose={() => setActive(null)}
+          onSubmit={(r) => run(() => completeTask(active.task.taskId, { ...r, actor: userId }), t('todo.completeOk'))}
+        />
       )}
       {active?.type === 'delegate' && (
-        <DelegateModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(assignee, reason) => run(() => delegateTask(active.task.taskId, { assignee, reason, actor: userId }))} />
+        <DelegateModal
+          task={active.task}
+          busy={busy}
+          onClose={() => setActive(null)}
+          onSubmit={(assignee, reason) =>
+            run(() => delegateTask(active.task.taskId, { assignee, reason, actor: userId }))
+          }
+        />
       )}
       {active?.type === 'return' && (
-        <ReturnModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => returnTask(active.task.taskId, { ...r, actor: userId }))} />
+        <ReturnModal
+          task={active.task}
+          busy={busy}
+          onClose={() => setActive(null)}
+          onSubmit={(r) => run(() => returnTask(active.task.taskId, { ...r, actor: userId }))}
+        />
       )}
       {active?.type === 'addsign' && (
-        <AddSignModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => addSignTask(active.task.taskId, { ...r, actor: userId }))} />
+        <AddSignModal
+          task={active.task}
+          busy={busy}
+          onClose={() => setActive(null)}
+          onSubmit={(r) => run(() => addSignTask(active.task.taskId, { ...r, actor: userId }))}
+        />
       )}
       {active?.type === 'reassign' && (
-        <ReassignModal task={active.task} busy={busy} onClose={() => setActive(null)} onSubmit={(r) => run(() => reassignTask(active.task.taskId, { ...r, actor: userId }))} />
+        <ReassignModal
+          task={active.task}
+          busy={busy}
+          onClose={() => setActive(null)}
+          onSubmit={(r) => run(() => reassignTask(active.task.taskId, { ...r, actor: userId }))}
+        />
       )}
-    </div>
+    </Page>
   );
 }
 
-function DelegateModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (assignee: string, reason: string) => void }) {
+// ── 委派 ────────────────────────────────────────────────────
+
+interface DelegateForm {
+  assignee: string;
+  reason: string;
+}
+
+function DelegateModal({
+  task,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  task: TaskView;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (assignee: string, reason: string) => void;
+}) {
   const { t } = useTranslation();
-  const [assignee, setAssignee] = useState('');
-  const [reason, setReason] = useState('');
+  const [form, setForm] = useState<DelegateForm>({ assignee: '', reason: '' });
+
+  const fields: Array<FormField<DelegateForm>> = [
+    { key: 'assignee', labelKey: 'todo.delegateUser', kind: 'text', required: true, placeholder: 'carol' },
+    { key: 'reason', labelKey: 'todo.delegateReason', kind: 'textarea', rows: 3, span: 2 },
+  ];
+
   return (
-    <Modal
-      title={`${t('todo.delegateTitle')} · ${task.name}`}
+    <CimModal
+      open
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy || !assignee.trim()} onClick={() => onSubmit(assignee.trim(), reason)}>
-            <IconUser width={14} height={14} /> {t('common.submit')}
-          </button>
-        </>
-      }
+      title={`${t('todo.delegateTitle')} · ${task.name}`}
+      onOk={() => onSubmit(form.assignee.trim(), form.reason)}
+      okDisabled={busy || !form.assignee.trim()}
+      okLoading={busy}
+      okKey="common.submit"
+      cancelKey="common.cancel"
     >
-      <div className="field">
-        <label className="field-label">{t('todo.delegateUser')}</label>
-        <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="carol" />
-      </div>
-      <div className="field">
-        <label className="field-label">{t('todo.delegateReason')}</label>
-        <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
-      <p className="dim">{t('todo.delegateHint')}</p>
-    </Modal>
+      <FormGrid<DelegateForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+      />
+      <p className="dim" style={{ marginBottom: 0 }}>{t('todo.delegateHint')}</p>
+    </CimModal>
   );
 }
 
-function ReturnModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (r: import('@/types').ReturnRequest) => void }) {
-  const { t } = useTranslation();
-  const [targets, setTargets] = useState<import('@/types').ReturnTargetsView | null>(null);
-  const [loadErr, setLoadErr] = useState('');
-  const [mode, setMode] = useState<'previous' | 'initiator' | 'specified'>('previous');
-  const [specified, setSpecified] = useState('');
-  const [reason, setReason] = useState('');
+// ── 回退 ────────────────────────────────────────────────────
 
-  useEffect(() => {
-    getReturnTargets(task.taskId)
-      .then(setTargets)
-      .catch((e) => setLoadErr((e as Error).message));
-  }, [task.taskId]);
+interface ReturnForm {
+  mode: 'previous' | 'initiator' | 'specified';
+  specified: string;
+  reason: string;
+}
+
+function ReturnModal({
+  task,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  task: TaskView;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (r: ReturnRequest) => void;
+}) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState<ReturnForm>({ mode: 'previous', specified: '', reason: '' });
+
+  const targetsRes = useResource(({ signal }) => getReturnTargets(task.taskId, { signal }));
+  const targets = targetsRes.data;
 
   const maxReached = targets != null && targets.currentRound >= targets.maxRounds;
-  const targetId = targets == null ? null
-    : mode === 'previous' ? targets.previousNodeId
-      : mode === 'initiator' ? targets.initiatorNodeId
-        : specified || null;
-  const canSubmit = targets != null && !maxReached && !!targetId && !!reason.trim();
+  const targetId =
+    targets == null
+      ? null
+      : form.mode === 'previous'
+        ? targets.previousNodeId
+        : form.mode === 'initiator'
+          ? targets.initiatorNodeId
+          : form.specified || null;
+  const canSubmit = targets != null && !maxReached && !!targetId && !!form.reason.trim();
+
+  // 字段按当前目标节点重建（而不是渲染后隐藏）：否则切过「指定节点」再切回来，
+  // 上一次选的 nodeId 仍留在 state 里，随 payload 一起发出去
+  const fields: Array<FormField<ReturnForm>> = [
+    {
+      key: 'mode',
+      labelKey: 'todo.returnMode',
+      kind: 'radio',
+      span: 2,
+      options: [
+        {
+          value: 'previous',
+          label: t('todo.returnModePrevious') + (targets?.previousNodeName ? `（${targets.previousNodeName}）` : ''),
+          disabled: !targets?.previousNodeId,
+        },
+        {
+          value: 'initiator',
+          label: t('todo.returnModeInitiator'),
+          disabled: !!targets?.initiatorNodeMulti,
+        },
+        {
+          value: 'specified',
+          label: t('todo.returnModeSpecified'),
+          disabled: (targets?.historicNodes.length ?? 0) === 0,
+        },
+      ],
+    },
+    ...(form.mode === 'specified'
+      ? [
+          {
+            key: 'specified' as const,
+            labelKey: 'todo.returnTarget',
+            kind: 'select' as const,
+            span: 2,
+            required: true,
+            options: (targets?.historicNodes ?? []).map((n) => ({ value: n.id, label: n.name })),
+          },
+        ]
+      : []),
+    { key: 'reason', labelKey: 'todo.returnReason', kind: 'textarea', rows: 3, span: 2, required: true },
+  ];
 
   return (
-    <Modal
-      title={`${t('todo.returnTitle')} · ${task.name}`}
+    <CimModal
+      open
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy || !canSubmit} onClick={() => onSubmit({ targetActivityId: targetId, reason: reason.trim(), actor: '' })}>
-            <IconReturn width={14} height={14} /> {t('common.submit')}
-          </button>
-        </>
-      }
+      title={`${t('todo.returnTitle')} · ${task.name}`}
+      width={560}
+      onOk={() => onSubmit({ targetActivityId: targetId!, reason: form.reason.trim(), actor: '' })}
+      okDisabled={busy || !canSubmit}
+      okLoading={busy}
+      okKey="common.submit"
+      cancelKey="common.cancel"
     >
-      {loadErr && <p className="dim">{loadErr}</p>}
+      {targetsRes.error && <p className="dim">{targetsRes.error.message}</p>}
+      {!targets && !targetsRes.error && <p className="dim">{t('common.loading')}</p>}
       {targets && (
         <>
           <p className="dim" style={{ marginTop: 0 }}>
             {t('todo.returnRound', { n: targets.currentRound, max: targets.maxRounds })}
           </p>
-          {maxReached && (
-            <p style={{ color: 'var(--err, #d03050)' }}>{t('todo.returnMaxReached', { max: targets.maxRounds })}</p>
+          {maxReached && <p style={{ color: 'var(--err)' }}>{t('todo.returnMaxReached', { max: targets.maxRounds })}</p>}
+          <FormGrid<ReturnForm>
+            fields={fields}
+            value={form}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          />
+          {targets.initiatorNodeMulti && form.mode === 'initiator' && (
+            <p className="dim">{t('todo.returnMultiInitiatorHint')}</p>
           )}
-          <div className="field">
-            <label className="field-label">{t('todo.returnMode')}</label>
-            <label className="radio-row">
-              <input type="radio" name="return-mode" checked={mode === 'previous'} disabled={!targets.previousNodeId} onChange={() => setMode('previous')} />
-              <span>{t('todo.returnModePrevious')}{targets.previousNodeName ? `（${targets.previousNodeName}）` : ''}</span>
-            </label>
-            <label className="radio-row">
-              <input type="radio" name="return-mode" checked={mode === 'initiator'} disabled={targets.initiatorNodeMulti} onChange={() => setMode('initiator')} />
-              <span>{t('todo.returnModeInitiator')}</span>
-            </label>
-            {targets.initiatorNodeMulti && (
-              <p className="dim" style={{ marginTop: 0 }}>{t('todo.returnMultiInitiatorHint')}</p>
-            )}
-            <label className="radio-row">
-              <input type="radio" name="return-mode" checked={mode === 'specified'} disabled={targets.historicNodes.length === 0} onChange={() => setMode('specified')} />
-              <span>{t('todo.returnModeSpecified')}</span>
-            </label>
-            {mode === 'specified' && (
-              <select value={specified} onChange={(e) => setSpecified(e.target.value)}>
-                <option value="">—</option>
-                {targets.historicNodes.map((n) => (
-                  <option key={n.id} value={n.id}>{n.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          {mode !== 'initiator' && targets.parallelActive && (
+          {form.mode !== 'initiator' && targets.parallelActive && (
             <p className="dim">{t('todo.returnParallelHint')}</p>
           )}
-          <div className="field">
-            <label className="field-label">{t('todo.returnReason')}</label>
-            <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
         </>
       )}
-      {!targets && !loadErr && <p className="dim">{t('common.loading')}</p>}
-    </Modal>
+    </CimModal>
   );
 }
 
-function AddSignModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (r: import('@/types').AddSignRequest) => void }) {
+// ── 加签 ────────────────────────────────────────────────────
+
+interface AddSignForm {
+  assignee: string;
+  type: 'AFTER' | 'BEFORE';
+  reason: string;
+}
+
+function AddSignModal({
+  task,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  task: TaskView;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (r: AddSignRequest) => void;
+}) {
   const { t } = useTranslation();
-  const [assignee, setAssignee] = useState('');
-  const [type, setType] = useState<'AFTER' | 'BEFORE'>('AFTER');
-  const [reason, setReason] = useState('');
+  const [form, setForm] = useState<AddSignForm>({ assignee: '', type: 'AFTER', reason: '' });
+
+  const fields: Array<FormField<AddSignForm>> = [
+    { key: 'assignee', labelKey: 'todo.addSignUser', kind: 'text', required: true, placeholder: 'dave' },
+    {
+      key: 'type',
+      labelKey: 'todo.addSignType',
+      kind: 'select',
+      options: [
+        { value: 'AFTER', labelKey: 'todo.addSign.after' },
+        { value: 'BEFORE', labelKey: 'todo.addSign.before' },
+      ],
+    },
+    { key: 'reason', labelKey: 'todo.addSignReason', kind: 'textarea', rows: 3, span: 2 },
+  ];
+
   return (
-    <Modal
+    <CimModal
+      open
+      onClose={onClose}
       title={`${t('todo.addSignTitle')} · ${task.name}`}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy || !assignee.trim()} onClick={() => onSubmit({ assignee: assignee.trim(), type, reason, actor: '' })}>
-            <IconAddUser width={14} height={14} /> {t('common.submit')}
-          </button>
-        </>
-      }
+      onOk={() => onSubmit({ assignee: form.assignee.trim(), type: form.type, reason: form.reason, actor: '' })}
+      okDisabled={busy || !form.assignee.trim()}
+      okLoading={busy}
+      okKey="common.submit"
+      cancelKey="common.cancel"
     >
-      <div className="field">
-        <label className="field-label">{t('todo.addSignUser')}</label>
-        <input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="dave" />
-      </div>
-      <div className="field">
-        <label className="field-label">{t('todo.addSignType')}</label>
-        <select value={type} onChange={(e) => setType(e.target.value as 'AFTER' | 'BEFORE')}>
-          <option value="AFTER">{t('todo.addSign.after')}</option>
-          <option value="BEFORE">{t('todo.addSign.before')}</option>
-        </select>
-      </div>
-      <div className="field">
-        <label className="field-label">{t('todo.addSignReason')}</label>
-        <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
-    </Modal>
+      <FormGrid<AddSignForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+      />
+    </CimModal>
   );
 }
 
-function ReassignModal({ task, busy, onClose, onSubmit }: { task: TaskView; busy: boolean; onClose: () => void; onSubmit: (r: import('@/types').ReassignRequest) => void }) {
+// ── 改派 ────────────────────────────────────────────────────
+
+interface ReassignForm {
+  newAssignee: string;
+  reason: string;
+}
+
+function ReassignModal({
+  task,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  task: TaskView;
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (r: ReassignRequest) => void;
+}) {
   const { t } = useTranslation();
-  const [newAssignee, setNewAssignee] = useState('');
-  const [reason, setReason] = useState('');
+  const [form, setForm] = useState<ReassignForm>({ newAssignee: '', reason: '' });
+
+  const fields: Array<FormField<ReassignForm>> = [
+    { key: 'newAssignee', labelKey: 'todo.reassignUser', kind: 'text', required: true, placeholder: 'bob' },
+    { key: 'reason', labelKey: 'todo.reassignReason', kind: 'textarea', rows: 3, span: 2 },
+  ];
+
   return (
-    <Modal
-      title={`${t('todo.reassignTitle')} · ${task.name}`}
+    <CimModal
+      open
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn btn-sm" disabled={busy || !newAssignee.trim()} onClick={() => onSubmit({ newAssignee: newAssignee.trim(), reason, actor: '' })}>
-            <IconSwap width={14} height={14} /> {t('common.submit')}
-          </button>
-        </>
-      }
+      title={`${t('todo.reassignTitle')} · ${task.name}`}
+      onOk={() => onSubmit({ newAssignee: form.newAssignee.trim(), reason: form.reason, actor: '' })}
+      okDisabled={busy || !form.newAssignee.trim()}
+      okLoading={busy}
+      okKey="common.submit"
+      cancelKey="common.cancel"
     >
-      <div className="field">
-        <label className="field-label">{t('todo.reassignUser')}</label>
-        <input value={newAssignee} onChange={(e) => setNewAssignee(e.target.value)} placeholder="bob" />
-      </div>
-      <div className="field">
-        <label className="field-label">{t('todo.reassignReason')}</label>
-        <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
-    </Modal>
+      <FormGrid<ReassignForm>
+        fields={fields}
+        value={form}
+        onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+      />
+    </CimModal>
   );
 }

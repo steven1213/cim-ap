@@ -111,6 +111,7 @@ export const zhCN: Record<string, string> = {
   'common.updatedAt': '更新时间',
   'common.copy': '复制',
   'common.copied': '已复制',
+  'common.operationOk': '操作成功',
   'common.yes': '是',
   'common.no': '否',
 
@@ -331,6 +332,12 @@ export const zhCN: Record<string, string> = {
   'cb.status.SENT': '已送达',
   'cb.status.DEAD': '死信',
   'cb.event.PROCESS_COMPLETED': '流程完成',
+  // 后端实际会发的 5 个事件类型（ApprovalCallbackService）：只登记 PROCESS_COMPLETED 时，
+  // 其余四类会走 humanize 兜底，界面上出现「TASK DONE」这种半截英文
+  'cb.event.TASK_DONE': '任务完成',
+  'cb.event.TASK_RETURNED': '任务退回',
+  'cb.event.TASK_OVERDUE': '任务超时',
+  'cb.event.TASK_CANCELLED': '任务取消',
 
   // 审计
   'audit.title': '审计追溯',
@@ -552,6 +559,7 @@ export const enUS: Record<string, string> = {
   'common.updatedAt': 'Updated',
   'common.copy': 'Copy',
   'common.copied': 'Copied',
+  'common.operationOk': 'Done',
   'common.yes': 'Yes',
   'common.no': 'No',
 
@@ -766,6 +774,10 @@ export const enUS: Record<string, string> = {
   'cb.status.SENT': 'Sent',
   'cb.status.DEAD': 'Dead letter',
   'cb.event.PROCESS_COMPLETED': 'Process completed',
+  'cb.event.TASK_DONE': 'Task completed',
+  'cb.event.TASK_RETURNED': 'Task returned',
+  'cb.event.TASK_OVERDUE': 'Task overdue',
+  'cb.event.TASK_CANCELLED': 'Task cancelled',
 
   'audit.title': 'Audit Trail',
   'audit.sub': 'Query the immutable hash chain by business key',
