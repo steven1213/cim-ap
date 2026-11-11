@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useResource } from '@cim/data';
+import {
+  CimInput,
+  CimSelect,
+  CimTag,
+  DataTable,
+  Page,
+  Panel,
+  useConfirm,
+  useToast,
+  type DataTableColumn,
+} from '@cim/ui';
 import * as api from '@/lib/api';
 import type { AdminUserRow, OrgNode } from '@/types';
 import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
 import { fmtDateTime, orgTypeLabel, originLabel } from '@/lib/format';
-import Panel from '@/components/Panel';
 import Perms from '@/components/Perms';
 import {
   USER_CREATE,
@@ -15,19 +26,14 @@ import {
   USER_UNLOCK,
   USER_UPDATE,
 } from '@/lib/permCodes';
-import {
-  IconAlert,
-  IconBan,
-  IconCheckCircle,
-  IconEdit,
-  IconKey,
-  IconPlus,
-  IconPower,
-  IconRefresh,
-  IconTree,
-  IconTrash,
-  IconUsers,
-} from '@/components/Icons';
+import { IconBan, IconEdit, IconKey, IconPlus, IconPower, IconTree, IconTrash } from '@/components/Icons';
+
+type PanelMode = null | 'create' | 'reset' | 'profile' | 'orgs';
+
+interface Bundle {
+  users: AdminUserRow[];
+  orgs: OrgNode[];
+}
 
 /**
  * 用户与档案。
@@ -36,20 +42,16 @@ import {
  * 每行标注档案来源与组织归属。口令相关操作沿用与登录一致的两层派生——浏览器内先做第一层 PBKDF2，
  * 仅上传 clientHash + 随机盐，明文口令不出浏览器。</p>
  */
-
-type PanelMode = null | 'create' | 'reset' | 'profile' | 'orgs';
-
 export default function UsersPage() {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<AdminUserRow[]>([]);
-  const [orgs, setOrgs] = useState<OrgNode[]>([]);
-  const [err, setErr] = useState('');
-  const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [panel, setPanel] = useState<PanelMode>(null);
   const [target, setTarget] = useState<AdminUserRow | null>(null);
   const [keyword, setKeyword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   // 新建
   const [nu, setNu] = useState('');
@@ -71,31 +73,40 @@ export default function UsersPage() {
   const [orgSel, setOrgSel] = useState<Record<string, boolean>>({});
   const [orgPrimary, setOrgPrimary] = useState('');
 
-  async function load() {
-    setLoading(true);
-    setErr('');
-    try {
-      const [us, os] = await Promise.all([
-        api.get<AdminUserRow[]>('/admin/users'),
-        api.get<OrgNode[]>('/admin/orgs'),
-      ]);
-      setRows(us);
-      setOrgs(os);
-    } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errLoad'));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const bundleRes = useResource<Bundle>(async ({ signal }) => {
+    const [users, orgs] = await Promise.all([
+      api.get<AdminUserRow[]>('/admin/users', undefined, { signal }),
+      api.get<OrgNode[]>('/admin/orgs', undefined, { signal }),
+    ]);
+    return { users, orgs };
+  });
 
+  const rows = bundleRes.data?.users ?? [];
+  const orgs = bundleRes.data?.orgs ?? [];
+
+  /** 打开「归属」面板才取该用户当前的组织（抽屉未打开不发请求）。 */
+  const curOrgsRes = useResource<{ orgId: string; primary: boolean }[]>(
+    ({ signal }) =>
+      api.get<{ orgId: string; primary: boolean }[]>(
+        `/admin/users/${encodeURIComponent(target?.userId ?? '')}/orgs`,
+        undefined,
+        { signal },
+      ),
+    { deps: [target?.userId, panel], enabled: panel === 'orgs' && !!target },
+  );
+
+  // 服务端回包 → 本地勾选态。这是「外部数据落到可编辑副本」，只在回包变化时做一次
   useEffect(() => {
-    load();
-  }, []);
-
-  function flash(t: string) {
-    setMsg(t);
-    setTimeout(() => setMsg(''), 3000);
-  }
+    if (panel !== 'orgs' || !curOrgsRes.data) return;
+    const sel: Record<string, boolean> = {};
+    let primary = '';
+    for (const o of curOrgsRes.data) {
+      sel[o.orgId] = true;
+      if (o.primary) primary = o.orgId;
+    }
+    setOrgSel(sel);
+    setOrgPrimary(primary || curOrgsRes.data[0]?.orgId || '');
+  }, [curOrgsRes.data, panel]);
 
   function closePanel() {
     setPanel(null);
@@ -122,16 +133,14 @@ export default function UsersPage() {
         .sort((a, b) => a.path.localeCompare(b.path))
         .map((n) => ({
           id: n.id,
-          label: `${'·'.repeat(Math.max(0, n.path.split('/').filter(Boolean).length - 1))} ${n.name} · ${orgTypeLabel(n.nodeType)}${
-            n.source === 'AD_SYNCED' ? '［AD］' : ''
-          }`,
+          label: `${'·'.repeat(Math.max(0, n.path.split('/').filter(Boolean).length - 1))} ${n.name} · ${orgTypeLabel(
+            n.nodeType,
+          )}${n.source === 'AD_SYNCED' ? '［AD］' : ''}`,
         })),
     [orgs],
   );
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault();
-    setErr('');
+  async function onCreate() {
     setBusy(true);
     try {
       const clientSalt = randomClientSalt();
@@ -144,67 +153,66 @@ export default function UsersPage() {
         employeeNo: ne.trim() || null,
         jobTitle: nj.trim() || null,
       });
-      flash(t('iam.users.msgCreated', { name: nu }));
+      toast.success(t('iam.users.msgCreated', { name: nu.trim() }));
       setNu('');
       setNp('');
       setNd('');
       setNe('');
       setNj('');
       closePanel();
-      await load();
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errCreate'));
+      toast.error(e?.msg || t('iam.users.errCreate'));
     } finally {
       setBusy(false);
     }
   }
 
   async function onToggleStatus(r: AdminUserRow) {
-    setErr('');
+    setToggling(r.userId);
     try {
       await api.put(`/admin/users/${encodeURIComponent(r.userId)}/status`, { enabled: !r.enabled });
-      flash(`${r.username} ` + (r.enabled ? t('iam.users.msgDisabled') : t('iam.users.msgEnabled')));
-      await load();
+      toast.success(`${r.username} ` + (r.enabled ? t('iam.users.msgDisabled') : t('iam.users.msgEnabled')));
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errOp'));
+      toast.error(e?.msg || t('iam.users.errOp'));
+    } finally {
+      setToggling(null);
     }
   }
 
   async function onUnlock(r: AdminUserRow) {
-    setErr('');
     try {
       const cleared = await api.post<boolean>(`/admin/users/${encodeURIComponent(r.userId)}/unlock`);
-      flash(cleared ? t('iam.users.msgUnlocked', { user: r.username }) : t('iam.users.msgNoLock', { user: r.username }));
-      await load();
+      toast.success(
+        cleared ? t('iam.users.msgUnlocked', { user: r.username }) : t('iam.users.msgNoLock', { user: r.username }),
+      );
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errUnlock'));
+      toast.error(e?.msg || t('iam.users.errUnlock'));
     }
   }
 
-  async function onReset(e: FormEvent) {
-    e.preventDefault();
+  async function onReset() {
     if (!target) return;
-    setErr('');
     setBusy(true);
     try {
       const clientSalt = randomClientSalt();
       const credential = await deriveClientHash(rp, clientSalt);
       await api.put(`/admin/users/${encodeURIComponent(target.userId)}/password`, { credential, clientSalt });
-      flash(t('iam.users.msgResetDone', { id: target.userId }));
+      toast.success(t('iam.users.msgResetDone', { id: target.userId }));
       setRp('');
       closePanel();
-      await load();
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errReset'));
+      toast.error(e?.msg || t('iam.users.errReset'));
     } finally {
       setBusy(false);
     }
   }
 
-  async function onSaveProfile(e: FormEvent) {
-    e.preventDefault();
+  async function onSaveProfile() {
     if (!target) return;
-    setErr('');
     setBusy(true);
     try {
       await api.put(`/admin/profiles/${encodeURIComponent(target.userId)}`, {
@@ -213,50 +221,49 @@ export default function UsersPage() {
         mobile: edMobile.trim() || null,
         jobTitle: edJob.trim() || null,
       });
-      flash(t('iam.users.msgProfileSaved'));
+      toast.success(t('iam.users.msgProfileSaved'));
       closePanel();
-      await load();
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errSaveProfile'));
+      toast.error(e?.msg || t('iam.users.errSaveProfile'));
     } finally {
       setBusy(false);
     }
   }
 
-  async function onSaveOrgs(e: FormEvent) {
-    e.preventDefault();
+  async function onSaveOrgs() {
     if (!target) return;
-    setErr('');
     setBusy(true);
     try {
       const list = Object.entries(orgSel)
         .filter(([, v]) => v)
         .map(([id]) => ({ orgId: id, primary: id === orgPrimary }));
       await api.put(`/admin/users/${encodeURIComponent(target.userId)}/orgs`, { orgs: list });
-      flash(t('iam.users.msgOrgsSaved'));
+      toast.success(t('iam.users.msgOrgsSaved'));
       closePanel();
-      await load();
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errSaveOrgs'));
+      toast.error(e?.msg || t('iam.users.errSaveOrgs'));
     } finally {
       setBusy(false);
     }
   }
 
   async function onDelete(r: AdminUserRow) {
-    if (r.hasCredential) {
-      if (!window.confirm(t('iam.users.confirmDelete', { name: r.username }))) return;
-    } else {
-      if (!window.confirm(t('iam.users.confirmAdDelete', { name: r.username }))) return;
-      return;
-    }
-    setErr('');
+    const ok = await confirm({
+      title: t('iam.common.delete'),
+      content: t('iam.users.confirmDelete', { name: r.username }),
+      danger: true,
+      okKey: 'iam.common.delete',
+      cancelKey: 'iam.common.cancel',
+    });
+    if (!ok) return;
     try {
       await api.del(`/admin/users/${encodeURIComponent(r.userId)}`);
-      flash(t('iam.users.msgDeleted', { name: r.username }));
-      await load();
+      toast.success(t('iam.users.msgDeleted', { name: r.username }));
+      bundleRes.refresh();
     } catch (e: any) {
-      setErr(e?.msg || t('iam.users.errDelete'));
+      toast.error(e?.msg || t('iam.users.errDelete'));
     }
   }
 
@@ -269,67 +276,179 @@ export default function UsersPage() {
     setPanel('profile');
   }
 
-  async function openOrgs(r: AdminUserRow) {
+  function openOrgs(r: AdminUserRow) {
     setTarget(r);
     setPanel('orgs');
-    try {
-      const cur = await api.get<{ orgId: string; primary: boolean }[]>(
-        `/admin/users/${encodeURIComponent(r.userId)}/orgs`,
-      );
-      const sel: Record<string, boolean> = {};
-      let primary = '';
-      cur.forEach((o) => {
-        sel[o.orgId] = true;
-        if (o.primary) primary = o.orgId;
-      });
-      setOrgSel(sel);
-      setOrgPrimary(primary || cur[0]?.orgId || '');
-    } catch {
-      setOrgSel({});
-      setOrgPrimary('');
-    }
   }
 
   const enabled = rows.filter((r) => r.enabled).length;
   const locked = rows.filter((r) => r.locked).length;
   const adCount = rows.filter((r) => r.source === 'AD_SYNCED').length;
 
-  return (
-    <div className="page">
-      {err && (
-        <div className="alert err">
-          <IconAlert width={15} height={15} />
-          <span>{err}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="alert ok">
-          <IconCheckCircle width={15} height={15} />
-          <span>{msg}</span>
-        </div>
-      )}
+  const columns = useMemo<Array<DataTableColumn<AdminUserRow>>>(
+    () => [
+      {
+        key: 'username',
+        titleKey: 'iam.users.th.user',
+        render: (r) => (
+          <div className="user-cell">
+            <span className="cim-mono">{r.username}</span>
+            {r.displayName && <span className="dim">{r.displayName}</span>}
+            {r.jobTitle && <span className="tag">{r.jobTitle}</span>}
+            {!r.hasCredential && (
+              <CimTag size="small" tone="run">
+                {t('iam.users.tagProfileOnly')}
+              </CimTag>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'employeeNo',
+        titleKey: 'iam.users.th.empNo',
+        width: 100,
+        mono: true,
+        render: (r) => <span className="dim">{r.employeeNo ?? '—'}</span>,
+      },
+      {
+        key: 'source',
+        titleKey: 'iam.users.th.source',
+        width: 100,
+        render: (r) => (
+          <CimTag size="small" tone={r.source === 'AD_SYNCED' ? 'run' : r.source === 'IAM_MANAGED' ? 'idle' : 'idle'}>
+            {originLabel(r.source)}
+          </CimTag>
+        ),
+      },
+      {
+        key: 'orgNames',
+        titleKey: 'iam.users.th.org',
+        render: (r) =>
+          r.orgNames.length ? (
+            <div className="tag-list">
+              {r.orgNames.slice(0, 3).map((o, i) => (
+                <span key={i} title={o}>
+                  <CimTag size="small">{o.length > 26 ? `${o.slice(-18)}…` : o}</CimTag>
+                </span>
+              ))}
+              {r.orgNames.length > 3 && <span className="dim">+{r.orgNames.length - 3}</span>}
+            </div>
+          ) : (
+            <span className="dim">{t('iam.users.noOrg')}</span>
+          ),
+      },
+      {
+        key: 'status',
+        titleKey: 'iam.users.th.status',
+        width: 170,
+        render: (r) => (
+          <>
+            <CimTag size="small" tone={r.enabled ? 'ok' : 'err'}>
+              {r.enabled ? t('iam.users.statusEnabled') : t('iam.users.statusDisabled')}
+            </CimTag>
+            {r.locked && (
+              <span title={t('iam.lockouts.th.until') + ' ' + fmtDateTime(r.lockedUntil)} style={{ marginLeft: 6 }}>
+                <CimTag size="small" tone="warn">
+                  {t('iam.users.tagLocked')}
+                </CimTag>
+              </span>
+            )}
+            {r.status === 'INACTIVE' && (
+              <span style={{ marginLeft: 6 }}>
+                <CimTag size="small" tone="warn">
+                  {t('iam.users.tagProfileDisabled')}
+                </CimTag>
+              </span>
+            )}
+          </>
+        ),
+      },
+      {
+        key: 'apps',
+        titleKey: 'iam.users.th.admission',
+        width: 80,
+        align: 'right',
+        render: (r) => r.apps?.length ?? 0,
+      },
+      {
+        key: 'actions',
+        titleKey: 'iam.users.th.actions',
+        width: 330,
+        render: (r) => (
+          <div className="cell-actions">
+            <Perms code={USER_UPDATE}>
+              <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
+                <IconEdit width={13} height={13} />
+                {t('iam.users.btnProfile')}
+              </button>
+            </Perms>
+            <Perms code={USER_ORGS}>
+              <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
+                <IconTree width={13} height={13} />
+                {t('iam.users.btnOrgs')}
+              </button>
+            </Perms>
+            <Perms code={USER_STATUS}>
+              <button
+                className="btn-ghost btn-sm"
+                disabled={toggling === r.userId}
+                onClick={() => void onToggleStatus(r)}
+              >
+                {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
+                {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
+              </button>
+            </Perms>
+            {r.hasCredential && (
+              <Perms code={USER_RESET_PWD}>
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setTarget(r);
+                    setRp('');
+                    setPanel('reset');
+                  }}
+                >
+                  <IconKey width={13} height={13} />
+                  {t('iam.users.btnReset')}
+                </button>
+              </Perms>
+            )}
+            {r.locked && (
+              <Perms code={USER_UNLOCK}>
+                <button className="btn-ghost btn-sm" onClick={() => void onUnlock(r)}>
+                  <IconKey width={13} height={13} />
+                  {t('iam.users.btnUnlock')}
+                </button>
+              </Perms>
+            )}
+            <Perms code={USER_DELETE}>
+              <button
+                className="btn-danger btn-sm"
+                onClick={() => void onDelete(r)}
+                disabled={!r.hasCredential}
+              >
+                <IconTrash width={13} height={13} />
+              </button>
+            </Perms>
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, toggling],
+  );
 
+  return (
+    <Page>
       <Panel
         title={t('iam.users.title')}
         sub={t('iam.users.sub')}
-        flush
         actions={
           <>
-            <span className="tag">{t('iam.users.count', { n: rows.length })}</span>
-            <span className="tag ok">{t('iam.users.enabled', { n: enabled })}</span>
-            {adCount > 0 && <span className="tag info">{t('iam.users.adSynced', { n: adCount })}</span>}
-            {locked > 0 && <span className="tag err">{t('iam.users.locked', { n: locked })}</span>}
-            <input
-              className="select-sm"
-              style={{ width: 168 }}
-              placeholder={t('iam.users.searchPH')}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-            <button className="btn-ghost btn-sm" onClick={load} disabled={loading}>
-              <IconRefresh width={13} height={13} />
-              {loading ? t('iam.users.refreshing') : t('iam.users.refresh')}
-            </button>
+            <CimTag>{t('iam.users.count', { n: rows.length })}</CimTag>
+            <CimTag tone="ok">{t('iam.users.enabled', { n: enabled })}</CimTag>
+            {adCount > 0 && <CimTag tone="run">{t('iam.users.adSynced', { n: adCount })}</CimTag>}
+            {locked > 0 && <CimTag tone="err">{t('iam.users.locked', { n: locked })}</CimTag>}
             <Perms code={USER_CREATE}>
               <button
                 className="btn-sm"
@@ -345,251 +464,168 @@ export default function UsersPage() {
           </>
         }
       >
-        {filtered.length ? (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>{t('iam.users.th.user')}</th>
-                  <th style={{ width: 92 }}>{t('iam.users.th.empNo')}</th>
-                  <th style={{ width: 92 }}>{t('iam.users.th.source')}</th>
-                  <th>{t('iam.users.th.org')}</th>
-                  <th style={{ width: 130 }}>{t('iam.users.th.status')}</th>
-                  <th style={{ width: 76 }}>{t('iam.users.th.admission')}</th>
-                  <th style={{ width: 320 }}>{t('iam.users.th.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((r) => (
-                  <tr key={r.userId}>
-                    <td>
-                      <div className="user-cell">
-                        <span className="mono">{r.username}</span>
-                        {r.displayName && <span className="dim">{r.displayName}</span>}
-                        {r.jobTitle && <span className="tag">{r.jobTitle}</span>}
-                        {!r.hasCredential && <span className="tag info">{t('iam.users.tagProfileOnly')}</span>}
-                      </div>
-                    </td>
-                    <td className="mono dim">{r.employeeNo ?? '—'}</td>
-                    <td>
-                      <span className={'tag ' + (r.source === 'AD_SYNCED' ? 'info' : r.source === 'IAM_MANAGED' ? 'pri' : '')}>
-                        {originLabel(r.source)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="tag-list">
-                        {r.orgNames.slice(0, 3).map((o, i) => (
-                          <span key={i} className="tag" title={o}>
-                            {o.length > 26 ? `${o.slice(-18)}…` : o}
-                          </span>
-                        ))}
-                        {r.orgNames.length > 3 && <span className="dim">+{r.orgNames.length - 3}</span>}
-                        {!r.orgNames.length && <span className="dim">{t('iam.users.noOrg')}</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="status">
-                        <i className={'led ' + (r.enabled ? 'ok' : 'err')} />
-                        <b>{r.enabled ? t('iam.users.statusEnabled') : t('iam.users.statusDisabled')}</b>
-                      </span>
-                      {r.locked && (
-                        <span className="tag err" style={{ marginLeft: 6 }} title={t('iam.lockouts.th.until') + ' ' + fmtDateTime(r.lockedUntil)}>
-                           {t('iam.users.tagLocked')}
-                        </span>
-                      )}
-                      {r.status === 'INACTIVE' && <span className="tag warn" style={{ marginLeft: 6 }}>{t('iam.users.tagProfileDisabled')}</span>}
-                    </td>
-                    <td className="num">{r.apps?.length ?? 0}</td>
-                    <td>
-                      <div className="cell-actions">
-                        <Perms code={USER_UPDATE}>
-                          <button className="btn-ghost btn-sm" onClick={() => openProfile(r)}>
-                            <IconEdit width={13} height={13} />
-                            {t('iam.users.btnProfile')}
-                          </button>
-                        </Perms>
-                        <Perms code={USER_ORGS}>
-                          <button className="btn-ghost btn-sm" onClick={() => openOrgs(r)}>
-                            <IconTree width={13} height={13} />
-                            {t('iam.users.btnOrgs')}
-                          </button>
-                        </Perms>
-                        <Perms code={USER_STATUS}>
-                          <button className="btn-ghost btn-sm" onClick={() => onToggleStatus(r)}>
-                            {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
-                            {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
-                          </button>
-                        </Perms>
-                        {r.hasCredential && (
-                          <Perms code={USER_RESET_PWD}>
-                            <button
-                              className="btn-ghost btn-sm"
-                              onClick={() => {
-                                setTarget(r);
-                                setRp('');
-                                setPanel('reset');
-                              }}
-                            >
-                              <IconKey width={13} height={13} />
-                              {t('iam.users.btnReset')}
-                            </button>
-                          </Perms>
-                        )}
-                        {r.locked && (
-                          <Perms code={USER_UNLOCK}>
-                            <button className="btn-ghost btn-sm" onClick={() => onUnlock(r)}>
-                              <IconKey width={13} height={13} />
-                              {t('iam.users.btnUnlock')}
-                            </button>
-                          </Perms>
-                        )}
-                        <Perms code={USER_DELETE}>
-                          <button className="btn-danger btn-sm" onClick={() => onDelete(r)} disabled={!r.hasCredential}>
-                            <IconTrash width={13} height={13} />
-                          </button>
-                        </Perms>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty">
-            <IconUsers width={22} height={22} />
-            <b>{rows.length ? t('iam.users.emptyMatch') : t('iam.users.emptyNone')}</b>
-            <span>{rows.length ? t('iam.users.emptyHintMatch') : t('iam.users.emptyHintNone')}</span>
-          </div>
-        )}
+        <DataTable<AdminUserRow>
+          flat
+          columns={columns}
+          rows={filtered}
+          rowKey={(r) => r.userId}
+          loading={bundleRes.loading}
+          error={bundleRes.error?.message}
+          onRetry={bundleRes.refresh}
+          onRefresh={bundleRes.refresh}
+          settingsKey="iam.users"
+          scrollX="max-content"
+          search={{
+            value: keyword,
+            onChange: setKeyword,
+            placeholderKey: 'iam.users.searchPH',
+            width: 180,
+          }}
+          emptyTitleKey={rows.length ? 'iam.users.emptyMatch' : 'iam.users.emptyNone'}
+          emptyHintKey={rows.length ? 'iam.users.emptyHintMatch' : 'iam.users.emptyHintNone'}
+        />
       </Panel>
 
       {panel === 'create' && (
         <Panel title={t('iam.users.createTitle')} sub={t('iam.users.createSub')}>
-          <form onSubmit={onCreate}>
-            <div className="row">
-              <div className="field">
-                <label className="field-label" htmlFor="nu">
-                  {t('iam.users.f.username')}
-                </label>
-                <input id="nu" className="mono" placeholder="operator01" value={nu} onChange={(e) => setNu(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="np">
-                  {t('iam.users.f.password')}
-                </label>
-                <input id="np" type="password" value={np} onChange={(e) => setNp(e.target.value)} autoComplete="new-password" />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="nd">
-                  {t('iam.users.f.name')}
-                </label>
-                <input id="nd" placeholder={t('iam.users.phName')} value={nd} onChange={(e) => setNd(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="ne">
-                  {t('iam.users.f.empNo')}
-                </label>
-                <input id="ne" className="mono" placeholder="1001" value={ne} onChange={(e) => setNe(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="nj">
-                  {t('iam.users.f.job')}
-                </label>
-                <input id="nj" placeholder={t('iam.users.phJob')} value={nj} onChange={(e) => setNj(e.target.value)} />
-              </div>
-              <button type="submit" disabled={busy || !nu.trim() || !np}>
-                {busy ? t('iam.users.creating') : t('iam.users.createSubmit')}
-              </button>
-              <button type="button" className="btn-ghost" onClick={closePanel}>
-                {t('iam.users.cancel')}
-              </button>
+          <div className="row">
+            <div className="field">
+              <label className="field-label" htmlFor="nu">
+                {t('iam.users.f.username')}
+              </label>
+              <CimInput id="nu" mono placeholder="operator01" value={nu} onChange={setNu} width={180} />
             </div>
-          </form>
+            <div className="field">
+              <label className="field-label" htmlFor="np">
+                {t('iam.users.f.password')}
+              </label>
+              <CimInput
+                id="np"
+                password
+                autoComplete="new-password"
+                value={np}
+                onChange={setNp}
+                width={200}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="nd">
+                {t('iam.users.f.name')}
+              </label>
+              <CimInput id="nd" placeholder={t('iam.users.phName')} value={nd} onChange={setNd} width={160} />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="ne">
+                {t('iam.users.f.empNo')}
+              </label>
+              <CimInput id="ne" mono placeholder="1001" value={ne} onChange={setNe} width={130} />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="nj">
+                {t('iam.users.f.job')}
+              </label>
+              <CimInput id="nj" placeholder={t('iam.users.phJob')} value={nj} onChange={setNj} width={160} />
+            </div>
+            <button type="button" disabled={busy || !nu.trim() || !np} onClick={() => void onCreate()}>
+              {busy ? t('iam.users.creating') : t('iam.users.createSubmit')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={closePanel}>
+              {t('iam.users.cancel')}
+            </button>
+          </div>
           <p className="hint">{t('iam.users.createHint')}</p>
         </Panel>
       )}
 
       {panel === 'reset' && target && (
         <Panel title={t('iam.users.resetTitle', { id: target.userId })} sub={t('iam.users.resetSub')}>
-          <form onSubmit={onReset}>
-            <div className="row">
-              <div className="field">
-                <label className="field-label" htmlFor="rp">
-                  {t('iam.users.resetNew')}
-                </label>
-                <input id="rp" type="password" value={rp} onChange={(e) => setRp(e.target.value)} autoComplete="new-password" />
-              </div>
-              <button type="submit" disabled={busy || !rp}>
-                {busy ? t('iam.users.submitting') : t('iam.users.resetSubmit')}
-              </button>
-              <button type="button" className="btn-ghost" onClick={closePanel}>
-                {t('iam.users.cancel')}
-              </button>
+          <div className="row">
+            <div className="field">
+              <label className="field-label" htmlFor="rp">
+                {t('iam.users.resetNew')}
+              </label>
+              <CimInput
+                id="rp"
+                password
+                autoComplete="new-password"
+                value={rp}
+                onChange={setRp}
+                width={220}
+                onEnter={() => void onReset()}
+              />
             </div>
-          </form>
+            <button type="button" disabled={busy || !rp} onClick={() => void onReset()}>
+              {busy ? t('iam.users.submitting') : t('iam.users.resetSubmit')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={closePanel}>
+              {t('iam.users.cancel')}
+            </button>
+          </div>
         </Panel>
       )}
 
       {panel === 'profile' && target && (
         <Panel
           title={t('iam.users.profileTitle', { id: target.userId })}
-          sub={
-            target.source === 'AD_SYNCED'
-              ? t('iam.users.profileSubAd')
-              : t('iam.users.profileSubIam')
-          }
+          sub={target.source === 'AD_SYNCED' ? t('iam.users.profileSubAd') : t('iam.users.profileSubIam')}
         >
-          <form onSubmit={onSaveProfile}>
-            <div className="row">
-              <div className="field">
-                <label className="field-label" htmlFor="pdn">
-                  {t('iam.users.f.name')}
-                </label>
-                <input
-                  id="pdn"
-                  value={edName}
-                  onChange={(e) => setEdName(e.target.value)}
-                  disabled={target.source === 'AD_SYNCED'}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="pem">
-                  {t('iam.users.f.email')}
-                </label>
-                <input
-                  id="pem"
-                  value={edEmail}
-                  onChange={(e) => setEdEmail(e.target.value)}
-                  disabled={target.source === 'AD_SYNCED'}
-                  placeholder="zhangsan@corp.com"
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="pmb">
-                  {t('iam.users.f.mobile')}
-                </label>
-                <input
-                  id="pmb"
-                  value={edMobile}
-                  onChange={(e) => setEdMobile(e.target.value)}
-                  disabled={target.source === 'AD_SYNCED'}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor="pjt">
-                  {t('iam.users.f.job')}
-                </label>
-                <input id="pjt" value={edJob} onChange={(e) => setEdJob(e.target.value)} placeholder={t('iam.users.phJob')} />
-              </div>
-              <button type="submit" disabled={busy}>
-                {busy ? t('iam.users.saving') : t('iam.users.save')}
-              </button>
-              <button type="button" className="btn-ghost" onClick={closePanel}>
-                {t('iam.users.cancel')}
-              </button>
+          <div className="row">
+            <div className="field">
+              <label className="field-label" htmlFor="pdn">
+                {t('iam.users.f.name')}
+              </label>
+              <CimInput
+                id="pdn"
+                value={edName}
+                onChange={setEdName}
+                disabled={target.source === 'AD_SYNCED'}
+                width={160}
+              />
             </div>
-          </form>
+            <div className="field">
+              <label className="field-label" htmlFor="pem">
+                {t('iam.users.f.email')}
+              </label>
+              <CimInput
+                id="pem"
+                value={edEmail}
+                onChange={setEdEmail}
+                disabled={target.source === 'AD_SYNCED'}
+                placeholder="zhangsan@corp.com"
+                width={220}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pmb">
+                {t('iam.users.f.mobile')}
+              </label>
+              <CimInput
+                id="pmb"
+                value={edMobile}
+                onChange={setEdMobile}
+                disabled={target.source === 'AD_SYNCED'}
+                width={160}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pjt">
+                {t('iam.users.f.job')}
+              </label>
+              <CimInput
+                id="pjt"
+                value={edJob}
+                onChange={setEdJob}
+                placeholder={t('iam.users.phJob')}
+                width={160}
+              />
+            </div>
+            <button type="button" disabled={busy} onClick={() => void onSaveProfile()}>
+              {busy ? t('iam.users.saving') : t('iam.users.save')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={closePanel}>
+              {t('iam.users.cancel')}
+            </button>
+          </div>
           <p className="hint">
             {t('iam.users.profileHint', { no: target.employeeNo ?? '—', src: originLabel(target.source) })}
           </p>
@@ -597,52 +633,47 @@ export default function UsersPage() {
       )}
 
       {panel === 'orgs' && target && (
-        <Panel
-          title={t('iam.users.orgsTitle', { id: target.userId })}
-          sub={t('iam.users.orgsSub')}
-        >
-          <form onSubmit={onSaveOrgs}>
-            <div className="org-pick">
-              {orgOptions.map((o) => (
-                <label key={o.id} className="check">
-                  <input
-                    type="checkbox"
-                    checked={!!orgSel[o.id]}
-                    onChange={(e) => {
-                      setOrgSel((prev) => ({ ...prev, [o.id]: e.target.checked }));
-                      if (e.target.checked && !orgPrimary) setOrgPrimary(o.id);
-                      if (!e.target.checked && orgPrimary === o.id) setOrgPrimary('');
-                    }}
-                  />
-                  <span>{o.label}</span>
-                </label>
-              ))}
-              {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
+        <Panel title={t('iam.users.orgsTitle', { id: target.userId })} sub={t('iam.users.orgsSub')}>
+          <div className="org-pick">
+            {orgOptions.map((o) => (
+              <label key={o.id} className="check">
+                <input
+                  type="checkbox"
+                  checked={!!orgSel[o.id]}
+                  onChange={(e) => {
+                    setOrgSel((prev) => ({ ...prev, [o.id]: e.target.checked }));
+                    if (e.target.checked && !orgPrimary) setOrgPrimary(o.id);
+                    if (!e.target.checked && orgPrimary === o.id) setOrgPrimary('');
+                  }}
+                />
+                <span>{o.label}</span>
+              </label>
+            ))}
+            {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
+          </div>
+          <div className="row" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label className="field-label" htmlFor="prm">
+                {t('iam.users.primaryOrg')}
+              </label>
+              <CimSelect
+                id="prm"
+                value={orgPrimary}
+                onChange={(v) => setOrgPrimary(typeof v === 'string' ? v : '')}
+                options={[
+                  { value: '', label: t('iam.users.primaryNone') },
+                  ...orgOptions.filter((o) => orgSel[o.id]).map((o) => ({ value: o.id, label: o.label })),
+                ]}
+                width={280}
+              />
             </div>
-            <div className="row" style={{ marginTop: 12 }}>
-              <div className="field">
-                <label className="field-label" htmlFor="prm">
-                  {t('iam.users.primaryOrg')}
-                </label>
-                <select id="prm" value={orgPrimary} onChange={(e) => setOrgPrimary(e.target.value)}>
-                  <option value="">{t('iam.users.primaryNone')}</option>
-                  {orgOptions
-                    .filter((o) => orgSel[o.id])
-                    .map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button type="submit" disabled={busy}>
-                {busy ? t('iam.users.saving') : t('iam.users.saveOrgs')}
-              </button>
-              <button type="button" className="btn-ghost" onClick={closePanel}>
-                {t('iam.users.cancel')}
-              </button>
-            </div>
-          </form>
+            <button type="button" disabled={busy} onClick={() => void onSaveOrgs()}>
+              {busy ? t('iam.users.saving') : t('iam.users.saveOrgs')}
+            </button>
+            <button type="button" className="btn-ghost" onClick={closePanel}>
+              {t('iam.users.cancel')}
+            </button>
+          </div>
           <p className="hint">{t('iam.users.orgsHint')}</p>
         </Panel>
       )}
@@ -655,6 +686,6 @@ export default function UsersPage() {
           <li>{t('iam.users.usagePwd')}</li>
         </ul>
       </Panel>
-    </div>
+    </Page>
   );
 }

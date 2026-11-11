@@ -610,3 +610,13 @@ button:disabled {
     display: none;
   }
 }
+
+/* 组织树节点：名称 + 编码 + 语义标签同一行（CimTree 的 labelNode） */
+.org-tree-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.org-tree {
+  padding: 8px 10px 12px;
+}
