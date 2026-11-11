@@ -18,10 +18,11 @@
 import './setup';
 
 import assert from 'node:assert/strict';
-import { createElement, type ComponentType } from 'react';
+import { createElement, type ComponentType, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { UiLocaleProvider } from '@cim/ui';
 
 import { useAuthStore } from '@/store/authStore';
 import { MemoryRouter } from 'react-router-dom';
@@ -87,10 +88,36 @@ function withPermissions(permissions: string[]): void {
   useAuthStore.setState({ permissions, permissionsLoaded: true });
 }
 
+/**
+ * 组件文案注入（与 `main.tsx` 的 `Root` 同构）。
+ *
+ * <p><b>为什么测试必须挂它</b>：`@cim/ui` 的组件文案一律走 `useUiLabel(key, fallback)`，
+ * 未挂 `UiLocaleProvider` 时用的是该包的兜底上下文（`t = key => key`、无 `hasKey`），
+ * 于是每个组件都回落到**内置中文兜底**（「搜索」「共 N 条」…）。实测表现是本文件
+ * 12 个存量页断言同时报「渲染结果含中文残留」，而产品代码并没有中文泄漏——
+ * 是测试的装配与真实应用不一致造成的假红（2026-11-12 修）。</p>
+ *
+ * <p><b>为什么 `hasKey` 恒为 true</b>：本测试断言的是「页面**请求了哪些键**」，
+ * 而不是「这些键有没有译文」。缺键处理器已把 `t(key)` 变成 `⟪key⟫` 标记；
+ * 若再让 `hasKey` 如实返回 false，`useUiLabel` 会取中文兜底，标记就永远出不来。
+ * 故这里声明「假定键齐备」，让所有组件都渲染成键标记——中文一旦出现即为真残留。</p>
+ */
+function Providers({ children }: { children: ReactNode }) {
+  const uiT = (key: string) => String(i18n.t(key));
+  const hasKey = () => true;
+  return (
+    <UiLocaleProvider t={uiT} locale="zh-CN" hasKey={hasKey}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </UiLocaleProvider>
+  );
+}
+
 /** 以「当前权限码集」渲染一个页面，返回其 HTML。 */
 function render(page: ComponentType, permissions: string[]): string {
   withPermissions(permissions);
-  return renderToStaticMarkup(createElement(page));
+  return renderToStaticMarkup(
+    <Providers>{createElement(page)}</Providers>,
+  );
 }
 
 // ---------------------------------------------------------------- 断言小工具
@@ -130,7 +157,11 @@ function expectNoticeOnly(html: string, noticeKey: string, bodyMarker: string): 
 const CJK = /[一-鿿]/;
 function assertNoChinese(html: string, page: string): void {
   const hit = html.match(CJK);
-  assert.ok(!hit, `${page} 渲染结果含中文残留：${hit?.[0] ?? ''}`);
+  if (!hit || hit.index === undefined) return;
+  // 带上上下文：只说「含中文」没法定位是哪个组件漏了键（历史上这里一度只报单个字）
+  const from = Math.max(0, hit.index - 90);
+  const ctx = html.slice(from, hit.index + 60);
+  assert.fail(`${page} 渲染结果含中文残留「${hit[0]}」，上下文：…${ctx}…`);
 }
 
 /**
@@ -184,9 +215,10 @@ async function main(): Promise<void> {
     has(html, missing('iam.admin.menus.selectNode'));
     has(html, missing('iam.common.refresh'));
     has(html, 'class="split"');
-    // 首屏无数据（useEffect 未执行）：渲染**空态**而非空树——这是有意的兜底，不是缺陷
-    has(html, 'class="empty"');
-    hasNot(html, 'class="tree"');
+    // 首屏无数据（useEffect 未执行）：渲染**空态**而非空树——这是有意的兜底，不是缺陷。
+    // 类名随组件层迁移由旧手写页的 `.empty` 改为 `@cim/ui` 的 `.cim-empty`（2026-11-12 对齐）
+    has(html, 'class="cim-empty"');
+    hasNot(html, 'class="cim-tree"');
   });
 
   check('只读（无 create/delete 码）→ 新增入口**不挂载**', () => {
@@ -317,12 +349,8 @@ async function main(): Promise<void> {
   for (const [name, Page] of stockPages) {
     check(`${name} 渲染输出不含中文`, () => {
       // 用全部权限渲染以覆盖按钮/抽屉等分支，确保「任何可见分支都没有中文」。
-      // 部分页用 useNavigate，需包在 Router 上下文里（SSR 才能渲染）。
-      withPermissions(ALL_PERMS);
-      const html = renderToStaticMarkup(
-        createElement(MemoryRouter, null, createElement(Page)),
-      );
-      assertNoChinese(html, name);
+      // Providers 内含 MemoryRouter（部分页用 useNavigate，SSR 需要 Router 上下文）。
+      assertNoChinese(render(Page, ALL_PERMS), name);
     });
   }
 
