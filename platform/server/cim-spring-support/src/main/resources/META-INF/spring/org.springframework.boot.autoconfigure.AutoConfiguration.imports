@@ -1,1 +1,2 @@
 com.cim.spring.support.config.SpringSupportAutoConfiguration
+com.cim.spring.support.config.CimDispatchAutoConfiguration

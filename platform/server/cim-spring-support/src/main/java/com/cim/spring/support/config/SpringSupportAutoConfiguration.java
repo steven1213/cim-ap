@@ -13,7 +13,10 @@ import com.cim.spring.support.tenant.TenantFilter;
 import com.cim.spring.support.tenant.TenantProperties;
 import com.cim.spring.support.tenant.TenantResolver;
 import com.cim.spring.support.trace.TraceIdFilter;
+import com.cim.spring.support.web.ApiContractVerifier;
+import com.cim.spring.support.web.ApiResponseProperties;
 import com.cim.spring.support.web.GlobalExceptionHandler;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,8 +31,20 @@ import org.springframework.context.annotation.Bean;
  * {@code @ConditionalOnMissingBean} 允许业务覆盖（可插拔，见 README §8）。</p>
  */
 @AutoConfiguration
-@EnableConfigurationProperties(TenantProperties.class)
+@EnableConfigurationProperties({TenantProperties.class, ApiResponseProperties.class})
 public class SpringSupportAutoConfiguration {
+
+    /**
+     * 统一响应契约校验器：启动收尾时扫描所有 {@code @RestController} 的映射方法，
+     * 返回类型必须是 {@code Result} 或标注 {@code @RawResponse}（见 {@code api-convention.md §6}）。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "cim.api.response", name = "verify", matchIfMissing = true)
+    public ApiContractVerifier apiContractVerifier(ListableBeanFactory beanFactory,
+                                                   ApiResponseProperties properties) {
+        return new ApiContractVerifier(beanFactory, properties);
+    }
 
     /** 全局异常处理器（依赖 {@link MessageResolver}）。 */
     @Bean
