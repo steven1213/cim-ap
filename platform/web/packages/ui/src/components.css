@@ -1,0 +1,226 @@
+/* ============================================================================
+ * @cim/ui 组件自带样式
+ * ----------------------------------------------------------------------------
+ * 为什么组件要自带样式：`page-head / toolbar / form-grid / field-label / modal`
+ * 这几个页面级原语此前散落在各应用的 styles.css（三份副本、已开始分叉）。
+ * 组件若依赖它们，就无法跨应用复用，所以在这里以 `cim-` 前缀重新落一份。
+ * 取值与现有 `business/<app>/web/src/styles.css` 完全一致（逐值抄录），
+ * 保证「换成组件」不产生视觉变化；后续随 P3 再统一回收各应用副本。
+ * ========================================================================== */
+
+/* ---------- 页头 ---------- */
+.cim-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cim-page-head-main {
+  min-width: 0;
+}
+.cim-page-head h1 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 680;
+  letter-spacing: -0.01em;
+}
+.cim-page-head-sub {
+  margin: 4px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.cim-page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+/* ---------- 工具栏 ---------- */
+.cim-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.cim-toolbar-left,
+.cim-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cim-toolbar-spacer {
+  flex: 1 1 auto;
+}
+.cim-toolbar-count {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- 表单字段 ---------- */
+.cim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.cim-field-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cim-field-label .cim-req {
+  color: var(--err);
+  margin-left: 3px;
+}
+.cim-field-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.cim-field-error {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--err);
+}
+
+.cim-form-grid {
+  display: grid;
+  gap: 11px;
+}
+.cim-form-grid > .cim-field {
+  grid-column: span 1;
+}
+
+/* ---------- 表格容器 ---------- */
+.cim-datatable {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cim-datatable .ant-table-wrapper {
+  min-width: 0;
+}
+/* 表格内等宽文本（编码 / 时间戳） */
+.cim-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+/* antd 表格默认给表头加粗 + 深色，这里按 `table.data` 的口径压一档 */
+.cim-datatable .ant-table-thead > tr > th {
+  font-weight: 650;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.cim-datatable .ant-table-tbody > tr > td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+/* 行语义色（rowClassName 返回 cim-row-* 时生效，来自 @cim/theme 的 5 档） */
+.cim-datatable .ant-table-tbody > tr.cim-row-err > td {
+  background: var(--cim-status-err-soft);
+}
+.cim-datatable .ant-table-tbody > tr.cim-row-warn > td {
+  background: var(--cim-status-warn-soft);
+}
+.cim-datatable .ant-table-tbody > tr.cim-row-ok > td {
+  background: var(--cim-status-ok-soft);
+}
+
+/* 错误态：不吞错，整块可重试 */
+.cim-datatable-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border: 1px solid var(--err);
+  border-radius: var(--radius);
+  background: var(--err-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.cim-datatable-error-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ---------- 空态 ---------- */
+.cim-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.cim-empty-title {
+  font-size: var(--fs-base);
+  color: var(--text-2);
+}
+.cim-empty-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+/* ---------- 列设置浮层 ---------- */
+.cim-colset {
+  min-width: 208px;
+  max-height: 320px;
+  overflow: auto;
+}
+.cim-colset-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.cim-colset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 2px;
+}
+.cim-colset-row:hover {
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+}
+.cim-colset-ops {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.cim-colset-ops .ant-btn {
+  padding: 0 4px;
+  height: 20px;
+  min-width: 20px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ---------- 状态标签（5 档语义，颜色由 @cim/theme/status 注入内联） ---------- */
+.cim-status-tag.ant-tag {
+  margin-inline-end: 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  line-height: 18px;
+  padding-inline: 7px;
+}

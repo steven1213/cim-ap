@@ -18,7 +18,14 @@ export default defineConfig({
       // docs/platform/web/component-platform-design.md §9。
       '@cim/theme': path.resolve(__dirname, '../../../platform/web/packages/theme/src'),
       '@cim/ui': path.resolve(__dirname, '../../../platform/web/packages/ui/src'),
+      // antd 装在**本应用**的 node_modules：@cim/ui 是源码直引，其内部的 `import 'antd'`
+      // 会从 shared 包所在目录向上查找，找不到业务的 node_modules，故显式指向本地副本。
+      // 这样 antd 内部 `import 'react'` 也能解析到本应用的 React，不会出现两份 React。
+      antd: path.resolve(__dirname, 'node_modules/antd'),
     },
+    // 共享包源码在工程根之外，其 `import 'react'` 会从 platform/web 向上解析而落空；
+    // dedupe 强制这些依赖一律用本应用的副本（也避免出现两份 React → invalid hook call）。
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     port: 5171,

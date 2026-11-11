@@ -1,5 +1,7 @@
-/* @cim/ui 样式入口：按 tokens → base → shell → ui 的顺序引入，勿调换。 */
+/* @cim/ui 样式入口：tokens → base → shell → ui → components，勿调换。
+ * components.css 必须最后：它是对 antd / 通用类的局部覆盖。 */
 @import '@cim/theme/tokens.css';
 @import './base.css';
 @import './shell.css';
 @import './ui.css';
+@import './components.css';

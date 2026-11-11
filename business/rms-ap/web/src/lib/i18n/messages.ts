@@ -167,6 +167,7 @@ export const zhCN: Record<string, string> = {
   'rms.common.time': '时间',
   'rms.common.remark': '备注',
   'rms.common.confirmDelete': '确认删除？此操作不可撤销。',
+  'rms.common.required': '必填',
 
   'rms.recipe.title': '配方库',
   'rms.recipe.exportAll': '导出全部',
@@ -1002,6 +1003,7 @@ export const enUS: Record<string, string> = {
   'rms.common.time': 'Time',
   'rms.common.remark': 'Remark',
   'rms.common.confirmDelete': 'Delete this record? This cannot be undone.',
+  'rms.common.required': 'Required',
 
   'rms.recipe.title': 'Recipe Library',
   'rms.recipe.exportAll': 'Export All',

@@ -21,7 +21,13 @@
       "@cim/theme": ["../../../platform/web/packages/theme/src/index.ts"],
       "@cim/theme/*": ["../../../platform/web/packages/theme/src/*"],
       "@cim/ui": ["../../../platform/web/packages/ui/src/index.ts"],
-      "@cim/ui/*": ["../../../platform/web/packages/ui/src/*"]
+      "@cim/ui/*": ["../../../platform/web/packages/ui/src/*"],
+      "antd": ["node_modules/antd"],
+      "antd/*": ["node_modules/antd/*"],
+      "react": ["node_modules/@types/react"],
+      "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime"],
+      "react-dom": ["node_modules/@types/react-dom"],
+      "react-dom/*": ["node_modules/@types/react-dom/*"]
     }
   },
   "include": ["src"]
