@@ -6,7 +6,6 @@ import com.cim.approval.server.notification.NotificationDispatcher;
 import com.cim.approval.server.notification.NotificationEvent;
 import com.cim.approval.server.domain.ApprovalAudit;
 import com.cim.approval.server.security.SecurityGuard;
-import com.cim.approval.server.security.ApprovalPermissions;
 import com.cim.approval.server.dto.AuditView;
 import com.cim.approval.server.dto.CompleteTaskRequest;
 import com.cim.approval.server.dto.DefinitionXmlView;
@@ -80,16 +79,23 @@ public class ApprovalProcessService {
     /**
      * 全部版本的定义列表（同 key 按 version 降序）。
      * <p>前端以「同 key 最新版本 = 可编辑、历史版本 = 只可查看」呈现状态。</p>
+     *
+     * <p><b>域过滤（G3）</b>：{@code domains} 由 {@code SecurityGuard.resolveDomainFilter} 给出，
+     * 含 {@code "*"} 表示不限（超管 / dev）。<b>未带域部署的定义视为全局共享</b>——存量定义全是不带
+     * 域部署的，若把它们排除，升级当天控制台会空屏。</p>
+     *
+     * <p>⚠️ Flowable 对「未指定租户」存的是<b>空串</b>而不是 {@code null}
+     * （{@code ACT_RE_PROCDEF.TENANT_ID_} 默认 {@code ''}）。这里按 {@code blank} 判共享域，
+     * 只判 {@code null} 会把全部内置定义过滤掉，表现为控制台 0 条且不报错。</p>
      */
-    public List<ProcessDefinitionView> listDefinitions(String appCode) {
+    public List<ProcessDefinitionView> listDefinitions(List<String> domains) {
         List<ProcessDefinition> defs = repositoryService.createProcessDefinitionQuery()
                 .orderByProcessDefinitionKey().asc()
                 .orderByProcessDefinitionVersion().desc()
                 .list();
-        if (appCode != null && !appCode.isBlank()) {
-            // G3：按业务域收敛（定义以 appCode 作为 Flowable tenantId 部署）
+        if (domains != null && !domains.contains("*")) {
             defs = defs.stream()
-                    .filter(d -> appCode.equals(d.getTenantId()))
+                    .filter(d -> isGlobalTenant(d.getTenantId()) || domains.contains(d.getTenantId()))
                     .collect(java.util.stream.Collectors.toList());
         }
         List<ProcessDefinitionView> views = new ArrayList<>();
@@ -107,6 +113,8 @@ public class ApprovalProcessService {
         if (d == null) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "流程定义不存在: " + definitionId);
         }
+        // G3 资源级：按 id 直取定义要校验归属域（tenantId=null 为全局共享定义，放行）
+        securityGuard.assertAppCodeScope(d.getTenantId());
         try (java.io.InputStream in = repositoryService.getResourceAsStream(d.getDeploymentId(), d.getResourceName())) {
             String xml = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             return new DefinitionXmlView(d.getId(), d.getKey(), d.getName(), d.getVersion(), xml);
@@ -223,11 +231,14 @@ public class ApprovalProcessService {
         if (req.variables() != null) {
             vars.putAll(req.variables());
         }
+        // G3 写入侧：域必须先过令牌校验，再落库。存量数据上的「域」之所以不可信，就是因为
+        // 以前把这个值原样透传——调用方填什么，实例就归属什么，之后的查询过滤全都建在沙上。
+        String domain = securityGuard.resolveDomain(req.tenantId());
         // 回调路由键（tenantId 即业务系统 appCode）
-        vars.put("appCode", req.tenantId());
+        vars.put("appCode", domain);
         // 流程实例级 Flowable 租户留空（定义全局共享），租户以变量承载，
         // 查询按 tenantId 变量过滤，实现多业务系统隔离；真正的定义级租户隔离为后续增强。
-        vars.put("tenantId", req.tenantId());
+        vars.put("tenantId", domain);
         // 审批轮次：发起为第 1 轮，每次退回重提/重审 +1（上限 approval.return.max-rounds）
         vars.put("round", 1);
 
@@ -260,10 +271,12 @@ public class ApprovalProcessService {
      * （{@code taskCandidateGroup}），用 OR 合并到同一查询。</p>
      */
     public PageResult<TaskView> listTodoPaged(String userId, List<String> roles, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        // G3：域条件只有一个来源——SecurityGuard。请求传的 tenantId 只是「想查哪个域」的意向，
+        // 越域在此 403；拿它直接拼查询条件，等于让调用方决定看谁的数据。
+        String domain = securityGuard.resolveDomain(tenantId);
         int page0 = Math.max(page, 1) - 1; // 平台分页页号 1 起，Flowable listPage 0 起
         var query = taskService.createTaskQuery()
-                .processVariableValueEquals("tenantId", tenantId)
+                .processVariableValueEquals("tenantId", domain)
                 .active()
                 .orderByTaskCreateTime().desc();
         applyCandidateFilter(query, userId, roles);
@@ -407,6 +420,13 @@ public class ApprovalProcessService {
 
     /** 定义停用/启用（管理员运维：停用后不可发起新实例）。 */
     public void suspendDefinition(String definitionId, boolean suspend) {
+        ProcessDefinition d = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionId(definitionId).singleResult();
+        if (d == null) {
+            throw new BizException(BizCode.DATA_NOT_FOUND, "流程定义不存在: " + definitionId);
+        }
+        // G3：域管理员只能停用自己的定义（tenantId=null 的全局定义由平台管理员操作）
+        securityGuard.assertAppCodeScope(d.getTenantId());
         if (suspend) {
             repositoryService.suspendProcessDefinitionById(definitionId);
         } else {
@@ -424,6 +444,8 @@ public class ApprovalProcessService {
         if (src == null) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "流程定义不存在: " + definitionId);
         }
+        // G3：源定义须在授权域内；副本沿用源定义的域，否则「复制」会把域私有定义洗成全局共享
+        securityGuard.assertAppCodeScope(src.getTenantId());
         String xml;
         try {
             xml = new String(repositoryService.getResourceAsStream(src.getDeploymentId(), src.getResourceName())
@@ -440,10 +462,13 @@ public class ApprovalProcessService {
         String newName = src.getName() != null ? src.getName() + "（副本）" : newKey;
         // BPMN 内 process 开标签与 key 对齐（部署查询按 key=process id 走）
         xml = replaceProcessTag(xml, newKey, newName);
-        org.flowable.engine.repository.Deployment dep = repositoryService.createDeployment()
+        org.flowable.engine.repository.DeploymentBuilder dupBuilder = repositoryService.createDeployment()
                 .name(newName)
-                .addString(newKey + ".bpmn20.xml", xml)
-                .deploy();
+                .addString(newKey + ".bpmn20.xml", xml);
+        if (!isGlobalTenant(src.getTenantId())) {
+            dupBuilder = dupBuilder.tenantId(src.getTenantId()); // 副本与源同域
+        }
+        org.flowable.engine.repository.Deployment dep = dupBuilder.deploy();
         ProcessDefinition pd = repositoryService.createProcessDefinitionQuery()
                 .deploymentId(dep.getId()).singleResult();
         if (pd == null) {
@@ -482,10 +507,10 @@ public class ApprovalProcessService {
 
     /** 已办分页查询。 */
     public PageResult<TaskView> listDonePaged(String userId, List<String> roles, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        String domain = securityGuard.resolveDomain(tenantId);
         int page0 = Math.max(page, 1) - 1;
         var query = historyService.createHistoricTaskInstanceQuery()
-                .processVariableValueEquals("tenantId", tenantId)
+                .processVariableValueEquals("tenantId", domain)
                 .finished()
                 .orderByHistoricTaskInstanceEndTime().desc();
         applyHistoricCandidateFilter(query, userId, roles);
@@ -520,11 +545,11 @@ public class ApprovalProcessService {
      * 排序约定：进行中在前，其余按开始时间倒序（与原全量行为一致）。
      */
     public PageResult<ProcessInstanceView> listInitiatedPaged(String userId, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        String domain = securityGuard.resolveDomain(tenantId);
         int page0 = Math.max(page, 1) - 1;
         List<ProcessInstanceView> runningList = new ArrayList<>();
         runtimeService.createProcessInstanceQuery()
-                .variableValueEquals("tenantId", tenantId)
+                .variableValueEquals("tenantId", domain)
                 .variableValueEquals("initiator", userId)
                 .includeProcessVariables()
                 .list()
@@ -538,7 +563,7 @@ public class ApprovalProcessService {
                         resolveDisplayFields(pi.getProcessVariables()))));
 
         var historicQuery = historyService.createHistoricProcessInstanceQuery()
-                .variableValueEquals("tenantId", tenantId)
+                .variableValueEquals("tenantId", domain)
                 .variableValueEquals("initiator", userId)
                 .finished()
                 .includeProcessVariables()
@@ -567,6 +592,20 @@ public class ApprovalProcessService {
                             resolveDisplayFields(hpi.getProcessVariables()))));
         }
         return PageResult.of(items, total, page0 + 1, size);
+    }
+
+    /** 实例/变量集合里的归属域（流程变量 {@code tenantId}）；缺失返回 null（视为共享域，放行）。 */
+    private static String domainOf(Map<String, Object> vars) {
+        if (vars == null) {
+            return null;
+        }
+        Object v = vars.get("tenantId");
+        return v == null ? null : v.toString();
+    }
+
+    /** 定义未归属任何业务域（全局共享）。Flowable 用空串而非 null 表示「未指定租户」。 */
+    private static boolean isGlobalTenant(String tenantId) {
+        return tenantId == null || tenantId.isBlank();
     }
 
     /** 实例当前活动任务中的最大超时分钟数；未超时/无活动任务返回 null。 */
@@ -615,15 +654,10 @@ public class ApprovalProcessService {
             throw new BizException(BizCode.PARAM_INVALID, "已有审批人处理该申请，不可撤回；如需终止请联系管理员");
         }
         String businessKey = hpi.getBusinessKey();
-        // 业务域断言的对象是 **appCode**，不是流程租户。此前这里传的 tenantId 是实例上的
-        // 流程变量（单租户部署恒为 "default"），与域集合（appCode 列表）不是同一维度，
-        // 认证态下必然 403（dev 态因 allowed=["*"] 放行，故长期未被发现）。
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
-        // 回调仍按「业务系统 appCode」路由，而实例上的 tenantId 流程变量承载该值
-        // （见 start()：vars.put("appCode", req.tenantId())）。故保留读取，只是不再用它做域断言。
+        // 实例的归属域（流程变量 tenantId）既是 G3 的校验对象，也是回调路由键。
         // 注意别再写 String.valueOf(null)——那会得到字面量 "null" 作为路由键。
-        String tenant = java.util.Optional.ofNullable(hpi.getProcessVariables())
-                .map(m -> m.get("tenantId")).map(String::valueOf).orElse(null);
+        String tenant = domainOf(hpi.getProcessVariables());
+        securityGuard.assertAppCodeScope(tenant);
 
         runtimeService.deleteProcessInstance(instanceId, "WITHDRAW");
 
@@ -658,10 +692,8 @@ public class ApprovalProcessService {
         }
         String businessKey = hpi.getBusinessKey();
         String title = String.valueOf(hpi.getProcessVariables().get("title"));
-        // 业务域断言的对象是 **appCode**，不是流程租户。此前这里传的 tenantId 是实例上的
-        // 流程变量（单租户部署恒为 "default"），与域集合（appCode 列表）不是同一维度，
-        // 认证态下必然 403（dev 态因 allowed=["*"] 放行，故长期未被发现）。
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        // G3 资源级：催办同样要按实例归属域校验
+        securityGuard.assertAppCodeScope(domainOf(hpi.getProcessVariables()));
         List<Task> tasks = taskService.createTaskQuery()
                 .processInstanceId(instanceId).active()
                 .orderByTaskCreateTime().asc().list();
@@ -768,7 +800,8 @@ public class ApprovalProcessService {
         String initiator = (String) vars.get("initiator");
 
         assertInstanceVisible(instanceId, userId, roles);
-        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        // G3 资源级：按 id 直接打开也要校验归属域，否则列表过滤形同虚设（id 可枚举）
+        securityGuard.assertAppCodeScope(domainOf(vars));
 
         String businessKey = hpi.getBusinessKey();
         Map<String, Object> formData = parseFormData(vars.get("formDataJson"));

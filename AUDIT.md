@@ -828,12 +828,65 @@ approval 与 rms 都补了 `/sys` 代理。
 
 ### 37.8 仍未做
 
-- **G3 业务域隔离未闭环**：定义/实例/任务/审计/回调五类查询目前**没有按 appCode 过滤**，
-  只做了「请求域 ⊆ 授权域」的入口断言。真正的按域过滤需要给流程变量写入 appCode 并改造
-  Flowable 查询条件，属独立工作量。
+- ~~**G3 业务域隔离未闭环**~~ → 已在本轮闭合，见 §38。
 - **超管通路依赖 IAM 展开**：IAM 目前不签发 `SUPER_ADMIN`/`ROLE_SUPER`，所以「平台超管跨域」
   实际只能靠 `approval-ap:ADMIN` 的域管理员通路生效。
 - **企微免登**在认证态不可用（见 §36.5）。
+
+## 2026-11-12（续 7）G3 收口：域只有一个来源
+
+### 38.1 问题的准确形态
+
+原记录写「只做了入口断言，五类查询未过滤」。逐端点核对后是四个不同的问题，混在一句描述里：
+
+| 端点 | 原实现 | 真实缺口 |
+|---|---|---|
+| `/tasks/{todo,done,initiated}` | 查询条件用调用方传的 `tenantId`，断言传常量 `APP_CODE` | 断言查「你是不是 approval-ap 的人」，查询用「你自报的域」，两条线不相交 |
+| `/stats` | 只有 `variableValueEquals("tenantId", …)` | **连断言都没有**，传任意 tenantId 即可跨域读耗时/趋势/驳回率 |
+| `/audit`、`/callbacks` | `appCode` 可选，不传走「不限域」分支 | 知道 businessKey 就能读该单跨域全量审计 |
+| `/definitions` | 内存按 `d.getTenantId()` 过滤 | 不传 `appCode` 返回全部；`/{id}/xml`、`duplicate`、`suspend` 完全不校验 |
+
+### 38.2 三条设计决定
+
+1. **域 = appCode，不是租户**。租户（`tenantId`）是流程变量，一个租户下可有多个业务方；域是「哪个 ap 的数据」，与令牌 `apps` 同一命名空间。单租户部署里两者取值都是 `default`，所以一直被混用——§37.3 那 6 处 `assertAppCodeScope(tenantId)` 就是这个混淆的产物。
+2. **允许集合 = 令牌 `apps` ∪ 令牌 `tenantId` ∪ 共享域 `default`**。只取 `apps` 会把「各 ap 都写 default」的存量部署全线 403（上一轮烧过一次）。
+3. **共享域恒放行是显式妥协**。未分域的历史数据全在 `default`；不放行则升级当天存量单据集体消失。代价是该域对所有已准入 ap 可读——真正隔离从「各 ap 以自身 appCode 发起新实例」开始生效。
+
+### 38.3 落点
+
+- `SecurityGuard` 新增 `resolveDomainFilter(requested)`（多值，五类查询唯一来源）与 `resolveDomain(requested)`（单值，写操作与列表域条件）；`assertAppCodeScope` 改为其判定形态。**未指定域时收敛为调用方授权域集合，而不是放开全量**——这是原实现最实质的洞。
+- 查询侧：`listTodoPaged` / `listDonePaged` / `listInitiatedPaged` / `StatsService`（含驳回率、审批人负载、待办/超时计数）全部改用 `resolveDomain`；审计/回调改多域 `IN`（新增 `findByBusinessKeyAndAppCodeIn…`、`findByAppCodeIn`）。
+- 资源级：`detail`、BPMN `xml`、`duplicate`、`suspend`、`withdraw`、`urge` 按归属域校验，否则 id 枚举可绕过全部列表过滤。
+- 写入侧：`start` 先 `resolveDomain(req.tenantId())` 再落库；`duplicate` 的副本沿用源定义的域，否则「复制」会把域私有定义洗成全局共享。
+- 前端：`SHARED_DOMAIN` 常量与后端同值；认证态身份与域由 `/me` 决定、`Layout` 只在 dev 通道渲染切换器（本来已如此，本轮补注释与 i18n 文案）。
+
+### 38.4 实跑才暴露的两件事
+
+- **Flowable 的「无租户」是空串不是 null**：`ACT_RE_PROCDEF.TENANT_ID_` 默认 `''`。按 `d.getTenantId() == null` 判全局定义，会把 3 个内置定义全过滤掉 —— 接口 200、返回 `[]`、不报错，控制台空屏。改按 `blank` 判。
+- **方法写错会被映射成 400 而不是 405**：`GlobalExceptionHandler` 把 `HttpRequestMethodNotSupportedException` 映射成 `OPERATION_NOT_ALLOWED(2004)` + HTTP 400，文案「当前状态不允许该操作」。用它调 `withdraw`（GET 打了 POST 接口）时看起来像业务状态拦截，实际是方法不匹配——排查时容易跑偏。
+
+### 38.5 验证（真 IAM + 真 JWT，全部实跑）
+
+令牌 `apps=[approval-ap, iam-ap, rms-ap]`、`roles=[approval-ap:ADMIN, …]`、`tenantId=null`。
+
+| 请求 | 结果 |
+|---|---|
+| `/me`、`/tasks/todo?tenantId=default`、`/stats?tenantId=default` | 200 |
+| `/tasks/todo?tenantId=rms-ap` | 200（令牌 apps 确实含 rms-ap，属授权域） |
+| `/tasks/{todo,done,initiated}?tenantId=mes-ap` | **403** ×3 |
+| `/stats?tenantId=mes-ap`（曾无断言） | **403** |
+| `/definitions?appCode=mes-ap` | **403**；不传参数 200 且返回 3 条（`tenantId=''`） |
+| `/audit?businessKey=…`（不传 appCode） | 200（收敛本人域，不再全量）；`&appCode=mes-ap` **403** |
+| `/callbacks`（不传 appCode） | 200（收敛）；`/callbacks/outbox?appCode=mes-ap` **403** |
+| `POST /processes/start` 带 `tenantId=mes-ap` | **403** 无操作权限（三个内置流程均如此） |
+| `POST /processes/start` 带 `tenantId=default` → detail → withdraw | 200 → 200 → 200 |
+| 后端全量 / 前端 | **19/19**（新增 `SecurityGuardDomainScopeTest` 7 例）；`tsc` 零错 + `vite build` 通过 |
+
+### 38.6 仍未做
+
+- **数据分域**：存量实例全在 `default`，因此「按域隔离」目前只在**通道**上成立；真实数据分域要等第二个业务方以自身 appCode 发起（D13 RMS 回调接线仍未启动）。
+- `/callbacks/outbox/stats` 仍是全局计数（无域参数），属运维 KPI，未纳入收敛。
+- `E2E`：`verify-security.mjs` 覆盖的是「传参跨域→403」，未覆盖「不传参→只见本域」，建议补双域用例。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**

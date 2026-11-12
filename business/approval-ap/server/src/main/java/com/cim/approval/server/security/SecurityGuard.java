@@ -17,11 +17,21 @@ import java.util.Set;
  * 统一安全守卫（G1 权限码三层 + G3 业务域隔离）。
  *
  * <h3>业务域作用域（G3）</h3>
+ *
+ * <p><b>域 = appCode</b>。域不是「租户」：租户（{@code tenantId}）是流程变量，一个租户下可以有多个
+ * 业务方；域是「哪个 ap 的数据」，与令牌 {@code apps} 同一命名空间。二者在单租户部署里取值相同
+ * （都是 {@code default}），所以极易混为一谈——历史上那 6 处 {@code assertAppCodeScope(tenantId)}
+ * 就是这么来的。</p>
+ *
  * <ul>
  *   <li>开放 API（X-App-Key 鉴权通过）：仅该 appKey 绑定的单一业务域，越域访问 403；</li>
- *   <li>JWT 认证态：由令牌 {@code apps} 权威推导（"*" 为超管跨域），缺域则拒绝；</li>
+ *   <li>JWT 认证态：{@code 令牌 apps} ∪ {@code 令牌 tenantId} ∪ {@link #SHARED_DOMAIN}；</li>
  *   <li>dev 放行态：信任全部（"*"），便于无 IAM 联调。</li>
  * </ul>
+ *
+ * <p><b>{@link #SHARED_DOMAIN}（default）恒在允许集合内</b>：未按业务方分域的历史数据全落在这里，
+ * 若不放行，升级当天所有存量单据与列表会集体消失。代价是该域对所有已准入的 ap 可读——这是显式的
+ * 共享域妥协，不是漏洞；真正的隔离从「新实例按各自的 appCode 写入」开始生效。</p>
  *
  * <h3>权限码三层（G1 / D6）</h3>
  * <ol>
@@ -49,6 +59,15 @@ public class SecurityGuard {
     private static final Set<String> SUPER_AUTHORITIES =
             Set.of("SUPER_ADMIN", "ROLE_SUPER", "ROLE_SUPER_ADMIN");
 
+    /**
+     * 平台共享域。历史数据（未按业务方分域的实例/审计）全部落在该域，所有已准入的 ap 均可读。
+     *
+     * <p>用常量而非散落的字面量，是因为它同时出现在三处语义里：前端 {@code identityStore} 的
+     * 缺省租户、{@code TaskController} 的 {@code defaultValue}、以及这里的允许集合。任一处改字面量
+     * 都会造成「登录成功但一条待办都看不到」这种不报错的故障。</p>
+     */
+    public static final String SHARED_DOMAIN = "default";
+
     @Value("${approval.security.dev-bypass:true}")
     private boolean devBypass;
 
@@ -71,6 +90,10 @@ public class SecurityGuard {
     /**
      * 解析调用方可访问的业务域集合。开放 API 收敛为单一域；JWT 态由权威推导；
      * dev 态返回 ["*"]（信任）。
+     *
+     * <p>JWT 态是<b>并集</b>：令牌 {@code apps}（哪些 ap 调得动我）+ 令牌 {@code tenantId}
+     * （同租户内视为一方）+ 共享域。只取 {@code apps} 会让「单租户、各 ap 都写 default」的
+     * 存量部署全线 403——那正是上一轮 {@code assertAppCodeScope(tenantId)} 的做法。</p>
      */
     public List<String> resolveAllowedAppCodes() {
         RequestScope scope = RequestScopeHolder.get();
@@ -78,9 +101,84 @@ public class SecurityGuard {
             return scope.allowedAppCodes();
         }
         if (currentUser.authEnabled()) {
-            return deriveFromAuthentication();
+            List<String> derived = deriveFromAuthentication();
+            if (derived.contains("*")) {
+                return derived; // 超管跨域
+            }
+            Set<String> union = new LinkedHashSet<>(derived);
+            String tenant = jwtTenantOrNull();
+            if (tenant != null && !tenant.isBlank()) {
+                union.add(tenant);
+            }
+            union.add(SHARED_DOMAIN);
+            return List.copyOf(union);
         }
         return List.of("*");
+    }
+
+    /**
+     * 解析「本次请求可查询的业务域集合」——<b>五类查询（定义/实例/任务/审计/回调）唯一的域来源</b>。
+     *
+     * <p>规则：请求域必须落在允许集合内（越域 403，不是 404，避免泄漏存在性）；未指定时
+     * <b>收敛为调用方全部授权域</b>，而不是放开全量——这正是原实现的洞：{@code appCode} 是可选参数，
+     * 不传就走「不限域」分支，知道 businessKey 就能读到跨域审计。</p>
+     *
+     * @param requested 请求指定的域；null/blank 表示未指定
+     * @return 可查询的域集合；含 {@code "*"} 表示不限（超管 / dev 放行态）
+     */
+    public List<String> resolveDomainFilter(String requested) {
+        RequestScope scope = RequestScopeHolder.get();
+        if (scope != null && scope.viaOpenApi()) {
+            // 开放 API：忽略调用方传入的域，强制收敛为 appKey 绑定域
+            String bound = scope.resolvedAppCode();
+            if (requested != null && !requested.isBlank() && !requested.equals(bound)) {
+                throw crossDomain(requested, List.of(bound));
+            }
+            return List.of(bound);
+        }
+        List<String> allowed = resolveAllowedAppCodes();
+        if (allowed.contains("*")) {
+            return (requested == null || requested.isBlank()) ? List.of("*") : List.of(requested);
+        }
+        if (requested == null || requested.isBlank()) {
+            return allowed;
+        }
+        if (!allowed.contains(requested)) {
+            throw crossDomain(requested, allowed);
+        }
+        return List.of(requested);
+    }
+
+    /**
+     * 单值域解析：写操作与「按单个域查询」的域条件来源。
+     *
+     * <p>返回 null 会退化成「不限域」，所以这里永不返回 null：未指定时取
+     * {@link #SHARED_DOMAIN}（可读且不会误放开全量），开放 API 下取 appKey 绑定域。</p>
+     */
+    public String resolveDomain(String requested) {
+        RequestScope scope = RequestScopeHolder.get();
+        if (scope != null && scope.viaOpenApi()) {
+            return resolveDomainFilter(requested).get(0); // 恒为该 appKey 绑定域
+        }
+        if (requested == null || requested.isBlank()) {
+            return SHARED_DOMAIN;
+        }
+        List<String> filter = resolveDomainFilter(requested);
+        return filter.contains("*") ? requested : filter.get(0);
+    }
+
+    private static BizException crossDomain(String requested, List<String> allowed) {
+        return new BizException(BizCode.ACCESS_DENIED,
+                "跨业务域访问被拒绝：请求域 [" + requested + "] 不在授权范围 " + allowed + " 内");
+    }
+
+    /** 令牌里的租户（{@code CimUserPrincipal#tenantId}）；无身份时返回 null。 */
+    private String jwtTenantOrNull() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a != null && a.getPrincipal() instanceof com.cim.auth.principal.CimUserPrincipal p) {
+            return p.tenantId();
+        }
+        return null;
     }
 
     /**
@@ -164,18 +262,16 @@ public class SecurityGuard {
     /**
      * 业务域隔离断言（G3）。请求的业务域须落在调用方作用域内，否则 403（不返回 404，避免泄漏存在性）。
      *
-     * @param requested 请求指定的业务域（通常即 tenantId / appCode）；null 表示不限定，放行
+     * <p>这是 {@link #resolveDomainFilter(String)} 的判定形态，供「只校验不取域」的场合使用
+     * （如按 id 打开某个资源时校验该资源归属域）。null 表示不限定，放行。</p>
+     *
+     * @param requested 资源或请求指定的业务域；null 表示全局共享资源
      */
     public void assertAppCodeScope(String requested) {
         if (requested == null || requested.isBlank()) {
             return;
         }
-        List<String> allowed = resolveAllowedAppCodes();
-        if (allowed.contains("*") || allowed.contains(requested)) {
-            return;
-        }
-        throw new BizException(BizCode.ACCESS_DENIED,
-                "跨业务域访问被拒绝：请求域 [" + requested + "] 不在授权范围内");
+        resolveDomainFilter(requested); // 越域时抛 403
     }
 
     /**

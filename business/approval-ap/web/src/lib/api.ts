@@ -8,7 +8,7 @@
 // 两种情况下身份参数都照发：后端在认证态会忽略它们，保留则让滚动发布期间旧后端仍可用。
 import axios, { type AxiosInstance } from 'axios';
 import { useAuthStore } from '@/store/authStore';
-import { useIdentityStore } from '@/store/identityStore';
+import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
 import type {
   AddSignRequest,
   AuditView,
@@ -96,8 +96,8 @@ http.interceptors.response.use(
 function currentIdentity(): { userId: string; tenantId: string; roles: string[] } {
   const { mode, user } = useAuthStore.getState();
   if (mode === 'sso' && user) {
-    // tenantId 缺省回落 default：审批流的租户是流程变量，存量实例都以 default 起
-    return { userId: user.userId ?? '', tenantId: user.tenantId || 'default', roles: user.roles ?? [] };
+    // tenantId 缺省回落共享域：域是流程变量，存量实例都在共享域；后端会校验它是否在令牌域内
+    return { userId: user.userId ?? '', tenantId: user.tenantId || SHARED_DOMAIN, roles: user.roles ?? [] };
   }
   const { userId, tenantId, roles } = useIdentityStore.getState();
   return { userId, tenantId, roles: roles ?? [] };

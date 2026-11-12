@@ -2,6 +2,7 @@ package com.cim.approval.server.service;
 
 import com.cim.approval.server.dto.StatsView;
 import com.cim.approval.server.repository.ApprovalAuditRepository;
+import com.cim.approval.server.security.SecurityGuard;
 import lombok.RequiredArgsConstructor;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.TaskService;
@@ -30,17 +31,21 @@ public class StatsService {
     private final HistoryService historyService;
     private final TaskService taskService;
     private final ApprovalAuditRepository auditRepository;
+    private final SecurityGuard securityGuard;
 
     /** 超时阈值（Duration），与 OverdueScanner/列表标红共用同一配置。 */
     @org.springframework.beans.factory.annotation.Value("${approval.task.timeout:24h}")
     private Duration timeout;
 
     public StatsView stats(String tenantId, int days) {
+        // G3：统计曾是唯一「传入任意 tenantId 即可跨域读」的端点——没有域断言，只有过滤条件。
+        // 现在域只有一个来源，越域 403；这里的 domain 同时用于下面每一条查询。
+        String domain = securityGuard.resolveDomain(tenantId);
         Instant since = Instant.now().minus(Duration.ofDays(days));
 
         // ---- 已完成实例：平均耗时 + 按日完成趋势 ----
         List<HistoricProcessInstance> finished = historyService.createHistoricProcessInstanceQuery()
-                .variableValueEquals("tenantId", tenantId)
+                .variableValueEquals("tenantId", domain)
                 .finished()
                 .startedAfter(java.util.Date.from(since))
                 .includeProcessVariables()
@@ -57,7 +62,7 @@ public class StatsService {
 
         // ---- 发起趋势（窗口内全部实例，含未完成）----
         List<HistoricProcessInstance> all = historyService.createHistoricProcessInstanceQuery()
-                .variableValueEquals("tenantId", tenantId)
+                .variableValueEquals("tenantId", domain)
                 .startedAfter(java.util.Date.from(since))
                 .includeProcessVariables()
                 .list();
@@ -76,14 +81,15 @@ public class StatsService {
         }
 
         // ---- 驳回率 ----
-        long approveCount = auditRepository.countByActionAndCreatedAtAfter("COMPLETE_APPROVE", since);
-        long rejectCount = auditRepository.countByActionAndCreatedAtAfter("COMPLETE_REJECT", since);
+        long approveCount = auditRepository.countByActionAndAppCodeAndCreatedAtAfter("COMPLETE_APPROVE", domain, since);
+        long rejectCount = auditRepository.countByActionAndAppCodeAndCreatedAtAfter("COMPLETE_REJECT", domain, since);
         Double rejectRate = (approveCount + rejectCount) > 0
                 ? (double) rejectCount / (approveCount + rejectCount) : null;
 
         // ---- 审批人负载：窗口内已办票数 TOP + 当前待办数 ----
         Map<String, Long> doneByUser = new HashMap<>();
         historyService.createHistoricTaskInstanceQuery()
+                .processVariableValueEquals("tenantId", domain)
                 .finished()
                 .taskCompletedAfter(java.util.Date.from(since))
                 .list()
@@ -93,7 +99,7 @@ public class StatsService {
                     }
                 });
         Map<String, Long> todoByUser = new HashMap<>();
-        taskService.createTaskQuery().active().list()
+        taskService.createTaskQuery().active().processVariableValueEquals("tenantId", domain).list()
                 .forEach(t -> {
                     if (t.getAssignee() != null) {
                         todoByUser.merge(t.getAssignee(), 1L, Long::sum);
@@ -115,8 +121,10 @@ public class StatsService {
             trend.add(new StatsView.TrendRow(d.toString(), pair[0], pair[1]));
         }
 
-        long todoCount = taskService.createTaskQuery().active().count();
+        long todoCount = taskService.createTaskQuery().active()
+                .processVariableValueEquals("tenantId", domain).count();
         long overdueCount = taskService.createTaskQuery().active()
+                .processVariableValueEquals("tenantId", domain)
                 .taskCreatedBefore(java.util.Date.from(
                         Instant.now().minus(timeout)))
                 .count();

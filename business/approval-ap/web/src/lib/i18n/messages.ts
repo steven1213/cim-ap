@@ -47,10 +47,11 @@ export const zhCN: Record<string, string> = {
   // 身份切换（dev 态）
   'identity.title': '当前身份',
   'identity.userId': '用户',
-  'identity.tenantId': '租户',
+  'identity.tenantId': '业务域',
   'identity.change': '切换身份',
   'identity.apply': '应用',
-  'identity.hint': 'dev 态以 userId / tenantId 标识身份，生产接入 IAM 后由 JWT 解析',
+  'identity.hint': 'dev 态以 userId / 业务域标识身份；切换到未授权的域会被服务端拒绝（403）。'
+    + '接入 IAM 后身份与域均由 JWT 决定，此处不可切换',
 
   // 通用
   'common.refresh': '刷新',
@@ -508,10 +509,11 @@ export const enUS: Record<string, string> = {
 
   'identity.title': 'Current Identity',
   'identity.userId': 'User',
-  'identity.tenantId': 'Tenant',
+  'identity.tenantId': 'Domain',
   'identity.change': 'Switch identity',
   'identity.apply': 'Apply',
-  'identity.hint': 'Dev mode identifies by userId / tenantId; production resolves from IAM JWT',
+  'identity.hint': 'Dev mode identifies by userId / business domain; switching to an unauthorised '
+    + 'domain is rejected by the server (403). Under IAM both come from the JWT and cannot be switched',
 
   'common.refresh': 'Refresh',
   'common.searchPlaceholder': 'Search title / business key…',

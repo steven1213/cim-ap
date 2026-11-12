@@ -38,17 +38,13 @@ public class AuditController {
                                         @RequestParam(required = false) String actor) {
         // G1：审计查看属管理端点，须持 approval:audit:view
         securityGuard.assertPermission(ApprovalPermissions.AUDIT_VIEW, currentUser.resolveNullable(actor));
-        // 开放 API：强制以令牌绑定域为准，忽略调用方传入的 appCode（防越域）
-        String scope = securityGuard.resolvedAppCodeOrNull();
-        String effective = scope != null ? scope : appCode;
-        List<ApprovalAudit> audits;
-        if (effective != null) {
-            securityGuard.assertAppCodeScope(effective);
-            audits = auditService.listByBusinessKeyAndAppCode(businessKey, effective);
-        } else {
-            // dev 旧式：仅按 businessKey 查询（信任态）
-            audits = auditService.listByBusinessKey(businessKey);
-        }
+        // G3：域集合只有一个来源。appCode 是可选参数，但它**不再意味着「不传就不限域」**——
+        // 未指定时收敛为调用方的授权域集合（认证态 = 令牌域 ∪ 共享域），否则知道 businessKey
+        // 就能读到跨域审计，列表过滤形同虚设。
+        List<String> domains = securityGuard.resolveDomainFilter(appCode);
+        List<ApprovalAudit> audits = domains.contains("*")
+                ? auditService.listByBusinessKey(businessKey)
+                : auditService.listByBusinessKeyAndAppCodes(businessKey, domains);
         List<AuditView> views = new ArrayList<>();
         for (ApprovalAudit a : audits) {
             views.add(new AuditView(a.getId(), a.getSeq(), a.getBusinessKey(), a.getProcessInstanceId(),

@@ -279,13 +279,27 @@ public class CallbackService {
         return r;
     }
 
-    public List<OutboxView> queryOutbox(String appCode, String businessKey) {
-        List<CallbackOutbox> list = (businessKey != null)
-                ? outboxRepository.findByBusinessKey(businessKey)
-                : (appCode != null ? outboxRepository.findByAppCode(appCode)
-                : outboxRepository.findAll());
+    /**
+     * 投递记录查询（G3）。
+     *
+     * @param domains 允许查询的域集合；含 {@code "*"} 表示不限（超管 / dev）。由
+     *                {@code SecurityGuard.resolveDomainFilter} 给出，不接受调用方自报
+     */
+    public List<OutboxView> queryOutbox(List<String> domains, String businessKey) {
+        boolean unrestricted = domains.contains("*");
+        List<CallbackOutbox> list;
+        if (businessKey != null) {
+            list = outboxRepository.findByBusinessKey(businessKey);
+        } else if (unrestricted) {
+            list = outboxRepository.findAll();
+        } else {
+            list = outboxRepository.findByAppCodeIn(domains);
+        }
         List<OutboxView> views = new ArrayList<>();
         for (CallbackOutbox o : list) {
+            if (!unrestricted && !domains.contains(o.getAppCode())) {
+                continue; // businessKey 路径也要按域收敛
+            }
             views.add(new OutboxView(o.getId(), o.getMessageId(), o.getAppCode(), o.getBusinessKey(),
                     o.getEventType(), o.getStatus().name(), o.getAttempts(), o.getCreatedAt(),
                     o.getSentAt(), o.getLastError()));

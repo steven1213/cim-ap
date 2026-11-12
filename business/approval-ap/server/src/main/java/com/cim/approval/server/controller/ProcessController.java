@@ -45,13 +45,10 @@ public class ProcessController {
     @GetMapping("/definitions")
     public Result<List<ProcessDefinitionView>> listDefinitions(
             @RequestParam(required = false) String appCode) {
-        // 开放 API：强制以令牌绑定域为准；dev 态可按 appCode 过滤或查看全部
-        String scope = securityGuard.resolvedAppCodeOrNull();
-        String effective = scope != null ? scope : appCode;
-        if (effective != null) {
-            securityGuard.assertAppCodeScope(effective);
-        }
-        return Result.ok(processService.listDefinitions(effective));
+        // 域集合由 SecurityGuard 给出：开放 API 强制收敛为令牌绑定域；认证态为「令牌域 ∪ 共享域」，
+        // 不传 appCode 时收敛为这些域（而不是放开全量）。越域在这里即 403。
+        List<String> domains = securityGuard.resolveDomainFilter(appCode);
+        return Result.ok(processService.listDefinitions(domains));
     }
 
     /** 读取定义 BPMN XML（设计器编辑/查看入口）。 */

@@ -11,7 +11,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as api from '@/lib/api';
 import { idpLogout } from '@/lib/sso';
-import { useIdentityStore } from '@/store/identityStore';
+import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
 import type { MeDto } from '@/types';
 
 /** 身份通道。`unknown` 仅存在于启动探针返回前。 */
@@ -98,11 +98,12 @@ export const useAuthStore = create<AuthState>()(
 /**
  * 把 `me` 写进 `identityStore`。
  *
- * <p>`tenantId` 缺省回落 `default`：审批流的租户是**流程变量**，存量实例都以 `default` 起，
- * 令牌里 `tenantId` 为空时若原样传 null，用户会「登录成功但一条待办都看不到」。</p>
+ * <p>`tenantId` 缺省回落 {@link SHARED_DOMAIN}：审批流的域是**流程变量**，存量实例都落在共享域；
+ * 令牌里 `tenantId` 为空时若原样传 null，用户会「登录成功但一条待办都看不到」。
+ * 回落值必须与后端 `SecurityGuard.SHARED_DOMAIN` 一致，否则会被当成越域 403。</p>
  */
 function hydrateIdentity(me: MeDto): void {
   useIdentityStore
     .getState()
-    .setIdentity(me.userId ?? '', me.tenantId || 'default', me.roles ?? []);
+    .setIdentity(me.userId ?? '', me.tenantId || SHARED_DOMAIN, me.roles ?? []);
 }

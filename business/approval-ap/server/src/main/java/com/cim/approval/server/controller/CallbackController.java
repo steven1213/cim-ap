@@ -47,12 +47,11 @@ public class CallbackController {
 
     @GetMapping
     public Result<List<CallbackRegistrationView>> list(@RequestParam(required = false) String appCode) {
-        String scope = securityGuard.resolvedAppCodeOrNull();
-        String effective = scope != null ? scope : appCode;
+        // G3：未指定 appCode 时收敛为调用方的授权域，而不是「列出全部」
+        List<String> domains = securityGuard.resolveDomainFilter(appCode);
         List<CallbackRegistrationView> all = callbackService.listRegistrations();
-        if (effective != null) {
-            securityGuard.assertAppCodeScope(effective);
-            all = all.stream().filter(v -> effective.equals(v.appCode())).toList();
+        if (!domains.contains("*")) {
+            all = all.stream().filter(v -> domains.contains(v.appCode())).toList();
         }
         return Result.ok(all);
     }
@@ -60,12 +59,8 @@ public class CallbackController {
     @GetMapping("/outbox")
     public Result<List<OutboxView>> outbox(@RequestParam(required = false) String appCode,
                                            @RequestParam(required = false) String businessKey) {
-        String scope = securityGuard.resolvedAppCodeOrNull();
-        String effective = scope != null ? scope : appCode;
-        if (effective != null) {
-            securityGuard.assertAppCodeScope(effective);
-        }
-        return Result.ok(callbackService.queryOutbox(effective, businessKey));
+        List<String> domains = securityGuard.resolveDomainFilter(appCode);
+        return Result.ok(callbackService.queryOutbox(domains, businessKey));
     }
 
     /** 手动触发单次投递（测试/运维用）。 */
@@ -90,9 +85,8 @@ public class CallbackController {
                                                     @RequestParam(required = false) String actor) {
         securityGuard.assertPermission(com.cim.approval.server.security.ApprovalPermissions.CALLBACK_MANAGE,
                 currentUser.resolveNullable(actor));
-        String scope = securityGuard.resolvedAppCodeOrNull();
-        String effective = scope != null ? scope : appCode;
-        securityGuard.assertAppCodeScope(effective);
-        return Result.ok(callbackService.sendTestCallback(effective));
+        // G3：开放 API 下 appCode 必须等于令牌绑定域，认证态下须在授权域内（越域 403）
+        securityGuard.assertAppCodeScope(appCode);
+        return Result.ok(callbackService.sendTestCallback(appCode));
     }
 }

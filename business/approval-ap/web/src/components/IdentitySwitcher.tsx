@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useIdentityStore, PRESET_USERS } from '@/store/identityStore';
+import { useIdentityStore, PRESET_USERS, SHARED_DOMAIN } from '@/store/identityStore';
 import { IconChevron } from '@/components/Icons';
 
 import { CimSelect, CimInput, CimField, CimButton } from '@cim/ui';
-// dev 态身份切换器：以 userId / tenantId 标识当前操作人。
+// dev 态身份切换器：以 userId / tenantId（业务域）标识当前操作人。
+// 统一登录态不渲染本组件（见 Layout.tsx：身份与域由 JWT 决定，界面只读）。
 export default function IdentitySwitcher() {
   const { t } = useTranslation();
   const { userId, tenantId, setIdentity } = useIdentityStore();
@@ -27,7 +28,7 @@ export default function IdentitySwitcher() {
   }, []);
 
   function apply() {
-    setIdentity(nextUser.trim() || 'alice', nextTenant.trim() || 'default');
+    setIdentity(nextUser.trim() || 'alice', nextTenant.trim() || SHARED_DOMAIN);
     setOpen(false);
   }
 
@@ -47,7 +48,7 @@ export default function IdentitySwitcher() {
         <span className="avatar">{initial}</span>
         <span className="user-meta">
           <b>{userId}</b>
-          <small>tenant:{tenantId}</small>
+          <small>domain:{tenantId}</small>
         </span>
         <IconChevron width={14} height={14} />
       </CimButton>

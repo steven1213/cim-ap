@@ -124,4 +124,13 @@
   - **前端 `fetchMe` 用裸 axios 从不带令牌** → 认证态下永远 401，`bootstrap()` 判定未登录并清掉落盘令牌，**用户一刷新就回登录页**。裸 axios 保留（为了区分「未登录」与「后端已登出」），但显式带 store 里的令牌。此 bug 只有「带有效令牌真启动一次」才看得见。
   - **`/sys` 代理从未配置**：两 ap 的 SSE 打 `/sys/notify/stream`，vite 只代理 `/api` → dev 下 404，EventSource 静默重连不报错 = 通知永远不来。approval/rms 均补。
   - 验证：真登录令牌 `apps=[approval-ap,iam-ap,rms-ap]`；`/me` 200、`/tasks/todo` 200（曾 403）、审计 200、部署 400（权限已过）、跨域 `mes-ap` **403**、篡改令牌 401；前端注入真令牌后落 `/` 且顶栏 `admin / tenant:default`、KPI 取到真实模板数；approval 后端 12/12、IAM 后端 73/73、两前端 `tsc`+`vite build` 通过。
-  - 仍未做：**G3 按 appCode 过滤未闭环**（只做了入口域断言，五类查询未过滤）；超管依赖 IAM 签发 `SUPER_ADMIN`（目前不发）；企微免登认证态不可用。
+  - 仍未做：~~**G3 按 appCode 过滤未闭环**~~（本轮闭合，见续 7）；超管依赖 IAM 签发 `SUPER_ADMIN`（目前不发）；企微免登认证态不可用。
+
+- **2026-11-12（续7）G3 收口：域只有一个来源（`SecurityGuard.resolveDomainFilter`）**：
+  - **先定性再动手**。「G3 未闭环」实际是四个问题：任务三列表「断言查 A、查询用 B」两条线不相交；`/stats` 连断言都没有；`/audit`、`/callbacks` 的 `appCode` 可选、不传即全量；`/definitions` 不传参数返回全部且 `/{id}/xml` 无校验。混成一句话会漏掉后三个。
+  - **域 = appCode，不是租户**。两者在单租户部署里都叫 `default`，所以被长期混用；允许集合定为「令牌 `apps` ∪ 令牌 `tenantId` ∪ 共享域」，只取 `apps` 会把存量部署全线 403。共享域恒放行是显式妥协（历史数据全在此），真隔离从「各 ap 以自身 appCode 发起」开始生效。
+  - **未指定域 = 收敛，不是放开**。`appCode` 可选不等于「不填就不限域」——原实现正是这样，知道 businessKey 即可读跨域审计。这一条是本次最实质的修复。
+  - **资源级必须单独校验**：`detail` / BPMN `xml` / `duplicate` / `suspend` / `withdraw` / `urge` 按归属域断言，否则列表过滤被 id 枚举绕过。`duplicate` 还要继承源定义的域，否则复制即「洗白成全局」。
+  - **实跑抓到的坑**：Flowable 的「无租户」存的是**空串**不是 `null`（`ACT_RE_PROCDEF.TENANT_ID_`），按 `null` 判全局定义 → 3 个内置定义全被过滤，接口 200 返回 `[]` 不报错；另 `HttpRequestMethodNotSupportedException` 被映射成 400/2004「当前状态不允许该操作」，用 GET 调 POST 接口时表现为「业务状态拦截」，容易误判。
+  - 验证：真 IAM + 真 JWT，令牌 `apps=[approval-ap,iam-ap,rms-ap]`。`default` 与 `rms-ap` 200，`mes-ap` 在 todo/done/initiated/stats/definitions/audit/callbacks/outbox/start 全线 403；`/definitions` 不传参 200 且 3 条；发起→详情→撤回 200/200/200。后端 19/19（新增 `SecurityGuardDomainScopeTest` 7 例），`tsc` + `vite build` 通过。
+  - 仍未做：数据分域（存量都在 `default`，等第二个业务方接入）；`outbox/stats` 全局计数；E2E 缺「不传参只见本域」用例。

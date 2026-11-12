@@ -5,7 +5,7 @@ import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from
 import { NAV_GROUPS, NAV_ITEMS } from '@/lib/navConfig';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { useTabStore } from '@/store/tabStore';
-import { useIdentityStore } from '@/store/identityStore';
+import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
 import { useAuthStore } from '@/store/authStore';
 import IdentitySwitcher from '@/components/IdentitySwitcher';
 import NotificationBell from '@/components/NotificationBell';
@@ -108,7 +108,7 @@ export default function Layout() {
         user={
           isDevChannel
             ? null
-            : { name: me?.username ?? me?.userId ?? '—', meta: `tenant:${me?.tenantId || 'default'}` }
+            : { name: me?.username ?? me?.userId ?? '—', meta: `domain:${me?.tenantId || SHARED_DOMAIN}` }
         }
         footerApp="CIM-AP / Approval-AP"
         footerTagline={t('shell.tagline')}

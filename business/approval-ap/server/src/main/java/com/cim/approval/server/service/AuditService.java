@@ -93,6 +93,11 @@ public class AuditService {
         return auditRepository.findByBusinessKeyAndAppCodeOrderBySeqAsc(businessKey, appCode);
     }
 
+    /** 按域集合查询（G3）：认证态未指定 appCode 时收敛为调用方的授权域集合。 */
+    public List<ApprovalAudit> listByBusinessKeyAndAppCodes(String businessKey, java.util.Collection<String> appCodes) {
+        return auditRepository.findByBusinessKeyAndAppCodeInOrderBySeqAsc(businessKey, appCodes);
+    }
+
     /**
      * 从流程实例变量解析业务域（tenantId）。先查运行时、回退历史，确保实例结束后仍能定位 appCode（G3）。
      */
