@@ -827,7 +827,11 @@ public interface TenantPort { String tenantId(); }
 
 - 每个业务 ap 有唯一接入码：当前 `mds-ap`、`mes-ap`；IAM 侧 `apps` 注册表集中维护。
 - 消费方通过 `cim.auth.admission.app-code` 声明本 ap 码；`cim-auth-starter` 校验令牌 `apps` claim 是否含该码，**不含 → 403**。
-- `cim.auth.admission.enabled=false` 时跳过准入（仅本地调试用）。
+- `cim.auth.admission.enabled=false` 时跳过准入（原为本地调试用）。
+- **落地状态（2026-11-12）**：业务系统接入 SSO **暂不做准入限制**——`rms-ap` / `approval-ap` 的
+  `cim.auth.admission.enabled` 均置 `false`（`app-code` 原值保留）。任何通过验签/版本/黑名单校验的令牌
+  都可进入这两个 ap，**ap 内部 RBAC 不受影响**；恢复限制只需把该项改回 `true`，代码无需改动。
+  `iam-ap`（签发方）与 `cim-bootstrap` 的 `app-code` 本就留空，不走准入。
 
 **(f) 平台侧权限映射**
 

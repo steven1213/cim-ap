@@ -49,7 +49,9 @@ cim:
     jwks-cache-ttl: 60m
     admission:
       app-code: approval-ap
-      enabled: true
+      # 业务系统接入 SSO 暂不做准入限制（2026-11-12）：不再要求令牌 apps 含本 ap 码。
+      # 恢复限制：改回 enabled: true 即可，app-code 已就位，无需改代码。
+      enabled: false
 
   jpa:
     id:
