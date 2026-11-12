@@ -161,3 +161,8 @@
   - **`CimDispatchController` 修掉**：它是 §6.5 硬事实的活反例（`@RequestMapping + @ResponseBody` + 开关默认关 + 零测试），开关一开就静默 404。改三件套 + `CimDispatchEndpointTest`/`CimDispatchDisabledTest` 各 2 例。**反向验证**：换回旧注解 → `endpointIsMapped` 404 失败、`controllerIsRegistered` 仍绿（「Bean 在、路由不在」）。
   - **approval 无权限门是「不做」不是「漏做」**：授权只到角色级（`approval-ap:ADMIN`），加守卫只能全放行或全拦。等权限码体系落地。
   - 验证：三端 `tsc` 零错 + `vite build` 全绿；`cim-spring-support` **29/29**；1 处反向验证先红后绿。
+- **2026-11-12（续11）404 三份 + 文案键对表**：
+  - 403 统一之后按同一线索往下推：**404 也是三份**。IAM 有图标/说明/返回，RMS 只有一行且**没有出口**，approval 用字面量标题还把「返回」配了盾牌图标（权限语义）。改成 `@cim/ui` 的 `StatePage` 骨架 + `ForbiddenState`/`NotFoundState` 两个语义预设（只差默认图标）。**警示：为 404 另写一个 Panel+EmptyState 组件，就是要清理的那个毛病本身。**
+  - 机械对了一遍「源码字面量 `t('x')`」与「key 目录」，扫出 3 个真缺口：`rms.shell.toggleTheme`、approval 的 `shell.toggleGroup`（tooltip 直接显示原始 key）、`rms.notFound.desc`。**i18next 缺键回落 key、页面照常渲染，不报错也不红** —— 这类缺口只能对表。IAM 的 key 在 `IamConsoleCatalog.java`（TextDef），比对对象要换。
+  - 同名文件逐个比对后的结论：`usePermission.ts` 逐字节相同但只是 store 适配层（28 行），上提要引 hook 工厂 → **暂不动**，等第三个消费方；`ProtectedRoute`/`LanguageSwitcher`/`RequirePerm`/`sso.ts`/`theme.ts` 的差异都在 app 标识、存储键、文案键、呈现位置，**属应用自身**。
+  - 验证：三端 `tsc` 零错 + `vite build` 全绿；404 用真 CSS 探针截图确认四段齐全。详见 `component-adoption-audit.md §10`。

@@ -363,7 +363,7 @@ mds / mes 仍是骨架，接入时照 approval 这一份抄即可（后端 `/me`
 | 对象 | 统一到 | 保留的差异（有意） |
 | --- | --- | --- |
 | 权限图标 | 13 个同名图标 → `@cim/ui`，本地只留 17 个领域图标（见 §7.5 更新） | `IconChevron` 方向（平台右箭头 = 树语义；下拉处 `rotate(90deg)`） |
-| 403 页 | 新增 `@cim/ui` 的 `ForbiddenState`（Panel + EmptyState large + 图标 + 出口插槽） | 呈现位置：IAM 跳 `/403`、RMS 就地渲染 |
+| 403 页 | 新增 `@cim/ui` 的 `ForbiddenState`（Panel + EmptyState large + 图标 + 出口插槽）；同日拆为 `StatePage` 的一个预设，见 §10.1 | 呈现位置：IAM 跳 `/403`、RMS 就地渲染 |
 | 时间线 | `.timeline*` 上提 `@cim/ui/ui.css`，两 ap 共用 | approval 多一行哈希（`.detail-hash` 留本地） |
 
 ### 9.3 顺带修掉的：`CimDispatchController`
@@ -377,3 +377,56 @@ mds / mes 仍是骨架，接入时照 approval 这一份抄即可（后端 `/me`
 页面级守卫、`<Can>`、`CimButton perm` 在 approval 里全为零。原因是授权链只到角色级
 （`approval-ap:ADMIN`），没有细粒度权限码：加守卫只能「全放行」或「全拦」，前者是假门、
 后者直接不可用。**等权限码体系落地再补**——现在补一个看起来有门的空壳，比没有更糟。
+
+---
+
+## 10. 第五次复扫：404 与「引用了但从未定义」的文案键（2026-11-12 续 5）
+
+上一轮统一 403 时，只处理了被点名的那一处。这次按同一线索往下推：**同源的另一半往往还在**。
+
+### 10.1 404 页三份，形态三样
+
+| 应用 | 原形态 | 缺的东西 |
+| --- | --- | --- |
+| IAM | 图标 + 标题 + 说明 + 返回概览 | ——（这个是模板） |
+| RMS | 一行「404 / 页面不存在」 | 没有图标、**没有出口**、标题是字面量 |
+| approval | 一行「404 / 页面不存在」+ 返回 | 标题字面量；「返回」配了**盾牌图标**（盾牌是权限语义） |
+
+处理方式不是「再写一个 `NotFoundState` 组件」，而是把上一轮那个 403 专用组件拆成：
+
+```
+StatePage            // 骨架：Panel + EmptyState large + 图标 + 出口插槽
+├── ForbiddenState   // 预设：默认图标 = 禁止符号
+└── NotFoundState    // 预设：默认图标 = 放大镜
+```
+
+**警示**：为 404 另写一个「Panel + EmptyState」的组件，就是本轮要清理的那个毛病本身。
+一个布局两个语义预设，比两个各自完整的组件更接近事实。
+
+### 10.2 文案键「引用了但从未定义」，静默渲染成原始 key
+
+机械对了一遍「源码里的字面量 `t('x')`」与「各应用的 key 目录」，扫出三个真缺口：
+
+| 键 | 位置 | 症状 |
+| --- | --- | --- |
+| `rms.shell.toggleTheme` | RMS `Layout.tsx` 顶栏主题按钮 | tooltip 显示 `rms.shell.toggleTheme` |
+| `shell.toggleGroup` | approval `Layout.tsx` 侧栏分组折叠 | 同上 |
+| `rms.notFound.desc` / `rms.forbidden.desc` | RMS 404 / 403 说明行 | 说明行为空 |
+
+**为什么不报错**：i18next 缺键时回落 key 本身，页面照常渲染。只有把鼠标停在按钮上、
+或盯着说明行缺失，才会发现。**这类缺口不靠眼睛，靠对表。**
+
+复用做法：Node 脚本两步——① 从 `messages.ts` 取 `'key':` 形式的定义集；② 扫源码
+`/\bt\(\s*'([\w.-]+)'/g` 取引用集，差集即缺口。`iam` 没有 `messages.ts`，定义集改从
+`IamConsoleCatalog.java` 的 `new TextDef("key", ...)` 取（809 条，本轮全中，零缺口）。
+
+口径两条：① 只认字面量，`t(\`a.${b}\`)` 走不了正则、也不该走——动态键由枚举兜底；
+② `t('x.' + suffix)` 会被截成前缀，以 `.` 结尾的命中一律当拼接排除。
+
+### 10.3 仍未统一（有意）
+
+- `lib/usePermission.ts`：IAM 与 RMS **逐字节相同**（28 行薄封装），但它是「读本 ap 的
+  zustand store」的适配层，上提需要引入 hook 工厂。收益低于多一层间接，**暂不动**；
+  若哪天出现第三个消费方（approval 有了权限码体系），再做工厂。
+- `ProtectedRoute` / `LanguageSwitcher` / `RequirePerm` / `sso.ts` / `theme.ts`：同名文件，
+  但差异都是各 ap 的 `app` 标识、存储键、文案键与呈现位置，**属应用自身，不该上提**。
