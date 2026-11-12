@@ -746,9 +746,94 @@ rms 同步改用新类名（`styles.css` 再减 15 行）。**组件渲染的类
 dev 通道（认证关闭）不受影响。要打通需给该端点单独 `permitAll` + 自行校验签名令牌，
 属独立改动，本轮不做，已写进前端路由注释。
 
-> ⚠️ approval 的 `cim.auth.enabled` 仍留 `false`（与仓库演示优先的取向一致）：
-> 打开它就需要本机有 IAM 才能登入。切换方式、前端表现已写进 `application.yml` 注释与 `.example`。
+> ℹ️ 当时 `cim.auth.enabled` 留的是 `false`；本轮已改为默认 `true`（见 §37）。
 > 本地跑集成测试仍然要 `-Dcim.notify.cluster.enabled=false`（无 Redis）。
+
+## 2026-11-12（续 6）认证开关默认开启：端到端跑一遍，挖出五个「认证态从未成立」的断链
+
+上一轮的结论是「approval 接入统一登录完成，开关留 `false`」。本轮把开关改成默认 `true`
+（与 rms 同口径），并以**真 IAM（H2）+ 真登录 + 真令牌**跑通全链路。结果是：开关一开，
+五个环节逐一暴露——它们全部只在 `cim.auth.enabled=true` 时才走到，而此前从未有人走到过。
+
+### 37.1 准入：IAM 侧根本没登记 approval-ap
+
+`BootstrapAdminRunner` 只按 `cim.iam.auth.bootstrap.apps` 登记接入码并授予首管理员准入。
+该列表里只有 `rms-ap`，没有 `approval-ap`。于是 admin 的令牌 `apps` 不含 `approval-ap`，
+approval 的准入过滤器直接 403——**登录成功，但进不去**（`BootstrapAdminRunner` 的 javadoc
+自己就警告过这种「两端登录页互相弹跳」）。已在两份 IAM 配置里补登记。
+
+> 这一条不是代码 bug，是**部署配置缺项**。它说明「新增一个 ap 接入统一登录」至少有两处
+> 要改：ap 侧的 `admission.app-code`，以及 IAM 侧的 `bootstrap.apps`。缺任一处都表现为 403。
+
+### 37.2 业务域：`SecurityGuard` 认的权威格式，IAM 从来不发
+
+`deriveFromAuthentication()` 只认 `app:<appCode>` 前缀，而 IAM 的 `TokenIssuerService` 下发的是
+`<appCode>:<ROLE>`（如 `approval-ap:ADMIN`）。`grep '"app:"'` 全仓**无任何产生点**，
+于是认证态下可访问域集合恒为空 → 所有带域断言的查询一律 403。
+
+同一处的超管判定写的是 `ROLE_SUPER_ADMIN`，而平台约定（`CimUserPrincipal#isSuper`、
+`CimPermissionEvaluator`）认 `SUPER_ADMIN` / `ROLE_SUPER`——两个码都不在 IAM 的签发范围里，
+即超管通路在认证态下也从未成立过。
+
+修法：两种前缀都认；`<appCode>:<ROLE>` 仅当「恰好两段且首段形如 `*-ap`」时取首段
+（否则会把三段式权限码 `approval:definition:manage` 误判成域 `approval`）；超管三个码都收。
+
+### 37.3 租户被当成业务域用
+
+`ApprovalProcessService` 有 6 处 `assertAppCodeScope(tenantId)`，传的是**实例上的流程变量
+`tenantId`**（单租户部署恒为 `"default"`），而域集合装的是 appCode 列表——两个维度。
+dev 态因 `allowed = ["*"]` 直接放行，所以这个错位长期不可见；认证态下必然 403。
+
+其中两处还写成 `String.valueOf(vars.get("tenantId"))`，值为 null 时会得到**字面量 `"null"`
+作为回调路由键**，一并修掉。现在这 6 处断言的对象改为本 ap 的 appCode
+（`ApprovalPermissions.APP_CODE`），语义是「本次操作确实发生在被准入的域内」，
+在开放 API（appKey 绑定单域）下仍有实际拦截作用。
+
+### 37.4 管理端点：G1 第 2 层「域管理员」没有落地
+
+`assertPermission` 只做权限码精确匹配。IAM 只授角色组（`approval-ap:ADMIN`）、不授
+`approval:definition:manage` 这类细粒度码，于是域管理员点开「流程模板/回调管理/审计」全是 403。
+现已把本 ap 的 `ADMIN` 视为域管理员通路；待 IAM 支持「应用角色 → 权限集」后应收敛回按码判定。
+
+### 37.5 前端：`fetchMe` 用裸 axios，从不带令牌 → 已登录用户每次刷新都被登出
+
+`fetchMe()` 为避免「未登录」也被 401 拦截器跳转，用了裸 `axios` 实例——代价是它**不附
+Authorization**。认证态下它永远 401，`bootstrap()` 于是判定未登录并 `clear()` 掉落盘令牌，
+用户一刷新就回到登录页。修法：裸 axios 保留，但显式带上 store 里的令牌。
+
+> 这个 bug 只有「真的带着有效令牌启动一次」才能发现。单测（`auth.enabled=false`）与
+> 靠 curl 打接口的验证都覆盖不到——它出在「前端如何自证已登录」这一步。
+
+### 37.6 通知链路：`/sys` 从来没被代理
+
+两个 ap 的 SSE 都打 `/sys/notify/stream`，而 `vite.config.ts` 只代理 `/api`。dev 下
+EventSource 打到 vite 自身 → 404，且它**只静默重连、不报错**，表现为「通知永远不来」。
+approval 与 rms 都补了 `/sys` 代理。
+
+### 37.7 验证（全部实跑）
+
+| 项 | 结果 |
+| --- | --- |
+| 真 IAM（8081，H2）+ 真登录（PBKDF2 派生） | 登录 200，令牌 `apps=[approval-ap, iam-ap, rms-ap]` |
+| approval `/api/v1/approval/me` | **200**，`userId=admin`、`authEnabled=true` |
+| `/tasks/todo`（曾 403） | **200** |
+| 审计查看（需 `approval:audit:view`） | **200**（域管理员通路） |
+| 定义部署（需 `approval:definition:manage`） | **400 参数校验**（权限已过，非 403） |
+| 跨域 `definitions?appCode=mes-ap`（未授权域） | **403** `code=1404` |
+| 篡改令牌 | **401** |
+| 前端认证态渲染（真令牌注入 + 同源 iframe） | 落 `/`，顶栏 `admin / tenant:default`，模板数 3 来自真实接口 |
+| 经 vite 访问 `/sys/notify/stream` | **401**（已转发到后端，不再是 vite 的 404） |
+| approval 后端全量 | **12/12**；IAM 后端全量 **73/73** |
+| approval / rms `tsc` + `vite build` | 零错 / 通过 |
+
+### 37.8 仍未做
+
+- **G3 业务域隔离未闭环**：定义/实例/任务/审计/回调五类查询目前**没有按 appCode 过滤**，
+  只做了「请求域 ⊆ 授权域」的入口断言。真正的按域过滤需要给流程变量写入 appCode 并改造
+  Flowable 查询条件，属独立工作量。
+- **超管通路依赖 IAM 展开**：IAM 目前不签发 `SUPER_ADMIN`/`ROLE_SUPER`，所以「平台超管跨域」
+  实际只能靠 `approval-ap:ADMIN` 的域管理员通路生效。
+- **企微免登**在认证态不可用（见 §36.5）。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**

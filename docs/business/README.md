@@ -15,6 +15,14 @@ cim-ap 是统一底座（认证、多租户、审计/历史、i18n、RBAC、通�
 - 业务 ap 经 IAM 统一登录拿令牌，本地验签 + 校验 `apps` claim 准入后，再用本 ap 的 RBAC 控制内部权限。
   **已接入**：`rms-ap`（8084）、`approval-ap`（8085）——三者共用 IAM 的 `GET /login` 登录页，本 ap 只保留「未登录 → 中继」与「`/sso` 回调」两条路由；`mds-ap` / `mes-ap` 仍是骨架。
   后端开关 `cim.auth.enabled`：`true` 时 `/api/**` 未带有效 JWT 一律 401、身份只认令牌；`false` 仅供无 IAM 的本地演示（身份走查询参数），两者共存于同一份前端产物。
+  **已接入的 ap 均默认 `true`**（iam / rms / approval）；无 IAM 演示时用 `--cim.auth.enabled=false` 起后端，前端会据 `/me` 的 `authEnabled` 自动切回 dev 通道。
+- ⚠️ **新增一个 ap 接入统一登录，要改两处**，缺任一处都表现为「登录成功但被 403 挡回」：
+  1. 本 ap 侧 `cim.auth.admission.app-code`（如 `approval-ap`）；
+  2. **IAM 侧** `cim.iam.auth.bootstrap.apps` 登记同一 code —— `BootstrapAdminRunner` 只按这份清单
+     注册接入码并授予首管理员准入。漏了它，令牌 `apps` claim 不含本码，准入过滤器直接 403。
+- ⚠️ 业务域判定看的是**权威格式**：IAM 下发 `roles`/`authorities` 均为 `<appCode>:<ROLE>`（如
+  `approval-ap:ADMIN`）。服务端若按别的形态（如 `app:<code>`）推导业务域，认证态下会得到空集合
+  而全量 403 —— approval 踩过，见 `AUDIT.md` §37.2。
 
 ## 约定
 - 每个业务系统（ap）一个子目录，命名形如 `{ap}-ap`（如 `mds-ap`、`mes-ap`），例如 `docs/business/mds-ap/`、`docs/business/mes-ap/`；**每个 ap 内部再分 `server/` 与 `web/` 子文档**，与基础底座 `docs/platform/{server,web}` 保持同构（见下方规划结构）。

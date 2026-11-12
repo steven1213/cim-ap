@@ -115,3 +115,13 @@
   - **真坑（两个 ap 共有）**：`ApprovalSecurityConfig` / `RmsSecurityConfig` 的 SSE 链把 `addFilterBefore` 的**锚点**写成平台自定义的 `JwtAuthenticationFilter.class` → 认证一开就 `The Filter class ... does not have a registered order` 启动崩。实测还原 rms 的 HEAD 版本启动，报同一异常——**说明 rms 默认 `auth.enabled=true` 却从未这样起过**，这条分支此前只是「看起来有」。改为 `UsernamePasswordAuthenticationFilter.class` 后两 ap 均正常。
   - 顺手回收：rms 的 `.dev-token*` 上提为 `@cim/ui` 的 `.sso-relay-dev*`（approval 复用同一块）。
   - 验证：approval 后端 **12/12**（新增 `ApprovalMeControllerTest` 2 例）；approval/rms `tsc` 零错 + `vite build` 通过；以 `--cim.auth.enabled=true` 起 approval（18085），`/me`、假令牌 `/me`、`/definitions`、SSE **全部 401**；rms（默认认证开，18084）启动成功且 `/rms/me`=401。
+- **2026-11-12（续6）认证开关默认开启 + 端到端跑通，挖出五个「认证态从未成立」的断链**：
+  - **开关改默认 `true`**（与 rms 同口径）。但只改开关不够——**IAM 侧的 `bootstrap.apps` 里根本没登记 `approval-ap`**，admin 的令牌 `apps` 不含该码 → 登录成功却被准入 403 挡回。这属于「新增 ap 接入」的必改项，已补进两份 IAM 配置。**结论：接一个 ap 要改两处**（ap 侧 `admission.app-code` + IAM 侧 `bootstrap.apps`），缺一处都表现成 403。
+  - **端到端验证方式**：真 IAM（H2，8081）+ 真登录（Node 算 PBKDF2 派生）+ 真 JWT 打 approval，而不是靠 curl 打未认证请求。这一步才把后面四个问题全照出来。
+  - **业务域判定认错了权威格式**：`deriveFromAuthentication()` 只认 `app:<code>`，而 IAM 发的是 `<appCode>:<ROLE>`（`grep '"app:"'` 全仓无产生点）→ 域集合恒空 → 列表接口全 403。超管判定写 `ROLE_SUPER_ADMIN`，平台约定是 `SUPER_ADMIN`/`ROLE_SUPER`，两个码 IAM 都不发。改：两种前缀都认，`<appCode>:<ROLE>` 限「恰好两段且首段 `*-ap`」（否则三段式权限码 `approval:definition:manage` 会被误判成域 `approval`）。
+  - **租户被当业务域**：`ApprovalProcessService` 6 处 `assertAppCodeScope(tenantId)` 传的是流程变量（恒 `"default"`），与 appCode 不同维度；dev 态 `allowed=["*"]` 所以从没暴露。改为断言本 ap 的 `APP_CODE`（开放 API 下仍有拦截作用）。顺带修 `String.valueOf(null)` → 字面量 `"null"` 当回调路由键。
+  - **G1 第 2 层「域管理员」没落地**：`assertPermission` 只做权限码精确匹配，IAM 只授 `approval-ap:ADMIN` → 管理端点全 403。改：本 ap 的 `ADMIN` 视为域管理员通路。
+  - **前端 `fetchMe` 用裸 axios 从不带令牌** → 认证态下永远 401，`bootstrap()` 判定未登录并清掉落盘令牌，**用户一刷新就回登录页**。裸 axios 保留（为了区分「未登录」与「后端已登出」），但显式带 store 里的令牌。此 bug 只有「带有效令牌真启动一次」才看得见。
+  - **`/sys` 代理从未配置**：两 ap 的 SSE 打 `/sys/notify/stream`，vite 只代理 `/api` → dev 下 404，EventSource 静默重连不报错 = 通知永远不来。approval/rms 均补。
+  - 验证：真登录令牌 `apps=[approval-ap,iam-ap,rms-ap]`；`/me` 200、`/tasks/todo` 200（曾 403）、审计 200、部署 400（权限已过）、跨域 `mes-ap` **403**、篡改令牌 401；前端注入真令牌后落 `/` 且顶栏 `admin / tenant:default`、KPI 取到真实模板数；approval 后端 12/12、IAM 后端 73/73、两前端 `tsc`+`vite build` 通过。
+  - 仍未做：**G3 按 appCode 过滤未闭环**（只做了入口域断言，五类查询未过滤）；超管依赖 IAM 签发 `SUPER_ADMIN`（目前不发）；企微免登认证态不可用。
