@@ -45,6 +45,7 @@ export { CimTag, CimCheckTag, type CimTagProps, type CimCheckTagProps } from './
 
 // ── content 容器 ────────────────────────────────────────────────
 export { EmptyState, Page, PageHead, Panel, Toolbar } from './content/Page';
+export { ForbiddenState, type ForbiddenStateProps } from './content/ForbiddenState';
 export { CimDivider, type CimDividerProps } from './content/Divider';
 export { CimDrawer, type CimDrawerProps } from './content/Drawer';
 export { CimScrollArea, type CimScrollAreaProps } from './content/ScrollArea';
