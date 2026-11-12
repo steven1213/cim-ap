@@ -722,7 +722,9 @@ BeanInstantiationException: Factory method 'notifySecurityFilterChain' threw exc
 
 > **这条推论比 bug 本身重要**：这两个 ap 的「认证态」从未以 `enabled=true` 跑过一次
 > （单测都跑 `enabled=false`，dev 也是关的）。凡是只在这条分支上的代码，此前都只是「看起来有」。
-> **仍未做**：认证开启态的启动冒烟进 CI——本轮只靠手工起服务验证（见 §36.5），下次改这条链仍可能重犯。
+> **入口已备、流水线不接**（2026-11-12 决定，见 §40.6）：认证开启态的启动冒烟现由
+> `scripts/e2e-security.sh` 一键跑（起服务→等 `Started`→断言→`trap` 停进程），
+> 但**暂不接入 CI**，仍靠本地手工触发。所以「改这条链要真起一次服务」这条纪律依然成立。
 
 ### 36.4 顺带回收：DEV 令牌区样式上提
 
@@ -993,10 +995,17 @@ cim.jpa.sql-log.admin-enabled=false
 | 前端 | iam / rms `tsc --noEmit` 零错 |
 | 反向验证 | 4 处（域隔离、JWT 签名篡改、sql-log 扫描、SSE 扫描），均先红后绿 |
 
-### 40.6 仍未做
+### 40.6 明确不做的：CI 接入
 
-- `verify-security.mjs` **已能一键执行，但还没进 CI**（缺流水线定义，不是缺入口）。
-- 认证态 JWT 的测试依赖 `cim-auth-starter` 的 test-jar：**消费方构建前必须先 `install` 平台模块**（与「改平台模块必 install」同一条约束），CI 里要保证顺序。
+**已决策：暂不接入 CI**（2026-11-12，用户决定）。此前记的「未进 CI」不是漏做的活，是边界。
+
+- `scripts/e2e-security.sh` 已是一键入口（`auth|dev|both`，起服务→等就绪→跑 17 条→`trap` 收尾，
+  端口被占直接退），**手工执行即可**；缺的从来只是流水线定义，不是入口。
+- 因此以下两条从「待办」转为「将来若接入 CI 时的前置条件」，别当缺口重复提：
+  1. 认证态 JWT 测试依赖 `cim-auth-starter` 的 **test-jar**，消费方构建前必须先 `install` 平台模块——CI 里得显式排这个顺序（与「改平台模块必 install」同一条约束）。
+  2. E2E 是**起真进程**的集成测试（占端口、连库），与单测不能同 job 串跑；要么独立 job，要么只在合并前跑一遍。
+- 代价写清楚：这条链（`addFilterBefore` 锚点、`SecurityContextHolderFilter` 覆盖上下文、开放 API 身份写入）
+  本身**测试覆盖不到**，改它必须手工起一次服务。这一点没变。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
