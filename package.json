@@ -13,6 +13,7 @@
     "build:iam": "npm run build -w cim-iam-ap-web",
     "build:rms": "npm run build -w cim-rms-ap-web",
     "build:approval": "npm run build -w cim-approval-ap-web",
+    "build:mds": "npm run build -w cim-mds-ap-web",
     "check:i18n": "node scripts/check-i18n.mjs"
   }
 }
