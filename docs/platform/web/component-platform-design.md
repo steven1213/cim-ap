@@ -243,11 +243,18 @@ const cim = createI18n({
 | `builtin` | 内置包；同时是「远端只回覆盖项」时的基线。远端包**逐键覆盖**、不抹掉内置包 | `{}` |
 | `remote.loadBundle` | 拉整包，返回 `{version,lang,messages}`；抛错则退回本地缓存 | 不给 = 纯内置包应用 |
 | `remote.loadLocales` | 语言目录；抛错或空则回退 `locales` | 可选 |
-| `remote.reportMissing` | 缺键上报；**不给就完全不装 `missingKeyHandler`**（连 `saveMissing` 都不开） | 可选 |
+| `remote.reportMissing` | 缺键上报；**不给只是没有工单通道**，开发态提示照旧 | 可选 |
 | `onLanguageChange` | 切语言时同步 `Accept-Language` 等应用侧副作用 | 可选 |
 | `missingDebounceMs` | 上报去抖窗口 | `3000` |
 
-**四级兜底**（顺序即优先级）：目标语言（远端叠在内置包之上）→ `defaultLng` → 内置包 → `humanize(key)`。最后一级只做「取末段 + 驼峰拆词 + 首字母大写」，唯一目的是**绝不把裸 key 渲染到界面上**。
+**四级兜底**（顺序即优先级）：目标语言（远端叠在内置包之上）→ `defaultLng` → 内置包 → 最后一级兜底。最后一级**分环境**：
+
+- 生产：`humanize(key)`——「取末段 + 驼峰拆词 + 首字母大写」，`rms.shell.toggleTheme` → `Toggle Theme`；
+- 开发：`markMissingKey(key)`——`⟦rms.shell.toggleTheme⟧`，原样暴露 key。
+
+> 为什么不统一成一种：humanize 的产物**看起来像译文**。`rms.notFound.desc` 会显示成一个孤零零的 `Desc`，
+> `cb.event.callback_failed` 变成 `Callback failed`——开发时反而看不出来（这正是 §10.6 那次中英混排的成因）。
+> 生产又不能让终端用户看方括号。两个环境要的东西不一样，只能分开，而不是取折中。
 
 > ⚠️ 本地必须缓存**整包**而非仅版本号：端点约定「版本一致则只回版本、消息体为空」，只存版本号会在刷新后拿到空包导致界面全空。
 
@@ -275,6 +282,43 @@ const cim = createI18n({
 | `配方编码` 当 key | 改文案即改 key，译文全丢 |
 | `rms.Recipe.Code` | 大小写混用，DB 主键大小写敏感 |
 | `rms.recipe.code.label.for.table` | 语义堆叠，复用无望 |
+
+### 6.4 缺键怎么被发现（2026-11-12 补齐）
+
+缺键有**三种**形态，信号强度完全不同。前两种能靠运行时发现，第三种只能靠静态对表：
+
+| 形态 | 界面表现 | 信号 |
+| --- | --- | --- |
+| 键在所有语言里都不存在 | 生产 humanize 假译文 / 开发 `⟦key⟧` | `missingKeyHandler`（dev 打 console，IAM 另上报） |
+| 键只在默认语言里有（英文缺译） | 英文界面显示中文 | **无**：键是「命中」的（`fallbackLng` 兜住了），i18next 不会报缺键 |
+| 服务端把中文并进了英文包（IAM） | 同英文界面显示中文 | **永远无**：`frontendBundle` 先放 fallback 再放 target |
+
+**① 运行时（已改）**：`missingKeyHandler` **无条件注册**，不再依赖上报通道。
+
+> 改之前它是 `canReport ? … : undefined`——而 `canReport` 要求有 `remote.reportMissing`。
+> RMS / approval 是纯内置包应用，于是**连 dev 的 console.warn 都没有**，缺键完全静默，
+> 只能靠人恰好打开那个页面、恰好盯着那个 tooltip。**发现缺口和上报工单是两件事，不能绑在一个开关上。**
+
+`saveMissing` 随之恒为 `true`（不设它 i18next 根本不回调 handler；有 handler 时不会退去找后端）。
+生产 + 无上报通道时 `report()` 直接返回，不记也不攒，避免 `seen` 随会话无界增长。
+
+**② 静态对表（新增）**：`npm run check:i18n` → `scripts/check-i18n.mjs`。
+
+扫**两类**引用，少扫一类就会漏一整片：
+
+1. `t('some.key')` / `exists('some.key')`；
+2. `xxxKey="some.key"` 注入式——`titleKey` / `hintKey` / `okKey` / `placeholderKey` …
+   （平台组件按 key 自己去翻译）。全仓 **334 处**。
+
+> ⚠️ **只扫 `t()` 会漏掉注入式那一类**。`<NotFoundState hintKey="rms.notFound.desc">` 就是这种形状，
+> 而它恰恰是 2026-11-12 真实缺失的那个键——当时的 t-only 扫描报「0 缺口」。
+> 同时排除两个「名字像文案键但不是」的属性：`settingsKey`（DataTable 列设置持久化）、`storageKey`（localStorage）。
+
+三个应用一起查，目录源不同：rms / approval 读 `lib/i18n/messages.ts`（顺带查中英键集对等），
+IAM 读 `IamConsoleCatalog.java` 的 `new TextDef(...)`（中英同行，天然对等）。
+
+输出四类结论：缺定义（error）、中英不对等（error）、拼接前缀无任何成员（error）、目录里无人引用（仅提示）。
+**不进 CI**（用户已决策），本地改完文案跑一次。
 
 ---
 

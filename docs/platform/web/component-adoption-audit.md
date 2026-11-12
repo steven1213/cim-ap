@@ -403,25 +403,34 @@ StatePage            // 骨架：Panel + EmptyState large + 图标 + 出口插�
 **警示**：为 404 另写一个「Panel + EmptyState」的组件，就是本轮要清理的那个毛病本身。
 一个布局两个语义预设，比两个各自完整的组件更接近事实。
 
-### 10.2 文案键「引用了但从未定义」，静默渲染成原始 key
+### 10.2 文案键「引用了但从未定义」
 
 机械对了一遍「源码里的字面量 `t('x')`」与「各应用的 key 目录」，扫出三个真缺口：
 
 | 键 | 位置 | 症状 |
 | --- | --- | --- |
-| `rms.shell.toggleTheme` | RMS `Layout.tsx` 顶栏主题按钮 | tooltip 显示 `rms.shell.toggleTheme` |
-| `shell.toggleGroup` | approval `Layout.tsx` 侧栏分组折叠 | 同上 |
-| `rms.notFound.desc` / `rms.forbidden.desc` | RMS 404 / 403 说明行 | 说明行为空 |
+| `rms.shell.toggleTheme` | RMS `Layout.tsx` 顶栏主题按钮 | tooltip 显示 `Toggle Theme` |
+| `shell.toggleGroup` | approval `Layout.tsx` 侧栏分组折叠 | 显示 `Toggle Group` |
+| `rms.notFound.desc` / `rms.forbidden.desc` | RMS 404 / 403 说明行 | 说明行显示 `Desc`（或为空） |
 
-**为什么不报错**：i18next 缺键时回落 key 本身，页面照常渲染。只有把鼠标停在按钮上、
-或盯着说明行缺失，才会发现。**这类缺口不靠眼睛，靠对表。**
+> **更正（2026-11-12 晚）**：本节初稿写的是「显示原始 key」，**不成立**。`createI18n` 早就设了
+> `parseMissingKeyHandler: humanize`，缺键渲染的是「取末段 + 拆词 + 首字母大写」的伪译文。
+> 真实症状比裸 key 更隐蔽：`Desc`、`Callback failed`、`Toggle Theme` 都**像**是设计如此。
+> 处理方式见 `component-platform-design.md §6.4`：生产保持 humanize，开发态改 `⟦key⟧` + console.warn，
+> 并加 `npm run check:i18n` 静态对表。
+
+**为什么不报错**：i18next 缺键时走 `parseMissingKeyHandler`，页面照常渲染；更早的实现在没有
+上报通道时**连 `missingKeyHandler` 都不注册**（RMS / approval 即如此），所以开发态也没有任何提示。
+**这类缺口不靠眼睛，靠对表。**
 
 复用做法：Node 脚本两步——① 从 `messages.ts` 取 `'key':` 形式的定义集；② 扫源码
 `/\bt\(\s*'([\w.-]+)'/g` 取引用集，差集即缺口。`iam` 没有 `messages.ts`，定义集改从
 `IamConsoleCatalog.java` 的 `new TextDef("key", ...)` 取（809 条，本轮全中，零缺口）。
 
-口径两条：① 只认字面量，`t(\`a.${b}\`)` 走不了正则、也不该走——动态键由枚举兜底；
-② `t('x.' + suffix)` 会被截成前缀，以 `.` 结尾的命中一律当拼接排除。
+口径三条：① 只认字面量，`t(\`a.${b}\`)` 走不了正则、也不该走——动态键由枚举兜底；
+② `t('x.' + suffix)` 会被截成前缀，以 `.` 结尾的命中一律当拼接排除；
+③ **必须同时扫 `xxxKey="..."` 注入式属性**（全仓 334 处）——只扫 `t()` 正是本轮漏掉
+`rms.notFound.desc` 的原因。
 
 ### 10.3 仍未统一（有意）
 
