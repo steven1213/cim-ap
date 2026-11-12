@@ -162,7 +162,6 @@ export default function DefinitionsPage() {
     <Page>
       <Panel
         titleKey="def.title"
-        subKey="def.sub"
         actions={
           <>
             <CimButton size="small" icon={<IconPencil width={13} height={13} />} onClick={() => navigate('/designer')}>

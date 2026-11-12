@@ -106,7 +106,6 @@ export default function DashboardPage() {
     <Page>
       <Panel
         titleKey="dash.title"
-        subKey="dash.sub"
         actions={
           <CimButton size="small" onClick={overviewRes.refresh} loading={overviewRes.loading}>
             {t('common.refresh')}
@@ -140,7 +139,7 @@ export default function DashboardPage() {
       </Panel>
 
       {stats && (
-        <Panel titleKey="dash.stats.title" subKey="dash.stats.sub">
+        <Panel titleKey="dash.stats.title">
           <KpiGrid>
             <KpiCard icon={<IconFlow width={16} height={16} />} label={t('dash.stats.avgHours')} value={stats.avgCompleteHours != null ? stats.avgCompleteHours.toFixed(1) + ' h' : '—'} />
             <div className={'kpi' + (stats.overdueCount > 0 ? ' warn' : '')}>

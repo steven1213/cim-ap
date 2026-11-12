@@ -8,7 +8,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  Panel,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -249,9 +248,8 @@ export default function TodoPage() {
 
   return (
     <Page>
-      <Panel titleKey="todo.title" subKey="todo.sub" flush>
         <DataTable<TaskView>
-          flat
+          titleKey="todo.title"
           columns={columns}
           rows={pageRows}
           rowKey={(tk) => tk.taskId}
@@ -298,7 +296,6 @@ export default function TodoPage() {
           emptyTitleKey="todo.empty"
           scrollX="max-content"
         />
-      </Panel>
 
       {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={todoRes.refresh} />}
 

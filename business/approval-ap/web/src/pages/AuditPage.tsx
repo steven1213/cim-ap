@@ -104,7 +104,6 @@ export default function AuditPage() {
     <Page>
       <Panel
         titleKey="audit.title"
-        subKey="audit.sub"
         actions={
           <>
             <CimInput

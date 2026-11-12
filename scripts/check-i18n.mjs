@@ -64,6 +64,14 @@ const TARGETS = [
       file: 'business/iam-ap/server/src/main/java/com/cim/iam/server/console/IamConsoleCatalog.java',
     },
   },
+  {
+    app: 'mds',
+    root: 'business/mds-ap/web/src',
+    catalog: {
+      kind: 'ts',
+      file: 'business/mds-ap/web/src/lib/i18n/messages.ts',
+    },
+  },
 ];
 
 function walk(dir, acc = []) {
@@ -249,6 +257,15 @@ function collectUsage(root) {
     }
     for (const m of src.matchAll(/\b([A-Za-z]+Key)\s*:\s*"([\w.\-]+)"/g)) {
       if (!NON_I18N_PROPS.has(m[1])) push(m[2], m.index, `${m[1]}:`);
+    }
+
+    // 4) `i18n: 'key'` / `i18nCode: 'key'` —— 导航配置等载体属性，属性名不带 Key 后缀。
+    //    漏掉它会把 navConfig 的活键判成「无人引用」，顺着死键清理就会删掉菜单文案。
+    for (const m of src.matchAll(/\b(?:i18n|i18nCode)\s*[:=]\s*'([\w.\-]+)'/g)) {
+      push(m[1], m.index, 'i18n=');
+    }
+    for (const m of src.matchAll(/\b(?:i18n|i18nCode)\s*[:=]\s*"([\w.\-]+)"/g)) {
+      push(m[1], m.index, 'i18n=');
     }
   }
   return out;

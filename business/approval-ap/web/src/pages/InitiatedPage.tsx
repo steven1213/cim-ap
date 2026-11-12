@@ -7,7 +7,6 @@ import {
   CimTag,
   DataTable,
   Page,
-  Panel,
   useConfirm,
   useToast,
   StatusTag,
@@ -155,9 +154,8 @@ export default function InitiatedPage() {
 
   return (
     <Page>
-      <Panel titleKey="init.title" subKey="init.sub" flush>
         <DataTable<ProcessInstanceView>
-          flat
+          titleKey="init.title"
           columns={columns}
           rows={pageRows}
           rowKey={(pi) => pi.processInstanceId}
@@ -187,7 +185,6 @@ export default function InitiatedPage() {
           emptyTitleKey="common.empty"
           scrollX="max-content"
         />
-      </Panel>
 
       {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={initRes.refresh} />}
     </Page>

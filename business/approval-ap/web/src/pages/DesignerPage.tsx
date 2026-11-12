@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CimSelect, CimInputNumber, CimInput, CimField, CimButton, CimModal, PageHead, useToast } from '@cim/ui';
+import { CimSelect, CimInputNumber, CimInput, CimField, CimButton, CimModal, useToast } from '@cim/ui';
 import api from '@/lib/api';
 import {
   KIND_LABEL,
@@ -411,46 +411,41 @@ export default function DesignerPage() {
 
   return (
     <div className="designer">
-      <PageHead
-        titleKey="designer.title"
-        subtitleKey="designer.sub"
-        actions={
-          <div className="designer-meta">
-            <CimField compact label={t('def.colKey')}>
-              <CimInput width={180} value={processKey} onChange={setProcessKey} placeholder="customApproval" disabled={readonly} />
-            </CimField>
-            <CimField compact label={t('def.colName')}>
-              <CimInput width={200} value={processName} onChange={setProcessName} placeholder="自定义审批" disabled={readonly} />
-            </CimField>
-            <div className="designer-actions">
-              {!readonly && (
-                <>
-                  <CimButton size="small" onClick={() => { setModel(sampleModel()); setSelectedNode(null); setSelectedEdge(null); }}>
-                    {t('designer.loadSample')}
-                  </CimButton>
-                  <CimButton size="small" onClick={() => { setModel({ nodes: [], edges: [] }); setSelectedNode(null); setSelectedEdge(null); }}>
-                    {t('common.clear')}
-                  </CimButton>
-                </>
-              )}
-              <CimButton size="small" icon={<IconCopy width={14} height={14} />} onClick={() => setShowXml(true)}>
-                {t('designer.exportXml')}
+            {/* 设计器工具条：标题/说明已由页签承载，这里只保留功能性控件 */}
+      <div className="designer-meta">
+        <CimField compact label={t('def.colKey')}>
+          <CimInput width={180} value={processKey} onChange={setProcessKey} placeholder="customApproval" disabled={readonly} />
+        </CimField>
+        <CimField compact label={t('def.colName')}>
+          <CimInput width={200} value={processName} onChange={setProcessName} placeholder="自定义审批" disabled={readonly} />
+        </CimField>
+        <div className="designer-actions">
+          {!readonly && (
+            <>
+              <CimButton size="small" onClick={() => { setModel(sampleModel()); setSelectedNode(null); setSelectedEdge(null); }}>
+                {t('designer.loadSample')}
               </CimButton>
-              {!readonly && (
-                <CimButton
-                  size="small"
-                  type="primary"
-                  icon={<IconPlay width={14} height={14} />}
-                  disabled={busy || errs.length > 0}
-                  onClick={onDeploy}
-                >
-                  {t('designer.deploy')}
-                </CimButton>
-              )}
-            </div>
-          </div>
-        }
-      />
+              <CimButton size="small" onClick={() => { setModel({ nodes: [], edges: [] }); setSelectedNode(null); setSelectedEdge(null); }}>
+                {t('common.clear')}
+              </CimButton>
+            </>
+          )}
+          <CimButton size="small" icon={<IconCopy width={14} height={14} />} onClick={() => setShowXml(true)}>
+            {t('designer.exportXml')}
+          </CimButton>
+          {!readonly && (
+            <CimButton
+              size="small"
+              type="primary"
+              icon={<IconPlay width={14} height={14} />}
+              disabled={busy || errs.length > 0}
+              onClick={onDeploy}
+            >
+              {t('designer.deploy')}
+            </CimButton>
+          )}
+        </div>
+      </div>
 
       {readonly && (
         <div className="designer-hint" style={{ borderColor: 'var(--warn)', color: 'var(--warn)' }}>

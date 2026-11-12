@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
-import { CimButton, DataTable, Page, Panel, type DataTableColumn } from '@cim/ui';
+import { CimButton, DataTable, Page, type DataTableColumn } from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
 import { IconSearch } from '@/components/Icons';
 import { listDone } from '@/lib/api';
@@ -69,9 +69,8 @@ export default function DonePage() {
 
   return (
     <Page>
-      <Panel titleKey="done.title" subKey="done.sub" flush>
         <DataTable<TaskView>
-          flat
+          titleKey="done.title"
           columns={columns}
           rows={pageRows}
           rowKey={(tk) => tk.taskId}
@@ -102,7 +101,6 @@ export default function DonePage() {
           emptyTitleKey="common.empty"
           scrollX="max-content"
         />
-      </Panel>
 
       {detailId && <DetailModal processInstanceId={detailId} onClose={() => setDetailId(null)} onChanged={doneRes.refresh} />}
     </Page>

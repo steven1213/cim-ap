@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
-import { NAV_GROUPS, NAV_ITEMS } from '@/lib/navConfig';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup, type ShellNavItem } from '@cim/shell';
+import { NAV_GROUPS, NAV_ITEMS, type NavItem } from '@/lib/navConfig';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { useTabStore } from '@/store/tabStore';
 import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
@@ -42,18 +42,24 @@ export default function Layout() {
   // 路由切换 → 打开/激活对应页签（仅已知导航路径；404 等未知路径不开签）
   useEffect(() => {
     const m = NAV_ITEMS.find((x) => x.to === pathname);
-    if (m) openTab({ path: m.to, i18nCode: m.i18n });
+    if (m?.to) openTab({ path: m.to, i18nCode: m.i18n });
   }, [pathname, openTab]);
 
-  const groups = useMemo<ShellNavGroup[]>(
-    () =>
-      NAV_GROUPS.map((g) => ({
-        key: g.i18n,
-        cap: t(g.i18n),
-        items: g.items.map((it) => ({ key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon })),
-      })),
-    [t],
-  );
+  const groups = useMemo<ShellNavGroup[]>(() => {
+    const toShell = (items: NavItem[]): ShellNavItem[] => {
+      const out: ShellNavItem[] = [];
+      for (const it of items) {
+        if (it.children?.length) {
+          out.push({ key: it.i18n, label: t(it.i18n), Icon: it.Icon, children: toShell(it.children) });
+        } else if (it.to) {
+          out.push({ key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon });
+        }
+      }
+      return out;
+    };
+
+    return NAV_GROUPS.map((g) => ({ key: g.i18n, cap: t(g.i18n), items: toShell(g.items) }));
+  }, [t]);
 
   const labels = useMemo<ShellLabels>(
     () => ({

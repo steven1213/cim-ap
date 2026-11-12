@@ -253,7 +253,7 @@ export default function CallbacksPage() {
       </Panel>
 
       {stats && (
-        <Panel titleKey="cb.stats.title" subKey="cb.stats.sub">
+        <Panel titleKey="cb.stats.title">
           <KpiGrid>
             <KpiCard label={t('cb.stats.sent')} value={stats.sent ?? '—'} />
             <KpiCard tone="warn" label={t('cb.stats.pending')} value={stats.pending ?? '—'} />
@@ -268,9 +268,8 @@ export default function CallbacksPage() {
         </Panel>
       )}
 
-      <Panel titleKey="cb.title" subKey="cb.sub" flush>
         <DataTable<CallbackRegistrationView>
-          flat
+          titleKey="cb.title"
           columns={regColumns}
           rows={regs}
           rowKey={(r) => r.id}
@@ -281,11 +280,9 @@ export default function CallbacksPage() {
           emptyTitleKey="cb.empty"
           scrollX="max-content"
         />
-      </Panel>
 
-      <Panel titleKey="cb.outbox" flush>
         <DataTable<OutboxView>
-          flat
+          titleKey="cb.outbox"
           columns={outboxColumns}
           rows={outbox}
           rowKey={(o) => o.id}
@@ -293,7 +290,6 @@ export default function CallbacksPage() {
           emptyTitleKey="common.empty"
           scrollX="max-content"
         />
-      </Panel>
 
       <CimModal
         open={!!overwrite}

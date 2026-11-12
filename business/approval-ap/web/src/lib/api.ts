@@ -1,12 +1,15 @@
 // 审批流平台 API 客户端。
 //
 // 后端所有接口位于 /api/v1/approval 前缀下（见 server 各 Controller 的 @RequestMapping）。
-// 成功响应为平台统一的 `Result<T>`（{code,msg,data}），由响应拦截器解包；异常时同样从中
-// 提取可读 message。身份来源随认证通道切换（见 `currentIdentity`）：
+// 传输层（Bearer、`Result<T>` 解包、401 清态回登录页、`Accept-Language`）在 `@cim/data`
+// 的 `createHttpClient` 里，四个 ap 共用一份；本文件只保留审批流自己的东西——资源前缀、
+// 身份参数怎么取、以及各端点封装。
+//
+// 身份来源随认证通道切换（见 `currentIdentity`）：
 // - 统一登录（cim.auth.enabled=true）：附 Bearer，后端 `CurrentUserResolver` 只认 JWT；
 // - dev 态：以 userId/tenantId/roles 查询参数标识操作人。
 // 两种情况下身份参数都照发：后端在认证态会忽略它们，保留则让滚动发布期间旧后端仍可用。
-import axios, { type AxiosInstance } from 'axios';
+import { createHttpClient, type RequestOptions } from '@cim/data';
 import { useAuthStore } from '@/store/authStore';
 import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
 import type {
@@ -31,61 +34,20 @@ import type {
   MeDto,
 } from '@/types';
 
-export interface ApiError extends Error {
-  code?: number;
-  errors?: Record<string, string>;
-}
+export type { ApiError, RequestOptions } from '@cim/data';
 
-const http: AxiosInstance = axios.create({ baseURL: '/api/v1/approval' });
-
-// 统一登录态下每个请求都带 Bearer；dev 通道没有令牌，自然不加。
-http.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+/**
+ * ⚠️ 与 `store/authStore.ts` 是**循环 import**（它要 `http` 发 `/me` 与登出）。
+ * 能成立是因为 `getToken` / `onUnauthorized` 都是闭包，只在发请求时才求值。
+ */
+const http = createHttpClient({
+  // 与另外三端不同：approval 的资源前缀是 `/api/v1/approval`，页面里只写 `/definitions` 这类资源段
+  baseURL: '/api/v1/approval',
+  getToken: () => useAuthStore.getState().token,
+  // dev 通道下 token 恒为 null，清态是空操作；身份在 `identityStore`，不受影响。
+  onUnauthorized: () => useAuthStore.getState().clear(),
+  loginPath: '/login',
 });
-
-http.interceptors.response.use(
-  (resp) => {
-    // 平台统一返回结构（platform README §4）：{code, msg, data, ...}
-    // code===0 视为成功，把 data 解包给调用方；非 0 统一抛错（HTTP 状态可能为 200）
-    const body = resp?.data;
-    if (body && typeof body === 'object' && 'code' in body && 'data' in body) {
-      if (body.code !== 0) {
-        const e: ApiError = new Error(body.msg || '请求失败');
-        e.code = body.code;
-        e.errors = body.errors;
-        return Promise.reject(e);
-      }
-      resp.data = body.data;
-    }
-    return resp;
-  },
-  (error) => {
-    // 401：令牌过期/被踢出。清态并回登录页重新走 SSO（`/login` 会自动中继到 IAM）。
-    if (error?.response?.status === 401) {
-      useAuthStore.getState().clear();
-      if (window.location.pathname !== '/login') {
-        window.location.assign('/login');
-      }
-    }
-    const data = error?.response?.data;
-    let message = error?.message || '请求失败';
-    if (data && typeof data === 'object') {
-      if ('code' in data && data.code !== 0 && 'msg' in data) {
-        message = data.msg;
-      } else if ('message' in data && typeof data.message === 'string') {
-        message = data.message;
-      }
-    }
-    const e: ApiError = new Error(message);
-    e.code = data?.code;
-    e.errors = data?.errors;
-    return Promise.reject(e);
-  },
-);
 
 /**
  * 当前操作人身份。
@@ -108,30 +70,13 @@ function currentIdentity(): { userId: string; tenantId: string; roles: string[] 
 /**
  * 启动探针：判定认证通道。
  *
- * <p>用的是**裸 axios**而非本文件的 `http` 实例：探针在「没有令牌」时调用是正常路径，
- * 走实例会被 401 拦截器当成会话失效直接跳登录页，反而分不清「未登录」与「后端关了认证」。</p>
- *
- * <p>⚠️ 裸 axios 不会自动附 Bearer，所以**必须自己带上落盘的令牌**：否则已登录用户
- * （localStorage 里有有效 token）每次启动都会收到 401，被判成未登录并清掉会话——
- * 表现为「登录成功后刷新页面又回到登录页」。</p>
+ * <p>走 `HttpClient#fetchMe`（内部用裸 axios）：探针在「没有令牌」时调用是正常路径，
+ * 走带拦截器的实例会被 401 当成会话失效直接跳登录页，反而分不清「未登录」与「后端关了认证」。</p>
  *
  * @returns 后端档案；401（认证已开启但未登录 / 令牌失效）返回 null
  */
-export async function fetchMe(): Promise<MeDto | null> {
-  try {
-    const token = useAuthStore.getState().token;
-    const r = await axios.get('/api/v1/approval/me', {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    const body = r.data;
-    if (body && typeof body === 'object' && 'code' in body) {
-      return body.code === 0 ? (body.data as MeDto | null) : null;
-    }
-    return (body as MeDto) ?? null;
-  } catch (e) {
-    if (axios.isAxiosError(e) && e.response?.status === 401) return null;
-    throw e;
-  }
+export function fetchMe(): Promise<MeDto | null> {
+  return http.fetchMe<MeDto>('/api/v1/approval/me');
 }
 
 /** 拉取当前用户档案（已登录；走带拦截器的实例，401 会清态跳登录）。 */
@@ -139,19 +84,12 @@ export function getMe(opts?: RequestOptions): Promise<MeDto | null> {
   return apiGet<MeDto | null>('/me', undefined, opts);
 }
 
-/** 请求可选项。`signal` 用于 `useResource` 的取消语义（不传则 abort 只是丢弃回包）。 */
-export interface RequestOptions {
-  signal?: AbortSignal;
-}
-
 async function apiGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
-  const r = await http.get<T>(url, { params, signal: opts?.signal });
-  return r.data;
+  return http.get<T>(url, params, opts);
 }
 
 async function apiPost<T>(url: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
-  const r = await http.post<T>(url, body, params ? { params } : undefined);
-  return r.data;
+  return http.post<T>(url, body, params ? { params } : undefined);
 }
 
 // ---------- 流程定义 / 发起 ----------
@@ -347,13 +285,13 @@ export async function uploadAttachment(
   const r = await http.post<AttachmentView>('/attachments/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return r.data;
+  return r;
 }
 
 export function deleteAttachment(id: string, actor?: string): Promise<void> {
-  return http.delete(`/attachments/${encodeURIComponent(id)}`, {
-    params: { actor: actor ?? currentIdentity().userId },
-  }).then(() => undefined);
+  return http.del<void>(`/attachments/${encodeURIComponent(id)}`, {
+    actor: actor ?? currentIdentity().userId,
+  });
 }
 
 export function attachmentDownloadUrl(id: string): string {

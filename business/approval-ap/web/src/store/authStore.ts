@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import * as api from '@/lib/api';
-import { idpLogout } from '@/lib/sso';
+import { sso } from '@/lib/sso';
 import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
 import type { MeDto } from '@/types';
 
@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>()(
         const { token, refreshToken, mode } = get();
         if (mode === 'sso') {
           // 走 IdP 做服务端吊销：令牌入黑名单 + 清 SSO 会话 Cookie。
-          const revoked = await idpLogout(token, refreshToken);
+          const revoked = await sso.idpLogout(token, refreshToken);
           if (!revoked) {
             console.warn('[sso] IdP 登出未确认，已清本地会话；服务端令牌可能仍在有效期内');
           }
