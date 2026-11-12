@@ -11,6 +11,7 @@ import com.cim.notify.transport.SseController;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +45,13 @@ public class ApprovalSecurityConfig {
     private final AppAdmissionChecker admissionChecker;
     private final LocalAuthorityLoader authorityLoader;
     private final BearerTokenQueryParamFilter bearerFilter;
+    /**
+     * 开放 API 过滤器（{@code approval.api.security.enabled=true} 时才存在）。
+     *
+     * <p>用 {@link ObjectProvider} 而非直接注入：开关关闭时容器里没有该 bean，直接注入会让本配置类
+     * 在「只关开放面、开着认证」的部署下启动失败。</p>
+     */
+    private final ObjectProvider<ApiAuthFilter> apiAuthFilter;
 
     /**
      * SSE 实时推送端点 {@code /sys/notify/stream} 的安全链（先于 /api 链）。
@@ -109,8 +117,15 @@ public class ApprovalSecurityConfig {
                         }
                     }
                     chain.doFilter(request, response);
-                }, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                }, UsernamePasswordAuthenticationFilter.class);
+        // 开放 API（X-App-Key）校验：必须在链内、且先于 JWT 过滤器——它负责建立服务身份，
+        // 放进容器层会被 SecurityContextHolderFilter 覆盖掉（见 ApiAuthFilterRegistration）。
+        // 锚点仍用 UsernamePasswordAuthenticationFilter：自定义过滤器类没有注册顺序，会启动失败。
+        ApiAuthFilter openApi = apiAuthFilter.getIfAvailable();
+        if (openApi != null) {
+            http.addFilterBefore(openApi, UsernamePasswordAuthenticationFilter.class);
+        }
+        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }

@@ -276,7 +276,8 @@ public class SecurityGuard {
 
     /**
      * 平台权限码断言（G1）。认证态按 Spring Security 权威校验（超管跨域放行）；
-     * dev 态由 dev-bypass / dev-enforce 控制。
+     * dev 态由 dev-bypass / dev-enforce 控制；<b>开放 API 态直接放行</b>——那套叫「权限码」的东西
+     * 属于用户，而服务间调用的凭据是 appKey（详见下方开放 API 分支说明）。
      *
      * <p><b>域管理员通路</b>：G1 第 2 层定义的「域管理员」在本平台就是某 ap 的 {@code ADMIN}
      * 角色（IAM 下发的 {@code <appCode>:ADMIN}）。IAM 目前只授角色组、不授细粒度权限码，
@@ -288,6 +289,13 @@ public class SecurityGuard {
      * @param actorParam 调用方身份（dev 态用于 dev-super-admin 白名单判定；可为 null）
      */
     public void assertPermission(String code, String actorParam) {
+        RequestScope scope = RequestScopeHolder.get();
+        if (scope != null && scope.viaOpenApi()) {
+            // 开放 API：鉴权已在 ApiAuthFilter 完成（签名 / 重放窗口 / IP 白名单 / 限流 / 域绑定）。
+            // appKey 本身即服务级凭证，不套用「用户权限码」模型——服务身份没有 JWT，也没有角色。
+            // 域隔离不受影响：后续仍走 resolveDomainFilter 的域断言。
+            return;
+        }
         if (currentUser.authEnabled()) {
             if (isSuperAdmin()) {
                 return;

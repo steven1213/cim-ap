@@ -10,8 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -29,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 
 /**
  * 开放 API（服务间调用）安全拦截器（G9 / D2）。
@@ -41,10 +43,16 @@ import java.util.HexFormat;
  * → 源 IP 不在白名单 → 超速率配额 → 跨业务域（请求域≠appKey 绑定域）。</p>
  *
  * <p>校验通过后将调用方收敛为单一业务域写入 {@link RequestScopeHolder}，供 {@link SecurityGuard}
- * 实施 G3 跨域拦截。</p>
+ * 实施 G3 跨域拦截；同时向 Spring Security 登记一个最小服务身份，使 {@code /api/**} 链上的
+ * {@code authenticated()} 放行。</p>
+ *
+ * <p><b>本过滤器由 Security 链注册（不是容器级 Filter）</b>：容器级 filter 早于 Security 链执行，
+ * 而 {@code SecurityContextHolderFilter} 在链首会用 {@code SecurityContextRepository} 覆盖
+ * SecurityContext——容器层设置的身份会被清掉，表现为「签名校验全过、接口仍 401」。
+ * 容器级自动注册已在 {@link ApiAuthFilterRegistration} 中显式关闭（否则还会执行两次，限流配额
+ * 被双倍消耗）。</p>
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
 @ConditionalOnProperty(prefix = "approval.api.security", name = "enabled", havingValue = "true")
 public class ApiAuthFilter extends OncePerRequestFilter {
 
@@ -134,11 +142,20 @@ public class ApiAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        // ⚠️ 必须同时向 Spring Security 登记「已认证」：本过滤器只设置域作用域（ThreadLocal），
+        // 而 /api/** 链是 anyRequest().authenticated()。认证开启后若这里不写 SecurityContext，
+        // 表现为「签名校验全部通过、接口仍然 401」——整条服务间调用面在认证态下不可用。
+        // 主体取 appCode，权威留空：服务间的权限由 appKey + 域绑定决定，不套用用户权限码模型
+        // （见 SecurityGuard.assertPermission 的开放 API 分支、CurrentUserResolver 的身份来源）。
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(new UsernamePasswordAuthenticationToken(appKey, null, List.of()));
+        SecurityContextHolder.setContext(ctx);
         RequestScopeHolder.set(RequestScope.openApi(appKey));
         try {
             chain.doFilter(wrapped, response);
         } finally {
             RequestScopeHolder.clear();
+            SecurityContextHolder.clearContext();
         }
     }
 
