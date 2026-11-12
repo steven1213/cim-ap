@@ -832,6 +832,61 @@ button:disabled {
   align-items: center;
 }
 
+/* ---------- 时间线（事件流） ----------
+   竖线 + 圆点 + 标题/时间/详情三行。RMS 的签核事件流与 approval 的审批历史都用这一套，
+   此前 approval 另起了一套 `.detail-timeline`（左侧竖排 tag + 虚线分隔），同一产品里
+   两种时间轴观感；现统一为这一份，动作标签就近放进标题行。
+   圆点语义：默认主色（普通事件）、`.ok` 通过、`.err` 驳回/失效、`.warn` 预警。 */
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+.timeline-item {
+  position: relative;
+  margin-left: 5px;
+  padding: 0 0 14px 16px;
+  border-left: 1px solid var(--line);
+}
+.timeline-item:last-child {
+  padding-bottom: 0;
+  border-left-color: transparent;
+}
+.timeline-dot {
+  position: absolute;
+  left: -4px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.timeline-dot.ok {
+  background: var(--ok);
+}
+.timeline-dot.err {
+  background: var(--err);
+}
+.timeline-dot.warn {
+  background: var(--warn);
+}
+.timeline-time {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--muted);
+}
+.timeline-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+}
+.timeline-detail {
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+}
+
 /* 网格的收窄断点：与 .grid-2/.grid-3 本体一起放在平台，避免各 ap 再抄一份 */
 @media (max-width: 1180px) {
   .grid-3 {

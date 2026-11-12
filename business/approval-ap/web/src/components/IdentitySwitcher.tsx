@@ -50,7 +50,8 @@ export default function IdentitySwitcher() {
           <b>{userId}</b>
           <small>domain:{tenantId}</small>
         </span>
-        <IconChevron width={14} height={14} />
+        {/* 平台 `IconChevron` 是「右箭头」（树/面包屑语义），这里是下拉展开指示，转 90° 用。 */}
+        <IconChevron width={14} height={14} style={{ transform: 'rotate(90deg)' }} />
       </CimButton>
 
       {open && (

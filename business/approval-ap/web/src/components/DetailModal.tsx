@@ -136,6 +136,9 @@ const ACTION_TONE: Record<string, StatusTone> = {
   CALLBACK_FAILED: 'err',
 };
 
+/** 时间轴圆点：平台 `.timeline-dot` 只给了 ok/err/warn 三档，其余走默认主色。 */
+const DOT_CLASS: Record<string, string> = { ok: 'ok', err: 'err', warn: 'warn' };
+
 /** 审批详情弹窗：基本信息 / 审批内容 / 当前待办 / 附件 / 审批历史。
  *  <p>详情内直达操作：办理人可审批（通过/驳回），发起人可催办/撤回——消除「关弹窗回列表」断点。</p> */
 export default function DetailModal({
@@ -467,10 +470,12 @@ export default function DetailModal({
           />
         </section>
 
-        {/* 审批历史（哈希链：保留自定义时间线，标签色走 5 档语义） */}
+        {/* 审批历史（哈希链）。时间轴与 RMS 的签核事件流同一套 `.timeline`（`@cim/ui`），
+            动作标签就近放在标题行——此前这里是另一套 `.detail-timeline`（竖排 tag + 虚线），
+            同一产品里两种时间轴观感。圆点沿用 5 档语义色，与标签色同源。 */}
         <section className="detail-section">
           <h4 className="detail-heading">{t('detail.history')}</h4>
-          <div className="detail-timeline">
+          <div className="timeline">
             {detail.history.map((h) => {
               // 仅 COMPLETE_* 的 detail 是 {comment} JSON；其余动作为 key=value 摘要，不作为意见展示
               let comment = '';
@@ -482,23 +487,21 @@ export default function DetailModal({
               } catch {
                 // 非 JSON：非审批意见，忽略
               }
+              const tone = ACTION_TONE[h.action] ?? 'idle';
               return (
-                <div key={h.id} className="detail-timeline-item">
-                  <CimTag tone={ACTION_TONE[h.action] ?? 'idle'} size="small">
-                    {t(`detail.action.${h.action}`, h.action)}
-                  </CimTag>
-                  <div className="detail-timeline-body">
-                    <div>
-                      <b>{h.actor}</b>
-                      {h.afterState && <span className="dim"> → {h.afterState}</span>}
-                      <span className="dim" style={{ marginLeft: 8 }}>
-                        {formatDateTime(h.createdAt)}
-                      </span>
-                    </div>
-                    {comment && <div className="detail-comment">“{comment}”</div>}
-                    <div className="detail-hash mono" title={h.hash}>
-                      #{h.seq} {h.hash.slice(0, 12)}…
-                    </div>
+                <div key={h.id} className="timeline-item">
+                  <span className={'timeline-dot' + (DOT_CLASS[tone] ? ' ' + DOT_CLASS[tone] : '')} />
+                  <div className="timeline-title">
+                    <CimTag tone={tone} size="small">
+                      {t(`detail.action.${h.action}`, h.action)}
+                    </CimTag>
+                    <b>{h.actor}</b>
+                    {h.afterState && <span className="dim"> → {h.afterState}</span>}
+                  </div>
+                  <div className="timeline-time">{formatDateTime(h.createdAt)}</div>
+                  {comment && <div className="timeline-detail">“{comment}”</div>}
+                  <div className="detail-hash mono" title={h.hash}>
+                    #{h.seq} {h.hash.slice(0, 12)}…
                   </div>
                 </div>
               );

@@ -1,9 +1,35 @@
-// 内联 SVG 图标集（描边随 currentColor，深浅主题自动适配）。
+// 图标出口（薄壳 + 审批领域图标）。
+//
+// 通用图标（用户/铃铛/盾牌/新增/搜索/刷新/垃圾桶/主题/侧栏/登出/chevron…）的实现
+// 在 `@cim/ui`（`platform/web/packages/ui/src/icons.tsx`）——IAM 与 RMS 早已迁过去，
+// 本文件是最后一份未并的副本：13 个同名图标与平台版本**同名不同路径**（同一语义两套画法），
+// 同屏出现时观感不一致。现统一 re-export 平台版本，本地只保留审批领域图标。
+//
+// 新加图标前先判断：通用语义 → 加到 `@cim/ui`；只有审批懂的（流程图/回退/退回/企微…）
+// → 才在本文件本地实现。
+export {
+  IconInbox,
+  IconShield,
+  IconBell,
+  IconUser,
+  IconPlus,
+  IconSearch,
+  IconSun,
+  IconMoon,
+  IconSidebar,
+  IconLogout,
+  IconRefresh,
+  IconChevron,
+  IconTrash,
+  IconX,
+} from '@cim/ui';
+
 import type { ReactNode, SVGProps } from 'react';
 
 type P = SVGProps<SVGSVGElement> & { width?: number; height?: number };
 
-function Svg({ width = 18, height = 18, children, ...rest }: P & { children: ReactNode }) {
+/** 与 `@cim/ui` 保持一致的描边基准（本地图标沿用，避免两套视觉）。 */
+function Svg({ width = 20, height = 20, children, ...rest }: P & { children: ReactNode }) {
   return (
     <svg
       width={width}
@@ -11,7 +37,7 @@ function Svg({ width = 18, height = 18, children, ...rest }: P & { children: Rea
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.7}
+      strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
       {...rest}
@@ -38,13 +64,6 @@ export const IconFlow = (p: P) => (
   </Svg>
 );
 
-export const IconInbox = (p: P) => (
-  <Svg {...p}>
-    <path d="M3 13h4l2 3h6l2-3h4" />
-    <path d="M5 5h14l2 8v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z" />
-  </Svg>
-);
-
 export const IconCheck = (p: P) => (
   <Svg {...p}>
     <path d="M20 6 9 17l-5-5" />
@@ -66,37 +85,10 @@ export const IconWebhook = (p: P) => (
   </Svg>
 );
 
-export const IconShield = (p: P) => (
-  <Svg {...p}>
-    <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
-    <path d="M9 12l2 2 4-4" />
-  </Svg>
-);
-
-export const IconBell = (p: P) => (
-  <Svg {...p}>
-    <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
-    <path d="M10 19a2 2 0 0 0 4 0" />
-  </Svg>
-);
-
 export const IconUndo = (p: P) => (
   <Svg {...p}>
     <path d="M8 5 3 10l5 5" />
     <path d="M3 10h11a6 6 0 0 1 0 12h-4" />
-  </Svg>
-);
-
-export const IconUser = (p: P) => (
-  <Svg {...p}>
-    <circle cx="12" cy="8" r="4" />
-    <path d="M4 21a8 8 0 0 1 16 0" />
-  </Svg>
-);
-
-export const IconPlus = (p: P) => (
-  <Svg {...p}>
-    <path d="M12 5v14M5 12h14" />
   </Svg>
 );
 
@@ -118,60 +110,6 @@ export const IconAddUser = (p: P) => (
 export const IconSwap = (p: P) => (
   <Svg {...p}>
     <path d="M7 7h12l-3-3M17 17H5l3 3" />
-  </Svg>
-);
-
-export const IconSearch = (p: P) => (
-  <Svg {...p}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="M21 21l-4-4" />
-  </Svg>
-);
-
-export const IconClose = (p: P) => (
-  <Svg {...p}>
-    <path d="M6 6l12 12M18 6 6 18" />
-  </Svg>
-);
-
-export const IconX = IconClose;
-
-export const IconSun = (p: P) => (
-  <Svg {...p}>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" />
-  </Svg>
-);
-
-export const IconMoon = (p: P) => (
-  <Svg {...p}>
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-  </Svg>
-);
-
-export const IconSidebar = (p: P) => (
-  <Svg {...p}>
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <path d="M9 4v16" />
-  </Svg>
-);
-
-export const IconLogout = (p: P) => (
-  <Svg {...p}>
-    <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" />
-    <path d="M10 12H3M6 8l-3 4 3 4" />
-  </Svg>
-);
-
-export const IconRefresh = (p: P) => (
-  <Svg {...p}>
-    <path d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5" />
-  </Svg>
-);
-
-export const IconChevron = (p: P) => (
-  <Svg {...p}>
-    <path d="M6 9l6 6 6-6" />
   </Svg>
 );
 
@@ -205,12 +143,6 @@ export const IconPencil = (p: P) => (
   <Svg {...p}>
     <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
     <path d="M13.5 6.5l3 3" />
-  </Svg>
-);
-
-export const IconTrash = (p: P) => (
-  <Svg {...p}>
-    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
   </Svg>
 );
 

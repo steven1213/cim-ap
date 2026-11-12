@@ -171,56 +171,12 @@ input.mono {
   padding: 28px 0 !important;
 }
 
-/* ---------- RMS 业务流补充：表单错误 / 事件时间线 / 差异行 ---------- */
+/* ---------- RMS 业务流补充：表单错误 / 差异行 ----------
+   事件时间线（`.timeline*`）已上提到 `@cim/ui` 的 `ui.css`，与 approval 共用一份。 */
 .form-error {
   margin-top: 6px;
   font-size: var(--fs-xs);
   color: var(--err);
-}
-.timeline {
-  display: flex;
-  flex-direction: column;
-}
-.timeline-item {
-  position: relative;
-  margin-left: 5px;
-  padding: 0 0 14px 16px;
-  border-left: 1px solid var(--line);
-}
-.timeline-item:last-child {
-  padding-bottom: 0;
-  border-left-color: transparent;
-}
-.timeline-dot {
-  position: absolute;
-  left: -4px;
-  top: 3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--primary);
-}
-.timeline-dot.ok {
-  background: var(--ok);
-}
-.timeline-dot.err {
-  background: var(--err);
-}
-.timeline-dot.warn {
-  background: var(--warn);
-}
-.timeline-time {
-  font-family: var(--font-mono);
-  font-size: var(--fs-micro);
-  color: var(--muted);
-}
-.timeline-title {
-  font-size: var(--fs-xs);
-  font-weight: 650;
-}
-.timeline-detail {
-  font-size: var(--fs-xs);
-  color: var(--text-2);
 }
 tr.diff-changed > td {
   background: var(--warn-soft);
