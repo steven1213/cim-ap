@@ -386,10 +386,12 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.field.i18nCode", "文案键", "Text key"));
         t.add(new TextDef("iam.field.locale", "语言", "Locale"));
         t.add(new TextDef("iam.field.content", "译文", "Text"));
+        t.add(new TextDef("iam.field.coverage", "覆盖率", "Coverage"));
         t.add(new TextDef("iam.type.dir", "目录", "Directory"));
         t.add(new TextDef("iam.type.menu", "菜单", "Menu"));
         t.add(new TextDef("iam.type.button", "按钮", "Button"));
         t.add(new TextDef("iam.i18n.missing", "缺失译文", "Missing translations"));
+        t.add(new TextDef("iam.i18n.untranslated", "未译条目", "Untranslated"));
         t.add(new TextDef("iam.i18n.default", "默认语言", "Default locale"));
         // —— 通用动作 / 状态（W4 页面复用；避免各页重复造词）——
         t.add(new TextDef("iam.common.actions", "操作", "Actions"));
@@ -520,6 +522,16 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.admin.i18n.filterModule", "按模块筛选", "Filter by module"));
         t.add(new TextDef("iam.admin.i18n.keyword", "键或译文关键字", "Key or text keyword"));
         t.add(new TextDef("iam.admin.i18n.missingCount", "缺失 {{n}} 条", "{{n}} missing"));
+        t.add(new TextDef("iam.admin.i18n.untranslatedHint",
+                "{{locale}} 下没有译文、由默认语言兜底的键——服务端合并后这些键是「命中」的，"
+                        + "所以界面上表现为该语言显示中文，前端不会上报",
+                "Keys in {{locale}} that fall back to the default locale — the server merges them in, "
+                        + "so the key resolves and the frontend never reports it"));
+        t.add(new TextDef("iam.admin.i18n.untranslatedCount", "{{n}} 条未译", "{{n}} untranslated"));
+        t.add(new TextDef("iam.admin.i18n.untranslatedTruncated",
+                "只列出前 50 条，补完刷新后可看到更多", "Showing the first 50; refresh for more"));
+        t.add(new TextDef("iam.admin.i18n.noUntranslated",
+                "该语言的键都有译文", "Every key has a translation in this locale"));
         // —— 控制台外壳（Layout / 语言切换 / 引导与错误页）——
         t.add(new TextDef("iam.shell.brandSub", "IAM-AP / 统一身份准入", "IAM-AP / Identity & Admission"));
         t.add(new TextDef("iam.shell.tagline", "统一登录与准入控制", "Unified sign-in & admission"));

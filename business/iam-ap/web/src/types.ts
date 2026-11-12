@@ -316,6 +316,29 @@ export interface SysLocaleDto {
   status: 'ENABLED' | 'DISABLED';
 }
 
+/**
+ * 单个语言的译文覆盖率（`GET /admin/i18n/coverage`，对齐 `LocaleCoverage`）。
+ *
+ * 与「缺失译文」不是一回事：缺失译文记的是「四级兜底全未命中」，而这里记的是
+ * **本语言自己没有值、靠默认语言兜底**的键——表现就是英文界面显示中文。
+ */
+export interface LocaleCoverageDto {
+  /** 语言代码（如 `en-US`）。 */
+  locale: string;
+  /** 语言显示名。 */
+  name: string | null;
+  /** 是否默认兜底语言（恒 100%）。 */
+  base: boolean;
+  /** 基准键数（默认语言的键集）。 */
+  total: number;
+  /** 本语言已译条数。 */
+  translated: number;
+  /** 缺译的键（可能被截断）。 */
+  missing: string[];
+  /** 缺译键是否被截断。 */
+  truncated: boolean;
+}
+
 /** 译文包（`GET /api/i18n/messages?lang=&v=`，对齐 I18nController.I18nBundle）。 */
 export interface I18nBundle {
   /** 译文版本号（前端本地缓存比对用）。 */

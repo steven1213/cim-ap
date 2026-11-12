@@ -20,7 +20,7 @@ import {
 } from '@cim/ui';
 import * as api from '@/lib/api';
 import { changeLanguage, currentLang } from '@/lib/i18n';
-import type { SysI18nDto, SysLocaleDto } from '@/types';
+import type { LocaleCoverageDto, SysI18nDto, SysLocaleDto } from '@/types';
 import { useHasPermission } from '@/lib/usePermission';
 import { I18N_LIST, I18N_CREATE, I18N_DELETE, I18N_LOCALE } from '@/lib/permCodes';
 import { IconChevron, IconEdit, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
@@ -88,10 +88,30 @@ export default function I18nAdminPage() {
     ({ signal }) => api.get<Record<string, string>>('/admin/i18n/missing', undefined, { signal }),
     { enabled: canRead },
   );
+  const coverageRes = useResource<LocaleCoverageDto[]>(
+    ({ signal }) => api.get<LocaleCoverageDto[]>('/admin/i18n/coverage', undefined, { signal }),
+    { enabled: canRead },
+  );
 
   const locales = useMemo(() => localesRes.data ?? [], [localesRes.data]);
   const messages = useMemo(() => messagesRes.data ?? [], [messagesRes.data]);
   const missing = useMemo(() => missingRes.data ?? {}, [missingRes.data]);
+  const coverage = useMemo(() => coverageRes.data ?? [], [coverageRes.data]);
+
+  /** 语言代码 → 覆盖率，左栏表格按行取。 */
+  const coverageByLocale = useMemo(
+    () => new Map(coverage.map((c) => [c.locale, c])),
+    [coverage],
+  );
+
+  /**
+   * 「未译条目」面板跟踪的语言：优先左栏选中的那个；没选就挑**第一个真有缺口**的语言。
+   * 不挑 `[0]`——列表首项通常是默认语言，恒 100%，面板会永远空着，看起来像坏了。
+   */
+  const gapLocale = useMemo(() => {
+    if (filterLocale) return coverage.find((c) => c.locale === filterLocale);
+    return coverage.find((c) => !c.base && c.missing.length > 0) ?? coverage.find((c) => !c.base);
+  }, [coverage, filterLocale]);
 
   /** 过滤条件变化 → 回第一页（否则会停在一个不存在的页码上）。 */
   useEffect(() => setPage(1), [filterLocale, filterModule, appliedKw]);
@@ -126,6 +146,7 @@ export default function I18nAdminPage() {
     localesRes.refresh();
     messagesRes.refresh();
     missingRes.refresh();
+    coverageRes.refresh();
   }
 
   async function onSaveLocale() {
@@ -262,6 +283,23 @@ export default function I18nAdminPage() {
         ),
       },
       {
+        key: 'coverage',
+        titleKey: 'iam.field.coverage',
+        width: 84,
+        render: (l) => {
+          const c = coverageByLocale.get(l.code);
+          if (!c || c.total === 0) return <span className="dim">—</span>;
+          const pct = Math.round((c.translated * 100) / c.total);
+          return (
+            <span title={`${c.translated} / ${c.total}`}>
+              <CimTag size="small" tone={pct >= 100 ? 'ok' : pct >= 80 ? 'warn' : 'err'}>
+                {pct}%
+              </CimTag>
+            </span>
+          );
+        },
+      },
+      {
         key: 'actions',
         titleKey: 'iam.common.actions',
         width: 76,
@@ -304,7 +342,7 @@ export default function I18nAdminPage() {
     ],
     // onDeleteLocale 依赖 filterLocale，透传 t 与 filterLocale 即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, filterLocale],
+    [t, filterLocale, coverageByLocale],
   );
 
   const messageColumns = useMemo<Array<DataTableColumn<SysI18nDto>>>(
@@ -668,6 +706,74 @@ export default function I18nAdminPage() {
                 </div>
               )
             ) : null}
+          </Panel>
+
+          {/*
+            未译条目 ≠ 缺失译文：
+            - 缺失译文 = 四级兜底全未命中（连中文都没有），前端会上报，量很小；
+            - 未译条目 = 本语言没值、被默认语言兜底填满。**服务端合并后键是命中的**，
+              英文界面显示中文，前端不会上报任何东西。只有按原始值比才看得见。
+          */}
+          <Panel
+            title={t('iam.i18n.untranslated')}
+            sub={
+              gapLocale
+                ? t('iam.admin.i18n.untranslatedHint', { locale: gapLocale.name ?? gapLocale.locale })
+                : undefined
+            }
+            actions={
+              <>
+                {gapLocale && (
+                  <CimTag tone={gapLocale.missing.length ? 'warn' : 'ok'}>
+                    {t('iam.admin.i18n.untranslatedCount', {
+                      n: gapLocale.missing.length + (gapLocale.truncated ? '+' : ''),
+                    })}
+                  </CimTag>
+                )}
+                <CimButton size="small" onClick={coverageRes.refresh} disabled={coverageRes.loading}>
+                  <IconRefresh width={13} height={13} />
+                  {coverageRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
+                </CimButton>
+              </>
+            }
+          >
+            {gapLocale && gapLocale.missing.length ? (
+              <>
+                <div className="tag-list">
+                  {gapLocale.missing.map((k) => (
+                    <CimTag key={k} tone="warn" className="cim-mono">
+                      <span title={k}>{k}</span>
+                      <Can perm={I18N_CREATE}>
+                        <CimButton
+                          bare
+                          className="chip-x"
+                          title={t('iam.common.add')}
+                          onClick={() => {
+                            setMsgErr({});
+                            setMsgDraft({
+                              id: '',
+                              localeCode: gapLocale.locale,
+                              code: k,
+                              content: '',
+                              module: '',
+                              scope: 'USER',
+                            });
+                          }}
+                        >
+                          +
+                        </CimButton>
+                      </Can>
+                    </CimTag>
+                  ))}
+                </div>
+                {gapLocale.truncated && <p className="dim">{t('iam.admin.i18n.untranslatedTruncated')}</p>}
+              </>
+            ) : (
+              <div className="cim-empty">
+                <div className="cim-empty-title">{t('iam.common.none')}</div>
+                <div className="cim-empty-hint">{t('iam.admin.i18n.noUntranslated')}</div>
+              </div>
+            )}
           </Panel>
         </div>
       </CimSplitPane>
