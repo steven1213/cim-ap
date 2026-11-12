@@ -59,6 +59,23 @@
             <artifactId>cim-mq-starter</artifactId>
             <version>${cim.version}</version>
         </dependency>
+        <!-- 实时推送（SSE，多实例经 Redis 扇出）：主数据变更事件推给订阅方（MES 等）。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-notify-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+        <!--
+            域模块 cim-system（sys_menu 父子树 + sys_permission(module:res:action) + RBAC），
+            不另造表；其 DbLocalAuthorityLoader 顶替 cim-auth-starter 的默认
+            ClaimLocalAuthorityLoader，使 MDS 权限源由「令牌 roles claim」转「本 ap 库内 RBAC」。
+            对齐 rms-ap/server 的同款依赖（design.md §2.10 / §8 边界表）。
+        -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-system</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -73,6 +90,17 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- H2 内存库（开发/演示数据源，与 application.yml 的 org.h2.Driver 对应） -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -81,6 +109,32 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <!--
+                  沙箱 JDK21 + maven-compiler-plugin 环境下，Lombok 经 annotationProcessorPaths
+                  放到 -processorpath 后，javac 未通过 SPI(META-INF/services) 自动发现该处理器，
+                  导致 @Getter/@Setter/@Slf4j 静默失效（满屏「找不到符号」）。
+                  显式用 -processor 指定 Lombok 处理器类名可稳定触发（绕开 SPI 发现失效）。
+                  与 business/{iam,rms}-ap/server 同款修复；parameters=true 为 ADR-9 红线。
+                -->
+                <version>3.13.0</version>
+                <configuration>
+                    <parameters>true</parameters>
+                    <compilerArgs>
+                        <arg>-processor</arg>
+                        <arg>lombok.launch.AnnotationProcessorHider$AnnotationProcessor</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
         </plugins>
     </build>

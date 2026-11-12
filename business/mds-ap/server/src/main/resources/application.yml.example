@@ -1,0 +1,87 @@
+# MDS-AP 生产配置模板（复制为 application-local.yml，或用环境变量覆盖）
+# 本文件入库；application.yml / application-local.yml 等真实配置不入库（见 .gitignore）。
+
+server:
+  port: 8082
+
+spring:
+  application:
+    name: mds-ap
+  datasource:
+    url: jdbc:mysql://localhost:3306/mds_ap?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: mds
+    password: change-me
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+cim:
+  # HTTP 响应契约（cim-spring-support；规约见 docs/platform/server/api-convention.md）
+  # 本 ap 目前没有 @RawResponse 例外：全部端点返回 Result<T>。
+  api:
+    response:
+      verify: true
+      strict: true                       # false = 违规只记 ERROR 不阻断启动（仅过渡期）
+      include-packages:
+        - com.cim
+    dispatch:
+      enabled: false
+      base-path: /api/v1/messages
+      base-packages: []
+
+  # 认证（cim-auth-starter）：经 IAM 统一登录，本地 JWKS 验签（不逐请求回查 IAM）
+  auth:
+    enabled: true
+    jwks-uri: http://iam-ap:8081/.well-known/jwks.json
+    jwks-cache-ttl: 60m
+    admission:
+      app-code: mds-ap
+      # ⚠️ 恢复准入前，IAM 侧 cim.iam.auth.bootstrap.apps 必须登记同一个 code（已加 mds-ap），
+      # 否则令牌 apps claim 不含它 → 准入 403，表现是「登录后在 IAM 与本 ap 之间来回弹跳」。
+      # 业务系统接入 SSO 暂不做准入限制（与 rms-ap / approval-ap 一致，2026-11-12）：
+      # 任何通过验签/版本/黑名单校验的令牌都可进入本 ap，ap 内部 RBAC 不受影响。
+      # 恢复限制：改回 enabled: true 即可，app-code 已就位，无需改代码。
+      enabled: false
+
+  # 持久化（cim-jpa-starter）：主键全应用层生成，无自增
+  jpa:
+    id:
+      mode: SNOWFLAKE
+      # 机器号/机房号由部署环境下发；合法区间 0-31（各 5 bit），同数据中心内 worker-id 必须唯一。
+      worker-id: ${CIM_WORKER_ID:2}
+      datacenter-id: ${CIM_DATACENTER_ID:1}
+
+  # 业务内部 RBAC（域模块 cim-system）：权限源由「令牌 roles」转「本 ap 库内 sys_* 授权表」。
+  system:
+    enabled: true
+    seed-permissions: true
+
+  # 实时推送（cim-notify-starter）：app-code 必填，用于 Redis 频道命名空间隔离。
+  # ⚠️ Redis 必须在线：监听容器在上下文启动阶段就订阅，连不上直接启动失败。
+  notify:
+    app-code: mds-ap
+    cluster:
+      enabled: true
+
+  mds:
+    console:
+      # 启动时把权限码 / 菜单 / 角色 / 译文幂等写入本 ap 的库。
+      # 关掉它 = 管理员没有任何 mds:* 权限，所有接口 403。
+      seed-enabled: true
+      seed-admin-profile: true
+      seed-english: true
+      admin-display-name: MDS 管理员
+
+# 排障：可执行 SQL 日志（参数已内联，可直接粘贴执行；见 platform/server/design.md §2.3）
+# 方式一：启动即输出
+# logging:
+#   level:
+#     cim.jpa.sql: DEBUG
+# 方式二（推荐）：运行时动态开关，无需重启
+#   curl -X POST 'http://localhost:8082/sys/sql-log?enabled=true'
+#   curl -X POST 'http://localhost:8082/sys/sql-log?enabled=false'
+#   curl 'http://localhost:8082/sys/sql-log'
