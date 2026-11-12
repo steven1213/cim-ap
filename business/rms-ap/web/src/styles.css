@@ -171,22 +171,6 @@ input.mono {
   padding: 28px 0 !important;
 }
 
-/* DEV 预览区（仅出现在 `<SsoRelay>` 卡片里，DEV 构建才渲染）。
-   中继页本体样式在 @cim/ui 的 shell.css（`.sso-relay*`），本文件不再持有登录页版式。 */
-.dev-token {
-  border-top: 1px dashed var(--line-strong);
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.dev-token-cap {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 /* ---------- RMS 业务流补充：表单错误 / 事件时间线 / 差异行 ---------- */
 .form-error {
   margin-top: 6px;

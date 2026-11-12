@@ -281,9 +281,11 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 | --- | --- | --- |
 | IAM 后端 `static/login/` | **唯一登录页**，全仓共用 | ❌ 刻意纯 CSS/JS，零框架依赖 |
 | `@cim/shell` 的 `<SsoRelay>` | 各 ap 的「正在跳转 / 准入失败」中继页 | ✅ 在 React 应用内，正常用组件 |
-| iam / approval 的 `.login-*` 样式 | 无（已删） | — |
-| rms `styles.css` 的 `.login-*` | 无（已随 `<SsoRelay>` 迁移删除） | — |
+| `@cim/ui` 的 `.sso-relay-dev*` | `SsoRelay` 卡片里的 DEV 令牌区 | ✅ 两 ap 逐字节相同，已从 rms 上提 |
+| iam / approval / rms 的 `.login-*` | 无（已删） | — |
 
+**接入面**：iam、rms、approval 三处都只做「中继 + 回跳」，不再各自持有登录版式；
+mds / mes 仍是骨架，接入时照 approval 这一份抄即可（后端 `/me` + 前端 `authStore` 两步）。
 **为什么不复用组件库**：登录页要在「React/antd 全都没加载」的状态下可用——这正是它存在的场景。
 把登录表单挂进控制台 SPA，就要过 `ProtectedRoute`/`BootGate`，未登录时被弹回登录页形成往返；
 控制台打包失败时登录入口跟着一起死。这是身份服务最不该有的单点。
@@ -291,6 +293,15 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 **代价（已知并接受）**：`login.css` 是一份**令牌子集副本**（17 个变量，机械复制自
 `platform/web/packages/theme/src/tokens.css`，变量名逐字一致），改配色要改两处；
 `tokens.css` 顶部有指向 `login.css` 的反向注释，减少漏改。版式也只能与 `ui.css` 人工对齐。
+
+**approval-ap 的接入（本轮）**：它的身份链本来就是「两条通道」——`CurrentUserResolver`
+在 `cim.auth.enabled=true` 时只认 JWT、`false` 时用查询参数。前端此前只实现了后者，
+于是顶栏常驻「身份切换」、登出只是清 localStorage。现在补 `authStore` + `/login` `/sso`
+两条路由 + `ProtectedRoute`/`BootGate`，**通道由后端 `/me` 的 `authEnabled` 决定**：
+同一份前端产物既能跑带 IAM 的部署，也能跑无 IAM 的演示（顶栏自动换回身份切换器）。
+
+> 为什么不像 rms 那样用构建期常量定死：那样两种后端配置要各打一次包。
+> 开关放在后端配置里、由接口回传，前端只按事实分支。
 
 **同时修掉的两个坑**：
 1. rms 旧中继页把品牌名放在 `.brand-title` 里，而该类的文字色是为深色侧栏定的 `#fff`——

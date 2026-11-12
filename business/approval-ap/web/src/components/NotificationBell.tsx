@@ -33,7 +33,7 @@ export default function NotificationBell() {
     if (clientRef.current) clientRef.current.close();
     setConnected(false);
     const client = new SseClient({
-      url: notificationsStreamUrl(), // dev 直连 ?userId=&tenantId=；生产应改用 getToken 注入 ?token=
+      url: notificationsStreamUrl(), // 统一登录带 ?token=；dev 态带 ?userId=&tenantId=
       getToken: () => null,
       mode: 'event-source',
       onOpen: () => setConnected(true),

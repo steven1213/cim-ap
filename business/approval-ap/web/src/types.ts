@@ -267,3 +267,14 @@ export interface StatsView {
   workloads: { assignee: string; done: number; todo: number }[];
   trend: { date: string; started: number; completed: number }[];
 }
+
+// 当前登录用户（GET /api/v1/approval/me）。
+// authEnabled 反映后端 cim.auth.enabled：前端据它在「统一登录」与「dev 身份切换」之间选通道。
+export interface MeDto {
+  userId: string | null;
+  username: string | null;
+  tenantId: string | null;
+  roles: string[];
+  permissions: string[];
+  authEnabled: boolean;
+}

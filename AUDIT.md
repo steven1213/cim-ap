@@ -666,6 +666,90 @@ rms 准入失败时，页面渲染的按钮文案是 `t('rms.login.redirecting')
 - 登录页实机截图（1440×900 双栏 + 窄屏单栏）：布局正确、i18n 兜底生效、`app=RMS` 时 lead 显示「登录以访问 RMS」。
 - ⚠️ 截图踩坑：Chrome headless 的**最小窗口宽度约 500px**，`--window-size=430` 会按 ~500 布局再裁切，看起来像横向溢出。判定用同源 iframe 探针读 `documentElement.scrollWidth` 才准（430 与 360 下均等于视口宽，无溢出）。
 
+## 2026-11-12（续 5）approval-ap 接入统一登录：顺手挖出一个启动即崩的共有缺陷
+
+上一轮结尾留了个问题：「approval 没接统一登录，要不要做」。本轮做完，并在实测中撞到一个
+**两个 ap 共有的、只在认证开启时才暴露的启动崩溃**——也就是说这条链此前从未真正跑起来过。
+
+### 36.1 设计：通道由后端配置决定，不由构建期常量决定
+
+approval 的后端其实早就准备好了两条通道：`CurrentUserResolver` 在 `cim.auth.enabled=true`
+时只认 JWT（并显式忽略前端传的 userId/actor，防伪造代办），`false` 时才用查询参数。
+缺的只有前端：顶栏常驻「身份切换」、登出只清 localStorage、没有 `/login` 与 `/sso`。
+
+新增 `GET /api/v1/approval/me`，除档案外多回一个 `authEnabled`。前端 `main.tsx` 在**挂载前**
+打这一枪，据此选通道：
+
+| 返回 | 通道 | 前端行为 |
+| --- | --- | --- |
+| 401 | 统一登录·未登录 | 落 `/login` → 整页中继 IAM `GET /login?app=APPROVAL` |
+| 200 + `authEnabled:false` | dev 演示 | 不设登录门，顶栏保留身份切换（查询参数标识操作人） |
+| 200 + 档案 | 统一登录·已登录 | 档案写入 `identityStore`，顶栏显示用户块，登出走 IdP 吊销 |
+
+> **为什么不做成 `import.meta.env` 常量**：同一份前端产物要能同时跑「带 IAM」与「无 IAM 演示」
+> 两种后端配置。写成构建期常量，就得为每种部署各打一次包，且灰度期两份产物并存时行为不可控。
+
+前端只加「怎么拿身份」，不改「身份放哪」：`identityStore` 仍是全应用唯一的「我是谁」，
+十余处页面（待办/已办/我发起/详情/重送/定义/企微回调）**一行没改**。
+
+### 36.2 三个容易漏的细节（都是「不报错但不对」型）
+
+1. **SSE 与附件下载带不了 Authorization 头**：走 `?token=`。`ApprovalSecurityConfig` 的
+   `/api/**` 链本就有 `?token=` → Bearer 的还原逻辑，`/sys/notify/stream` 另有专门一条链
+   （`BearerTokenQueryParamFilter`）。前端 `notificationsStreamUrl()` / `attachmentDownloadUrl()`
+   按通道切凭据载体，dev 态仍用 `?userId=&tenantId=`。
+2. **租户回落 `default`**：审批流的租户是**流程变量**，存量实例全以 `default` 起；
+   JWT 的 `tenantId` 可能为空，原样传 null 会表现成「登录成功但一条待办都看不到」。
+3. **落盘令牌被服务端拒绝时首帧会误放行**：`bootstrap()` 拿到 401 时必须顺手清 token，
+   否则 `ProtectedRoute` 凭它放行一帧，每个请求再各自 401 一次、各弹一次跳转。
+
+### 36.3 真坑：`addFilterBefore` 的锚点用了自定义过滤器 → 认证一开就启动失败
+
+以 `--cim.auth.enabled=true` 启动 approval，直接刷栈：
+
+```
+BeanInstantiationException: Factory method 'notifySecurityFilterChain' threw exception
+  The Filter class com.cim.auth.filter.JwtAuthenticationFilter does not have a registered order
+```
+
+`addFilterBefore(filter, anchor)` 的锚点必须是 Spring Security **注册表里有顺序**的过滤器。
+写成平台自定义的 `JwtAuthenticationFilter.class` 必然抛异常——它只是本平台的 Bean。
+**rms 的 `RmsSecurityConfig` 是同一段代码**，而 rms 的 `cim.auth.enabled` 默认就是 `true`。
+
+实测确认：把 rms 的该文件还原到 HEAD 版本启动，报同一个异常；
+改成 `UsernamePasswordAuthenticationFilter.class` 后两个 ap 都能起（两次 `addFilterBefore`
+指向同一锚点时按调用顺序插入，`bearer` 仍先于 `jwt`，`?token=` 还原逻辑不受影响）。
+
+> **这条推论比 bug 本身重要**：这两个 ap 的「认证态」从未以 `enabled=true` 跑过一次
+> （单测都跑 `enabled=false`，dev 也是关的）。凡是只在这条分支上的代码，此前都只是「看起来有」。
+> **仍未做**：认证开启态的启动冒烟进 CI——本轮只靠手工起服务验证（见 §36.5），下次改这条链仍可能重犯。
+
+### 36.4 顺带回收：DEV 令牌区样式上提
+
+`rms` 登录中继页的「粘贴 JWT 进入」区块有两条样式（`.dev-token*`）。approval 需要同一块，
+按「跨 ≥2 应用且逐字节相同才上提」的判据改名为 `.sso-relay-dev*` 收进 `@cim/ui/shell.css`，
+rms 同步改用新类名（`styles.css` 再减 15 行）。**组件渲染的类名，样式必须在包内**——同 `.scrim` 的教训。
+
+### 36.5 验证
+
+| 项 | 结果 |
+| --- | --- |
+| approval 后端全量 | **12/12 绿**（新增 `ApprovalMeControllerTest` 2 例：principal→DTO 映射、dev 态只回开关） |
+| `ApiContractVerifier` | 启动期通过（`/me` 返回 `Result<T>`，不占 `@RawResponse` 例外） |
+| approval `tsc --noEmit` / `vite build` | 零错 / 通过（9.9s） |
+| rms `tsc --noEmit` / `vite build` | 零错 / 通过（10.3s） |
+| 实测认证态（`--cim.auth.enabled=true`，端口 18085） | `/me`=401、假令牌 `/me`=401、`/definitions`=401、SSE=401；启动成功 |
+| 实测 rms（默认认证开，端口 18084） | 启动成功，`/api/v1/rms/me`=401 |
+
+**已知边界（未修）**：企微免登（`/wecom/callback`）在认证态下不可用——它的链接由企微内置浏览器
+直接打开、不带 JWT，而后端 `/api/**` 链统一要求令牌，`verifyWeComToken` 必然 401。
+dev 通道（认证关闭）不受影响。要打通需给该端点单独 `permitAll` + 自行校验签名令牌，
+属独立改动，本轮不做，已写进前端路由注释。
+
+> ⚠️ approval 的 `cim.auth.enabled` 仍留 `false`（与仓库演示优先的取向一致）：
+> 打开它就需要本机有 IAM 才能登入。切换方式、前端表现已写进 `application.yml` 注释与 `.example`。
+> 本地跑集成测试仍然要 `-Dcim.notify.cluster.enabled=false`（无 Redis）。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

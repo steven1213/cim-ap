@@ -1,10 +1,13 @@
 // 审批流平台 API 客户端。
 //
 // 后端所有接口位于 /api/v1/approval 前缀下（见 server 各 Controller 的 @RequestMapping）。
-// 后端为 dev 态：成功响应为**裸数据**（未套 Result 包装），仅异常时由平台全局异常处理器
-// 包装为 {code,msg,...}（或 Spring 默认错误体）。故本客户端：成功直接返回解析后的数据；
-// 失败时对两种错误体都能提取可读 message。
+// 成功响应为平台统一的 `Result<T>`（{code,msg,data}），由响应拦截器解包；异常时同样从中
+// 提取可读 message。身份来源随认证通道切换（见 `currentIdentity`）：
+// - 统一登录（cim.auth.enabled=true）：附 Bearer，后端 `CurrentUserResolver` 只认 JWT；
+// - dev 态：以 userId/tenantId/roles 查询参数标识操作人。
+// 两种情况下身份参数都照发：后端在认证态会忽略它们，保留则让滚动发布期间旧后端仍可用。
 import axios, { type AxiosInstance } from 'axios';
+import { useAuthStore } from '@/store/authStore';
 import { useIdentityStore } from '@/store/identityStore';
 import type {
   AddSignRequest,
@@ -25,6 +28,7 @@ import type {
   StatsView,
   TaskView,
   AttachmentView,
+  MeDto,
 } from '@/types';
 
 export interface ApiError extends Error {
@@ -33,6 +37,15 @@ export interface ApiError extends Error {
 }
 
 const http: AxiosInstance = axios.create({ baseURL: '/api/v1/approval' });
+
+// 统一登录态下每个请求都带 Bearer；dev 通道没有令牌，自然不加。
+http.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 http.interceptors.response.use(
   (resp) => {
@@ -51,6 +64,13 @@ http.interceptors.response.use(
     return resp;
   },
   (error) => {
+    // 401：令牌过期/被踢出。清态并回登录页重新走 SSO（`/login` 会自动中继到 IAM）。
+    if (error?.response?.status === 401) {
+      useAuthStore.getState().clear();
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
+    }
     const data = error?.response?.data;
     let message = error?.message || '请求失败';
     if (data && typeof data === 'object') {
@@ -67,9 +87,49 @@ http.interceptors.response.use(
   },
 );
 
+/**
+ * 当前操作人身份。
+ *
+ * <p>统一登录态取 JWT 档案（`/me` 已写入 authStore）；dev 态取身份切换器维护的 store。
+ * 页面一律不必关心来源——`identityStore` 在两种通道下都持有「当前我是谁」。</p>
+ */
 function currentIdentity(): { userId: string; tenantId: string; roles: string[] } {
+  const { mode, user } = useAuthStore.getState();
+  if (mode === 'sso' && user) {
+    // tenantId 缺省回落 default：审批流的租户是流程变量，存量实例都以 default 起
+    return { userId: user.userId ?? '', tenantId: user.tenantId || 'default', roles: user.roles ?? [] };
+  }
   const { userId, tenantId, roles } = useIdentityStore.getState();
   return { userId, tenantId, roles: roles ?? [] };
+}
+
+// ---------- 当前用户 / 认证通道 ----------
+
+/**
+ * 启动探针：判定认证通道。
+ *
+ * <p>用的是**裸 axios**而非本文件的 `http` 实例：探针在「没有令牌」时调用是正常路径，
+ * 走实例会被 401 拦截器当成会话失效直接跳登录页，反而分不清「未登录」与「后端关了认证」。</p>
+ *
+ * @returns 后端档案；401（认证已开启但未登录）返回 null
+ */
+export async function fetchMe(): Promise<MeDto | null> {
+  try {
+    const r = await axios.get('/api/v1/approval/me');
+    const body = r.data;
+    if (body && typeof body === 'object' && 'code' in body) {
+      return body.code === 0 ? (body.data as MeDto | null) : null;
+    }
+    return (body as MeDto) ?? null;
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.status === 401) return null;
+    throw e;
+  }
+}
+
+/** 拉取当前用户档案（已登录；走带拦截器的实例，401 会清态跳登录）。 */
+export function getMe(opts?: RequestOptions): Promise<MeDto | null> {
+  return apiGet<MeDto | null>('/me', undefined, opts);
 }
 
 /** 请求可选项。`signal` 用于 `useResource` 的取消语义（不传则 abort 只是丢弃回包）。 */
@@ -290,7 +350,11 @@ export function deleteAttachment(id: string, actor?: string): Promise<void> {
 }
 
 export function attachmentDownloadUrl(id: string): string {
-  return `/api/v1/approval/attachments/${encodeURIComponent(id)}/download`;
+  const base = `/api/v1/approval/attachments/${encodeURIComponent(id)}/download`;
+  // `<a download>` 带不了 Authorization 头：统一登录态走 `?token=`（后端 /api 链专门为此放行），
+  // 与 SSE 同一处理方式（见 ApprovalSecurityConfig）。
+  const { mode, token } = useAuthStore.getState();
+  return mode === 'sso' && token ? `${base}?token=${encodeURIComponent(token)}` : base;
 }
 
 // ---------- 审计 ----------
@@ -302,9 +366,14 @@ export function listAudit(businessKey: string, opts?: RequestOptions): Promise<A
 // ---------- SSE 通知 ----------
 //
 // 统一经 cim-notify-starter 的 /sys/notify/stream 端点（平台前缀 /sys/**）。
-// dev 态（cim.auth.enabled=false + dev-accept-query-identity=true）以 userId/tenantId 查询参数直连；
-// 生产接入 IAM 后由组件内 SseClient 的 getToken 拼装 ?token=<JWT>（此处仅返回基础地址）。
+// EventSource 无法自定义请求头，故两种通道各用自己的凭据载体：
+// - 统一登录：`?token=<JWT>`（后端 BearerTokenQueryParamFilter 还原为 Bearer 头）；
+// - dev 态：`?userId=&tenantId=`（cim.notify.dev-accept-query-identity）。
 export function notificationsStreamUrl(): string {
+  const { mode, token } = useAuthStore.getState();
+  if (mode === 'sso' && token) {
+    return `/sys/notify/stream?token=${encodeURIComponent(token)}`;
+  }
   const { userId, tenantId } = useIdentityStore.getState();
   const params = new URLSearchParams({ userId, tenantId });
   return `/sys/notify/stream?${params.toString()}`;
@@ -324,6 +393,8 @@ export function verifyWeComToken(token: string): Promise<{ userId: string; taskI
 }
 
 export default {
+  fetchMe,
+  getMe,
   listDefinitions,
   getDefinitionXml,
   startProcess,

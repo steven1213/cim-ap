@@ -108,3 +108,10 @@
   - **撞见三个真坑**：① rms 中继页把品牌名放进 `.brand-title`（该类为深色侧栏定的 `#fff`），白卡片上**完全看不见**；② 登录页 `.caps-hint` 是从未匹配到元素的死规则且引用未定义的 `--warn`，文档却写着「已实现」；③ `iam.login.lead` 写着「进入 IAM 控制台」，而这页是所有 ap 共用的。
   - **顺手修一个死路**：rms 准入失败时那个按钮文案是「正在跳转…」、点击重跑同一段 SSO 中继 → IAM 会话还在，会拿同一枚令牌弹回 `/sso`，正是注释里反复警告的往返。现在改成「改用其他账号登录」（先 `POST /api/v1/logout` 清 SSO Cookie 再回登录页）。
   - 验证：`SsoSessionSharingTest` **2/2**（新增静态资源与 `no-store` 断言）；iam/rms `tsc --noEmit` 零错、`vite build` 通过；登录页实机截图双栏/单栏均正常。**截图坑**：Chrome headless 最小窗口宽约 500px，`--window-size=430` 会按 ~500 布局再裁切，看起来像溢出——判定要用同源 iframe 探针读 `scrollWidth`。
+- **2026-11-12（续5）approval-ap 接入统一登录 + 挖出共有启动崩溃**：
+  - **补的是前端，后端早就两条通道**：`CurrentUserResolver` 一直在 `cim.auth.enabled=true` 时只认 JWT、`false` 时用查询参数，缺的是前端没有 `/login` `/sso`、顶栏常驻身份切换、登出只清 localStorage。新增 `GET /api/v1/approval/me`（档案 + `authEnabled`），前端挂载前探一次，据结果在「SSO 中继」与「dev 身份切换」间选通道——**同一份产物跑两种后端配置**，不做构建期常量。
+  - **身份仍只存一处**：`identityStore` 保持全应用唯一「我是谁」，十余处页面零改动；`authStore` 只管令牌与通道。
+  - **三个「不报错但不对」的细节**：SSE 与附件下载带不了头 → `?token=`；JWT `tenantId` 可能为空 → 回落 `default`（否则登录成功但待办全空）；落盘令牌已被拒时要顺手清，否则 `ProtectedRoute` 会凭它放行一帧。
+  - **真坑（两个 ap 共有）**：`ApprovalSecurityConfig` / `RmsSecurityConfig` 的 SSE 链把 `addFilterBefore` 的**锚点**写成平台自定义的 `JwtAuthenticationFilter.class` → 认证一开就 `The Filter class ... does not have a registered order` 启动崩。实测还原 rms 的 HEAD 版本启动，报同一异常——**说明 rms 默认 `auth.enabled=true` 却从未这样起过**，这条分支此前只是「看起来有」。改为 `UsernamePasswordAuthenticationFilter.class` 后两 ap 均正常。
+  - 顺手回收：rms 的 `.dev-token*` 上提为 `@cim/ui` 的 `.sso-relay-dev*`（approval 复用同一块）。
+  - 验证：approval 后端 **12/12**（新增 `ApprovalMeControllerTest` 2 例）；approval/rms `tsc` 零错 + `vite build` 通过；以 `--cim.auth.enabled=true` 起 approval（18085），`/me`、假令牌 `/me`、`/definitions`、SSE **全部 401**；rms（默认认证开，18084）启动成功且 `/rms/me`=401。

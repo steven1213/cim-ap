@@ -12,7 +12,9 @@ cim-ap 是统一底座（认证、多租户、审计/历史、i18n、RBAC、通�
   - IAM 负责：企业内统一登录、令牌颁发/刷新、用户能否进入某 ap（准入）、ap 内粗角色组（如管理员/操作员）。
   - 业务系统负责：自身菜单 / 按钮 / 数据行级权限（复用平台框架 RBAC，后端文档 §21.1）。
 - 认证源：企业内 **LDAP / AD**（员工身份由 AD 托管）；令牌采用 **JWT(RS256) + JWKS 本地验签**，claim 含 `apps`（可进入 ap 列表）与 `roles`（ap 内粗角色组）。
-- `mds-ap` / `mes-ap` 等业务 ap 经 IAM 统一登录拿令牌，本地验签 + 校验 `apps` claim 准入后，再用本 ap 的 RBAC 控制内部权限。
+- 业务 ap 经 IAM 统一登录拿令牌，本地验签 + 校验 `apps` claim 准入后，再用本 ap 的 RBAC 控制内部权限。
+  **已接入**：`rms-ap`（8084）、`approval-ap`（8085）——三者共用 IAM 的 `GET /login` 登录页，本 ap 只保留「未登录 → 中继」与「`/sso` 回调」两条路由；`mds-ap` / `mes-ap` 仍是骨架。
+  后端开关 `cim.auth.enabled`：`true` 时 `/api/**` 未带有效 JWT 一律 401、身份只认令牌；`false` 仅供无 IAM 的本地演示（身份走查询参数），两者共存于同一份前端产物。
 
 ## 约定
 - 每个业务系统（ap）一个子目录，命名形如 `{ap}-ap`（如 `mds-ap`、`mes-ap`），例如 `docs/business/mds-ap/`、`docs/business/mes-ap/`；**每个 ap 内部再分 `server/` 与 `web/` 子文档**，与基础底座 `docs/platform/{server,web}` 保持同构（见下方规划结构）。

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import App from './App';
 import { CimProvider, UiLocaleProvider, UiToastProvider } from '@cim/ui';
 import { bootstrapI18n } from '@/lib/i18n';
+import { useAuthStore } from '@/store/authStore';
 import '@cim/ui/index.css';
 import './styles.css';
 
@@ -24,8 +25,11 @@ function Root() {
   );
 }
 
-// 先灌入 i18n 资源（本地缓存优先防闪白），再挂载应用。
-bootstrapI18n().then(() => {
+// 先灌入 i18n 资源（本地缓存优先防闪白），再探明认证通道，最后挂载应用。
+// 认证探针必须早于渲染：`ProtectedRoute` 要在首帧就知道该不该放行，
+// 否则会先渲染一帧外壳再被踢去登录页（闪一下）。
+bootstrapI18n().then(async () => {
+  await useAuthStore.getState().bootstrap();
   // 不用 React.StrictMode：dev 模式下它会把组件挂载→卸载→再挂载，
   // useEffect 的数据加载执行两次 → 每次切换菜单同一请求发两遍（生产构建虽不受影响，
   // 但 dev 调试与 E2E 请求计数都被干扰）；页面数据加载均为幂等 GET，无需其严格检查。

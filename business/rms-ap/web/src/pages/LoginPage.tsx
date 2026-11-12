@@ -81,8 +81,8 @@ export default function LoginPage() {
       )}
 
       {isDev && (
-        <div className="dev-token">
-          <div className="dev-token-cap">DEV 预览（粘贴 IAM 签发的 JWT）</div>
+        <div className="sso-relay-dev">
+          <div className="sso-relay-dev-cap">DEV 预览（粘贴 IAM 签发的 JWT）</div>
           <CimInput rows={3} placeholder="eyJ..." value={devToken} onChange={setDevToken} />
           <CimButton block onClick={applyDevToken}>
             以本地令牌进入

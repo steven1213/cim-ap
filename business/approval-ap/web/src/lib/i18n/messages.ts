@@ -28,6 +28,13 @@ export const zhCN: Record<string, string> = {
   'shell.tagline': 'Flowable 驱动的统一审批流编排',
   'shell.crypto': '审计哈希链 · 不可篡改',
   'shell.logout': '退出',
+  // 登录中继（统一登录）
+  'login.title': '登录以继续',
+  'login.redirecting': '正在跳转至统一登录…',
+  'login.admissionDenied': '当前账号未获准访问审批平台（令牌 apps 不含 approval-ap），请联系 IAM 管理员授予准入。',
+  'login.ssoFailed': '统一登录未能完成（令牌无效或已过期），请重新登录。',
+  'login.switchAccount': '改用其他账号登录',
+
   'shell.tabs.label': '页面标签',
   'shell.tabs.scrollLeft': '向左滚动',
   'shell.tabs.scrollRight': '向右滚动',
@@ -483,6 +490,13 @@ export const enUS: Record<string, string> = {
   'shell.tagline': 'Unified approval orchestration powered by Flowable',
   'shell.crypto': 'Hash-chained audit · immutable',
   'shell.logout': 'Logout',
+  // Sign-in relay (unified SSO)
+  'login.title': 'Sign in to continue',
+  'login.redirecting': 'Redirecting to single sign-on…',
+  'login.admissionDenied': 'This account is not admitted to Approval (token apps missing approval-ap). Ask the IAM administrator to grant access.',
+  'login.ssoFailed': 'Single sign-on did not complete (token invalid or expired). Please sign in again.',
+  'login.switchAccount': 'Sign in with another account',
+
   'shell.tabs.label': 'Page tabs',
   'shell.tabs.scrollLeft': 'Scroll left',
   'shell.tabs.scrollRight': 'Scroll right',

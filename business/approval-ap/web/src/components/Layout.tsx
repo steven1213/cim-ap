@@ -6,6 +6,7 @@ import { NAV_GROUPS, NAV_ITEMS } from '@/lib/navConfig';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { useTabStore } from '@/store/tabStore';
 import { useIdentityStore } from '@/store/identityStore';
+import { useAuthStore } from '@/store/authStore';
 import IdentitySwitcher from '@/components/IdentitySwitcher';
 import NotificationBell from '@/components/NotificationBell';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -14,16 +15,22 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
  * 审批流平台外壳。
  *
  * <p>框架来自 {@link ConsoleShell}（与 IAM / RMS 同一份），本文件只保留本 ap 的差异：
- * 菜单来自 {@link NAV_GROUPS} 静态配置、顶栏放身份切换（dev 态模拟操作人）+ 通知铃，
- * 且<b>没有用户块</b>——审批平台当前不持有登录态，接入 IAM 后再补 `user`。</p>
+ * 菜单来自 {@link NAV_GROUPS} 静态配置、顶栏放通知铃与语言切换。</p>
+ *
+ * <p>身份区按通道二选一：统一登录态显示用户块（姓名 + 租户，登出走 IdP 吊销）；
+ * dev 态显示「身份切换」（演示多角色，身份以查询参数表达）。同一份产物两种部署通用。</p>
  */
 export default function Layout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { clear: clearIdentity } = useIdentityStore();
+  const mode = useAuthStore((s) => s.mode);
+  const me = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const openTab = useTabStore((s) => s.open);
   const clearTabs = useTabStore((s) => s.clear);
+  const isDevChannel = mode === 'dev';
 
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const isProd = import.meta.env.MODE === 'production';
@@ -93,10 +100,15 @@ export default function Layout() {
         }}
         topbarExtra={
           <>
-            <IdentitySwitcher />
+            {isDevChannel && <IdentitySwitcher />}
             <NotificationBell />
             <LanguageSwitcher />
           </>
+        }
+        user={
+          isDevChannel
+            ? null
+            : { name: me?.username ?? me?.userId ?? '—', meta: `tenant:${me?.tenantId || 'default'}` }
         }
         footerApp="CIM-AP / Approval-AP"
         footerTagline={t('shell.tagline')}
@@ -106,11 +118,17 @@ export default function Layout() {
           setTheme(next);
           persistTheme(next);
         }}
-        onLogout={() => {
-          // dev 态无真实登出：清身份与页签残留，回到工作台。
-          clearIdentity();
+        onLogout={async () => {
           clearTabs();
-          navigate('/');
+          if (isDevChannel) {
+            // dev 态无真实登出：清身份与页签残留，回到工作台。
+            clearIdentity();
+            navigate('/');
+            return;
+          }
+          // 统一登录：先回 IdP 做服务端吊销（令牌入黑名单 + 清 SSO Cookie），再回登录中继页。
+          await logout();
+          navigate('/login', { replace: true });
         }}
         tabs={tabs}
       >

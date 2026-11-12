@@ -863,3 +863,19 @@ button.side-cap.page-cap {
 @media (prefers-reduced-motion: reduce) {
   .sso-relay-bar i { animation: none; width: 100%; opacity: 0.35; }
 }
+
+/* DEV 令牌区：仅出现在 `<SsoRelay>` 卡片里、DEV 构建才渲染（粘贴 IAM 签发的 JWT 做本地预览）。
+   与中继页同属一类版式，故收在这里；rms 与 approval 两处登录中继页共用（原各自手写一份）。 */
+.sso-relay-dev {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+}
+.sso-relay-dev-cap {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
