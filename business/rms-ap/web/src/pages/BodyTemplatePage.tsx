@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
   Can,
+  CimCheckbox,
   CimDescriptions,
   CimDrawer,
   CimInput,
@@ -435,14 +436,11 @@ function TemplateModal({
                 placeholder={t('rms.btpl.defaultValue')}
                 onChange={(v) => setItem(i, { defaultValue: v })}
               />
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={it.required !== false}
-                  onChange={(e) => setItem(i, { required: e.target.checked })}
-                />
-                {t('rms.btpl.required')}
-              </label>
+              <CimCheckbox
+                checked={it.required !== false}
+                onChange={(checked) => setItem(i, { required: checked })}
+                label={t('rms.btpl.required')}
+              />
               <CimButton
                 size="small"
                 onClick={() => setItems((l) => l.filter((_, idx) => idx !== i))}

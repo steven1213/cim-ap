@@ -135,6 +135,8 @@ export function EmptyState({
   icon,
   children,
   large = false,
+  className,
+  style,
 }: {
   titleKey?: string;
   title?: ReactNode;
@@ -146,12 +148,21 @@ export function EmptyState({
   children?: ReactNode;
   /** 大号形态：整页状态页（图标更大、留白更多）。 */
   large?: boolean;
+  /**
+   * 额外类名（合并而非覆盖）。
+   *
+   * 面板内嵌的空态常要改外边距/内边距，此前这类页面只能手写
+   * `<div className="empty" style={{ padding: '28px 0' }}>` 绕开组件。
+   */
+  className?: string;
+  /** 内联样式，用途同 `className`（压 padding / margin）。 */
+  style?: CSSProperties;
 }) {
   const t = useUiT();
   const main = titleKey ? t(titleKey) : title;
   const sub = hintKey ? t(hintKey) : hint;
   return (
-    <div className={large ? 'cim-empty cim-empty-lg' : 'cim-empty'}>
+    <div className={cx('cim-empty', large && 'cim-empty-lg', className)} style={style}>
       {icon ? <div className="cim-empty-icon">{icon}</div> : null}
       {main ? <div className="cim-empty-title">{main}</div> : null}
       {sub ? <div className="cim-empty-hint">{sub}</div> : null}

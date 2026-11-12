@@ -329,6 +329,84 @@
   font-size: var(--fs-xs);
   color: var(--text-2);
 }
+/* 静态说明文案行：开关 + 不随状态变化的说明（「只显示生效中」）。
+   与 `.cim-switch-text` 的区别是后者跟 checked 变文字，这里恒定。 */
+.cim-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+/* ---------- 单复选框 ----------
+   自绘方框：全局 `input { width:100%; padding; border }` 会把复选框拉成输入框。
+   同一套画法原先散在三个 ap 的 `.check` 里（iam/rms/approval 逐字节相同）。 */
+.cim-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.cim-checkbox-block {
+  align-items: flex-start;
+  white-space: normal;
+}
+/* 自绘方框：`CimCheckbox` 内部用，也可单独挂在裸 <input> 上
+   （表格/网格单元格里的复选框没有配对文案，套不进 CimCheckbox）。
+   全局 `input { width:100%; padding; border }` 会把复选框拉成输入框，故自绘。 */
+.cim-check,
+.cim-checkbox input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--panel);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: 0.14s ease;
+}
+.cim-check:hover:not(:disabled),
+.cim-checkbox input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.cim-check:checked,
+.cim-checkbox input[type='checkbox']:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.cim-check:checked::after,
+.cim-checkbox input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1.5px;
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.cim-check:focus-visible,
+.cim-checkbox input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.cim-check:disabled,
+.cim-checkbox input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ---------- 下拉选项（值 + 右侧补充说明） ---------- */
 .cim-select-opt {

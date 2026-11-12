@@ -5,6 +5,7 @@ import {
   CimTag,
   CimTree,
   DataTable,
+  EmptyState,
   Page,
   PageHead,
   Panel,
@@ -14,7 +15,6 @@ import {
   CimButton,
   InlineAlert,
   KpiCard,
-
   KpiGrid,
   CimSplitPane,
 } from '@cim/ui';
@@ -315,7 +315,7 @@ export default function DeviceRecipePage() {
             <InlineAlert tone="err" style={{ margin: 14 }}>{baseRes.error.message}</InlineAlert>
           ) : null}
           {nodes.length === 0 && baseRes.loaded ? (
-            <div className="empty">{t('rms.deviceRecipes.noAreas')}</div>
+            <EmptyState title={t('rms.deviceRecipes.noAreas')} />
           ) : (
             <div style={{ padding: '8px 6px' }}>
               <CimTree

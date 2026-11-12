@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
   Can,
+  CimCheckbox,
   CimInput,
   CimSelect,
   CimTag,
@@ -610,18 +611,17 @@ export default function UsersPage() {
         <Panel title={t('iam.users.orgsTitle', { id: target.userId })} sub={t('iam.users.orgsSub')}>
           <div className="org-pick">
             {orgOptions.map((o) => (
-              <label key={o.id} className="check">
-                <input
-                  type="checkbox"
-                  checked={!!orgSel[o.id]}
-                  onChange={(e) => {
-                    setOrgSel((prev) => ({ ...prev, [o.id]: e.target.checked }));
-                    if (e.target.checked && !orgPrimary) setOrgPrimary(o.id);
-                    if (!e.target.checked && orgPrimary === o.id) setOrgPrimary('');
-                  }}
-                />
-                <span>{o.label}</span>
-              </label>
+              <CimCheckbox
+                key={o.id}
+                checked={!!orgSel[o.id]}
+                onChange={(checked) => {
+                  setOrgSel((prev) => ({ ...prev, [o.id]: checked }));
+                  if (checked && !orgPrimary) setOrgPrimary(o.id);
+                  if (!checked && orgPrimary === o.id) setOrgPrimary('');
+                }}
+              >
+                {o.label}
+              </CimCheckbox>
             ))}
             {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
           </div>

@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import { IconAlert } from '@/components/Icons';
 
-import { CimButton } from '@cim/ui';
+import { CimButton, EmptyState } from '@cim/ui';
 /**
  * 启动数据闸门：登录态下，先取齐「菜单树 + 权限码集」再渲染控制台。
  *
@@ -47,9 +47,7 @@ export default function BootGate({ children }: { children: ReactNode }) {
       <div className="boot-splash">
         <div className="panel">
           <div className="panel-body">
-            <div className="empty">
-              <b>{t('iam.common.loading')}</b>
-            </div>
+            <EmptyState title={t('iam.common.loading')} />
           </div>
         </div>
       </div>
@@ -61,12 +59,15 @@ export default function BootGate({ children }: { children: ReactNode }) {
       <div className="boot-splash">
         <div className="panel">
           <div className="panel-body">
-            <div className="empty">
-              <IconAlert width={28} height={28} />
-              <b>{t('iam.common.menuFailed')}</b>
-              <p>{error}</p>
-              <CimButton type="primary" onClick={() => setAttempt((v) => v + 1)}>{t('iam.common.retry')}</CimButton>
-            </div>
+            <EmptyState
+              icon={<IconAlert width={28} height={28} />}
+              title={t('iam.common.menuFailed')}
+              hint={error}
+            >
+              <CimButton type="primary" onClick={() => setAttempt((v) => v + 1)}>
+                {t('iam.common.retry')}
+              </CimButton>
+            </EmptyState>
           </div>
         </div>
       </div>

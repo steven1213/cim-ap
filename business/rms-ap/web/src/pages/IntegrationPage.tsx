@@ -328,10 +328,12 @@ export default function IntegrationPage() {
         titleKey="rms.integration.holds"
         flush
         actions={
-          <label className="check">
-            <CimSwitch size="small" checked={activeOnly} onChange={setActiveOnly} />
-            {t('rms.integration.onlyActive')}
-          </label>
+          <CimSwitch
+            size="small"
+            checked={activeOnly}
+            onChange={setActiveOnly}
+            label={t('rms.integration.onlyActive')}
+          />
         }
       >
         <DataTable<HoldView>
@@ -351,10 +353,12 @@ export default function IntegrationPage() {
         titleKey="rms.integration.alarms"
         flush
         actions={
-          <label className="check">
-            <CimSwitch size="small" checked={unackOnly} onChange={setUnackOnly} />
-            {t('rms.integration.onlyUnack')}
-          </label>
+          <CimSwitch
+            size="small"
+            checked={unackOnly}
+            onChange={setUnackOnly}
+            label={t('rms.integration.onlyUnack')}
+          />
         }
       >
         <DataTable<AlarmView>
@@ -1038,10 +1042,12 @@ function DownloadPanel({
           </Can>
         }
         right={
-          <label className="check">
-            <CimSwitch size="small" checked={pendingOnly} onChange={setPendingOnly} />
-            {t('rms.integration.dl.pendingOnly')}
-          </label>
+          <CimSwitch
+            size="small"
+            checked={pendingOnly}
+            onChange={setPendingOnly}
+            label={t('rms.integration.dl.pendingOnly')}
+          />
         }
       />
 

@@ -75,6 +75,7 @@ export {
   type CimTimePickerProps,
 } from './form/DatePicker';
 export { CimSwitch, type CimSwitchProps } from './form/Switch';
+export { CimCheckbox, type CimCheckboxProps } from './form/Checkbox';
 export { CimChoice, type CimChoiceProps, type ChoiceMode } from './form/Choice';
 export { CimUpload, type CimUploadProps } from './form/Upload';
 

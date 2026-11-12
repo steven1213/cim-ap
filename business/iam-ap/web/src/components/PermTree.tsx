@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { MenuTreeNode, SysPermissionDto } from '@/types';
 import { IconChevron } from '@/components/Icons';
 
-import { CimButton } from '@cim/ui';
+import { CimButton, CimCheckbox } from '@cim/ui';
 /**
  * 权限点树（权限管理 / 角色授权共用）——与菜单树**同构**的 DIR → MENU → BUTTON 三层树。
  *
@@ -154,6 +154,7 @@ export default function PermTree({
         {grantMode ? (
           <input
             type="checkbox"
+            className="cim-check"
             checked={id !== undefined && (checkedPerms?.has(id) ?? false)}
             disabled={superMode || id === undefined}
             onChange={() => {
@@ -278,6 +279,7 @@ export default function PermTree({
             {grantMode ? (
               <input
                 type="checkbox"
+                className="cim-check"
                 title={t('iam.admin.roles.menuTip')}
                 checked={checkedMenus?.has(m.id) ?? false}
                 disabled={superMode}
@@ -294,17 +296,17 @@ export default function PermTree({
             </span>
             {m.permCode ? (
               grantMode ? (
-                <label className="check ptree-entry" title={t('iam.admin.roles.entryTip')}>
-                  <input
-                    type="checkbox"
-                    checked={entryId !== undefined && (checkedPerms?.has(entryId) ?? false)}
-                    disabled={superMode || entryId === undefined}
-                    onChange={() => {
-                      if (entryId !== undefined) onTogglePerm?.(entryId, !checkedPerms?.has(entryId));
-                    }}
-                  />
+                <CimCheckbox
+                  className="ptree-entry"
+                  title={t('iam.admin.roles.entryTip')}
+                  checked={entryId !== undefined && (checkedPerms?.has(entryId) ?? false)}
+                  disabled={superMode || entryId === undefined}
+                  onChange={() => {
+                    if (entryId !== undefined) onTogglePerm?.(entryId, !checkedPerms?.has(entryId));
+                  }}
+                >
                   <span className="tree-code dim mono">{m.permCode}</span>
-                </label>
+                </CimCheckbox>
               ) : (
                 <span
                   className={'tree-code dim mono' + (pickable ? ' clickable' : '')}

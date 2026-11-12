@@ -7,6 +7,7 @@ import {
   CimInput,
   CimTag,
   DataTable,
+  EmptyState,
   Page,
   Panel,
   type DataTableColumn,
@@ -143,10 +144,11 @@ export default function AuditPage() {
             scrollX="max-content"
           />
         ) : (
-          <div className="empty" style={{ padding: '28px 0' }}>
-            <IconShield width={26} height={26} />
-            <span>{t('audit.empty')}</span>
-          </div>
+          <EmptyState
+            icon={<IconShield width={26} height={26} />}
+            title={t('audit.empty')}
+            style={{ padding: '28px 0' }}
+          />
         )}
       </Panel>
     </Page>

@@ -8,13 +8,6 @@
   width: 100%;
   overflow-x: auto;
 }
-/* 表格行内操作区：允许换行，避免窄列把按钮挤成竖排 */
-.cell-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
 /* 表头内的紧凑下拉（审计筛选等） */
 .select-sm {
   height: 26px;
@@ -66,12 +59,6 @@ table.data th.num,
 table.data td.num {
   text-align: right;
 }
-table.data .cell-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
 /* ---------- 表单 ----------
    `.field*` 已上提到 `@cim/ui`（`.cim-field*`，由 `CimField` 组件承载），
    含「网格内相邻 margin 归零」那条规则。页面侧不再手写 `.field`。 */
@@ -148,16 +135,6 @@ input.mono {
 .row > button {
   flex: 0 0 auto;
 }
-
-/* ---------- 提示 ---------- */
-
-.hint {
-  margin: 9px 0 0;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  line-height: 1.6;
-}
-
 .note-list {
   margin: 0;
   padding-left: 16px;
@@ -170,26 +147,6 @@ input.mono {
   background: var(--panel-3);
   padding: 1px 4px;
   border-radius: 3px;
-}
-
-/* 空状态 */
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 26px 16px;
-  text-align: center;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-.empty svg {
-  color: var(--line-strong);
-}
-.empty b {
-  color: var(--text-2);
-  font-weight: 600;
-  font-size: var(--fs-sm);
 }
 
 /* ---------- 启动闸门（等菜单 + 权限就绪，此时外壳尚未渲染） ---------- */
@@ -359,55 +316,7 @@ input.mono {
   gap: 10px;
   margin-top: 12px;
 }
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--fs-xs);
-  color: var(--text-2);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-/* 复选框需清掉全局 input 的样式并自绘，否则原生控件不受 padding/背景影响（权限点树同款） */
-.check input[type='checkbox'],
-.ptree input[type='checkbox'] {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  margin: 0;
-  border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  background: var(--panel);
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: 0.14s ease;
-}
-.check input[type='checkbox']:hover {
-  border-color: var(--primary);
-}
-.check input[type='checkbox']:checked {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-.check input[type='checkbox']:checked::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 1.5px;
-  width: 4px;
-  height: 7px;
-  border: solid #fff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.check input[type='checkbox']:focus-visible {
-  outline: none;
-  box-shadow: var(--ring);
-}
+
 .caps-hint {
   margin: 6px 0 0;
   font-size: var(--fs-xs);
@@ -427,73 +336,6 @@ input.mono {
 }
 
 /* ---------- 响应式 ---------- */
-@media (max-width: 1180px) {
-  .grid-3 {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 900px) {
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: var(--shadow-lg);
-  }
-  .shell.collapsed .sidebar {
-    width: var(--sidebar-w);
-  }
-  .shell.collapsed .brand-text,
-  .shell.collapsed .side-text,
-  .shell.collapsed .side-cap,
-  .shell.collapsed .side-note span {
-    display: revert;
-  }
-  .shell.collapsed .sidebar-brand {
-    justify-content: flex-start;
-    padding: 0 16px;
-  }
-  .shell.collapsed .side-link {
-    justify-content: flex-start;
-    padding: 8px 10px;
-  }
-  .shell.collapsed .side-link.active::before {
-    left: -8px;
-  }
-  .shell.mobile-open .sidebar {
-    transform: translateX(0);
-  }
-  .main,
-  .shell.collapsed .main {
-    margin-left: 0;
-  }
-  .grid-2 {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .login-page {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .login-visual {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .topbar {
-    padding: 0 12px;
-  }
-  .content {
-    padding: 12px 10px 18px;
-  }
-  .env-chip,
-  .user-meta {
-    display: none;
-  }
-  .crumb p,
-  .crumb .path {
-    display: none;
-  }
-}
-
 /* ============================================================================
  * RMS 补充工具类（W2 新增；与 iam 设计系统同源，统一复用令牌）
  * ========================================================================== */

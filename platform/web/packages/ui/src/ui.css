@@ -815,3 +815,31 @@ button:disabled {
   font-size: 10.5px;
   letter-spacing: 0.04em;
 }
+
+/* ---------- 工具类（跨 ap 逐字节相同，原三份各自定义） ---------- */
+/* 字段下方的一行补充说明 */
+.hint {
+  margin: 9px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  line-height: 1.6;
+}
+/* 表格行内操作区：允许换行，避免窄列把按钮挤成竖排 */
+.cell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* 网格的收窄断点：与 .grid-2/.grid-3 本体一起放在平台，避免各 ap 再抄一份 */
+@media (max-width: 1180px) {
+  .grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

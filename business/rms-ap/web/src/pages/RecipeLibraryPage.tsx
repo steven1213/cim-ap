@@ -261,10 +261,12 @@ export default function RecipeLibraryPage() {
           width: 220,
         }}
         actions={
-          <label className="check">
-            <CimSwitch size="small" checked={goldenOnly} onChange={setGoldenOnly} />
-            {t('rms.recipe.goldenOnly')}
-          </label>
+          <CimSwitch
+            size="small"
+            checked={goldenOnly}
+            onChange={setGoldenOnly}
+            label={t('rms.recipe.goldenOnly')}
+          />
         }
         onRowDoubleClick={(r) => setActive(r)}
       />
