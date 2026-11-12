@@ -1007,6 +1007,91 @@ cim.jpa.sql-log.admin-enabled=false
 - 代价写清楚：这条链（`addFilterBefore` 锚点、`SecurityContextHolderFilter` 覆盖上下文、开放 API 身份写入）
   本身**测试覆盖不到**，改它必须手工起一次服务。这一点没变。
 
+## 41. 同一件事的第二份实现：一次横向清理（2026-11-12）
+
+### 41.1 起点：approval 的 styles.css 是 RMS 的整份拷贝
+
+清样式时看到一段注释：`/* ---------- RMS 业务流补充：工具栏 / 搜索框 / 批量条 / 复选框 / 选中行 ---------- */`
+——这是 approval 的样式文件。顺着这条线索扫下去：146 个类选择器里，**32 个在 approval 里零引用**
+（batch-report / dcrumb / pick-list / row-sel / fp-* 中的一部分…），另有 13 个是「平台组件在用、
+approval 又抄了一份」的重复定义。
+
+判定方法（写下来，避免下次靠感觉）：
+
+```
+候选 = CSS 里出现的所有类名
+活   = approval 的 tsx/ts/index.html 里出现过（正则 (?<![\w-])cls(?![\w-])，前后不能粘 - 和字母）
+半死 = approval 不引用，但 platform/web/packages 的 tsx/css 引用 → 平台组件在用，不能删
+真死 = 两边都不引用 → 删
+```
+
+⚠️ **两个必须手工复核的坑**：
+1. **动态拼接逃过正则**：`className={`fp-step fp-${st}`}` 让 `fp-active/fp-done/fp-pending/fp-skipped`
+   四个类在任何字面量里都不出现。所以「零引用」结论出来以后，还得把 `className={` 与三元表达式
+   逐个看一遍（本项目只有 4 处动态拼接，成本很低）。
+2. **`data` 被 `res.data` 命中**：按单词边界找 `data` 会把 `detailRes.data` 当成类名使用，
+   于是 `table.data` 被误判为活样式。表家族要按完整选择器（`table.data`）判，不能按类名判。
+   —— 这条正是「逐字节相同 ≠ 都活着」的姊妹教训：**同一个词在不同命名空间里的命中，不算命中**。
+
+结果：删 42 条规则 + 7 条 `table.data` 规则，styles.css 1243 → 953 行。
+
+### 41.2 图标：approval 是第三份未并的副本
+
+`@cim/ui/src/icons.tsx` 的注释早就写着「IAM 与 RMS 曾各存一份、现在本文件是唯一来源」，
+但 approval 没跟上：**13 个同名图标，路径无一相同**（`IconInbox`/`IconShield`/`IconBell`/`IconUser`/
+`IconPlus`/`IconSearch`/`IconSun`/`IconMoon`/`IconSidebar`/`IconLogout`/`IconRefresh`/`IconChevron`/`IconTrash`）。
+同一语义两套画法，切应用时能看出图标「胖瘦」不同。
+
+改为 iam/rms 用过的薄壳范式：顶部 re-export 平台版本，本地只留 17 个审批领域图标，
+`Svg` 基准对齐 `@cim/ui`（20px / stroke 1.8，原来是 18 / 1.7）。
+
+⚠️ **同名不等于同语义**：`IconChevron` 平台版是**右**箭头（树/面包屑），approval 原版是**下**箭头
+（下拉展开指示）。直接换会让身份切换器的箭头指错方向，所以那一处加 `rotate(90deg)` 并写清原因。
+同类要注意的还有 `IconShield`（平台版无勾、approval 版带勾），语义仍在「权限/安全」范围内，接受。
+
+### 41.3 403：判定早统一了，呈现各写各的
+
+`RequirePermission` 早在 `@cim/shell` 共用，但两个应用注入的 fallback 差得远：
+IAM 是「图标 + 标题 + 说明 + 返回首页」，RMS 只有一行「403 / 无访问权限」，**没有图标也没有出口**。
+同一个语义在相邻两个应用里不像同一个产品。
+
+新增 `@cim/ui` 的 `ForbiddenState`（Panel + EmptyState large + 图标 + 出口插槽），两处改用。
+文案仍各自注入（`@cim/ui` 不碰文案的铁律不变），`Link` 由应用给（`@cim/ui` 不依赖 router）。
+
+**保留的差异**（有意，不是没统一）：呈现位置——IAM 跳 `/403`（权限管理台要让地址栏明确「你在 403」，
+才好引导去角色授权），RMS 就地渲染（URL 不变，补权限后刷新即达原页）。
+
+### 41.4 时间线：两套视觉合成一套
+
+RMS 的签核事件流用 `.timeline`（竖线 + 圆点 + 标题/时间/详情），approval 的审批历史用
+另一套 `.detail-timeline`（左侧竖排 tag + 虚线分隔）。同一产品里两种时间轴观感。
+
+处理：`.timeline` 全家 10 条规则**逐字节相同**（脚本比对确认）→ 上提到 `@cim/ui/ui.css`，
+rms 删本地副本；approval 的渲染改成同一结构，动作标签从左侧独立列改为**就近放进标题行**
+（`.timeline-title` 加 `display:flex`，对 rms 无副作用），圆点沿用 5 档语义色映射到
+`ok/err/warn` + 默认主色。哈希行（`#seq hash…`）保留在本地 `.detail-hash`。
+
+视觉验证用探针页（静态 HTML + 真 CSS，chrome headless 截图 2 倍放大）确认：
+竖线连续、圆点对齐首行文字、tag 与 actor 同行不重叠、末项竖线终止。
+
+### 41.5 `CimDispatchController`：默认关闭的未验证写法，改掉
+
+见 `api-convention.md §6.5` 的引注。结论：它是 Spring 6 硬事实的活反例（开关一开就 404），
+已改三件套 + 4 例测试，反向验证先红后绿。
+
+### 41.6 验证
+
+| 项 | 结果 |
+|---|---|
+| approval / rms / iam 前端 | `tsc --noEmit` 全绿；三者 `vite build` 全绿 |
+| `cim-spring-support` | **29/29**（新增 `CimDispatchEndpointTest` 2 + `CimDispatchDisabledTest` 2） |
+| 反向验证 | 把 `@RestController` 换回 `@RequestMapping + @ResponseBody` → `endpointIsMapped` 失败（404），Bean 断言仍绿 |
+| 视觉 | 探针页 2× 截图：时间线 / 403 结构均正确 |
+
+**明确不做的**：approval 前端没有权限门（页面级守卫、`<Can>`、`CimButton perm` 全为零）。
+不是漏的——它的授权链只到角色级（`approval-ap:ADMIN`），没有细粒度权限码，加页面守卫
+只能全放行或全拦。等权限码体系定下来再说，别现在补一个假装有门的空壳。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

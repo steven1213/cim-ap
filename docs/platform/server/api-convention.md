@@ -260,6 +260,13 @@ public SseController sseController(SseRegistry r, NotifyProperties p) { … }
 守门测试：`LibraryEndpointScanTest`（bootstrap，关开关真启动一次）、`SseControllerScanConditionTest`
 （notify，扫描候选断言，毫秒级）。
 
+> **`CimDispatchController` 曾是这条规则的活反例**：`cim.api.dispatch.enabled` 默认关、零测试，
+> 类注释还写着「`@RequestMapping + @ResponseBody` 仍被 MVC 识别为处理器」——正是硬事实一要否掉的说法。
+> 意思是只要有人打开开关，端点就静默 404，而当时没人会打开它。2026-11-12 改为三件套并补了
+> `CimDispatchEndpointTest` / `CimDispatchDisabledTest` 各 2 例；**反向验证**：把 `@RestController`
+> 换回 `@RequestMapping + @ResponseBody`，`endpointIsMapped` 立刻转红（404），而 `controllerIsRegistered`
+> 仍绿——「Bean 在、路由不在」正是这个坑的形状，光看启动日志和 Bean 列表都发现不了。
+
 ---
 
 ## 7. 落地清单

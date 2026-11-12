@@ -151,3 +151,13 @@
   - **库内端点定死**：反编译确认 Spring **6.0** 起 `isHandler()` 只认 `@Controller`，所以 `@RequestMapping + @ResponseBody` + @Bean 注册**永远 404**（5.x 的旧分支已删）。而 `@Controller` 蕴含 `@Component`，宿主 `scanBasePackages="com.cim"` 必扫到——**开关一关 `@Bean` 不注册，扫描定义成唯一 → `No qualifying bean of type 'java.lang.String'`（SqlLogAdminController 构造器首参 loggerName）**，报错不提开关。修法：类上补与自动装配一字不差的 `@ConditionalOnProperty`（`SqlLogAdminController` / `SseController`），规则三件套写进 `api-convention.md` §6.5。
   - 验证：approval **29/29**、`cim-spring-support` 25/25、`cim-jpa-starter` 43/43、`cim-notify-starter` 13/13、`cim-bootstrap` 6/6、E2E 两形态各 17/17、iam/rms `tsc` 零错。**4 处反向验证**均先红后绿（域隔离、签名篡改、sql-log 扫描、SSE 扫描）。
   - 仍未做：JWT 测试依赖 test-jar，消费方构建前须先 `install` 平台模块（**接入 CI 时的前置条件**，见 AUDIT §40.6）。
+- **2026-11-12（续10）CI 决策 + 横向统一清理**：
+  - **CI 明确不接**（用户决定）：`e2e-security.sh` 入口已在，手工触发；「先 install 平台模块」「E2E 起真进程须独立 job」两条转为将来接入时的前置条件，不再当缺口提。代价写明：认证链那条路径测试覆盖不到，改它必须手工起一次服务。
+  - **approval 的 styles.css 是 RMS 整份拷贝**：146 个类名里 32 个零引用、13 个与平台重复。删 42 + 7 条规则，1243 → 953 行。判定三步：ap 内引用 → 平台组件引用（不能删）→ 动态拼接复核（`fp-${st}` 这类躲得过正则）。
+  - **⚠️ `data` 会被 `res.data` 命中** → `table.data` 误判为活。表格家族按**完整选择器**判，不能按类名判。
+  - **图标第三份并入**：approval 13 个同名图标路径无一相同 → 改薄壳 re-export（iam/rms 早做过），本地只留 17 个领域图标，`Svg` 基准对齐 20px/1.8。⚠️ **同名 ≠ 同语义**：平台 `IconChevron` 是右箭头（树语义），approval 原版是下箭头（下拉）→ 那处加 `rotate(90deg)`。
+  - **403 统一呈现**：新增 `@cim/ui` 的 `ForbiddenState`（Panel + EmptyState large + 图标 + 出口插槽）。判定早就在 `@cim/shell` 共用，漂的是呈现层（RMS 原版只有一行「403」、没图标没出口）。保留差异：IAM 跳 `/403`、RMS 就地渲染——这是产品选择，不是没统一。
+  - **时间线两套合一套**：`.timeline*` 10 条规则两 ap **逐字节相同** → 上提 `@cim/ui/ui.css`；approval 的 `.detail-timeline` 改同一结构，动作 tag 就近放进标题行（`.timeline-title` 加 flex，对 rms 无副作用）。视觉用探针页 2× 截图验证：竖线连续、圆点对齐首行、tag 与 actor 不重叠。
+  - **`CimDispatchController` 修掉**：它是 §6.5 硬事实的活反例（`@RequestMapping + @ResponseBody` + 开关默认关 + 零测试），开关一开就静默 404。改三件套 + `CimDispatchEndpointTest`/`CimDispatchDisabledTest` 各 2 例。**反向验证**：换回旧注解 → `endpointIsMapped` 404 失败、`controllerIsRegistered` 仍绿（「Bean 在、路由不在」）。
+  - **approval 无权限门是「不做」不是「漏做」**：授权只到角色级（`approval-ap:ADMIN`），加守卫只能全放行或全拦。等权限码体系落地。
+  - 验证：三端 `tsc` 零错 + `vite build` 全绿；`cim-spring-support` **29/29**；1 处反向验证先红后绿。

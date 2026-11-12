@@ -223,14 +223,21 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 - **入字典**：同一枚举**跨页出现 ≥2 次**（`qualificationStatus`、`versionStatus`、`auditResult`）。
 - **不入**：只出现 1 次的页面局部判定（`reconcileResult === 'DRIFT'`、`severity === 'CRITICAL'`、`cmpResult`）——进 `STATUS_TONES` 只会造出**无人复用的键**，反而让字典失真。
 
-### 7.5 `approval` 的图标：同名但不同画法
+### 7.5 `approval` 的图标：同名但不同画法 ✅ 已合并（2026-11-12）
 
-`approval-ap/web/src/components/Icons.tsx` 仍是 235 行 / 32 个本地图标，其中 14 个与 `@cim/ui` **同名**
-（`IconBell`/`IconChevron`/`IconInbox`/`IconLogout`/`IconMoon`/`IconPlus`/`IconRefresh`/`IconSearch`/`IconShield`/`IconSidebar`/`IconSun`/`IconTrash`/`IconUser`/`IconX`），
-但逐个比对 `d` 属性**全部不同**——approval 是 24×24 stroke 画法，平台是另一套网格。
+`approval-ap/web/src/components/Icons.tsx` 曾是第三份未并的副本（235 行 / 31 个本地图标），其中
+**13 个与 `@cim/ui` 同名**（`IconBell`/`IconChevron`/`IconInbox`/`IconLogout`/`IconMoon`/`IconPlus`/
+`IconRefresh`/`IconSearch`/`IconShield`/`IconSidebar`/`IconSun`/`IconTrash`/`IconUser`，外加别名 `IconX`），
+逐个比对 `d` 属性**无一相同**。
 
-按「逐字节相同才上提」的判据**不合并**（合并会改 approval 图标观感）。这属于**视觉一致性**议题，
-需要一次统一图标的独立决策，不能顺手做。
+当时按「逐字节相同才上提」判为**不合并**（合并会改观感），并把它标成「需一次统一图标的独立决策」。
+2026-11-12 做掉了：同名就是同一语义，两套画法属缺陷而非差异 → 改薄壳 re-export，本地只留 17 个
+审批领域图标，`Svg` 基准对齐平台（20px / stroke 1.8，原 18 / 1.7）。
+
+⚠️ **同名 ≠ 同语义，合并时逐个看方向/细节**：平台 `IconChevron` 是**右**箭头（树/面包屑），
+approval 原版是**下**箭头（下拉展开），直接换会让身份切换器箭头指错 → 那一处加 `rotate(90deg)`。
+`IconShield` 平台版无勾、approval 版带勾，语义仍在「权限/安全」内，接受。
+判据补充：**判「能不能合并」看语义，判「要不要上提」才看逐字节相同**——前者是产品一致性，后者是代码复用。
 
 ---
 
@@ -315,8 +322,8 @@ mds / mes 仍是骨架，接入时照 approval 这一份抄即可（后端 `/me`
 | --- | --- | --- |
 | 手写 `<div className="form-grid">` 包 `CimField` 子树 | 1 | `FormGrid` 是**受控声明式表单**（`fields[]` + `value/onChange` 自动渲染控件），接不住自定义 `CimField` 子节点；只有 1 处，不值得再开一个「纯布局网格」组件 |
 | 手写 `<dl className="meta">` / `<dl className="kv">` | 9 | 用的是平台 `.meta`/`.kv` 样式，`CimDescriptions` 是「label/value 数组」语义；这些块的 value 里嵌 `CimTag`/条件渲染，逐块判断成本高于收益 |
-| 时间线 | 2 套 | rms 用 `.timeline*`（SignoffPage），approval 用 `.detail-timeline*`（详情弹窗），**类名与结构都不同**。是否统一属视觉决策，需先比对两套设计稿 |
-| `table.data` 遗留表格样式 | iam / approval | 两 ap 已无手写 `<table>`，但这段与 rms 的 `RecipeDetailDrawer` 同源，删前需确认 rms 视觉不变——留给死样式专项 |
+| 时间线 | 2 套 → **已统一** | 原判「类名与结构都不同，是否统一属视觉决策」。2026-11-12 决定统一：`.timeline*` 规则两 ap **逐字节相同**（脚本比对），上提 `@cim/ui/ui.css`；approval 的 `.detail-timeline` 改为同一结构，动作标签就近放进标题行。见 §9.2 |
+| `table.data` 遗留表格样式 | iam / approval → **已删** | 两 ap 已无手写 `<table>`；approval 侧 7 条规则直接删除（`grep <table` 零命中）。rms 侧仍在用（`RecipeDetailDrawer` 的 k/v 表），未动。见 §9.1 |
 
 ### 8.5 复扫方法（可复现）
 
@@ -328,3 +335,45 @@ mds / mes 仍是骨架，接入时照 approval 这一份抄即可（后端 `/me`
 
 ⚠️ 第 3 步必须剔注释：本仓大量迁移说明写着「手写 `.modal-backdrop` → `CimModal`」，
 不剔注释会把 `.modal*`/`.drawer*`/`table.data` 全判成活代码（本轮先踩了一次）。
+
+---
+
+## 9. 第四次复扫：清死代码 + 三处横向统一（2026-11-12 续 4）
+
+本轮不再是「页面绕开组件」，而是**同一件事的第二份实现**：样式抄了一份、图标存了第三份、
+403 页各写一份、时间线各有一套。
+
+### 9.1 `approval/styles.css`：从 RMS 整份拷来的 32 个死类
+
+线索是一段注释——approval 的样式文件里写着「RMS 业务流补充」。扫完 146 个类名：**32 个零引用**，
+13 个「平台组件在用、approval 又抄一份」。删 42 + 7 条规则，文件 1243 → 953 行。
+
+判定口径（三步，缺一会误删）：
+
+1. **ap 内引用**：`tsx/ts/index.html` 里整词出现（前后不能粘 `-`/字母）；
+2. **平台组件引用**：`platform/web/packages` 的 `tsx/css` 里出现 → 是平台组件产生的类名，**不能删**；
+3. **动态拼接复核**：``className={`fp-step fp-${st}`}` `` 让 `fp-active/fp-done/…` 在字面量里永不出现。
+   本项目仅 4 处动态拼接，逐个人工看一遍即可。
+
+⚠️ **按类名判会误杀/误留**：`data` 这个类名会被 `detailRes.data` 命中 → `table.data` 被判活。
+表格家族必须按**完整选择器**判。姊妹教训：逐字节相同 ≠ 都活着；同一个词在不同命名空间命中 ≠ 命中。
+
+### 9.2 三处横向统一
+
+| 对象 | 统一到 | 保留的差异（有意） |
+| --- | --- | --- |
+| 权限图标 | 13 个同名图标 → `@cim/ui`，本地只留 17 个领域图标（见 §7.5 更新） | `IconChevron` 方向（平台右箭头 = 树语义；下拉处 `rotate(90deg)`） |
+| 403 页 | 新增 `@cim/ui` 的 `ForbiddenState`（Panel + EmptyState large + 图标 + 出口插槽） | 呈现位置：IAM 跳 `/403`、RMS 就地渲染 |
+| 时间线 | `.timeline*` 上提 `@cim/ui/ui.css`，两 ap 共用 | approval 多一行哈希（`.detail-hash` 留本地） |
+
+### 9.3 顺带修掉的：`CimDispatchController`
+
+默认关 + 零测试 + 用 Spring 6 不认的注解写法（注释还断言「仍被 MVC 识别」）。
+改三件套并补 4 例测试；反向验证：换回旧注解，`endpointIsMapped` 立刻 404 而 Bean 断言仍绿
+——「Bean 在、路由不在」。详见 `docs/platform/server/api-convention.md §6.5` 与 AUDIT §41.5。
+
+### 9.4 结论：`approval` 前端没有权限门，是**不做**不是**漏做**
+
+页面级守卫、`<Can>`、`CimButton perm` 在 approval 里全为零。原因是授权链只到角色级
+（`approval-ap:ADMIN`），没有细粒度权限码：加守卫只能「全放行」或「全拦」，前者是假门、
+后者直接不可用。**等权限码体系落地再补**——现在补一个看起来有门的空壳，比没有更糟。
