@@ -119,7 +119,7 @@
 | 7 | `.split` 双栏 | 6 处 5 文件；`ui.css` 已有 `.split` 样式但**无组件** | 无 | 加 `SplitPane`（`left` / `right` / `ratio`），顺带把 `CimSplitter` 的用途讲清 | ✅ 新增 `CimSplitPane`，6 处替换；与 `CimSplitter` 的分工写进两个 header |
 | 8 | `.field` 表单块 | 101 处（IAM 65 / approval 36）；`FormGrid` 已存在但只 4/4 文件使用 | 与 `FormGrid` 职责重叠 | **不建议**新增组件，按页把 `.field` 手写块并进 `FormGrid` | ✅ 结论修正：容器口径实为 49 处，`CimField` 已存在但**没有 CSS**（空壳）→ 补样式后全部替换，`FormGrid` 只在"整表配置驱动"时用 |
 | 9 | `PermTree`（IAM 335 行） | 单应用 | 领域组件 | 不上提 | — |
-| 10 | `th`/`td` 手写表 | 仅 RMS `Dashboard` / `DeviceArea` 各 1 处 | 无 | 换 `DataTable`（`scrollX` 已支持） | ⏳ 仍待办 |
+| 10 | `th`/`td` 手写表 | `Dashboard` / `DeviceArea` 两处已换 `DataTable`；现仅剩 `RecipeDetailDrawer` 一处 k/v 表（与 §6.5 同一处） | 无 | 剩下的那处是「字段名/字段值」两列，`DataTable` 接不住 | ✅ 已落地（本条曾标 ⏳，实际早已迁完——核账时按 `grep -rln "<th\\b\\|<td\\b"` 数，别按记忆） |
 
 ---
 
@@ -134,6 +134,7 @@
 | `IdentitySwitcher` | approval-ap | 审批暂无 RBAC，用"切身份"联调，与 IAM/RMS 的权限模型不同 |
 | `PermTree` | iam-ap | 菜单树 + 平台码双闸门，IAM 域专用 |
 | `NotificationBell` 的通知 DTO | rms/approval | 见 §4-5，**组件可上提、DTO 不提** |
+| `lib/format.ts`（72 行，iam 与 rms 曾**逐字节相同**） | iam / rms | **看似重复，实则只有一方在用**：rms 那份里 5 个函数（`auditLabel`/`orgTypeLabel`/`originLabel`/`auditTone`/`fmtRelative`）零调用点，且引用的 `iam.*` 键在 rms 内置包里一个都没有（缺键兜底 humanize → `iam.common.dash` 渲染成 **"Dash"** 而非 "—"）。已删死函数、兜底改用 `rms.common.dash`。**判据：逐字节相同不等于都活着——先数调用点，再数 key 是否真的能命中。** |
 
 ### 5.1 0 采用但**保留**的（边界已写清，别再来一遍）
 

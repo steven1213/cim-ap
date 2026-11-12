@@ -144,3 +144,10 @@
   - 验证：认证态 **17/17**、dev 态同一脚本 **17/17**；dev 下无凭据直连 `/definitions`、`/tasks/todo`、`/me` 仍 200；JWT 用户态回归 `/me` 200、`todo@default` 200、`todo@mes-ap` **403**；后端 **23/23**（新增 `OpenApiAuthChainTest` 4 例），`tsc` + `vite build` 通过。
   - **新测试做过反向验证**：注释掉 `SecurityContextHolder.setContext` 重跑，`openApiPassesAuthenticatedChain` 立刻 expected 200 → was 401；恢复后转绿。不验这一步，「测试通过」可能只是没测到。
   - 仍未做：**认证开 + JWT 用户态**的自动化（要自签 RS256 + 假 JWKS，`TestTokens` 在 starter 的 `src/test` 下且无 test-jar，需提到共享测试模块或复制一份）；`verify-security.mjs` 仍未进流水线。
+- **2026-11-12（续9）清账：认证态自动化 / E2E 一键入口 / 死代码 / 库内端点装配**：
+  - **认证态终于有自动化**：`cim-auth-starter` 发布 **test-jar**（`TestTokens` 自签 RS256 + 假 JWKS）给下游，approval 侧 `JwtAuthChainTest` 6 例覆盖「无令牌 401 / `/me` 取 JWT 身份 / 本域 200 / 越域 403 / 篡改签名 401 / `apps` 缺本 ap 403」。不复制签发逻辑——两份密钥生成代码漂移时，故障会表现成「令牌验不过」而非「测试写错」。
+  - **E2E 一键**：`scripts/e2e-security.sh` 起服务→等就绪→跑 17 条→`trap` 保证停进程，支持 `auth|dev|both`；端口被占直接退出。实跑两种形态各 17/17。顺带把脚本里写死的 BPMN 绝对路径改为按 `import.meta.url` 定位。
+  - **「auditTone 重复」不成立**：rms 的 `lib/format.ts` 是整份拷贝，但 5 个函数零调用点，且引用的 `iam.*` 键在 rms 内置包里一个都没有 → 缺键兜底 `humanize` 把 `iam.common.dash` 渲染成 **"Dash"**。删死函数、兜底改 `rms.common.dash`，**不上提**。判据写进组件审计：逐字节相同 ≠ 都活着。
+  - **库内端点定死**：反编译确认 Spring **6.0** 起 `isHandler()` 只认 `@Controller`，所以 `@RequestMapping + @ResponseBody` + @Bean 注册**永远 404**（5.x 的旧分支已删）。而 `@Controller` 蕴含 `@Component`，宿主 `scanBasePackages="com.cim"` 必扫到——**开关一关 `@Bean` 不注册，扫描定义成唯一 → `No qualifying bean of type 'java.lang.String'`（SqlLogAdminController 构造器首参 loggerName）**，报错不提开关。修法：类上补与自动装配一字不差的 `@ConditionalOnProperty`（`SqlLogAdminController` / `SseController`），规则三件套写进 `api-convention.md` §6.5。
+  - 验证：approval **29/29**、`cim-spring-support` 25/25、`cim-jpa-starter` 43/43、`cim-notify-starter` 13/13、`cim-bootstrap` 6/6、E2E 两形态各 17/17、iam/rms `tsc` 零错。**4 处反向验证**均先红后绿（域隔离、签名篡改、sql-log 扫描、SSE 扫描）。
+  - 仍未做：`verify-security.mjs` 已能一键执行但**未进 CI**；JWT 测试依赖 test-jar，消费方构建前须先 `install` 平台模块。

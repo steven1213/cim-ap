@@ -937,6 +937,67 @@ approval 与 rms 都补了 `/sys` 代理。
 - **认证开 + JWT 用户态的自动化**：需要自签 RS256 + 假 JWKS。`TestTokens` 目前在 `cim-auth-starter` 的 `src/test` 下且未发布 test-jar，approval 侧拿不到；要么把它提到共享测试模块，要么复制一份。
 - **`verify-security.mjs` 仍未进流水线**：它覆盖的是「真服务 + 开放 API 全链路」（17 条），目前靠手工起服务跑。
 
+## 2026-11-12（续 12）清账四项：认证态自动化 / E2E 一键入口 / 死代码 / 库内端点装配
+
+### 40.1 认证开 + JWT 用户态终于有自动化了
+
+此前这一层只靠「人工起 IAM + 真登录跑一次」，而它的故障形态全是「不报错但不对」（令牌解析不出 → 待办全空；域判定认错格式 → 全 403）。单元测试（`ApprovalMeControllerTest`）直接往 `SecurityContext` 塞 principal，把验签、准入、域解析整条链都绕过了。
+
+做法：`cim-auth-starter` 发布 **test-jar**（`maven-jar-plugin:test-jar`），把 `it/TestTokens`（自签 RS256 + 假 JWKS）暴露给下游；approval 侧新增 `JwtAuthChainTest` 6 例（无令牌 401 / `/me` 200 取 JWT 身份 / 本域待办 200 / 越域 403 / 篡改签名 401 / `apps` 缺本 ap 403）。不复制一份签发逻辑——两份密钥生成代码漂移时，故障会表现成「令牌验不过」而不是「测试写错了」。
+
+**反向验证**：把 `resolveAllowedAppCodes` 的认证分支临时改成恒返回 `["*"]`，越域用例立刻 `expected 403 but was 200`，恢复转绿。
+
+**顺带修掉一个自造的脆弱测试**：第一版篡改的是 JWT 签名段的**末**字符。RS256 签名 256 字节 = 342 个 base64url 字符，末字符只有 2 位有效——改动可能落在 padding 位，解码出同样的字节，验签照样通过。单跑时随机过一次，全量跑时红了。改为篡改签名段首字符，连跑两次稳定。
+
+### 40.2 E2E 不再靠手工起服务
+
+`verify-security.mjs` 17 条覆盖的是「真服务 + 真签名」全链路，却一直「手工起服务、手工跑脚本」——所以「认证一开服务间面全断」那次是隔了一轮才被发现的。
+
+新增 `business/approval-ap/scripts/e2e-security.sh`：起服务（jar 缺失或源码更新则先打包）→ 轮询 `Started ApprovalApApplication` → 跑脚本 → **无论成败都停进程**（`trap` + `kill -9` 兜底）→ 按 `auth|dev|both` 汇总。端口被占直接退出（连别人的服务跑测试，结论是假的）。实跑：认证态 17/17、dev 态 17/17，端口每次正常释放。
+
+顺带把脚本里写死的 BPMN 绝对路径改成按 `import.meta.url` 定位——写死时换机器报 `ENOENT`，看起来像「流程定义缺失」。
+
+### 40.3 「iam/rms 的 auditTone 逐字节重复」不成立——那份是死代码
+
+原本的计划是把重复的 `auditTone` 上提到平台。核实后发现前提错了：rms 的 `lib/format.ts` 是 iam 那份的**整份拷贝**（72 行逐字节相同），但其中 5 个函数（`auditLabel`/`orgTypeLabel`/`originLabel`/`auditTone`/`fmtRelative`）在 rms **零调用点**，只有 `fmtDateTime` 在用。
+
+更严重的是这些死函数引用的 `iam.*` 译文键在 rms 内置包里**一个都没有**（`grep -c "^  'iam\." = 0`），而缺键兜底是 `humanize`——于是 `fmtDateTime(null)` 在界面上显示的是 **"Dash"** 而不是 "—"。死代码不会报错，但兜底键照样会渲染。
+
+处理：rms 侧删掉 5 个死函数，兜底改用 `rms.common.dash`；**不上提**。判据写进组件审计文档：「逐字节相同 ≠ 都活着——先数调用点，再数 key 是否真的命中」。
+
+### 40.4 库 jar 里的端点到今天才定死
+
+「库里的控制器禁 `@RestController`，替代写法 `@RequestMapping + @ResponseBody` 实测未通过」这条记录一直挂着，但没人知道为什么失败，于是 `CimDispatchController` 用着同一种未验证的写法、默认关闭、零测试。
+
+反编译定因：`RequestMappingHandlerMapping.isHandler()` 在 **Spring Framework 6.0** 起只剩 `hasAnnotation(beanType, Controller.class)`；5.0.8 里的「或 `@RequestMapping`」分支已删。**所以那种替代写法在 Spring 6 上永远 404**，与是否 @Bean 注册无关。`LibraryControllerAssemblyTest` 三个用例把这条钉住（A 形态 200 / B 形态 404 / 未注册 404）。
+
+而 `@Controller` 蕴含 `@Component`，宿主 `scanBasePackages="com.cim"` 一定扫得到——默认态因为 Boot 允许 `@Bean` 覆盖扫描定义而看不出问题，**开关一关就炸**：
+
+```
+cim.jpa.sql-log.admin-enabled=false
+→ No qualifying bean of type 'java.lang.String' available
+   （SqlLogAdminController 构造器第一参是 loggerName）
+```
+
+报错完全不提「你关了一个开关」。修法是把同一个 `@ConditionalOnProperty` 写到控制器类上，让扫描阶段直接跳过：`SqlLogAdminController`（sql-log 开关）、`SseController`（notify 开关）。`I18nController` 无开关，天然一致，不动。
+
+守门测试两个层次：`LibraryEndpointScanTest`（bootstrap，关开关真启动一次，断言 Bean 不存在）、`SseControllerScanConditionTest`（notify，扫描候选断言，毫秒级）。**两者都做过反向验证**：去掉类上条件后，前者 `No qualifying bean` 启动失败、后者 `doesNotContain` 立刻红。
+
+### 40.5 验证
+
+| 项 | 结果 |
+|---|---|
+| approval 后端 | **29/29**（新增 `JwtAuthChainTest` 6 例） |
+| 平台侧 | `cim-spring-support` 25/25、`cim-jpa-starter` 43/43、`cim-notify-starter` 13/13（1 跳过）、`cim-bootstrap` 6/6 |
+| E2E | 认证态 17/17、dev 态 17/17（一键脚本各跑一次） |
+| 前端 | iam / rms `tsc --noEmit` 零错 |
+| 反向验证 | 4 处（域隔离、JWT 签名篡改、sql-log 扫描、SSE 扫描），均先红后绿 |
+
+### 40.6 仍未做
+
+- `verify-security.mjs` **已能一键执行，但还没进 CI**（缺流水线定义，不是缺入口）。
+- 认证态 JWT 的测试依赖 `cim-auth-starter` 的 test-jar：**消费方构建前必须先 `install` 平台模块**（与「改平台模块必 install」同一条约束），CI 里要保证顺序。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

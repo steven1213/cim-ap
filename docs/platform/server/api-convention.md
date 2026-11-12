@@ -112,7 +112,7 @@ cim.api.response.strict            # 默认 true＝违规即启动失败；false
 cim.api.response.include-packages  # 默认 [com.cim]；限定校验范围
 ```
 
-校验对象：`@RestController` 的 Bean，以及**仅有类型级 `@RequestMapping`** 的处理器 Bean（后者用于"不是组件、只能由自动装配注册"的端点，见 §6）。
+校验对象：`@RestController` 的 Bean，以及**仅有类型级 `@RequestMapping`** 的处理器 Bean。（后者只是「不是组件」的一种形态，**它对 MVC 不可见**——见 §7，别照着写端点。）
 
 跳过项：`@ExceptionHandler` / `@InitBinder` / `@ModelAttribute`；框架自带控制器（`BasicErrorController` 等，默认被 `include-packages` 排除——它是错误页出口，不属于业务契约）。
 
@@ -194,7 +194,7 @@ public class LeaveApplyProcessor implements CimMessageProcessor<LeaveApplyReques
 | 泛型一致性 | 不校验 | 注册期校验处理器泛型参数与 DTO 是否一致 | 绑错处理器在参考实现里要到运行期强转才炸 |
 | 入口形态 | 两套通配（`/{x}Controller/{y}Request`、`/auto/{y}Request`） | 单段 `/messages/{name}` | 前者要求调用方拼内部类名，等于把实现细节写进对外契约 |
 | 事务 | 控制器方法级 `@Transactional` | 处理器自行声明 | 同一入口既有查询也有写操作，一刀切会把只读消息拖进写事务 |
-| 组件语义 | `@RestController`（可被宿主扫描） | `@RequestMapping + @ResponseBody`（只能由自动装配注册） | 宿主 `scanBasePackages="com.cim"` 会把库里的控制器扫进来，而自动装配关闭时依赖不存在 → 启动失败（本仓库实测踩到） |
+| 组件语义 | `@RestController`（可被宿主扫描） | `@RestController` + 自动装配 `@Bean` 注册（两条路都通，见 §7） | 参考实现把控制器留在宿主工程里，库只管处理器表；本仓库让 starter 自带端点，于是必须处理「宿主扫描」与「开关」的交互——结论见 §7 |
 | 失败语义 | 自定义 `CoreException` + 错误码枚举 | 复用 `BizCode` + 全局异常处理器 | 一套错误码，前端一个判据 |
 
 ### 6.4 开启方式
@@ -213,6 +213,52 @@ cim:
 **日志**：每次分发写 `[cim-dispatch][START|DONE|FAILED]`，并把 `path` / `processor` 放进 MDC（`cim.msg.path` / `cim.msg.processor`），便于按消息类型过滤。
 
 **失败语义**：路径未注册 → `PARAM_INVALID`（**不回显已注册清单**，避免探测）；报文无法反序列化 → `PARAM_INVALID` 并指明目标类型；处理器抛业务异常原样透传；其余 → `SystemException`。
+
+### 6.5 库 jar 里的 HTTP 端点（starter 自带端点）
+
+这条约定此前写反过，导致「把 `@RestController` 换成 `@RequestMapping` 就能避免宿主扫描」的尝试反复出现（并 404）。现在两条硬事实都实测过，按这个写。
+
+**硬事实一：Spring 6 起只有 `@Controller` 能被 MVC 发现。**
+
+`RequestMappingHandlerMapping.isHandler()` 在 Spring Framework **6.0** 起方法体只剩一句
+`hasAnnotation(beanType, Controller.class)`；5.x 里「或 `@RequestMapping`」的分支已删（反编译
+6.1.14 与 5.0.8 对比确认）。所以「类上只写 `@RequestMapping + @ResponseBody`、由自动装配 `@Bean` 注册」
+在 Spring 6 上**永远 404**——405/500 都不是，就是找不到 handler。守门测试：
+`cim-spring-support` 的 `LibraryControllerAssemblyTest`（A 形态 200 / B 形态 404 / 未注册 404）。
+
+**硬事实二：`@Controller` 蕴含 `@Component`，宿主扫描一定会扫到。**
+
+`cim-bootstrap` 用 `scanBasePackages="com.cim"`，会把所有 starter 的控制器扫进来。默认态看着没事——
+Boot 的 `isOverriddenByExistingDefinition` 允许自动装配的 `@Bean` 覆盖扫描定义，而 `@ConditionalOnMissingBean`
+在扫描先赢时会让位，最终只剩一个 Bean，谁赢都不报错。**但只要开关关闭**，`@Bean` 不注册，扫描的定义
+成为唯一，而它依赖的 Bean 也不存在了：
+
+```
+cim.jpa.sql-log.admin-enabled=false
+→ No qualifying bean of type 'java.lang.String' available
+   （SqlLogAdminController 的构造器第一个参数是 loggerName）
+```
+
+报错完全不提「你关了一个开关」。同类隐患：`SseController`（依赖 `SseRegistry`/`NotifyProperties`）。
+
+**规则（三件套，缺一不可）：**
+
+```java
+@RestController                                                     // ① MVC 才认
+@ConditionalOnProperty(prefix = "cim.notify", name = "enabled",     // ② 与自动装配一字不差
+        havingValue = "true", matchIfMissing = true)                //    扫描阶段即跳过
+public class SseController { … }
+
+@Bean @ConditionalOnMissingBean                                     // ③ 正常装配路径
+public SseController sseController(SseRegistry r, NotifyProperties p) { … }
+```
+
+**不要**：① 去掉 `@RestController` 换 `@RequestMapping`（404）；② 只加 `@Bean` 不写类上条件
+（开关一关启动失败）；③ 用 `@ConditionalOnBean` 代替 `@ConditionalOnProperty`——前者只在自动配置类里有
+确定顺序，组件扫描阶段求值不可靠。
+
+守门测试：`LibraryEndpointScanTest`（bootstrap，关开关真启动一次）、`SseControllerScanConditionTest`
+（notify，扫描候选断言，毫秒级）。
 
 ---
 
