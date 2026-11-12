@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CimSpin } from '@cim/ui';
+import { CimButton, CimSpin } from '@cim/ui';
 import { SsoRelay } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
@@ -70,7 +70,8 @@ function BootGate({ children }: { children: ReactNode }) {
   const loadMe = useAuthStore((s) => s.loadMe);
   const loadPermissions = useAuthStore((s) => s.loadPermissions);
   const [ready, setReady] = useState(false);
-  const [bootFailed, setBootFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [failure, setFailure] = useState<{ kind: 'admission' | 'unavailable' | 'auth'; detail: string } | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -78,27 +79,69 @@ function BootGate({ children }: { children: ReactNode }) {
       return;
     }
     let alive = true;
+    setReady(false);
+    setFailure(null);
     Promise.all([loadMe(), loadPermissions()])
       .then(() => {
         if (alive) setReady(true);
       })
-      .catch((err) => {
-        // 401 已由 api.ts 拦截清态跳登录；此处处理 403（无本 ap 准入）
-        // 或其它 boot 失败，避免无权限令牌卡死 Loading。
-        console.error('[BootGate] boot failed', err);
-        useAuthStore.getState().clear();
-        if (alive) setBootFailed(true);
+      .catch((err: unknown) => {
+        if (!alive) return;
+        // ⚠️ 三类失败必须分开，原来一律当「准入失败」处理，后果是页面无限跳动（见下）：
+        //   auth        401 —— api.ts 已清态并整页跳 /login，这里只需交出去；
+        //   admission   403 / 1403 —— 令牌 apps 不含本 ap，清态后停在登录页讲原因；
+        //   unavailable 连不上 / 5xx —— **保持登录态**，就地给「重试」。
+        // 把第三种也当准入失败去清态，token 一清外层 ProtectedRoute 立刻渲染
+        // `<Navigate to="/login">`（不带 error），error 参数随之丢失 → 登录页自动中继回 IAM
+        // → IAM 侧 SSO 会话还在 → 立刻带同一枚令牌弹回 /sso → 再失败 → 再跳……整页往返，
+        // 表现为「页面一直在跳」且后端日志只有一串 ECONNREFUSED。
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        const bizCode = (err as { code?: unknown })?.code;
+        const kind: 'admission' | 'unavailable' | 'auth' =
+          status === 401
+            ? 'auth'
+            : status === 403 || bizCode === 1403
+              ? 'admission'
+              : 'unavailable';
+        console.error('[BootGate] boot failed', { kind, status, err });
+        if (kind === 'admission' || kind === 'auth') {
+          // 准入失败必须清态：否则 LoginPage 见 token 仍在会把用户弹回首页，形成两端往返
+          useAuthStore.getState().clear();
+        }
+        setFailure({ kind, detail: (err as { message?: string })?.message || String(err) });
       });
     return () => {
       alive = false;
     };
-  }, [token, loadMe, loadPermissions]);
+    // attempt：点「重试」时 +1，重新拉一次
+  }, [token, attempt, loadMe, loadPermissions]);
 
-  // 引导失败（典型：令牌 apps claim 不含本 ap 接入码 → 后端 403）。
-  // 必须带 error=admission 落回 /login：否则 /login 会自动中继回 IAM，
-  // 而 IAM 侧会话仍在、会拿同一枚令牌再次弹回 /sso，形成两端登录页无限往返。
-  if (bootFailed) {
+  // 准入失败：带 error=admission 落回 /login，登录页据此**停住**不再自动中继
+  // （否则 IAM 侧会话仍在，会拿同一枚令牌再弹回 /sso，两端无限往返）。
+  if (failure?.kind === 'admission') {
     return <Navigate to="/login?error=admission" replace />;
+  }
+  if (failure?.kind === 'auth') {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 后端不可达 / 5xx：不是登录问题，清态与跳转都只会把「服务没起」演成「一直在登录」。
+  // 就地停住，把真实原因和重试按钮摆出来。
+  if (failure?.kind === 'unavailable') {
+    return (
+      <SsoRelay
+        mark="RM"
+        brand="CIM RMS"
+        label={t('rms.boot.backendDown')}
+        hint={t('rms.boot.backendDownHint')}
+        busy={false}
+      >
+        <CimButton block onClick={() => setAttempt((v) => v + 1)}>
+          {t('rms.common.retry')}
+        </CimButton>
+        <p className="sso-relay-hint">{failure.detail}</p>
+      </SsoRelay>
+    );
   }
 
   if (!ready) {
@@ -117,11 +160,14 @@ export default function App() {
 
         <Route
           element={
-            <ProtectedRoute>
-              <BootGate>
+            // ⚠️ BootGate 在 ProtectedRoute **外层**：BootGate 判断「引导失败」时要跳到
+            // `/login?error=admission`，若它在内层，清态后外层守卫会先行渲染
+            // `<Navigate to="/login">`（不带 error）把原因吞掉，登录页便自动中继回 IAM → 往返。
+            <BootGate>
+              <ProtectedRoute>
                 <Layout />
-              </BootGate>
-            </ProtectedRoute>
+              </ProtectedRoute>
+            </BootGate>
           }
         >
           <Route path="/" element={lazyRoute(DashboardPage)} />

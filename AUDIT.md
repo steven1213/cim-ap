@@ -1189,6 +1189,55 @@ rms 删本地副本；approval 的渲染改成同一结构，动作标签从左�
 三端 `tsc --noEmit` 零错（IAM / RMS / approval，包为源码直引）。RMS / approval 是内置包、
 `pullRemote` 直接返回，不受影响；IAM 是唯一后端驱动的应用，也只有它会踩到。
 
+## 44. 「页面一直在跳」：后端不可达被当成准入失败（2026-11-12）
+
+用户报：5174 登录时页面一直跳动，vite 代理日志刷 `/api/v1/rms/me`、`/api/v1/rms/permissions`
+的 `ECONNREFUSED`。
+
+### 44.1 两层原因
+
+直接原因是 **RMS 后端（8084）没起**——所以每条请求都连接被拒。但这只是「为什么失败」，
+「为什么会一直跳」是前端自己的问题：
+
+旧 `BootGate` 把 **任何** boot 失败都当准入失败处理：
+
+```
+catch → clear()（清 token）→ <Navigate to="/login?error=admission" replace />
+```
+
+`clear()` 一执行，**外层** `<ProtectedRoute authenticated={!!token}>` 立刻看到未登录，
+在同一次渲染里先渲染 `<Navigate to="/login">`——**不带 error**。于是：
+
+/ → /login（无 error）→ 登录页 `autoRelay` 自动中继 IAM → IAM 侧 SSO 会话还在
+→ 302 带同一枚令牌回 /sso → 写入 token → BootGate 再失败 → 清态 → /login（无 error）→ …
+
+整页往返，每轮两次请求，浏览器里看就是「页面一直在跳」。原来那条「`error=admission`
+必须停住」的保护，被**外层守卫抢先导航**绕掉了。
+
+### 44.2 修：三类分开 + 「连不上」就地停住 + 嵌套换位
+
+| 失败 | 判定 | 处理 |
+|---|---|---|
+| 401 | `status === 401` | 拦截器已清态整页跳 /login；这里只交出去 |
+| 准入 | `status === 403` 或业务码 `1403` | 清态 + `/login?error=admission`（登录页据此停住） |
+| 连不上 / 5xx | 其余（无 `response`、或 5xx） | **保持登录态**，就地渲染「连不上后端 + 重试」，不跳转 |
+
+外加一处结构改动：`<BootGate>` 与 `<ProtectedRoute>` **换位**（BootGate 在外）。
+理由就是 44.1 的抢跑——BootGate 在内层时，它要导航的目标总会被外层守卫先覆盖掉。
+
+### 44.3 验证
+
+| 项 | 结果 |
+|---|---|
+| RMS 修复后（后端仍 down） | 探针注入假令牌进首页 → DOM 出现「连不上 RMS 后端」+ 重试按钮，URL 停在 5174 |
+| RMS 修复前（同一探针） | headless 12s 内 `--dump-dom` 出不来（页面持续整页导航）——与用户描述一致 |
+| approval | 同款第二份实现（`/me` 失败一律准入）同修，文案 `common.*` |
+| 类型检查 / 文案对表 | RMS、approval `tsc` 零错；`npm run check:i18n` 三端通过 |
+
+> 这类故障的形状值得记一笔：**「依赖不可达」被当成「身份不成立」**，于是重试逻辑被换成了
+> 登录重定向，而重定向又会自动回来——所有「自动重登」的路径都可能这样自激。
+> 判据是「错误里有没有 HTTP 响应」：没有响应就不是身份问题。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

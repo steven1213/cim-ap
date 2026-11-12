@@ -160,6 +160,7 @@ export const zhCN: Record<string, string> = {
   'rms.common.confirm': '确认',
   'rms.common.close': '关闭',
   'rms.common.loading': '加载中…',
+  'rms.common.retry': '重试',
   'rms.common.noData': '暂无数据',
   'rms.common.yes': '是',
   'rms.common.no': '否',
@@ -371,6 +372,8 @@ export const zhCN: Record<string, string> = {
 
   'rms.login.title': '统一登录',
   'rms.login.redirecting': '正在跳转至统一身份认证中心…',
+  'rms.boot.backendDown': '连不上 RMS 后端',
+  'rms.boot.backendDownHint': '页面没能取到用户档案与权限。通常是后端未启动或端口不通（本地默认 8084），也可能刚重启。服务恢复后点「重试」即可，不需要重新登录。',
   'rms.login.ssoFailed': '登录失败，请重试',
   'rms.login.admissionDenied': '当前账号未获准访问 RMS（令牌 apps 不含 rms-ap），请联系 IAM 管理员授予准入。',
   'rms.login.switchAccount': '改用其他账号登录',
@@ -1035,6 +1038,7 @@ export const enUS: Record<string, string> = {
   'rms.common.confirm': 'Confirm',
   'rms.common.close': 'Close',
   'rms.common.loading': 'Loading…',
+  'rms.common.retry': 'Retry',
   'rms.common.noData': 'No data',
   'rms.common.yes': 'Yes',
   'rms.common.no': 'No',
@@ -1246,6 +1250,8 @@ export const enUS: Record<string, string> = {
 
   'rms.login.title': 'Unified Login',
   'rms.login.redirecting': 'Redirecting to identity provider…',
+  'rms.boot.backendDown': 'Cannot reach the RMS backend',
+  'rms.boot.backendDownHint': 'The console could not load your profile and permissions. Usually the backend is not running or the port is unreachable (8084 in local dev). Press Retry once it is back — no need to sign in again.',
   'rms.login.ssoFailed': 'Login failed, please retry',
   'rms.login.admissionDenied': 'This account is not admitted to RMS (token apps missing rms-ap). Ask the IAM administrator to grant access.',
   'rms.login.switchAccount': 'Sign in with another account',
