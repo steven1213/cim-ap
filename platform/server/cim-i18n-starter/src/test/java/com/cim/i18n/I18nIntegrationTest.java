@@ -1,6 +1,7 @@
 package com.cim.i18n;
 
 import com.cim.i18n.model.I18nScope;
+import com.cim.i18n.model.LocaleCoverage;
 import com.cim.i18n.model.SysI18n;
 import com.cim.i18n.service.I18nService;
 import com.cim.i18n.source.DatabaseMessageSource;
@@ -124,5 +125,48 @@ class I18nIntegrationTest {
         String after = cache.version();
         assertThat(after).isNotEqualTo(before);
         assertThat(resolver.resolve("iam.test.hello", "zh-CN", null)).isEqualTo("你好");
+    }
+
+    /**
+     * 覆盖率是 {@code frontendBundle} 的对照组：只译了中文的键，在英文整包里「命中中文」，
+     * 前端与 i18next 都不会报警；只有拿原始值比，才知道英文还差这一条。
+     */
+    @Test
+    void coverageExposesKeysThatFrontendBundleSilentlyFillsWithChinese() {
+        SysI18n onlyZh = new SysI18n();
+        onlyZh.setLocaleCode("zh-CN");
+        onlyZh.setCode("iam.test.coverage.onlyzh");
+        onlyZh.setContent("只有中文");
+        onlyZh.setScope(I18nScope.USER);
+        service.saveMessage(onlyZh);
+
+        // 整包看不见缺口：英文包里这个键「有值」（中文兜底）
+        assertThat(service.frontendBundle("en-US")).containsEntry("iam.test.coverage.onlyzh", "只有中文");
+
+        LocaleCoverage en = service.coverage(0).stream()
+                .filter(c -> "en-US".equals(c.locale()))
+                .findFirst()
+                .orElseThrow();
+        // 覆盖率看得见：英文这条算缺译（limit=0 只要计数，不回明细）
+        assertThat(en.translated()).isLessThan(en.total());
+        assertThat(en.missing()).isEmpty();
+        assertThat(en.base()).isFalse();
+
+        // 默认语言恒为自己的基准
+        LocaleCoverage zh = service.coverage(0).stream()
+                .filter(c -> "zh-CN".equals(c.locale()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(zh.base()).isTrue();
+        assertThat(zh.translated()).isEqualTo(zh.total());
+
+        // 明细模式：缺的键确实列在 missing 里，且截断标记与条数自洽
+        LocaleCoverage enWithList = service.coverage(500).stream()
+                .filter(c -> "en-US".equals(c.locale()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(enWithList.missing()).contains("iam.test.coverage.onlyzh");
+        assertThat(enWithList.total() - enWithList.translated()).isEqualTo(enWithList.missing().size());
+        assertThat(enWithList.truncated()).isFalse();
     }
 }

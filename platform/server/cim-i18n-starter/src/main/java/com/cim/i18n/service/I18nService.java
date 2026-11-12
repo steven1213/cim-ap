@@ -2,6 +2,7 @@ package com.cim.i18n.service;
 
 import com.cim.i18n.config.I18nProperties;
 import com.cim.i18n.model.I18nScope;
+import com.cim.i18n.model.LocaleCoverage;
 import com.cim.i18n.model.LocaleStatus;
 import com.cim.i18n.model.SysI18n;
 import com.cim.i18n.model.SysI18nRepository;
@@ -93,6 +94,48 @@ public class I18nService {
             merged.putAll(cache.bundle(target));
         }
         return merged;
+    }
+
+    /**
+     * 各语言的译文覆盖率（管理端）。
+     *
+     * <p><b>这是 {@link #frontendBundle(String)} 的对照组</b>：前端整包按四级兜底合并后，
+     * 「英文缺译」的表现是<b>英文界面显示中文</b>——键是命中的，i18next 不会报缺键，
+     * 前端也无从发现。只有拿原始值比一次才知道还差多少条。</p>
+     *
+     * <p>基准集 = 默认兜底语言的键集；某语言在基准键上有非空值即算已译。
+     * 本语言独有的键不计入分母（它们不会出现在其他语言里，算进去只会虚高）。</p>
+     *
+     * @param missingLimit 每个语言最多回多少个缺失键（{@code <=0} 表示不要列表，只回计数）
+     */
+    public List<LocaleCoverage> coverage(int missingLimit) {
+        String fallback = properties.getDefaultLocale();
+        List<String> baseKeys = new ArrayList<>(bundle(fallback).keySet());
+        baseKeys.sort(Comparator.naturalOrder());
+
+        List<LocaleCoverage> result = new ArrayList<>();
+        for (SysLocale locale : localeRepository.findAllByOrderBySortNoAsc()) {
+            boolean isBase = fallback.equals(locale.getCode());
+            // isBase 也走同一条路径：bundle(默认) 即基准集本身，结果恒为 100%
+            Map<String, String> own = bundle(locale.getCode());
+            int translated = 0;
+            List<String> missing = new ArrayList<>();
+            for (String key : baseKeys) {
+                String value = own.get(key);
+                if (value != null && !value.isBlank()) {
+                    translated++;
+                } else {
+                    missing.add(key);
+                }
+            }
+            boolean truncated = missingLimit > 0 && missing.size() > missingLimit;
+            List<String> shown = missingLimit > 0
+                    ? missing.subList(0, Math.min(missing.size(), missingLimit))
+                    : List.of();
+            result.add(new LocaleCoverage(locale.getCode(), locale.getName(), isBase,
+                    baseKeys.size(), translated, List.copyOf(shown), truncated));
+        }
+        return result;
     }
 
     /** 译文版本号。 */

@@ -1,5 +1,6 @@
 package com.cim.iam.server.admin;
 
+import com.cim.i18n.model.LocaleCoverage;
 import com.cim.i18n.model.SysI18n;
 import com.cim.i18n.model.SysLocale;
 import com.cim.i18n.service.I18nService;
@@ -101,6 +102,21 @@ public class I18nAdminController {
     }
 
     // ------------------------------------------------------------------ 缺失译文
+
+    /**
+     * 各语言的翻译覆盖率。
+     *
+     * <p><b>和 {@code /missing} 不是一回事</b>：{@code /missing} 记的是「四级兜底全未命中」
+     * ——键在默认语言里也不存在。而「英文缺译」的键在中文里有值，四级兜底会拿中文填满，
+     * 于是<b>英文界面显示中文</b>、前端不报缺键、本页的「缺失译文」也永远是 0。
+     * 覆盖率用原始值比一次，才看得见差多少条。</p>
+     */
+    @GetMapping("/coverage")
+    @PreAuthorize("hasAuthority('" + IamPermissionCodes.I18N_LIST + "')")
+    public Result<List<LocaleCoverage>> coverage(
+            @RequestParam(name = "limit", defaultValue = "50") int limit) {
+        return Result.ok(i18nService.coverage(limit));
+    }
 
     /** 缺失译文汇总（四级兜底全未命中的键，供生成待翻译工单）。 */
     @GetMapping("/missing")
