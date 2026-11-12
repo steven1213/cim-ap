@@ -163,6 +163,10 @@ cim:
             name: 审批流平台
             roles:
               - ADMIN
+          - code: mds-ap
+            name: 主数据平台
+            roles:
+              - ADMIN
 
     # 身份目录（Wave 0：组织架构 + 用户档案 + 同步到业务系统，见 identity-directory.md）
     directory:
