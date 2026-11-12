@@ -121,7 +121,7 @@ public class ProcessController {
     @GetMapping("/processes/initiated/page")
     public Result<PageResult<com.cim.approval.server.dto.ProcessInstanceView>> initiatedPaged(
             @RequestParam(required = false) String userId,
-            @RequestParam(defaultValue = "default") String tenantId,
+            @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return Result.ok(processService.listInitiatedPaged(
@@ -130,7 +130,7 @@ public class ProcessController {
 
     /** 审批效率统计（Dashboard 看板）。 */
     @GetMapping("/stats")
-    public Result<StatsView> stats(@RequestParam(defaultValue = "default") String tenantId,
+    public Result<StatsView> stats(@RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                    @RequestParam(defaultValue = "30") int days) {
         return Result.ok(statsService.stats(tenantId, Math.min(Math.max(days, 1), 90)));
     }

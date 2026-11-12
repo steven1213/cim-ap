@@ -9,6 +9,7 @@ import com.cim.approval.server.dto.ReturnRequest;
 import com.cim.approval.server.dto.ReturnTargetsView;
 import com.cim.approval.server.dto.TaskView;
 import com.cim.approval.server.security.CurrentUserResolver;
+import com.cim.approval.server.security.SecurityGuard;
 import com.cim.approval.server.service.ApprovalAddSignService;
 import com.cim.approval.server.service.ApprovalProcessService;
 import com.cim.approval.server.service.ApprovalReassignService;
@@ -46,7 +47,7 @@ public class TaskController {
     @GetMapping("/todo")
     public Result<List<TaskView>> todo(@RequestParam(required = false) String userId,
                                        @RequestParam(required = false) List<String> roles,
-                                       @RequestParam(defaultValue = "default") String tenantId) {
+                                       @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId) {
         String uid = currentUser.resolve(userId);
         return Result.ok(processService.listTodo(uid, currentUser.resolveRoles(roles), tenantId));
     }
@@ -54,14 +55,14 @@ public class TaskController {
     @GetMapping("/done")
     public Result<List<TaskView>> done(@RequestParam(required = false) String userId,
                                        @RequestParam(required = false) List<String> roles,
-                                       @RequestParam(defaultValue = "default") String tenantId) {
+                                       @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId) {
         String uid = currentUser.resolve(userId);
         return Result.ok(processService.listDone(uid, currentUser.resolveRoles(roles), tenantId));
     }
 
     @GetMapping("/initiated")
     public Result<List<ProcessInstanceView>> initiated(@RequestParam(required = false) String userId,
-                                                       @RequestParam(defaultValue = "default") String tenantId) {
+                                                       @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId) {
         return Result.ok(processService.listInitiated(currentUser.resolve(userId), tenantId));
     }
 
@@ -70,7 +71,7 @@ public class TaskController {
     @GetMapping("/todo/page")
     public Result<PageResult<TaskView>> todoPaged(@RequestParam(required = false) String userId,
                                                   @RequestParam(required = false) List<String> roles,
-                                                  @RequestParam(defaultValue = "default") String tenantId,
+                                                  @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "20") int size) {
         String uid = currentUser.resolve(userId);
@@ -81,7 +82,7 @@ public class TaskController {
     @GetMapping("/done/page")
     public Result<PageResult<TaskView>> donePaged(@RequestParam(required = false) String userId,
                                                   @RequestParam(required = false) List<String> roles,
-                                                  @RequestParam(defaultValue = "default") String tenantId,
+                                                  @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "20") int size) {
         String uid = currentUser.resolve(userId);
@@ -91,7 +92,7 @@ public class TaskController {
 
     @GetMapping("/initiated/page")
     public Result<PageResult<ProcessInstanceView>> initiatedPaged(@RequestParam(required = false) String userId,
-                                                                  @RequestParam(defaultValue = "default") String tenantId,
+                                                                  @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                                   @RequestParam(defaultValue = "1") int page,
                                                                   @RequestParam(defaultValue = "20") int size) {
         return Result.ok(processService.listInitiatedPaged(
