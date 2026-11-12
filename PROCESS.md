@@ -166,3 +166,9 @@
   - 机械对了一遍「源码字面量 `t('x')`」与「key 目录」，扫出 3 个真缺口：`rms.shell.toggleTheme`、approval 的 `shell.toggleGroup`（tooltip 显示 humanize 出的 `Toggle Theme`，看着像译文）、`rms.notFound.desc`（说明行显示 `Desc`）。**缺键不报错、单测也不红** —— 生产由 `parseMissingKeyHandler: humanize` 兜成伪译文，开发态原本连 warn 都没有（RMS/approval 无上报通道 → handler 未注册）。IAM 的 key 在 `IamConsoleCatalog.java`（TextDef），比对对象要换。详见 `component-platform-design.md §6.4`。
   - 同名文件逐个比对后的结论：`usePermission.ts` 逐字节相同但只是 store 适配层（28 行），上提要引 hook 工厂 → **暂不动**，等第三个消费方；`ProtectedRoute`/`LanguageSwitcher`/`RequirePerm`/`sso.ts`/`theme.ts` 的差异都在 app 标识、存储键、文案键、呈现位置，**属应用自身**。
   - 验证：三端 `tsc` 零错 + `vite build` 全绿；404 用真 CSS 探针截图确认四段齐全。详见 `component-adoption-audit.md §10`。
+- **2026-11-12（续12）「英文界面显示中文」——两端各关一半**：
+  - 定性：`frontendBundle` 按四级兜底合并，英文缺译的键**是命中的**（值是中文）→ i18next 不调 handler、前端无从判断、管理端「缺失译文」（只记四级全未命中）永远不进。**这是唯一没有任何运行时信号的故障**。
+  - **静态对表补三处漏扫**：① 对象属性 `titleKey: 'x'`（769 处，比 JSX 属性 334 处更多）→ 立刻扫出 2 个真缺口：RMS `labelKey: 'IP'`（字面量当 key 传，靠 humanize 恰好显示成 `IP`）、approval `titleKey: 'audit.colBusinessKey'`（键名写错，同组都叫 `cb.col*`）；② 英文槽质量（空 / 仍是中文 / 占位符不一致）；③ **解析失败必须报错**。
+  - ⚠️ **Java 目录不能按行/简单正则解析**：长文案跨行 + `+` 拼接，实测静默少一条（最长的 `iam.login.hero.desc`）。改逐字符扫描；判定「字面量拼接」要剥掉字符串后看剩下是否只有空白与 `+`——**不能反过来从原文删 `+`**，文案自己含 `+`（「点右上角「+」新建」）。
+  - **覆盖率视图**：`GET /api/v1/admin/i18n/coverage` 按 `bundle` **原始值**比（换 `frontendBundle` 会永远 100%，已反向验证）；管理端左栏加覆盖率列、右栏加「未译条目」面板（chip 点 `+` 直接带出补录）。与「缺失译文」是两个面板，不可合并。
+  - 验证：`cim-i18n-starter` 9/9、`iam-ap` 73/73 + 新增 `I18nCoverageEndpointTest`（锁字段名）；2 处反向验证先红后绿；三端 `tsc`/`vite build` 全绿；探针 2× 截图确认面板与空态。详见 `AUDIT.md §42`、`component-platform-design.md §6.4`。

@@ -432,6 +432,21 @@ StatePage            // 骨架：Panel + EmptyState large + 图标 + 出口插�
 ③ **必须同时扫 `xxxKey="..."` 注入式属性**（全仓 334 处）——只扫 `t()` 正是本轮漏掉
 `rms.notFound.desc` 的原因。
 
+**补扫（同日续）：对象属性形式 `titleKey: 'x'`。** 列定义与表单字段把文案键写成对象属性而不是
+JSX 属性，全仓 769 处，比 JSX 属性还多。补上后立刻扫出两个真缺口：
+
+| 位置 | 写法 | 症状 |
+| --- | --- | --- |
+| RMS `DeviceDetailDrawer.tsx:104` | `labelKey: 'IP'` | 把**字面量当 key 传**；靠 humanize 恰好显示成 `IP`，看起来完全正常 |
+| approval `CallbacksPage.tsx:198` | `titleKey: 'audit.colBusinessKey'` | 键名写错（同组都叫 `cb.col*`），表头显示 `Col Business Key` |
+
+两条都已修：前者改用目录里本来就有、只是一直没被用到的 `rms.device.ip`；后者补
+`cb.colBusinessKey`（中英各一条）并把引用改过去。
+
+> 教训同 §9.1：**「扫得到」和「扫得全」是两件事**。t-only 漏注入式，JSX-only 漏对象属性，
+> 按行解析漏跨行——每一次都是「脚本通过」，而缺口就在没被扫到的那一类里。
+> 所以脚本对「解析不出」必须报错而不是跳过，见 `check-i18n.mjs` 的 `unparsed`。
+
 ### 10.3 仍未统一（有意）
 
 - `lib/usePermission.ts`：IAM 与 RMS **逐字节相同**（28 行薄封装），但它是「读本 ap 的
