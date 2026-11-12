@@ -230,3 +230,74 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 
 按「逐字节相同才上提」的判据**不合并**（合并会改 approval 图标观感）。这属于**视觉一致性**议题，
 需要一次统一图标的独立决策，不能顺手做。
+
+---
+
+## 8. 第三次复扫：组件能力缺口与样式重复（2026-11-12 续 3）
+
+前两轮清的是「页面没引组件」和「类名手写」，本轮换了第三种判据：
+**把「页面为什么绕开组件」当成组件缺陷来查**。结论：剩下的手写基本不是纪律问题，
+是组件签名接不住那个用法。
+
+### 8.1 三处能力缺口（本轮已补）
+
+| 现象 | 处数 | 组件缺口 | 修法 |
+| --- | --- | --- | --- |
+| `<label className="check"><CimSwitch/>{文案}</label>` | 4 | `CimSwitch` 只有 `onText`/`offText`（**随状态变化**的文案），没有**静态说明**文案 → 页面把开关塞进复选框的排版里 | 增 `label`/`labelKey`，渲染 `.cim-switch-row` |
+| `<label className="check"><input type="checkbox"/>` | 2 | `CimChoice` 只收 `options: CimOption[]`，单布尔要写成 `options=[{value:'x'}]` 再取 `value[0]`，比手写还绕 | 新增 `CimCheckbox`（+ `.cim-check` 供网格单元格单独用） |
+| `<div className="empty" style={{padding:'28px 0'}}>` | 4 | `EmptyState` 没有 `className`/`style`，嵌在面板里要压内边距就只能手写 | 增 `className`（合并）/`style` 透传 |
+
+> 与 §7.2 的 `KpiGrid` 是同一条规律：**替换受阻时先问「组件能不能表达这个用法」**。
+> 这三处如果只做「页面改用组件」，改不动——必须先进组件补签名。
+
+⚠️ `CimSwitch` 的静态文案用 `<span>` 不用 `<label>`：antd `Switch` 渲染的是 `<button>`，
+`<label>` 包裹**不会**产生「点文字切换」的效果，写成 label 只是看起来像而实际不生效。
+
+### 8.2 跨 3 ap 逐字节相同 → 上提（本轮已做）
+
+统计口径：逐条规则文本比对（去注释、去空白），三份完全相同才动。
+
+| 对象 | 处数 | 去向 |
+| --- | --- | --- |
+| `.hint` | 15 | `ui.css` |
+| `.cell-actions` | 26 | `ui.css` |
+| `@media (max-width: 900px)` 外壳块（`.sidebar` / `.shell.collapsed *` / `.main`） | 3 份 | `shell.css` |
+| `@media (max-width: 640px)` 外壳块（`.topbar` / `.content` / `.env-chip` / `.user-meta` / `.crumb`） | 3 份 | `shell.css` |
+| `.grid-2` / `.grid-3` 收窄断点（1180 / 900） | 3 份 | `ui.css` |
+| `.scrim` | 3 份 | `shell.css` |
+
+⚠️ **`.scrim` 是反向缺口**：`ConsoleShell` 一直在渲染 `<div className="scrim">`（移动端抽屉遮罩），
+但 `shell.css` 从来没有这条规则——样式只存在于三个 ap 里。任何一个新建 ap 漏抄，表现就是
+「抽屉打开后点空白处没反应」。**组件渲染的类名，样式必须在组件包内**。
+
+### 8.3 登录页：同一套类名，三处实现
+
+| 实现 | 位置 | 是否生效 |
+| --- | --- | --- |
+| IAM 服务端内联 HTML + CSS | `SsoLoginPageController`（`<style>` 一块，含 900px 断点） | ✅ 唯一实际渲染的登录页 |
+| iam / approval 的 `.login-*` 样式 | 两 ap 的 `styles.css` | ❌ 无登录页，纯死代码（已删） |
+| rms `LoginPage.tsx` | `.login-screen` 另一套设计 | ✅ 仅 rms 准入失败等场景 |
+
+⚠️ 服务端那份是**手抄**的（注释写「复刻 `styles.css` 的登录页设计令牌」），
+改 SPA 的令牌不会同步到登录页。这是「单一登录页」设计的固有代价，暂不动；
+要动的话得把登录页样式抽成独立 css 由服务端 `<link>`，属独立决策。
+
+### 8.4 明确不提取（新增负向清单）
+
+| 对象 | 处数 | 不提取的理由 |
+| --- | --- | --- |
+| 手写 `<div className="form-grid">` 包 `CimField` 子树 | 1 | `FormGrid` 是**受控声明式表单**（`fields[]` + `value/onChange` 自动渲染控件），接不住自定义 `CimField` 子节点；只有 1 处，不值得再开一个「纯布局网格」组件 |
+| 手写 `<dl className="meta">` / `<dl className="kv">` | 9 | 用的是平台 `.meta`/`.kv` 样式，`CimDescriptions` 是「label/value 数组」语义；这些块的 value 里嵌 `CimTag`/条件渲染，逐块判断成本高于收益 |
+| 时间线 | 2 套 | rms 用 `.timeline*`（SignoffPage），approval 用 `.detail-timeline*`（详情弹窗），**类名与结构都不同**。是否统一属视觉决策，需先比对两套设计稿 |
+| `table.data` 遗留表格样式 | iam / approval | 两 ap 已无手写 `<table>`，但这段与 rms 的 `RecipeDetailDrawer` 同源，删前需确认 rms 视觉不变——留给死样式专项 |
+
+### 8.5 复扫方法（可复现）
+
+三个脚本，都在仓库外跑，判据写在注释里：
+
+1. **跨 ap 类名比对**：解析各 `styles.css` 顶层规则 → 类名 → 规则文本，取交集且文本全等。
+2. **平台归属判定**：类名是否出现在 `platform/web/packages/*/src/*.css`；是否由组件源码 `className="..."` 产生。
+3. **死类名判定**：app 内 `.tsx/.ts`（**剔除注释**）+ 平台源码里是否有整词出现。
+
+⚠️ 第 3 步必须剔注释：本仓大量迁移说明写着「手写 `.modal-backdrop` → `CimModal`」，
+不剔注释会把 `.modal*`/`.drawer*`/`table.data` 全判成活代码（本轮先踩了一次）。

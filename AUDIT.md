@@ -572,6 +572,51 @@
 
 - **验证**：三应用 `tsc --noEmit` 零错；`vite build` 通过（9.85 / 9.96 / 9.75s）；IAM 渲染契约 **33/33**；后端回退后 `SqlLogAdminControllerTest` 4/4、`NotifyEndToEndTest` 1/1 绿。
 
+## 2026-11-12（续 3）组件能力缺口：三处签名太窄 + 六类样式三份重复
+
+前两轮分别按「具名 statusTone 函数」「字符串字面量类名」统计；本轮换判据：**把「页面为什么绕开组件」当成组件缺陷来查**，并做逐条规则文本比对找重复样式。
+
+### 34.1 三处「组件接不住这个用法」（已补签名）
+
+| 现象 | 处数 | 缺口 | 修法 |
+| --- | --- | --- | --- |
+| `<label className="check"><CimSwitch/>{文案}</label>` | 4 | `CimSwitch` 只有随状态变化的 `onText`/`offText`，没有静态说明文案 | 增 `label`/`labelKey` → `.cim-switch-row` |
+| `<label className="check"><input type="checkbox"/>` | 2 | `CimChoice` 只收 `options[]`，单布尔要绕成 `options=[{value:'x'}]` | 新增 `CimCheckbox` |
+| `<div className="empty" style={{...}}>` | 4 | `EmptyState` 无 `className`/`style` | 增透传（`className` 合并而非覆盖） |
+
+- ⚠️ `CimSwitch` 的静态文案渲染为 `<span>` 而不是 `<label>`：antd `Switch` 是 `<button>`，`<label>` 包裹**不产生**「点文字切换」，写 label 只有样子没有效果。
+- ⚠️ `PermTree` 里两个复选框是**网格单元格**（无配对文案），套不进 `CimCheckbox`，改用平台类 `.cim-check`（与组件内部同一份画法）。
+- 这三处印证 §33 的规律：**替换受阻先问「组件能不能表达」**，否则「改用组件」根本改不动。
+
+### 34.2 六类样式三份重复（已上提）
+
+逐条规则文本比对（去注释/去空白）后，三份全等才动：`.hint`（15 处）、`.cell-actions`（26 处）、`@media 900px` 外壳块、`@media 640px` 外壳块、`.grid-2/.grid-3` 收窄断点、`.scrim`。
+
+- ⚠️ **`.scrim` 是反向缺口**：`ConsoleShell` 一直渲染 `<div className="scrim">`（移动端抽屉遮罩），但 `shell.css` 从无这条规则——样式只散在三个 ap 里。新建 ap 漏抄的表现是「抽屉打开后点空白关不掉」。**组件渲染的类名，样式必须在组件包内。**
+- 结果：`styles.css` 行数 iam 486→**182**、rms 889→**764**、approval 1679→**1382**。
+
+### 34.3 登录页有三套实现（未动，记录在案）
+
+| 实现 | 是否生效 |
+| --- | --- |
+| IAM 服务端内联 HTML+CSS（`SsoLoginPageController`，含 900px 断点） | ✅ 唯一实际渲染 |
+| iam / approval 的 `.login-*` | ❌ 两 ap 无登录页，纯死代码（**已删**） |
+| rms `LoginPage.tsx`（`.login-screen` 另一套设计） | ✅ 仅 rms 准入失败场景 |
+
+服务端那份是手抄 SPA 令牌（注释自述「复刻 styles.css」），改一边不同步。属**单一登录页**的固有代价，要根治需把登录样式抽成独立 css 由服务端 `<link>`——独立决策，未动。
+
+### 34.4 明确不提取（负向清单，写进审计文档 §8.4）
+
+手写 `form-grid` 包 `CimField` 子树（1 处，`FormGrid` 是受控声明式表单接不住）、手写 `<dl class="meta">`（9 处，value 里嵌组件）、两套时间线（rms `.timeline*` vs approval `.detail-timeline*`，类名结构都不同）、`table.data` 遗留表格样式（rms 仍有 1 处手写 k/v 表在用）。
+
+### 34.5 方法坑：死类名判定必须剔注释
+
+本仓大量迁移说明写着「手写 `.modal-backdrop` → `CimModal`」。不剔注释，`.modal*`/`.drawer*`/`table.data` 会被判成活代码——本轮先踩了一次（误判 30 条规则为「仍在使用」）。剔注释后判据才可用；即便如此，尾随在代码行后的 `//` 注释仍会污染，**逐类确认**比批量删安全。
+
+### 34.6 验证
+
+三应用 `tsc --noEmit` 零错；`vite build` 通过（9.88 / 10.75 / 12.84s）；IAM 渲染契约 **33/33**。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。
