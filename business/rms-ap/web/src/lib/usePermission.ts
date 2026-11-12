@@ -1,26 +1,12 @@
-// 权限判定的 React Hook 封装（配合 `<Perms>` 使用）。
+// 权限判定的 Hook —— 实现是 `@cim/ui` 的 `createPermissionHooks`，本文件只接线。
+//
+// 四个函数的函数体此前与 IAM / MDS 的副本逐行相同（只有 import 路径不同），
+// 改匹配语义时要动三处、漏一处就表现为「某个系统的按钮该隐藏没隐藏」。
+import { createPermissionHooks } from '@cim/ui';
 import { useAuthStore } from '@/store/authStore';
-import { hasAllPermissions, hasAnyPermission, hasPermission } from '@/lib/permissions';
 
-/** 当前用户权限码集。 */
-export function usePermissions(): string[] {
-  return useAuthStore((s) => s.permissions);
-}
+/** 当前用户权限码集（store 里的内存态，不落盘）。 */
+const useCodes = () => useAuthStore((s) => s.permissions);
 
-/** 是否具备某权限码（`code` 为空视为不需要权限）。 */
-export function useHasPermission(code: string | null | undefined): boolean {
-  const perms = usePermissions();
-  return hasPermission(perms, code);
-}
-
-/** 是否具备任一权限码。 */
-export function useHasAnyPermission(codes: readonly string[]): boolean {
-  const perms = usePermissions();
-  return hasAnyPermission(perms, codes);
-}
-
-/** 是否具备全部权限码。 */
-export function useHasAllPermissions(codes: readonly string[]): boolean {
-  const perms = usePermissions();
-  return hasAllPermissions(perms, codes);
-}
+export const { usePermissions, useHasPermission, useHasAnyPermission, useHasAllPermissions } =
+  createPermissionHooks(useCodes);

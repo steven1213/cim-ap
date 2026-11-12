@@ -7,7 +7,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -120,18 +119,14 @@ export default function DeviceAreaPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.deviceArea.title"
-        actions={
-          <Can perm="rms:device-area:create">
+      
+
+      <DataTable<DeviceArea>
+        headActions={<Can perm="rms:device-area:create">
             <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.deviceArea.createNew')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<DeviceArea>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

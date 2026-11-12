@@ -13,7 +13,6 @@ import {
   EmptyState,
   FormGrid,
   Page,
-  PageHead,
   Panel,
   Toolbar,
   useConfirm,
@@ -283,17 +282,7 @@ export default function SignoffPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.signoff.title"
-        subtitleKey="rms.signoff.sub"
-        actions={
-          <Can perm="rms:signoff:approve">
-            <CimButton type="primary" size="small" onClick={() => setShowSubmit(true)}>
-              + {t('rms.signoff.submit')}
-            </CimButton>
-          </Can>
-        }
-      />
+      
 
       {/* KPI 指标块 */}
       <KpiGrid>
@@ -329,6 +318,11 @@ export default function SignoffPage() {
       ) : null}
 
       <DataTable<Signoff>
+        headActions={<Can perm="rms:signoff:approve">
+            <CimButton type="primary" size="small" onClick={() => setShowSubmit(true)}>
+              + {t('rms.signoff.submit')}
+            </CimButton>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

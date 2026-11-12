@@ -5,10 +5,16 @@ import { useResource } from '@cim/data';
 import {
   CimTag,
   DataTable,
+  IconAlert,
+  IconGauge,
+  IconInbox,
+  IconKick,
+  IconLink,
+  IconRefresh,
+  InlineAlert,
+  KpiCard,
   KpiGrid,
   Page,
-  PageHead,
-  Panel,
   type DataTableColumn,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
@@ -85,46 +91,46 @@ export default function DashboardPage() {
       n: summary?.pending ?? 0,
       label: t('rms.dashboard.todoSignoff'),
       to: '/signoff',
-      tone: (summary?.pending ?? 0) > 0 ? 'warn' : 'ok',
+      icon: <IconInbox width={16} height={16} />,
+      tone: (summary?.pending ?? 0) > 0 ? 'warn' : '',
     },
     {
       n: inv?.drift ?? 0,
       label: t('rms.dashboard.todoDrift'),
       to: '/device-recipes',
-      tone: (inv?.drift ?? 0) > 0 ? 'err' : 'ok',
+      icon: <IconRefresh width={16} height={16} />,
+      tone: (inv?.drift ?? 0) > 0 ? 'err' : '',
     },
     {
       n: inv?.orphan ?? 0,
       label: t('rms.dashboard.todoOrphan'),
       to: '/device-recipes',
-      tone: (inv?.orphan ?? 0) > 0 ? 'err' : 'ok',
+      icon: <IconLink width={16} height={16} />,
+      tone: (inv?.orphan ?? 0) > 0 ? 'err' : '',
     },
     {
       n: alarms.length,
       label: t('rms.dashboard.todoAlarm'),
       to: '/integration',
-      tone: alarms.length > 0 ? 'warn' : 'ok',
+      icon: <IconAlert width={16} height={16} />,
+      tone: alarms.length > 0 ? 'warn' : '',
     },
     {
       n: summary?.tempActive ?? 0,
       label: t('rms.dashboard.todoTemp'),
       to: '/signoff',
-      tone: (summary?.tempActive ?? 0) > 0 ? 'warn' : 'ok',
+      icon: <IconKick width={16} height={16} />,
+      tone: (summary?.tempActive ?? 0) > 0 ? 'warn' : '',
     },
     {
       n: summary?.expiringSoon ?? 0,
       label: t('rms.dashboard.todoExpiring'),
       to: '/signoff',
-      tone: (summary?.expiringSoon ?? 0) > 0 ? 'warn' : 'ok',
+      icon: <IconGauge width={16} height={16} />,
+      tone: (summary?.expiringSoon ?? 0) > 0 ? 'warn' : '',
     },
   ];
 
-  const todos = loading ? 0 : pending.length + drift.length + orphan.length;
-  const banner = loading
-    ? ''
-    : todos > 0
-      ? t('rms.dashboard.todoBanner', { n: todos })
-      : t('rms.dashboard.allClear');
   const partial = (data?.failed ?? 0) > 0 ? t('rms.dashboard.partialFailed', { n: data?.failed }) : '';
 
   const pendingColumns = useMemo<Array<DataTableColumn<Signoff>>>(
@@ -214,93 +220,81 @@ export default function DashboardPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.dashboard.title"
-        subtitle={banner}
-        actions={<span className="muted">{partial}</span>}
-      />
+      {/* 健康检查有失败项时才出现的警告条——常驻说明一律不放页头，动态告警例外 */}
+      {partial ? <InlineAlert tone="warn">{partial}</InlineAlert> : null}
 
-      {/* 行动卡片：点卡片直达处理现场 */}
+      {/* 行动卡片：点卡片直达处理现场。
+          结构必须走 KpiCard（`kpi-ico + kpi-main(label/value)`）—— 这里原来是
+          `<div class="tag tone">数字</div> + <div class="kpi-label">`，数字靠彩色
+          标签块撑主角，六个指标就是六个彩色小方块排一行，是全页最「模板」的地方。 */}
       <KpiGrid>
         {cards.map((k) => (
-          <Link key={k.label} to={k.to} className="kpi">
-            <div className={'tag ' + k.tone} style={{ marginBottom: 6 }}>
-              {loading ? '—' : k.n}
-            </div>
-            <div className="kpi-label">{k.label}</div>
+          <Link key={k.label} to={k.to} className={k.tone ? `kpi ${k.tone}` : 'kpi'}>
+            <KpiCard bare icon={k.icon} label={k.label} value={loading ? '—' : k.n} />
           </Link>
         ))}
       </KpiGrid>
 
       <div className="grid-2">
-        {/* 待批签核清单 */}
-        <Panel
+        {/* 待批签核清单。
+            标题走 DataTable 的 titleKey、入口走 headActions —— 不再用
+            `<Panel title actions flush>` 包一层：那样 Panel 出一行标题、
+            DataTable 再出一行「左侧空、右侧只有共 n/刷新」的工具栏，是两层头。 */}
+        <DataTable<Signoff>
           titleKey="rms.dashboard.pendingSignoffs"
-          actions={
+          headActions={
             <Link to="/signoff" className="btn btn-ghost btn-sm">
               {t('rms.nav.signoff')}
             </Link>
           }
-          flush
-        >
-          <DataTable<Signoff>
-            flat
-            columns={pendingColumns}
-            rows={pending.slice(0, 8)}
-            rowKey={(s) => s.id}
-            loading={loading}
-            scrollX="max-content"
-            emptyTitleKey="rms.dashboard.nonePending"
-            onRowClick={() => nav('/signoff')}
-          />
-        </Panel>
+          flat
+          columns={pendingColumns}
+          rows={pending.slice(0, 8)}
+          rowKey={(s) => s.id}
+          loading={loading}
+          scrollX="max-content"
+          emptyTitleKey="rms.dashboard.nonePending"
+          onRowClick={() => nav('/signoff')}
+        />
 
         {/* 机台配方异常清单（漂移 + 孤儿） */}
-        <Panel
+        <DataTable<InventoryRow>
           titleKey="rms.dashboard.deviceIssues"
-          actions={
+          headActions={
             <Link to="/device-recipes" className="btn btn-ghost btn-sm">
               {t('rms.nav.deviceRecipes')}
             </Link>
           }
-          flush
-        >
-          <DataTable<InventoryRow>
-            flat
-            columns={issueColumns}
-            rows={[...drift, ...orphan].slice(0, 8)}
-            rowKey={(r) => r.id}
-            loading={loading}
-            scrollX="max-content"
-            emptyTitleKey="rms.dashboard.noneIssues"
-            onRowClick={() => nav('/device-recipes')}
-          />
-        </Panel>
+          flat
+          columns={issueColumns}
+          rows={[...drift, ...orphan].slice(0, 8)}
+          rowKey={(r) => r.id}
+          loading={loading}
+          scrollX="max-content"
+          emptyTitleKey="rms.dashboard.noneIssues"
+          onRowClick={() => nav('/device-recipes')}
+        />
       </div>
 
       {/* 次要：最近配方（保留原有上下文） */}
-      <Panel
+      <DataTable<Recipe>
         titleKey="rms.dashboard.recent"
-        actions={
+        headActions={
           <Link to="/recipes" className="btn btn-ghost btn-sm">
             {t('rms.nav.recipes')}
           </Link>
         }
-        flush
-      >
-        <DataTable<Recipe>
-          flat
-          columns={recipeColumns}
-          rows={recipes.slice(0, 8)}
-          rowKey={(r) => r.id}
-          loading={loading}
-          error={res.error?.message}
-          onRetry={res.refresh}
-          onRefresh={res.refresh}
-          scrollX="max-content"
-          emptyTitleKey="rms.common.noData"
-        />
-      </Panel>
+        flat
+        columns={recipeColumns}
+        rows={recipes.slice(0, 8)}
+        rowKey={(r) => r.id}
+        loading={loading}
+        error={res.error?.message}
+        onRetry={res.refresh}
+        onRefresh={res.refresh}
+        scrollX="max-content"
+        emptyTitleKey="rms.common.noData"
+      />
     </Page>
   );
 }

@@ -11,7 +11,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   Toolbar,
   useConfirm,
   useToast,
@@ -204,20 +203,7 @@ export default function EcSvPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.ecsv.title"
-        subtitleKey="rms.ecsv.sub"
-        actions={
-          <Can perm={ECSV_MANAGE}>
-            <CimButton size="small" onClick={() => setShowUpload(true)}>
-              {t('rms.ecsv.upload')}
-            </CimButton>
-            <CimButton type="primary" size="small" onClick={() => setShowSpec(true)}>
-              + {t('rms.ecsv.addSpec')}
-            </CimButton>
-          </Can>
-        }
-      />
+      
 
       {summary && (
         <KpiGrid>
@@ -265,6 +251,14 @@ export default function EcSvPage() {
             labelKey: 'rms.ecsv.specTab',
             children: (
               <DataTable<EcSvSpec>
+        headActions={<Can perm={ECSV_MANAGE}>
+            <CimButton size="small" onClick={() => setShowUpload(true)}>
+              {t('rms.ecsv.upload')}
+            </CimButton>
+            <CimButton type="primary" size="small" onClick={() => setShowSpec(true)}>
+              + {t('rms.ecsv.addSpec')}
+            </CimButton>
+          </Can>}
                 columns={specColumns}
                 rows={specsRes.data ?? NO_SPECS}
                 rowKey={(x) => x.id}

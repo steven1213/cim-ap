@@ -7,7 +7,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -138,19 +137,14 @@ export default function GoldenPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.golden.title"
-        subtitleKey="rms.golden.sub"
-        actions={
-          <Can perm={GOLDEN_MANAGE}>
+      
+
+      <DataTable<GoldenOverride>
+        headActions={<Can perm={GOLDEN_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.golden.submit')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<GoldenOverride>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

@@ -10,7 +10,6 @@ import {
   CimTag,
   DataTable,
   Page,
-  PageHead,
   Panel,
   Toolbar,
   type DataTableColumn,
@@ -264,8 +263,6 @@ export default function AuditLogPage() {
 
   return (
     <Page>
-      <PageHead titleKey="rms.audit.title" subtitleKey="rms.audit.sub" />
-
       {/* KPI */}
       <KpiGrid>
         <KpiCard label={t('rms.audit.kpi.total')} value={summary?.total ?? '—'} />
@@ -371,7 +368,7 @@ export default function AuditLogPage() {
       />
 
       {/* 配方对象历史（FR-H3 / Req 19） */}
-      <Panel titleKey="rms.audit.history.title" subKey="rms.audit.history.sub" flush>
+      <Panel titleKey="rms.audit.history.title" flush>
         <Toolbar
           left={
             <>

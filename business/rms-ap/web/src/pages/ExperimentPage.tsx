@@ -9,7 +9,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useToast,
   type DataTableColumn,
   type FormField,
@@ -171,19 +170,14 @@ export default function ExperimentPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.exp.title"
-        subtitleKey="rms.exp.sub"
-        actions={
-          <Can perm={EXPERIMENT_MANAGE}>
+      
+
+      <DataTable<Experiment>
+        headActions={<Can perm={EXPERIMENT_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.exp.create')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<Experiment>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

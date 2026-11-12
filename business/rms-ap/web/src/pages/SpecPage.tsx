@@ -10,7 +10,6 @@ import {
   DataTable,
   EmptyState,
   Page,
-  PageHead,
   Toolbar,
   useConfirm,
   useToast,
@@ -200,22 +199,7 @@ export default function SpecPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.spec.title"
-        subtitleKey="rms.spec.sub"
-        actions={
-          <Can perm={SPEC_MANAGE}>
-            <CimButton
-              type="primary"
-              size="small"
-              disabled={!recipeId}
-              onClick={() => setShowCreate(true)}
-            >
-              + {t('rms.spec.add')}
-            </CimButton>
-          </Can>
-        }
-      />
+      
 
       <Toolbar
         left={
@@ -262,6 +246,16 @@ export default function SpecPage() {
         <EmptyState titleKey="rms.spec.noRecipe" />
       ) : (
         <DataTable<ParamSpec>
+        headActions={<Can perm={SPEC_MANAGE}>
+            <CimButton
+              type="primary"
+              size="small"
+              disabled={!recipeId}
+              onClick={() => setShowCreate(true)}
+            >
+              + {t('rms.spec.add')}
+            </CimButton>
+          </Can>}
           columns={columns}
           rows={rows}
           rowKey={(r) => r.id}

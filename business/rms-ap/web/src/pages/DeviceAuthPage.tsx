@@ -7,7 +7,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -118,19 +117,14 @@ export default function DeviceAuthPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.deviceAuth.title"
-        subtitleKey="rms.deviceAuth.sub"
-        actions={
-          <Can perm={DEVICE_AUTH_MANAGE}>
+      
+
+      <DataTable<DeviceAuth>
+        headActions={<Can perm={DEVICE_AUTH_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.deviceAuth.grant')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<DeviceAuth>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

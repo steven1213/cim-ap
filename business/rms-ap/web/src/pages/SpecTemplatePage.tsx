@@ -11,7 +11,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -163,19 +162,14 @@ export default function SpecTemplatePage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.specTpl.title"
-        subtitleKey="rms.specTpl.sub"
-        actions={
-          <Can perm={SPEC_MANAGE}>
+      
+
+      <DataTable<SpecTemplate>
+        headActions={<Can perm={SPEC_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShowCreate(true)}>
               + {t('rms.specTpl.add')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<SpecTemplate>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

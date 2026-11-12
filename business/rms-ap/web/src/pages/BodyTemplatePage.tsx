@@ -12,7 +12,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -158,19 +157,14 @@ export default function BodyTemplatePage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.btpl.title"
-        subtitleKey="rms.btpl.sub"
-        actions={
-          <Can perm={BODY_TEMPLATE_MANAGE}>
+      
+
+      <DataTable<BodyTemplate>
+        headActions={<Can perm={BODY_TEMPLATE_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
               + {t('rms.btpl.create')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<BodyTemplate>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

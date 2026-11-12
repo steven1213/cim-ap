@@ -9,8 +9,8 @@ import {
   CimTag,
   DataTable,
   EmptyState,
+  FieldGrid,
   Page,
-  PageHead,
   Panel,
   useToast,
   type DataTableColumn,
@@ -232,7 +232,7 @@ export default function ComparePage() {
 
   return (
     <Page>
-      <PageHead titleKey="rms.compare.title" subtitleKey="rms.compare.sub" />
+      
 
       {/* 校验日志 KPI */}
       <KpiGrid>
@@ -245,7 +245,6 @@ export default function ComparePage() {
       {/* 版本比对 */}
       <Panel
         titleKey="rms.compare.title"
-        subKey="rms.compare.sub"
         actions={
           <>
             <CimSelect
@@ -261,7 +260,9 @@ export default function ComparePage() {
           </>
         }
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+        {/* 字段网格一律走 FieldGrid：手写内联 grid 吃不到 .cim-form-grid 的相邻 margin 豁免，
+            第二列会整体下移 11px（右列标签比左列低一截的「不对齐」就是这么来的） */}
+        <FieldGrid columns={2} gap={12}>
           <CimField labelKey="rms.compare.left">
             <div style={VERTICAL}>
               <CimSelect
@@ -310,7 +311,7 @@ export default function ComparePage() {
               />
             </div>
           </CimField>
-        </div>
+        </FieldGrid>
 
         <div style={{ marginTop: 12 }}>
           {result ? (
@@ -332,14 +333,13 @@ export default function ComparePage() {
       {/* 批量比对 */}
       <Panel
         titleKey="rms.compare.batch.title"
-        subKey="rms.compare.batch.sub"
         actions={
           <CimButton type="primary" size="small" onClick={runBatch} disabled={bBusy}>
             {bBusy ? t('rms.common.loading') : t('rms.compare.batchRun')}
           </CimButton>
         }
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+        <FieldGrid columns={2} gap={12}>
           <CimField labelKey="rms.compare.baseline">
             <div style={VERTICAL}>
               <CimSelect
@@ -379,7 +379,7 @@ export default function ComparePage() {
               width="100%"
             />
           </CimField>
-        </div>
+        </FieldGrid>
 
         <div style={{ marginTop: 12 }}>
           {bResults.length ? (
@@ -399,7 +399,6 @@ export default function ComparePage() {
       {/* 校验日志 */}
       <Panel
         titleKey="rms.compare.logs.title"
-        subKey="rms.compare.logs.sub"
         flush
         actions={
           <CimSelect

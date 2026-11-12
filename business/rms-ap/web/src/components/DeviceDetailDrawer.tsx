@@ -269,28 +269,27 @@ export default function DeviceDetailDrawer({
         />
       </Panel>
 
-      {/* 装载的配方（四来源聚合，行可点开配方详情） */}
-      <Panel
+      {/* 装载的配方（四来源聚合，行可点开配方详情）。
+          标题与统计摘要都交给 DataTable —— 用 `<Panel title sub>` 包一层会多出
+          一行「左侧空、右侧只有共 n/刷新」的工具栏（见 DataTable.titleKey 注释）。 */}
+      <DataTable
         titleKey="rms.deviceDetail.loaded"
         sub={
           view
             ? `${t('rms.deviceRecipes.total')} ${view.total} · ${t('rms.deviceRecipes.orphan')} ${view.orphan} · ${t('rms.deviceRecipes.drift')} ${view.drift}`
             : undefined
         }
-      >
-        <DataTable
-          flat
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.recipeId ?? `orphan:${r.ppidOnTool ?? ''}:${r.code ?? ''}`}
-          loading={viewRes.loading}
-          error={viewRes.error?.message}
-          onRetry={viewRes.refresh}
-          onRefresh={viewRes.refresh}
-          onRowClick={(r) => (r.recipeId ? onOpenRecipe?.(r) : undefined)}
-          emptyTitleKey="rms.deviceRecipes.empty"
-        />
-      </Panel>
+        flat
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.recipeId ?? `orphan:${r.ppidOnTool ?? ''}:${r.code ?? ''}`}
+        loading={viewRes.loading}
+        error={viewRes.error?.message}
+        onRetry={viewRes.refresh}
+        onRefresh={viewRes.refresh}
+        onRowClick={(r) => (r.recipeId ? onOpenRecipe?.(r) : undefined)}
+        emptyTitleKey="rms.deviceRecipes.empty"
+      />
     </CimDrawer>
   );
 }

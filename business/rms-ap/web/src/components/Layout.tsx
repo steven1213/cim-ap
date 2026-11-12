@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup, type ShellNavItem } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useTabStore } from '@/store/tabStore';
 import { hasPermission } from '@/lib/permissions';
 import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
-import { GROUPS, NAV_FLAT } from '@/lib/navConfig';
+import { GROUPS, NAV_FLAT, type NavItem } from '@/lib/navConfig';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -48,18 +48,29 @@ export default function Layout() {
   /**
    * 静态菜单 → 外壳的菜单模型。权限过滤在映射前做（无权限的条目根本不进模型），
    * 而不是在外壳里传一个 perm 字段——外壳不该认识各 ap 的权限码格式。
+   *
+   * <p>递归处理三级：有 `children` 的是模块节点（`to` 为空，外壳渲染成可展开行）；
+   * 子项全被权限过滤掉时连模块节点一起不渲染（留下一个点开空白的壳最糟）。</p>
    */
-  const groups = useMemo<ShellNavGroup[]>(
-    () =>
-      GROUPS.map((g) => ({
-        key: g.key,
-        cap: g.capI18n ? t(g.capI18n) : undefined,
-        items: g.items
-          .filter((it) => !it.perm || hasPermission(permissions, it.perm))
-          .map((it) => ({ key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon })),
-      })),
-    [t, permissions],
-  );
+  const groups = useMemo<ShellNavGroup[]>(() => {
+    const toShell = (it: NavItem): ShellNavItem | null => {
+      if (it.children?.length) {
+        const kids = it.children
+          .map(toShell)
+          .filter((x): x is ShellNavItem => x !== null);
+        return kids.length > 0 ? { key: it.i18n, label: t(it.i18n), Icon: it.Icon, children: kids } : null;
+      }
+      if (it.perm && !hasPermission(permissions, it.perm)) return null;
+      if (!it.to) return null;
+      return { key: it.to, path: it.to, label: t(it.i18n), Icon: it.Icon };
+    };
+
+    return GROUPS.map((g) => ({
+      key: g.key,
+      cap: g.capI18n ? t(g.capI18n) : undefined,
+      items: g.items.map(toShell).filter((x): x is ShellNavItem => x !== null),
+    }));
+  }, [t, permissions]);
 
   const labels = useMemo<ShellLabels>(
     () => ({

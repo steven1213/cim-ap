@@ -9,7 +9,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   Panel,
   Toolbar,
   useConfirm,
@@ -286,25 +285,7 @@ export default function IntegrationPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.integration.title"
-        subtitleKey="rms.integration.sub"
-        actions={
-          <>
-            <Can perm={INTEGRATION_OPERATE}>
-              <CimButton size="small" onClick={() => setShowBatchHold(true)}>
-                {t('rms.batch.holdBtn')}
-              </CimButton>
-              <CimButton size="small" onClick={() => setShowBatchDownload(true)}>
-                {t('rms.batch.downloadBtn')}
-              </CimButton>
-            </Can>
-            <CimButton size="small" onClick={refreshAll}>
-              {t('rms.common.refresh')}
-            </CimButton>
-          </>
-        }
-      />
+      
 
       {showBatchHold ? (
         <BatchHoldModal
@@ -337,6 +318,19 @@ export default function IntegrationPage() {
         }
       >
         <DataTable<HoldView>
+        headActions={<>
+            <Can perm={INTEGRATION_OPERATE}>
+              <CimButton size="small" onClick={() => setShowBatchHold(true)}>
+                {t('rms.batch.holdBtn')}
+              </CimButton>
+              <CimButton size="small" onClick={() => setShowBatchDownload(true)}>
+                {t('rms.batch.downloadBtn')}
+              </CimButton>
+            </Can>
+            <CimButton size="small" onClick={refreshAll}>
+              {t('rms.common.refresh')}
+            </CimButton>
+          </>}
           flat
           columns={holdColumns}
           rows={holds}
@@ -571,7 +565,7 @@ function PpidPanel({
   );
 
   return (
-    <Panel titleKey="rms.integration.ppid.title" subKey="rms.integration.ppid.sub">
+    <Panel titleKey="rms.integration.ppid.title">
       <FormGrid<PpidForm>
         fields={fields}
         value={{ ...form, deviceId, typeId, recipeId }}
@@ -735,7 +729,7 @@ function SimPanel({
   );
 
   return (
-    <Panel titleKey="rms.integration.sim.title" subKey="rms.integration.sim.sub">
+    <Panel titleKey="rms.integration.sim.title">
       <FormGrid<SimForm>
         fields={fields}
         value={{ ...form, toolId, recipeUid }}
@@ -1014,7 +1008,7 @@ function DownloadPanel({
   );
 
   return (
-    <Panel titleKey="rms.integration.dl.title" subKey="rms.integration.dl.sub">
+    <Panel titleKey="rms.integration.dl.title">
       {receipt ? (
         <InlineAlert tone={(receipt.result === 'ACCEPTED' ? 'ok' : 'err')} style={{ marginBottom: 10 }}>{receipt.result} · {t('rms.integration.dl.stage')} {receipt.stage}
             {receipt.errorDesc ? ` · ${receipt.errorDesc}` : ''}</InlineAlert>
@@ -1240,7 +1234,7 @@ function GemEventPanel({ devices }: { devices: Device[] }) {
   );
 
   return (
-    <Panel titleKey="rms.integration.evt.title" subKey="rms.integration.evt.sub">
+    <Panel titleKey="rms.integration.evt.title">
       {last ? (
         <InlineAlert tone={(last.alarmRaised ? 'err' : 'ok')} style={{ marginBottom: 10 }}>{last.eventType} · {last.ppid ?? t('rms.common.dash')} · {last.handlingResult}
             {last.driftDetected ? ` · ${t('rms.integration.evt.drift')}` : ''}
@@ -1407,7 +1401,7 @@ function InventoryPanel({ devices }: { devices: Device[] }) {
   ];
 
   return (
-    <Panel titleKey="rms.integration.inv.title" subKey="rms.integration.inv.sub">
+    <Panel titleKey="rms.integration.inv.title">
       {report ? (
         <InlineAlert
           tone={report.orphan > 0 || report.drift > 0 ? 'err' : 'ok'}

@@ -9,7 +9,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -175,19 +174,14 @@ export default function QualificationPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.qual.title"
-        subtitleKey="rms.qual.sub"
-        actions={
-          <Can perm={QUALIFICATION_MANAGE}>
+      
+
+      <DataTable<Qualification>
+        headActions={<Can perm={QUALIFICATION_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.qual.grant')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<Qualification>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

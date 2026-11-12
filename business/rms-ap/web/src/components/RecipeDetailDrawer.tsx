@@ -480,38 +480,38 @@ export default function RecipeDetailDrawer({
         ) : null}
 
         {/* 参数 */}
-        <Panel titleKey="rms.recipe.detail.params" flush>
-          <DataTable
-            flat
-            columns={paramColumns}
+        <DataTable
+          titleKey="rms.recipe.detail.params"
+          columns={paramColumns}
             rows={p?.params ?? []}
             rowKey={(x) => x.key}
             rowClassName={(x) =>
               (validation?.checks ?? []).some((c) => c.paramKey === x.key) ? 'cim-row-warn' : ''
             }
-            scrollX="max-content"
-            emptyTitleKey="rms.recipe.detail.noParams"
-          />
-        </Panel>
+          scrollX="max-content"
+          emptyTitleKey="rms.recipe.detail.noParams"
+        />
 
         {/* 步序 */}
         {(p?.steps ?? []).length > 0 ? (
-          <Panel titleKey="rms.recipe.detail.steps" flush>
-            <DataTable flat columns={stepColumns} rows={p?.steps ?? []} rowKey={(s) => String(s.stepNo)} scrollX="max-content" />
-          </Panel>
+          <DataTable
+            titleKey="rms.recipe.detail.steps"
+            columns={stepColumns}
+            rows={p?.steps ?? []}
+            rowKey={(s) => String(s.stepNo)}
+            scrollX="max-content"
+          />
         ) : null}
 
         {/* 子配方 */}
         {(p?.subRecipes ?? []).length > 0 ? (
-          <Panel titleKey="rms.recipe.detail.subRecipes" flush>
-            <DataTable
-              flat
-              columns={subColumns}
+          <DataTable
+            titleKey="rms.recipe.detail.subRecipes"
+            columns={subColumns}
               rows={p?.subRecipes ?? []}
-              rowKey={(s) => s.ref ?? s.name ?? Math.random().toString(36)}
-              scrollX="max-content"
-            />
-          </Panel>
+            rowKey={(s) => s.ref ?? s.name ?? Math.random().toString(36)}
+            scrollX="max-content"
+          />
         ) : null}
 
         {p && p.warnings && p.warnings.length > 0 ? (

@@ -7,7 +7,6 @@ import {
   DataTable,
   EmptyState,
   Page,
-  PageHead,
   Panel,
   useToast,
   type CimTreeNode,
@@ -303,7 +302,7 @@ export default function DeviceRecipePage() {
 
   return (
     <Page>
-      <PageHead titleKey="rms.deviceRecipes.title" subtitleKey="rms.deviceRecipes.sub" />
+      
 
       <CimSplitPane>
         <Panel

@@ -12,7 +12,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   Panel,
   useConfirm,
   useToast,
@@ -220,10 +219,10 @@ export default function RecipeLibraryPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.recipe.title"
-        actions={
-          <>
+      
+
+      <DataTable<Recipe>
+        headActions={<>
             <Can perm="rms:recipe:create">
               <CimButton size="small" onClick={() => setShowImport(true)}>
                 {t('rms.recipe.importBtn')}
@@ -239,11 +238,7 @@ export default function RecipeLibraryPage() {
                 + {t('rms.recipe.createNew')}
               </CimButton>
             </Can>
-          </>
-        }
-      />
-
-      <DataTable<Recipe>
+          </>}
         columns={columns}
         rows={listRes.data ?? NO_RECIPES}
         rowKey={(r) => r.id}

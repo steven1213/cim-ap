@@ -10,6 +10,7 @@ import {
   CimButton,
   CimInput,
   CimField,
+  FieldGrid,
 } from '@cim/ui';
 import * as api from '@/lib/rmsApi';
 import type { BatchDownloadItem, BatchOpResult, DeviceType } from '@/types';
@@ -221,9 +222,11 @@ export function BatchDownloadModal({
         <CimInput value={requestor} onChange={setRequestor} />
       </CimField>
 
+      {/* 每行用 FieldGrid 而非手写内联 grid：内联 grid 吃不到 .cim-form-grid 的相邻
+          margin 豁免，每行右侧字段会整体下移 11px */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {rows.map((row, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <FieldGrid key={i} columns={2} gap={8}>
             <CimField label={<>{t('rms.batch.device')} {i + 1}</>}>
               <CimSelect
                 value={row.toolId || null}
@@ -240,7 +243,7 @@ export function BatchDownloadModal({
                 width="100%"
               />
             </CimField>
-          </div>
+          </FieldGrid>
         ))}
       </div>
 

@@ -7,7 +7,6 @@ import {
   DataTable,
   FormGrid,
   Page,
-  PageHead,
   useConfirm,
   useToast,
   type DataTableColumn,
@@ -130,19 +129,14 @@ export default function BypassPage() {
 
   return (
     <Page>
-      <PageHead
-        titleKey="rms.bypass.title"
-        subtitleKey="rms.bypass.sub"
-        actions={
-          <Can perm={BYPASS_MANAGE}>
+      
+
+      <DataTable<Bypass>
+        headActions={<Can perm={BYPASS_MANAGE}>
             <CimButton type="primary" size="small" onClick={() => setShow(true)}>
               + {t('rms.bypass.create')}
             </CimButton>
-          </Can>
-        }
-      />
-
-      <DataTable<Bypass>
+          </Can>}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
