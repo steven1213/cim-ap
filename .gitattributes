@@ -1,0 +1,9 @@
+# 行尾策略：仓库在 Windows 上开发（core.autocrlf=true），但脚本要在 Linux/CI 上跑。
+# 没有这条时，checkout 会把 .sh 转成 CRLF，Linux 上直接 bash: $'\r': command not found。
+* text=auto
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.java text eol=lf
+*.yml  text eol=lf
+*.xml  text eol=lf
+*.md   text eol=lf
