@@ -15,8 +15,14 @@
 //   sanity 开放 API 贯通（部署/发起/待办）→ 200（认证开启后服务身份仍能过 /api/** 的 authenticated）。
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const BASE = process.env.BASE || 'http://localhost:8085/api/v1/approval';
+// 相对本脚本定位 BPMN：写死绝对路径时换机器/换目录就挂，而失败的报错是
+// ENOENT 而不是「路径不对」，容易误判成流程定义缺失。
+const BPMN_PATH = resolve(dirname(fileURLToPath(import.meta.url)),
+  '../../server/src/main/resources/processes/single-approval.bpmn20.xml');
 const KEYS = {
   'rms-ap': 'sec-rms-ap-2026',
   'mds-ap': 'sec-mds-ap-2026',
@@ -60,10 +66,7 @@ async function api(path, { method = 'GET', body, appKey } = {}) {
 const data = (r) => r.body?.data;
 
 async function main() {
-  const BPMN = fs.readFileSync(
-    'E:/Personal/CIM/cim-ap/business/approval-ap/server/src/main/resources/processes/single-approval.bpmn20.xml',
-    'utf8',
-  );
+  const BPMN = fs.readFileSync(BPMN_PATH, 'utf8');
 
   // ---- sanity: 开放 API 贯通（认证开启后服务身份仍须通过 /api/** 的 authenticated） ----
   // ApiAuthFilter 若只写域作用域、不写 SecurityContext，这里会全 401——那正是本轮修掉的断裂。
