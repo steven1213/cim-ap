@@ -593,7 +593,8 @@
 逐条规则文本比对（去注释/去空白）后，三份全等才动：`.hint`（15 处）、`.cell-actions`（26 处）、`@media 900px` 外壳块、`@media 640px` 外壳块、`.grid-2/.grid-3` 收窄断点、`.scrim`。
 
 - ⚠️ **`.scrim` 是反向缺口**：`ConsoleShell` 一直渲染 `<div className="scrim">`（移动端抽屉遮罩），但 `shell.css` 从无这条规则——样式只散在三个 ap 里。新建 ap 漏抄的表现是「抽屉打开后点空白关不掉」。**组件渲染的类名，样式必须在组件包内。**
-- 结果：`styles.css` 行数 iam 486→**182**、rms 889→**764**、approval 1679→**1382**。
+- 结果：`styles.css` 行数 iam 486→**182**、rms 889→**502**、approval 1679→**1242**（合计 3054→1926，−37%）。
+- 顺带清掉两处「同一 ap 内两份同名规则」：rms 的 `.login-card` 同时存在旧登录页版（含 `.lead`/`form`/`button[type=submit]`）与登录屏版，前者是删登录页时的残留；approval 删完登录块后留下 `.login-brand .logo` 与裸 `.modal` 两条孤儿规则。
 
 ### 34.3 登录页有三套实现（未动，记录在案）
 
