@@ -101,7 +101,7 @@ export default function DeviceDetailDrawer({
   const headerItems: Array<DescItem<Device>> = [
     { key: 'type', labelKey: 'rms.device.type', value: typeName ?? '—' },
     { key: 'area', labelKey: 'rms.device.area', value: areaName ?? '—' },
-    { key: 'ip', labelKey: 'IP', value: <span className="mono">{device.ip ?? '—'}</span> },
+    { key: 'ip', labelKey: 'rms.device.ip', value: <span className="mono">{device.ip ?? '—'}</span> },
     {
       key: 'status',
       labelKey: 'rms.device.status',

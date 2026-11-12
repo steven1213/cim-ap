@@ -195,7 +195,7 @@ export default function CallbacksPage() {
   const outboxColumns: Array<DataTableColumn<OutboxView>> = [
     { key: 'messageId', titleKey: 'cb.colMessageId', width: 130, mono: true },
     { key: 'appCode', titleKey: 'cb.colAppCode', width: 110, mono: true },
-    { key: 'businessKey', titleKey: 'audit.colBusinessKey', width: 150, mono: true },
+    { key: 'businessKey', titleKey: 'cb.colBusinessKey', width: 150, mono: true },
     {
       key: 'eventType',
       titleKey: 'cb.colEventType',
