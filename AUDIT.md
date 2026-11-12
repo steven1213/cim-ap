@@ -618,6 +618,54 @@
 
 三应用 `tsc --noEmit` 零错；`vite build` 通过（9.88 / 10.75 / 12.84s）；IAM 渲染契约 **33/33**。
 
+## 2026-11-12（续 4）统一登录归位：登录页从 Java 字符串搬成静态资源
+
+起因是「登录页应该在 IAM」这句话。查证结果：**它已经在 IAM 了**（`GET /login`，8081 直出，全仓唯一），
+但落位方式是最差的一种——255 行 HTML+CSS+JS 塞在 `SsoLoginPageController` 的 `"""` 文本块里。
+本轮改的是**形态**，不是归属。
+
+### 35.1 登录页：Java 文本块 → 三件静态资源
+
+| 项 | 改前 | 改后 |
+| --- | --- | --- |
+| 载体 | `SsoLoginPageController.LOGIN_HTML`（255 行字符串） | `static/login/{index.html 66, login.css 314, login.js 247}` |
+| Controller | 373 行（含整页 HTML） | **138 行**（只剩 SSO 会话判定 + 302 + 交回 Resource） |
+| 样式 | 内联 `<style>`，30+ 条规则 | 独立 `login.css`，可 lint/格式化 |
+| 文案兜底 | zh + en 两份词典（与 i18n 库各自漂移） | 只留 zh-CN；en 走运行时 bundle |
+| 缓存 | 无显式头 | `Cache-Control: no-store` |
+
+- 页面仍随 jar 发布（`classpath:static/login/`），**不依赖 nginx 或前端构建产物**——登录是「未认证也要能开」的页面，不能挂在 React 上。这是「零依赖静态页」而非「vite 第二入口」的理由。
+- `login.css` 的 `:root` 是 `tokens.css` 的 **17 变量子集副本**（变量名逐字一致）。已在 `tokens.css` 顶部加反向指针，说明这是唯一的受控例外。
+- 静态资源缺失会静默表现为「页面裸奔/按钮没反应」，故 `loginPage()` 在请求期显式检查 `LOGIN_PAGE.exists()` 并抛带指引的 `IllegalStateException`。
+
+### 35.2 中继页：5 处手写 → `<SsoRelay>` + `ssoLoginUrl`
+
+原状：iam 的 `LoginEntry` 与 `SsoCallback` 各写一份内联 `style={{...}}`；rms 的 `LoginPage`（106 行，自带 `.login-screen` 品牌卡片）、`SsoCallback`、`BootGate` 各写一份 `.login-screen` 结构；rms 与 iam 各拼一份 `${IAM}/login?app=&redirect=`。
+
+收进 `@cim/shell`（呈现与 URL 拼装不碰 store，与 `guards.tsx` 同口径）：
+
+- `ssoLoginUrl({iamBase, app, callbackUrl})` / `redirectToSso(...)` —— 参数拼装一处；
+- `<SsoRelay mark brand brandSub label hint busy>` —— 整页卡片 + 不确定进度条（`busy=false` 时关掉，错误态不该还在转）。
+
+顺带删掉 rms `styles.css` 的 `.login-*` 共 7 条规则（502 → **464** 行）。
+
+### 35.3 改的过程中撞见的三个真坑
+
+1. **rms 中继页的品牌名是白字白底，看不见。** `.brand-title` 在 `shell.css` 里是为深色侧栏定的 `color:#fff`，rms 却把它放进白色 `.login-card`。`<SsoRelay>` 改用自有的 `.sso-relay-name`，配色显式声明——**组件的类名不能借用另一套配色上下文**。
+2. **登录页的 `.caps-hint` 是死规则**，且 `color: var(--warn)` 里的 `--warn` 在页面 `:root` 从未定义；文档还写着「Caps Lock 提示已实现」。已删规则，并在 iam web README 里把这条标注为「未实现」，而不是继续留着假描述。
+3. **`iam.login.lead` 写着「进入 IAM 控制台」**——这页是所有 ap 共用的，RMS 用户会读到自己「要进 IAM 控制台」。改为中性的「使用统一身份继续」。
+
+### 35.4 顺带修掉一个死路
+
+rms 准入失败时，页面渲染的按钮文案是 `t('rms.login.redirecting')`（「正在跳转至统一身份认证中心…」），点击后**重跑同一段 SSO 中继**——IAM 侧会话还在，会拿同一枚令牌再弹回 `/sso`，正是代码注释里反复警告的无限往返。现改为「改用其他账号登录」：先 `POST /api/v1/logout`（该端点两个参数都可空、必清 SSO Cookie），再回登录页。准入没开通就重试是必然失败的动作，不该做成按钮。
+
+### 35.5 验证
+
+- 后端 `SsoSessionSharingTest` **2/2 绿**（原 1 例 + 新增 `loginPageAssets_areServedAndPageIsNotCached`，钉住三件资源可访问与 `no-store`）；`ApiContractVerifier` 28 控制器 / 109 映射 / 2 例外，启动期通过。
+- 前端 iam / rms `tsc --noEmit` 零错，`vite build` 均通过（12.0 / 12.6s）。
+- 登录页实机截图（1440×900 双栏 + 窄屏单栏）：布局正确、i18n 兜底生效、`app=RMS` 时 lead 显示「登录以访问 RMS」。
+- ⚠️ 截图踩坑：Chrome headless 的**最小窗口宽度约 500px**，`--window-size=430` 会按 ~500 布局再裁切，看起来像横向溢出。判定用同源 iframe 探针读 `documentElement.scrollWidth` 才准（430 与 360 下均等于视口宽，无溢出）。
+
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
 - 仓库根误入的 `视频.lnk` 已于提交 `5ae9bb7` 移除，并在 `.gitignore` 追加 `*.lnk`；`docs/business/mds-ap/server/截图.lnk` 等同类快捷方式现已被忽略，不再纳入版本控制（如需彻底删除本地文件请人工确认）。

@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { CimSpin } from '@cim/ui';
+import { SsoRelay } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -63,6 +65,7 @@ const ExperimentPage = lazy(() => import('@/pages/ExperimentPage'));
  * 再渲染受保护路由。避免「首帧权限为空 → 误判 403」。
  */
 function BootGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const token = useAuthStore((s) => s.token);
   const loadMe = useAuthStore((s) => s.loadMe);
   const loadPermissions = useAuthStore((s) => s.loadPermissions);
@@ -99,16 +102,7 @@ function BootGate({ children }: { children: ReactNode }) {
   }
 
   if (!ready) {
-    return (
-      <div className="login-screen">
-        <div className="login-card">
-          <div className="login-brand">
-            <div className="logo">RM</div>
-          </div>
-          <p>…</p>
-        </div>
-      </div>
-    );
+    return <SsoRelay mark="RM" brand="CIM RMS" label={t('rms.common.loading')} />;
   }
   return <>{children}</>;
 }

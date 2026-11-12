@@ -138,7 +138,6 @@ class SsoSessionSharingTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(noCookieBody).contains("id=\"f\""); // 登录表单已渲染
-
         // 5) 伪造/失效 SSO Cookie → 同样回到登录表单，不泄漏、不循环
         mvc.perform(get("/login")
                         .cookie(new Cookie(ssoProperties.getCookieName(), "forged.invalid.token"))
@@ -151,6 +150,30 @@ class SsoSessionSharingTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(forgedBody).contains("id=\"f\"");
+    }
+
+    /**
+     * 登录页本体的静态资源可访问性。
+     *
+     * <p>页面拆成 {@code static/login/{index.html,login.css,login.js}} 后，三件必须一起进 jar；
+     * 漏任何一件的表现都是「登录页裸奔」或「按钮点了没反应」，而不是明显的 500——故在此钉住。</p>
+     */
+    @Test
+    void loginPageAssets_areServedAndPageIsNotCached() throws Exception {
+        MvcResult page = mvc.perform(get("/login")).andExpect(status().isOk()).andReturn();
+        String body = page.getResponse().getContentAsString();
+        assertThat(body).contains("/login/login.css", "/login/login.js");
+        assertThat(page.getResponse().getHeader("Cache-Control"))
+                .as("登录页不得被缓存：缓存住的表单会带着别人的回跳地址")
+                .contains("no-store");
+
+        MvcResult css = mvc.perform(get("/login/login.css")).andExpect(status().isOk()).andReturn();
+        assertThat(css.getResponse().getContentType()).contains("css");
+        assertThat(css.getResponse().getContentAsString()).contains(".login-page");
+
+        MvcResult js = mvc.perform(get("/login/login.js")).andExpect(status().isOk()).andReturn();
+        assertThat(js.getResponse().getContentType()).contains("javascript");
+        assertThat(js.getResponse().getContentAsString()).contains("/api/v1/login");
     }
 
     private String fetchSalt(String username) throws Exception {

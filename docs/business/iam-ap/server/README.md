@@ -65,6 +65,14 @@
 - `LoginService.login`：按 `source` 选源 → 认证失败抛 `noAdmission` → 成功先 `bump` 该用户令牌版本（旧令牌即时失效，单会话语义）→ 再签发新令牌（携带最新 `ver`）。
 - `LoginController`：`POST /api/v1/login`（入参 `username`/`credential`/`clientSalt`）→ `{token, expiresInSeconds, tokenType}`；`GET /api/v1/login/salt?username=` 下发每用户 `clientSalt`（未知用户返回空盐，防账号枚举）。
 
+**(d.1) 统一登录页与 SSO 会话（`sso` 包）** — 各 ap 共用的唯一登录入口
+- `SsoLoginPageController.GET /login` 只有两个职责：① 请求带**有效 SSO 会话 Cookie**（`cim.iam.sso.cookie-name`，默认 `iam_sso`）且 `redirect` 在 `allowed-redirect-hosts` 白名单内 → 为请求方 ap 签发新令牌并 302 回跳，**不渲染表单**；② 否则交回静态登录页（`Cache-Control: no-store`）。
+- **页面本体**在 `src/main/resources/static/login/`（`index.html` + `login.css` + `login.js`），随 jar 发布，由 Spring 静态资源处理器托管。**零框架依赖**——登录页要在 React/antd 全都不在的情况下仍可用，故不复用 `@cim/ui`；代价是版式靠 `login.css` 与 `ui.css` 人工对齐（取舍见 `docs/platform/web/component-adoption-audit.md` §8.3）。
+- 文案运行时拉 `GET /api/i18n/messages?lang=`（公开端点，键 `iam.login.*`，种子在 `IamConsoleCatalog`），**改文案不发版**；页面内置词典只留 zh-CN 兜底。
+- `SsoSessionService`：登录成功种 HttpOnly + SameSite=Lax 的会话 Cookie（`cookie-domain` 决定跨子域共享，Cookie 与端口无关）；`/login` 命中时滑动续期；`POST /api/v1/logout` 清除——**从任一 ap 登出即结束单点登录**。
+- 回跳地址仅放行 `allowed-redirect-hosts` 内的主机（相对路径放行），防开放重定向。
+- 端到端已覆盖：`SsoSessionSharingTest` 跑通「登录下发 Cookie → 带 Cookie 访问 `/login?redirect=` 得 302 且令牌 `apps` 含 rms-ap → 无/伪 Cookie 回到表单 200」，并断言三件静态资源可访问、`/login` 响应 `Cache-Control: no-store`。
+
 **(e) 口令两层派生（`auth/PasswordDerivation`）** — §5.1 口令前端加密 / 服务端二次派生
 - 第一层（客户端）：`clientHash = PBKDF2(password, clientSalt, rounds)`，明文口令不出浏览器。
 - 第二层（服务端）：`serverHash = PBKDF2(clientHash, serverPepper, rounds)`；入库仅存 `serverHash`，`serverPepper` 为服务端密钥（`cim.iam.auth.password.pepper`，配置 / KMS，**不入库**）。

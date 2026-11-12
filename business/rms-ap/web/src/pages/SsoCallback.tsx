@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { SsoRelay } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 
 /**
@@ -26,14 +27,6 @@ export default function SsoCallback() {
   }, []);
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <div className="login-brand">
-          <div className="logo">RM</div>
-          <div className="brand-title">CIM RMS</div>
-        </div>
-        <p>{t('rms.login.redirecting')}</p>
-      </div>
-    </div>
+    <SsoRelay mark="RM" brand="CIM RMS" label={t('rms.login.redirecting')} />
   );
 }

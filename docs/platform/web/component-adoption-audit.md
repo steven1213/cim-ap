@@ -270,17 +270,32 @@ diff business/iam-ap/web/src/components/Icons.tsx business/rms-ap/web/src/compon
 但 `shell.css` 从来没有这条规则——样式只存在于三个 ap 里。任何一个新建 ap 漏抄，表现就是
 「抽屉打开后点空白处没反应」。**组件渲染的类名，样式必须在组件包内**。
 
-### 8.3 登录页：同一套类名，三处实现
+### 8.3 登录页：全仓只有一页，但它刻意不复用组件库
 
-| 实现 | 位置 | 是否生效 |
+结论先说：**登录页已收敛到唯一一处**——`business/iam-ap/server/src/main/resources/static/login/`
+（`index.html` + `login.css` + `login.js`，IAM 后端 `GET /login` 直出，随 jar 发布）。
+此前它是 `SsoLoginPageController` 里一段 255 行的 Java 文本块，现拆成静态资源：
+可 lint、可格式化、改样式不用重启 JVM。
+
+| 位置 | 角色 | 是否复用 `@cim/ui` |
 | --- | --- | --- |
-| IAM 服务端内联 HTML + CSS | `SsoLoginPageController`（`<style>` 一块，含 900px 断点） | ✅ 唯一实际渲染的登录页 |
-| iam / approval 的 `.login-*` 样式 | 两 ap 的 `styles.css` | ❌ 无登录页，纯死代码（已删） |
-| rms `LoginPage.tsx` | `.login-screen` 另一套设计 | ✅ 仅 rms 准入失败等场景 |
+| IAM 后端 `static/login/` | **唯一登录页**，全仓共用 | ❌ 刻意纯 CSS/JS，零框架依赖 |
+| `@cim/shell` 的 `<SsoRelay>` | 各 ap 的「正在跳转 / 准入失败」中继页 | ✅ 在 React 应用内，正常用组件 |
+| iam / approval 的 `.login-*` 样式 | 无（已删） | — |
+| rms `styles.css` 的 `.login-*` | 无（已随 `<SsoRelay>` 迁移删除） | — |
 
-⚠️ 服务端那份是**手抄**的（注释写「复刻 `styles.css` 的登录页设计令牌」），
-改 SPA 的令牌不会同步到登录页。这是「单一登录页」设计的固有代价，暂不动；
-要动的话得把登录页样式抽成独立 css 由服务端 `<link>`，属独立决策。
+**为什么不复用组件库**：登录页要在「React/antd 全都没加载」的状态下可用——这正是它存在的场景。
+把登录表单挂进控制台 SPA，就要过 `ProtectedRoute`/`BootGate`，未登录时被弹回登录页形成往返；
+控制台打包失败时登录入口跟着一起死。这是身份服务最不该有的单点。
+
+**代价（已知并接受）**：`login.css` 是一份**令牌子集副本**（17 个变量，机械复制自
+`platform/web/packages/theme/src/tokens.css`，变量名逐字一致），改配色要改两处；
+`tokens.css` 顶部有指向 `login.css` 的反向注释，减少漏改。版式也只能与 `ui.css` 人工对齐。
+
+**同时修掉的两个坑**：
+1. rms 旧中继页把品牌名放在 `.brand-title` 里，而该类的文字色是为深色侧栏定的 `#fff`——
+   在白色卡片上**完全看不见**。`<SsoRelay>` 改用自有的 `.sso-relay-name`，配色显式声明。
+2. 登录页的 `.caps-hint` 是从未匹配到元素的死规则，且引用了未定义变量 `--warn`；已删。
 
 ### 8.4 明确不提取（新增负向清单）
 

@@ -10,6 +10,13 @@ export {
   type RequirePermissionProps,
 } from './guards';
 export { TabStrip, type TabStripProps } from './TabStrip';
+export {
+  SsoRelay,
+  redirectToSso,
+  ssoLoginUrl,
+  type SsoLoginUrlOptions,
+  type SsoRelayProps,
+} from './sso';
 export { createTabStore, type TabItem, type TabState } from './createTabStore';
 export { useShellTabs, type UseShellTabsOptions } from './useShellTabs';
 export {

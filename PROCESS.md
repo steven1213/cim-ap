@@ -100,3 +100,11 @@
   - **批处理脚本的盲区要回头补扫**：上一批脚本只认字符串字面量 `className`，漏了两处表达式类名（`bell-item`/`tree-toggle`）被误加 `type="primary"`，套上 `.btn` 主色底。本轮按「有 className、不属 btn 家族、又没 `bare`」重扫才抓到。
   - **「0 采用」要先分清被页面用还是被组件用**：`useColumns` 由 `DataTable` 内部消费，按业务侧计数必然为 0，当死代码删掉会直接打断表格。`CimTooltip` 则给出边界（一行短提示用原生 `title`，多行/富内容才用它）写进审计文档 §5.1，不再反复评估。
   - 验证：三应用 `tsc --noEmit` 零错 + `vite build` 通过；IAM 渲染契约 33/33。
+- **2026-11-12（续4）统一登录归位：登录页搬出 Java 字符串 / 中继页收成一个组件**：
+  - **归属不必争**：查证后登录页本来就在 IAM（`GET /login`，8081 直出，全仓唯一）。问题在**形态**——255 行 HTML+CSS+JS 写在 `SsoLoginPageController` 的 `"""` 文本块里，改一个像素要重启 JVM，样式和 i18n 兜底各有一份会漂移的副本。本轮拆成 `static/login/{index.html,login.css,login.js}`，Controller 373→**138** 行。
+  - **为什么不挂进控制台 SPA**：登录页要在「未认证」状态可用。挂进 SPA 就要过 `ProtectedRoute`/`BootGate`，未登录被弹回登录页形成往返；控制台打包失败时登录入口跟着死。**身份服务最不该有的单点**。
+  - **为什么不用 vite 第二入口**：那样登录页要加载 React+antd（300KB+）且强依赖前端构建产物。宁可让它纯 CSS/JS、版式与 `ui.css` 人工对齐——代价已写进审计文档 §8.3，并在 `tokens.css` 顶部加了指向这份令牌副本的反向注释。
+  - **中继页统一**：`@cim/shell` 新增 `ssoLoginUrl`/`redirectToSso`/`<SsoRelay>`，替掉 iam 与 rms 的 5 处手写（2 处内联 style + 3 处 `.login-screen` 结构 + 2 份 URL 拼装）。判定时机仍在应用侧（不碰 store），与 `guards.tsx` 同口径。
+  - **撞见三个真坑**：① rms 中继页把品牌名放进 `.brand-title`（该类为深色侧栏定的 `#fff`），白卡片上**完全看不见**；② 登录页 `.caps-hint` 是从未匹配到元素的死规则且引用未定义的 `--warn`，文档却写着「已实现」；③ `iam.login.lead` 写着「进入 IAM 控制台」，而这页是所有 ap 共用的。
+  - **顺手修一个死路**：rms 准入失败时那个按钮文案是「正在跳转…」、点击重跑同一段 SSO 中继 → IAM 会话还在，会拿同一枚令牌弹回 `/sso`，正是注释里反复警告的往返。现在改成「改用其他账号登录」（先 `POST /api/v1/logout` 清 SSO Cookie 再回登录页）。
+  - 验证：`SsoSessionSharingTest` **2/2**（新增静态资源与 `no-store` 断言）；iam/rms `tsc --noEmit` 零错、`vite build` 通过；登录页实机截图双栏/单栏均正常。**截图坑**：Chrome headless 最小窗口宽约 500px，`--window-size=430` 会按 ~500 布局再裁切，看起来像溢出——判定要用同源 iframe 探针读 `scrollWidth`。

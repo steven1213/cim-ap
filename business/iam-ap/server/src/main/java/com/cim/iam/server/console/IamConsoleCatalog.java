@@ -571,8 +571,8 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.login.point.admission", "应用准入注册 · 用户角色分配 · 令牌即时踢下线",
                 "App admission registry · role assignment · instant token revocation"));
         t.add(new TextDef("iam.login.title", "登录", "Sign in"));
-        t.add(new TextDef("iam.login.lead", "请输入企业账号以进入 IAM 控制台",
-                "Enter your corporate account to open the IAM console"));
+        // 本页是**所有** ap 共用的登录页，提示语不能写「进入 IAM 控制台」——RMS 用户会看到。
+        t.add(new TextDef("iam.login.lead", "使用统一身份继续", "Continue with your identity"));
         t.add(new TextDef("iam.login.username", "用户名", "Username"));
         t.add(new TextDef("iam.login.password", "口令", "Password"));
         t.add(new TextDef("iam.login.passwordPlaceholder", "请输入口令", "Enter your password"));
@@ -586,6 +586,15 @@ public final class IamConsoleCatalog {
                 "口令在浏览器内完成第一层 PBKDF2 派生，明文不会上传到服务端。",
                 "The first PBKDF2 layer runs in your browser; the plain password is never uploaded."));
         t.add(new TextDef("iam.login.failed", "登录失败", "Sign-in failed"));
+        // 登录页（IAM 后端直出的静态页，静态资源在 server/src/main/resources/static/login/）
+        t.add(new TextDef("iam.login.forApp", "登录以访问 {{app}}", "Sign in to access {{app}}"));
+        t.add(new TextDef("iam.login.signedIn", "已登录", "Signed in"));
+        t.add(new TextDef("iam.login.signedInHint", "请从您的应用入口继续。",
+                "Continue from your application's entry point."));
+        // 各 ap 的中继页（@cim/shell 的 SsoRelay）——跳转通常不到一秒，失败时给个可判断的提示
+        t.add(new TextDef("iam.login.relay", "正在跳转至统一登录…", "Redirecting to unified sign-in…"));
+        t.add(new TextDef("iam.login.relayHint", "若长时间未跳转，请确认 IAM 服务可访问后重试。",
+                "If nothing happens, check that the IAM service is reachable and try again."));
         // ============================================================ W4b：存量业务页文案
         // 命名空间 iam.<page>.* 与页面组件一一对应；动态文案用 {{var}} 占位（i18next 插值）。
         // 仅在「用户可见」处使用；代码注释/键名（ASCII）不在此列。

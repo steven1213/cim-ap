@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>CIM 统一登录</title>
+<link rel="stylesheet" href="/login/login.css"/>
+</head>
+<body>
+<div class="login-page">
+  <section class="login-visual">
+    <div class="lg-brand"><div class="logo" aria-hidden="true">IA</div><span id="brand">CIM IAM</span></div>
+    <div class="login-hero">
+      <h2 id="heroTitle">统一身份认证</h2>
+      <p id="heroDesc">一个身份，贯通所有 CIM 应用。</p>
+      <ul class="login-points">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/></svg><span id="ptRs">RS256 签名令牌</span></li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 3h4v4"/></svg><span id="ptPb">PBKDF2 口令派生</span></li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span id="ptAd">基于应用的准入控制</span></li>
+      </ul>
+    </div>
+    <div class="lg-foot">CIM-AP / IAM-AP · © 2026</div>
+  </section>
+
+  <section class="login-panel">
+    <div class="login-lang" role="group" aria-label="Language">
+      <button id="langZh" type="button" class="active" data-lang="zh-CN">中文</button>
+      <button id="langEn" type="button" data-lang="en-US">EN</button>
+    </div>
+
+    <div class="login-card">
+      <h1 id="title">登录</h1>
+      <p class="lead" id="lead">使用统一身份继续</p>
+
+      <form id="f" onsubmit="return false;">
+        <div class="field">
+          <label class="field-label" for="u" id="lblUser">用户名</label>
+          <input id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="admin"/>
+        </div>
+        <div class="field">
+          <label class="field-label" for="p" id="lblPwd">口令</label>
+          <div class="pwd-wrap">
+            <input id="p" name="password" type="password" autocomplete="current-password" placeholder="password"/>
+            <button type="button" class="pwd-toggle" id="pw" title="显示口令" aria-label="显示口令">👁</button>
+          </div>
+        </div>
+        <div class="login-row">
+          <label class="check" for="rm"><input type="checkbox" id="rm"/> <span id="lblRem">记住用户名</span></label>
+        </div>
+        <div class="alert err" id="e" role="alert"><span id="eMsg"></span></div>
+        <button type="submit" class="submit" id="b">登录</button>
+      </form>
+
+      <div class="signed-in" id="ok" hidden>
+        <p class="signed-in-title" id="okTitle">已登录</p>
+        <p class="hint" id="okMsg">请从您的应用入口继续。</p>
+      </div>
+
+      <p class="hint" id="hint">CIM-AP / IAM-AP · 统一身份认证</p>
+    </div>
+  </section>
+</div>
+<script src="/login/login.js" defer></script>
+</body>
+</html>

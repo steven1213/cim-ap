@@ -70,13 +70,13 @@ business/iam-ap/web/
     │   ├── BootGate.tsx        # 启动闸门：等齐「菜单 + 权限」再渲染控制台（避免抖动/误判 403）
     │   ├── RequirePerm.tsx     # 路由级权限守卫（无权限跳 /403）
     │   ├── Perms.tsx           # 按钮级权限包裹器（无权限**不挂载**，非 display:none）
-    │   ├── LanguageSwitcher.tsx# 语言切换（顶栏 + 登录页共用，语言目录来自公开端点）
+    │   ├── LanguageSwitcher.tsx# 语言切换（控制台顶栏；语言目录来自公开端点）
     │   ├── Layout.tsx          # 控制台外壳：菜单树渲染 + i18n 文案 + 语言/主题切换
     │   ├── Panel.tsx           # 工程化面板（统一标题栏 + 内容区）
     │   └── Icons.tsx           # 内联 SVG 图标集（不引入图标库依赖）
     └── pages/
         ├── pageRegistry.tsx  # `component` 标识 → 页面组件（与后端 sys_menu.component 对应）
-        ├── LoginPage.tsx     # 统一登录（第一层 PBKDF2；含语言切换）
+        ├── SsoCallback.tsx   # 收 /sso-callback 回跳的 token → authStore → 首页
         ├── DashboardPage.tsx # 概览（有 iam:overview:view = 平台态势 8 KPI / 否则 = 个人准入矩阵 + 组织归属）
         ├── ForbiddenPage.tsx # 403（已登录但无该页权限）
         ├── NotFoundPage.tsx  # 404（路径不在当前用户的菜单集内）
@@ -195,22 +195,28 @@ business/iam-ap/web/
 
 ## 2. 登录门户（统一登录）
 
-- **第一层派生（明文口令不出浏览器）**：`lib/crypto.ts` 的 `deriveClientHash(password, clientSalt)` 用 `crypto.subtle` 做 `PBKDF2-SHA256(password, utf8(clientSalt), rounds=100_000)` → 256bit → hex。**与 server 端 `PasswordDerivation` 严格对齐**（salt 取 UTF-8 字节；rounds 与 `cim.iam.auth.password.rounds` 一致）。
-- **登录流程（`LoginPage`）**：
-  1. `GET /api/v1/login/salt?username=` 取服务端 `clientSalt`（未知用户返回空盐，防账号枚举）→ 兜底用 `randomClientSalt()`；
-  2. 浏览器内 `deriveClientHash` → `clientHash`；
+> **登录页不在本工程里。** 页面本体是 IAM 后端直出的静态页
+> （`server/src/main/resources/static/login/{index.html,login.css,login.js}`，入口 `GET /login`），
+> 全仓所有客户端——IAM 控制台、RMS、将来的 MDS/MES——共用这一页。本工程只留两条**中继**路由：
+> `/login`（无 token 即整页跳 IdP）与 `/sso-callback`（收 IAM 回跳的 token 写 `authStore`），
+> 两者的呈现统一走 `@cim/shell` 的 `<SsoRelay>`。为何不把登录表单放进控制台、为何不复用组件库，
+> 见 `docs/platform/web/component-adoption-audit.md` §8.3。
+
+- **第一层派生（明文口令不出浏览器）**：`crypto.subtle` 做 `PBKDF2-SHA256(password, utf8(clientSalt), rounds=100_000)` → 256bit → hex。**与 server 端 `PasswordDerivation` 严格对齐**（salt 取 UTF-8 字节；rounds 与 `cim.iam.auth.password.rounds` 一致）。登录页在自己的 `login.js` 里实现同一算法；本工程的 `lib/crypto.ts` 供 `ProfilePage`（自助改密）与 `UsersPage`（重置口令）复用。
+- **登录流程（登录页 `login.js`）**：
+  1. `GET /api/v1/login/salt?username=` 取服务端 `clientSalt`（未知用户返回空盐，防账号枚举）；
+  2. 浏览器内派生 → `clientHash`；
   3. `POST /api/v1/login {username, credential: clientHash, clientSalt}` → `{token, refreshToken, expiresInSeconds, tokenType}`；
-  4. `authStore.setSession` + `loadMe()`（`GET /me`）→ 跳转 `/`。
+  4. 整页跳 `redirect?token=&refreshToken=` → 本工程 `/sso-callback` 写 `authStore` → 跳转 `/`。
 - **会话存储**：`authStore`（zustand + persist，`name:'iam-auth'`）**只落盘 `token`/`refreshToken`**（`partialize` 显式裁剪），刷新不丢登录态；`user` 与 `permissions` **每次启动重取**。
   - ⚠️ **权限刻意不落盘**：权限随角色变更即时变化，落盘会带来「本机缓存的旧权限被当成本会话真值」——典型表现是「已撤权却仍看得到按钮」。`/sys/me/permissions` 每请求回显当前授权，重取即最新。
 - **令牌附带**：`api.ts` 请求拦截器自动加 `Authorization: Bearer <token>` 与 `Accept-Language`；响应拦截器解包 `Result<T>`（`code===0` → 取 `data`，否则抛 `{code,msg,errors}`）；401 → 清态并跳 `/login`。
-- **交互细节（按常用登录习惯设计）**：
-  - **记住用户名**：勾选后仅把用户名写入 `localStorage['iam-last-user']`（**口令从不落盘**），下次进入自动回填；
+- **交互细节（登录页，随页面在 server 静态资源）**：
+  - **记住用户名**：勾选后仅把用户名写入 `localStorage['iam-last-user']`（**口令从不落盘**），下次进入自动回填并聚焦口令框；
   - **口令可见性切换**：口令框右侧眼睛按钮切换明文/密文；
-  - **Caps Lock 提示**：口令框检测大写锁定并给出提示，减少输错；
-  - **自动聚焦**：已记住用户名 → 直接聚焦口令框，否则聚焦用户名框；**回车即可提交**；
-  - **失败回填友好**：登录失败自动聚焦并全选口令框，便于立即重输。
-  - **语言切换**：登录面板右上角提供语言切换（译文包端点是公开的，登录前即可用），见 §4。
+  - **自动聚焦**：已记住用户名 → 聚焦口令框，否则聚焦用户名框；**回车即可提交**；
+  - **语言切换**：面板右上角，译文包端点是公开的（登录前即可用），见 §4。
+  - ⚠️ **Caps Lock 提示：未实现**。旧版本文档与前一份 CSS 曾声称有该提示，实际从未接线（`.caps-hint` 是条从未匹配到元素的死规则，且引用了未定义变量 `--warn`）。已随登录页重构删掉，需要时再真做。
 
 ## 3. 管理控制台（功能页）
 

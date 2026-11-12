@@ -94,7 +94,7 @@ public ResponseEntity<byte[]> export(...) { }
 | `GET /api/v1/approval/attachments/{id}/download` | `DOWNLOAD` | 浏览器直接下载 | 信封会写进文件内容 |
 | `GET /api/v1/rms/recipes/export` | `DOWNLOAD` | 前端 `downloadBlob` | 同上 |
 | `GET /sys/notify/stream`（`SseController`） | `STREAM` | 各 ap 的 `SseClient` | 连接期内持续推事件帧，一次性信封不适用 |
-| `GET /login`（`SsoLoginPageController`） | `HTML` | 浏览器 | 渲染登录页 / 302 回跳业务 ap |
+| `GET /login`（`SsoLoginPageController`） | `HTML` | 浏览器 | 交回静态登录页（`static/login/index.html`）/ 302 回跳业务 ap |
 
 > 标注在**类上**表示该控制器的所有映射方法都是例外（如整体流式端点）；通常标在方法上。
 

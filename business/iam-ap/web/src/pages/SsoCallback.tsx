@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { SsoRelay } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 
 /**
@@ -10,6 +12,7 @@ import { useAuthStore } from '@/store/authStore';
  * 与 RMS 的 /sso 回调同构，确保「所有客户端共用同一登录页」。</p>
  */
 export default function SsoCallback() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
   const [params] = useSearchParams();
@@ -26,9 +29,5 @@ export default function SsoCallback() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--muted, #7d8899)', fontSize: 13 }}>正在登录…</div>
-    </div>
-  );
+  return <SsoRelay mark="IA" brand="CIM IAM" label={t('iam.login.submitting')} />;
 }

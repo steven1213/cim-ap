@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Suspense, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CimSpin } from '@cim/ui';
+import { SsoRelay, ssoLoginUrl } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -48,6 +50,7 @@ function RoutePage({ menu }: { menu: SysMenuDto }) {
  * 否则整页跳到 8081 登录页，成功后回跳本控制台的 /sso-callback 收口 token。</p>
  */
 function LoginEntry() {
+  const { t } = useTranslation();
   const token = useAuthStore((s) => s.token);
   const refreshToken = useAuthStore((s) => s.refreshToken);
   const [params] = useSearchParams();
@@ -64,18 +67,19 @@ function LoginEntry() {
       return;
     }
     const backend = import.meta.env.VITE_IAM_BACKEND_URL || 'http://localhost:8081';
-    const ownCallback = window.location.origin + '/sso-callback';
+    const ownCallback = `${window.location.origin}/sso-callback`;
     const target = redirect && redirect.indexOf('http') === 0 ? redirect : ownCallback;
-    window.location.assign(
-      `${backend}/login?app=IAM&redirect=${encodeURIComponent(target)}`,
-    );
+    window.location.assign(ssoLoginUrl({ iamBase: backend, app: 'IAM', callbackUrl: target }));
   }, [token, redirect, refreshToken]);
 
   if (token) return redirect ? null : <Navigate to="/" replace />;
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ color: 'var(--muted, #7d8899)', fontSize: 13 }}>正在跳转至统一登录…</div>
-    </div>
+    <SsoRelay
+      mark="IA"
+      brand="CIM IAM"
+      label={t('iam.login.relay')}
+      hint={t('iam.login.relayHint')}
+    />
   );
 }
 

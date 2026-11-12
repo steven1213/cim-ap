@@ -10,14 +10,25 @@
 // 跨域要求：IAM 侧 `cim.iam.web.allowed-origins` 必须包含本 ap 控制台源，且其 CORS 已开
 // `allow-credentials`（见 IamSecurityConfig），否则 `credentials: 'include'` 会被浏览器拦掉。
 
+import { ssoLoginUrl } from '@cim/shell';
+
 /** IdP（IAM）基址：优先 `VITE_IAM_LOGIN_BASE`，回退 `VITE_IAM_BASE`，最终 8081。 */
 export const IAM_BASE: string =
   import.meta.env.VITE_IAM_LOGIN_BASE || import.meta.env.VITE_IAM_BASE || 'http://localhost:8081';
 
+/** 登录成功后的回跳地址（本 ap 的回调页，负责把 token 写进 authStore）。 */
+export function ssoCallbackUrl(): string {
+  return `${window.location.origin}/sso`;
+}
+
+/** IAM 统一登录页地址（参数拼装收在 `@cim/shell`，各 ap 不再各写一份）。 */
+export function ssoLoginUrlFor(app = 'RMS'): string {
+  return ssoLoginUrl({ iamBase: IAM_BASE, app, callbackUrl: ssoCallbackUrl() });
+}
+
 /** 跳转 IAM 统一登录页（登录成功后由 IAM 回跳 `{origin}/sso?token=...&refreshToken=...`）。 */
 export function ssoLoginRedirect(app = 'RMS'): void {
-  const redirect = encodeURIComponent(`${window.location.origin}/sso`);
-  window.location.href = `${IAM_BASE}/login?app=${app}&redirect=${redirect}`;
+  window.location.assign(ssoLoginUrlFor(app));
 }
 
 /**

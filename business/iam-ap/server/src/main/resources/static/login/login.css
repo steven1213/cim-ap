@@ -1,0 +1,314 @@
+/* ============================================================================
+ * CIM 统一登录页样式（IAM 后端直出，见 SsoLoginPageController）
+ *
+ * 【令牌来源】下面 :root 的变量是从 platform/web/packages/theme/src/tokens.css
+ * 机械复制的**子集**——登录页只用到这些，名字与含义保持逐字一致。改配色时两处
+ * 都要改；tokens.css 顶部有指向本文件的反向注释。
+ *
+ * 【为什么不直接引用 tokens.css】登录页随身份服务打包进 jar，是「未认证也要能
+ * 打开」的页面，不能依赖前端工程的源码路径或构建产物。宁可有这一份受控副本。
+ *
+ * 【为什么是纯 CSS 不引组件库】同上：登录页要在 React/antd 全部加载失败时仍可用。
+ * 副作用是它无法复用 @cim/ui 的组件外观，版式只能与 ui.css 人工对齐（已列为
+ * 已知代价，见 docs/platform/web/component-adoption-audit.md §8.3）。
+ * ========================================================================== */
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 12.5px;
+  --fs-base: 13px;
+  --fs-xl: 20px;
+  --bg: #eef1f6;
+  --panel: #ffffff;
+  --line-strong: #ccd4e2;
+  --text: #0d1626;
+  --text-2: #46536b;
+  --muted: #7d8899;
+  --primary: #1f5fe0;
+  --primary-d: #1749b4;
+  --primary-ring: rgba(31, 95, 224, 0.2);
+  --err: #cf2f24;
+  --err-soft: #fcebe9;
+  --radius-sm: 6px;
+  --ring: 0 0 0 3px var(--primary-ring);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- 版式：左品牌 / 右表单 ---------- */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+}
+
+.login-visual {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 34px 42px;
+  color: #dfe7f6;
+  background: radial-gradient(110% 110% at 6% 4%, #1e459f 0%, #142a63 40%, #080e1c 100%);
+  overflow: hidden;
+}
+.login-visual::after {
+  content: '';
+  position: absolute;
+  right: -140px;
+  bottom: -170px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(91, 75, 216, 0.45), transparent 64%);
+  pointer-events: none;
+}
+
+.lg-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-base);
+  font-weight: 650;
+  color: #fff;
+}
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e459f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.login-hero { position: relative; z-index: 1; max-width: 430px; }
+.login-hero h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: #fff;
+}
+.login-hero p {
+  margin: 0 0 20px;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: rgba(223, 231, 246, 0.74);
+}
+.login-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.login-points li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--fs-xs);
+  color: rgba(223, 231, 246, 0.9);
+}
+.login-points svg { flex: 0 0 auto; color: #8fb2ff; }
+
+.lg-foot {
+  position: relative;
+  z-index: 1;
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(223, 231, 246, 0.5);
+}
+
+/* ---------- 表单侧 ---------- */
+.login-panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 22px;
+  background: var(--bg);
+}
+
+.login-lang {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  display: flex;
+  gap: 6px;
+}
+.login-lang button {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  padding: 4px 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.login-lang button.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.login-card { width: 100%; max-width: 348px; }
+.login-card h1 {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.login-card .lead { margin: 5px 0 0; font-size: var(--fs-xs); color: var(--muted); }
+.login-card form { margin-top: 18px; }
+
+.field { margin-top: 14px; }
+.field-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+input {
+  width: 100%;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+input:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
+
+.pwd-wrap { position: relative; }
+.pwd-wrap input { padding-right: 38px; }
+.pwd-toggle {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+}
+.pwd-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius-sm); }
+
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.check input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--panel);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: 0.14s ease;
+}
+.check input[type='checkbox']:checked { background: var(--primary); border-color: var(--primary); }
+.check input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1.5px;
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.alert {
+  display: none;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  border: 1px solid transparent;
+  margin-top: 12px;
+}
+.alert.on { display: flex; }
+.alert.err { color: var(--err); background: var(--err-soft); border-color: rgba(207, 47, 36, 0.24); }
+
+.hint { margin: 9px 0 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.6; }
+
+button.submit {
+  width: 100%;
+  margin-top: 16px;
+  padding: 9px;
+  font-family: inherit;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: 0.14s ease;
+}
+button.submit:hover:not(:disabled) { background: var(--primary-d); }
+button.submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.signed-in { margin-top: 18px; }
+.signed-in-title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  color: var(--text);
+}
+
+/* ---------- 窄屏：隐藏品牌栏，表单居中 ---------- */
+@media (max-width: 900px) {
+  .login-page { grid-template-columns: minmax(0, 1fr); }
+  .login-visual { display: none; }
+}
