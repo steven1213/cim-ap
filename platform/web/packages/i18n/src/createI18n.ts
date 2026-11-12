@@ -126,7 +126,16 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     if (!payload) return;
     if (payload.version) cache.writeVersion(payload.version);
     // 版本未变：服务端只回版本号、消息体为空 —— 此时保留刚灌入的缓存，勿清空
-    applyBundle(payload.lang || lang, payload.messages);
+    const applied = applyBundle(payload.lang || lang, payload.messages);
+    if (!applied && cached) {
+      // ⚠️ 「该语言的整包只在 localStorage 里、内存里没有」这一格必须补。
+      // 服务端按 `v` 判版本一致时回空包，若直接 `i18next.changeLanguage(lang)`，
+      // 切过去的语言在 i18next 里一条资源都没有 → 逐键回落 `fallbackLng`（默认语言），
+      // 表现为「下拉已显示 English，正文还是中文」，且不报错、不触发缺键上报——
+      // 键是命中的，只是命中的是兜底语言的值。本应用首次切某语言能生效、
+      // 刷新后再切就失效，正是这个原因（缓存还在，版本没变）。
+      applyBundle(lang, cached);
+    }
   }
 
   async function changeLanguage(lang: string, opts: { force?: boolean } = {}): Promise<void> {
@@ -144,6 +153,14 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     } else {
       // 同一语言但资源刚更新：手动触发重渲染
       i18next.emit('languageChanged', lang);
+    }
+    // 开发态兜底信号：切过去的语言在内存里一条资源都没有 → 界面整体回落默认语言，
+    // 用户看到的是「切了没反应」。这个形态既不报错也不触发缺键上报（键是命中的，
+    // 命中的是兜底语言的值），只能在这里喊一声。
+    if (dev && lang !== defaultLng && !i18next.hasResourceBundle(lang, 'translation')) {
+      console.warn(
+        `[i18n:${app}] 切到 ${lang} 后没有任何译文资源，界面将整体回落 ${defaultLng}（看起来像「切换不生效」）`,
+      );
     }
     langPref.write(lang);
   }
