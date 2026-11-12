@@ -67,8 +67,13 @@ public class RmsSecurityConfig {
                 .authorizeHttpRequests(a -> a.anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->
                         response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized")))
-                .addFilterBefore(bearerFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, JwtAuthenticationFilter.class);
+                // ⚠️ 锚点必须是 Spring Security **已注册顺序**的过滤器。写成
+                // `JwtAuthenticationFilter.class` 会在启动时抛
+                // 「The Filter class ... does not have a registered order」——它只是本平台
+                // 自定义过滤器，注册表里没有它的位置。两次 addFilterBefore 指向同一锚点时
+                // 按调用顺序插入，故 bearer 先于 jwt（EventSource 的 ?token= 先还原成 Bearer 头）。
+                .addFilterBefore(bearerFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
