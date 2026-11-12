@@ -2,9 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// 审批流平台前端：开发态代理到本省后端（business/approval-ap/server，端口 8085）。
-// 后端当前为 dev 态（cim.auth.enabled=false），所有接口以 userId / tenantId 查询参数标识身份，
-// 无需 IAM 登录；生产接入 IAM 后由后端从 JWT 解析身份，前端仅需附 Bearer。
+// 审批流平台前端：开发态代理到本后端（business/approval-ap/server，端口 8085）。
+// 后端默认 `cim.auth.enabled=true`（与 rms-ap 同口径）：接口只认 JWT，前端经 IAM（8081）
+// 统一登录拿令牌；仅当后端以 `--cim.auth.enabled=false` 启动时才是 dev 通道（身份走
+// userId/tenantId 查询参数），前端据 /api/v1/approval/me 的 authEnabled 自动切回「身份切换」。
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -42,6 +43,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
+        target: 'http://localhost:8085',
+        changeOrigin: true,
+      },
+      // 通知流走平台的 /sys/notify/**（不在 /api 前缀下）。漏了这条则 EventSource 直接打到
+      // vite 自身 → 404，且 EventSource 只会静默重连、不报错，表现为「通知永远不来」。
+      '/sys': {
         target: 'http://localhost:8085',
         changeOrigin: true,
       },

@@ -6,6 +6,7 @@ import com.cim.approval.server.notification.NotificationDispatcher;
 import com.cim.approval.server.notification.NotificationEvent;
 import com.cim.approval.server.domain.ApprovalAudit;
 import com.cim.approval.server.security.SecurityGuard;
+import com.cim.approval.server.security.ApprovalPermissions;
 import com.cim.approval.server.dto.AuditView;
 import com.cim.approval.server.dto.CompleteTaskRequest;
 import com.cim.approval.server.dto.DefinitionXmlView;
@@ -259,7 +260,7 @@ public class ApprovalProcessService {
      * （{@code taskCandidateGroup}），用 OR 合并到同一查询。</p>
      */
     public PageResult<TaskView> listTodoPaged(String userId, List<String> roles, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(tenantId);
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
         int page0 = Math.max(page, 1) - 1; // 平台分页页号 1 起，Flowable listPage 0 起
         var query = taskService.createTaskQuery()
                 .processVariableValueEquals("tenantId", tenantId)
@@ -481,7 +482,7 @@ public class ApprovalProcessService {
 
     /** 已办分页查询。 */
     public PageResult<TaskView> listDonePaged(String userId, List<String> roles, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(tenantId);
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
         int page0 = Math.max(page, 1) - 1;
         var query = historyService.createHistoricTaskInstanceQuery()
                 .processVariableValueEquals("tenantId", tenantId)
@@ -519,7 +520,7 @@ public class ApprovalProcessService {
      * 排序约定：进行中在前，其余按开始时间倒序（与原全量行为一致）。
      */
     public PageResult<ProcessInstanceView> listInitiatedPaged(String userId, String tenantId, int page, int size) {
-        securityGuard.assertAppCodeScope(tenantId);
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
         int page0 = Math.max(page, 1) - 1;
         List<ProcessInstanceView> runningList = new ArrayList<>();
         runtimeService.createProcessInstanceQuery()
@@ -614,9 +615,15 @@ public class ApprovalProcessService {
             throw new BizException(BizCode.PARAM_INVALID, "已有审批人处理该申请，不可撤回；如需终止请联系管理员");
         }
         String businessKey = hpi.getBusinessKey();
-        String tenant = String.valueOf(
-                hpi.getProcessVariables() != null ? hpi.getProcessVariables().get("tenantId") : null);
-        securityGuard.assertAppCodeScope(tenant);
+        // 业务域断言的对象是 **appCode**，不是流程租户。此前这里传的 tenantId 是实例上的
+        // 流程变量（单租户部署恒为 "default"），与域集合（appCode 列表）不是同一维度，
+        // 认证态下必然 403（dev 态因 allowed=["*"] 放行，故长期未被发现）。
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
+        // 回调仍按「业务系统 appCode」路由，而实例上的 tenantId 流程变量承载该值
+        // （见 start()：vars.put("appCode", req.tenantId())）。故保留读取，只是不再用它做域断言。
+        // 注意别再写 String.valueOf(null)——那会得到字面量 "null" 作为路由键。
+        String tenant = java.util.Optional.ofNullable(hpi.getProcessVariables())
+                .map(m -> m.get("tenantId")).map(String::valueOf).orElse(null);
 
         runtimeService.deleteProcessInstance(instanceId, "WITHDRAW");
 
@@ -651,9 +658,10 @@ public class ApprovalProcessService {
         }
         String businessKey = hpi.getBusinessKey();
         String title = String.valueOf(hpi.getProcessVariables().get("title"));
-        String tenant = (String) (hpi.getProcessVariables() != null
-                ? hpi.getProcessVariables().get("tenantId") : null);
-        securityGuard.assertAppCodeScope(tenant);
+        // 业务域断言的对象是 **appCode**，不是流程租户。此前这里传的 tenantId 是实例上的
+        // 流程变量（单租户部署恒为 "default"），与域集合（appCode 列表）不是同一维度，
+        // 认证态下必然 403（dev 态因 allowed=["*"] 放行，故长期未被发现）。
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
         List<Task> tasks = taskService.createTaskQuery()
                 .processInstanceId(instanceId).active()
                 .orderByTaskCreateTime().asc().list();
@@ -760,7 +768,7 @@ public class ApprovalProcessService {
         String initiator = (String) vars.get("initiator");
 
         assertInstanceVisible(instanceId, userId, roles);
-        securityGuard.assertAppCodeScope((String) vars.get("tenantId"));
+        securityGuard.assertAppCodeScope(ApprovalPermissions.APP_CODE);
 
         String businessKey = hpi.getBusinessKey();
         Map<String, Object> formData = parseFormData(vars.get("formDataJson"));

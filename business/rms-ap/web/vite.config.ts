@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// RMS 业务前端：开发态代理到本省后端（business/rms-ap/server，端口 8084）
+// RMS 业务前端：开发态代理到本后端（business/rms-ap/server，端口 8084）
+// 后端默认 `cim.auth.enabled=true`：接口只认 JWT，前端经 IAM（8081）统一登录拿令牌。
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -40,6 +41,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+      },
+      // 通知流走平台的 /sys/notify/**（不在 /api 前缀下）。漏了这条则 EventSource 打到
+      // vite 自身 → 404，而 EventSource 只静默重连不报错，表现为「通知永远不来」。
+      '/sys': {
         target: 'http://localhost:8084',
         changeOrigin: true,
       },

@@ -111,11 +111,18 @@ function currentIdentity(): { userId: string; tenantId: string; roles: string[] 
  * <p>用的是**裸 axios**而非本文件的 `http` 实例：探针在「没有令牌」时调用是正常路径，
  * 走实例会被 401 拦截器当成会话失效直接跳登录页，反而分不清「未登录」与「后端关了认证」。</p>
  *
- * @returns 后端档案；401（认证已开启但未登录）返回 null
+ * <p>⚠️ 裸 axios 不会自动附 Bearer，所以**必须自己带上落盘的令牌**：否则已登录用户
+ * （localStorage 里有有效 token）每次启动都会收到 401，被判成未登录并清掉会话——
+ * 表现为「登录成功后刷新页面又回到登录页」。</p>
+ *
+ * @returns 后端档案；401（认证已开启但未登录 / 令牌失效）返回 null
  */
 export async function fetchMe(): Promise<MeDto | null> {
   try {
-    const r = await axios.get('/api/v1/approval/me');
+    const token = useAuthStore.getState().token;
+    const r = await axios.get('/api/v1/approval/me', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     const body = r.data;
     if (body && typeof body === 'object' && 'code' in body) {
       return body.code === 0 ? (body.data as MeDto | null) : null;

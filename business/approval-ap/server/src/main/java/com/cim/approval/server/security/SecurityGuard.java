@@ -8,9 +8,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 统一安全守卫（G1 权限码三层 + G3 业务域隔离）。
@@ -37,6 +38,16 @@ import java.util.List;
 public class SecurityGuard {
 
     private final CurrentUserResolver currentUser;
+
+    /**
+     * 平台超管权威的几种写法。
+     *
+     * <p>平台约定（{@code CimUserPrincipal#isSuper} / {@code CimPermissionEvaluator}）认
+     * {@code SUPER_ADMIN} 与 {@code ROLE_SUPER}；本类历史上按 {@code ROLE_SUPER_ADMIN} 写。
+     * 三者都收，避免「IAM 按平台约定发 {@code SUPER_ADMIN}、审批平台却看不见」。</p>
+     */
+    private static final Set<String> SUPER_AUTHORITIES =
+            Set.of("SUPER_ADMIN", "ROLE_SUPER", "ROLE_SUPER_ADMIN");
 
     @Value("${approval.security.dev-bypass:true}")
     private boolean devBypass;
@@ -72,25 +83,54 @@ public class SecurityGuard {
         return List.of("*");
     }
 
+    /**
+     * 从 Spring Security 权威推导可访问的业务域。
+     *
+     * <p><b>IAM 实际下发的形态是 {@code <appCode>:<ROLE>}</b>（见 IAM {@code TokenIssuerService}：
+     * {@code roles} 与 {@code authorities} 两个 claim 同值，如 {@code approval-ap:ADMIN}）。
+     * 本方法原先只认 {@code app:<appCode>} 前缀——那个前缀**全仓无人产生**，于是认证态下
+     * 域集合恒为空、所有带域判定的查询一律 403。这里两种形态都认：</p>
+     *
+     * <ul>
+     *   <li>{@code app:<appCode>}：历史/预留写法，保留兼容；</li>
+     *   <li>{@code <appCode>:<ROLE>}：IAM 现行写法。仅当「恰好两段」且首段形如 {@code *-ap}
+     *       时才取首段——否则会把三段式权限码 {@code approval:definition:manage} 误判成域
+     *       {@code approval}。</li>
+     * </ul>
+     */
     private List<String> deriveFromAuthentication() {
         Authentication a = SecurityContextHolder.getContext().getAuthentication();
         if (a == null || !a.isAuthenticated()) {
             return List.of(); // 认证态无身份 → 拒绝具体域
         }
         Collection<? extends GrantedAuthority> auths = a.getAuthorities();
-        boolean superAdmin = auths.stream()
-                .anyMatch(g -> ApprovalPermissions.ROLE_SUPER_ADMIN.equals(g.getAuthority()));
-        if (superAdmin) {
+        if (auths.stream().anyMatch(g -> isSuperAuthority(g.getAuthority()))) {
             return List.of("*");
         }
-        List<String> codes = new ArrayList<>();
+        Set<String> codes = new LinkedHashSet<>();
         for (GrantedAuthority g : auths) {
             String au = g.getAuthority();
-            if (au != null && au.startsWith("app:")) {
-                codes.add(au.substring(4));
+            if (au == null || au.isBlank()) {
+                continue;
+            }
+            if (au.startsWith("app:")) {
+                codes.add(au.substring("app:".length()));
+                continue;
+            }
+            int first = au.indexOf(':');
+            boolean exactlyTwoSegments = first > 0 && au.indexOf(':', first + 1) < 0;
+            if (exactlyTwoSegments) {
+                String head = au.substring(0, first);
+                if (head.endsWith("-ap")) {
+                    codes.add(head);
+                }
             }
         }
-        return codes;
+        return List.copyOf(codes);
+    }
+
+    private static boolean isSuperAuthority(String authority) {
+        return authority != null && SUPER_AUTHORITIES.contains(authority);
     }
 
     /** 是否平台超管（跨域）。开放 API 恒 false；JWT 看权威；dev 看 {@code dev-super-admin} 白名单。 */
@@ -102,8 +142,7 @@ public class SecurityGuard {
         if (currentUser.authEnabled()) {
             Authentication a = SecurityContextHolder.getContext().getAuthentication();
             if (a != null) {
-                return a.getAuthorities().stream()
-                        .anyMatch(g -> ApprovalPermissions.ROLE_SUPER_ADMIN.equals(g.getAuthority()));
+                return a.getAuthorities().stream().anyMatch(g -> isSuperAuthority(g.getAuthority()));
             }
             return false;
         }
@@ -143,6 +182,12 @@ public class SecurityGuard {
      * 平台权限码断言（G1）。认证态按 Spring Security 权威校验（超管跨域放行）；
      * dev 态由 dev-bypass / dev-enforce 控制。
      *
+     * <p><b>域管理员通路</b>：G1 第 2 层定义的「域管理员」在本平台就是某 ap 的 {@code ADMIN}
+     * 角色（IAM 下发的 {@code <appCode>:ADMIN}）。IAM 目前只授角色组、不授细粒度权限码，
+     * 若这里只做权限码精确匹配，域管理员会被挡在所有管理端点外（表现为「登录成功但点哪都 403」）。
+     * 故本 ap 的 {@code ADMIN} 视为持有全部 {@code approval:*} 权限码；待 IAM 支持
+     * 「应用角色 → 权限集」后应收敛为按码判定。</p>
+     *
      * @param code       所需权限码（见 {@link ApprovalPermissions}）
      * @param actorParam 调用方身份（dev 态用于 dev-super-admin 白名单判定；可为 null）
      */
@@ -152,9 +197,14 @@ public class SecurityGuard {
                 return;
             }
             Authentication a = SecurityContextHolder.getContext().getAuthentication();
-            if (a != null && a.getAuthorities().stream()
-                    .anyMatch(g -> code.equals(g.getAuthority()))) {
-                return;
+            if (a != null) {
+                boolean granted = a.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .anyMatch(au -> code.equals(au)
+                                || ApprovalPermissions.DOMAIN_ADMIN_AUTHORITY.equals(au));
+                if (granted) {
+                    return;
+                }
             }
             throw new BizException(BizCode.ACCESS_DENIED, "缺少权限码：" + code);
         }

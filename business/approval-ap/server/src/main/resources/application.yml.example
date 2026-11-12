@@ -39,12 +39,12 @@ cim:
       base-packages: []
 
   auth:
-    # 认证开关。false = dev 态：接口放行、身份由 userId/tenantId 查询参数表达（顶栏「身份切换」）；
-    # true  = 统一登录：/api/** 与 /sys/notify/stream 未带有效 JWT 一律 401，身份只认令牌，
-    #         前端启动时据 /api/v1/approval/me 的 authEnabled 自动切到 IAM 登录中继。
-    # 生产必须置 true（并提供 jwks-uri 与准入 app-code）；本地可用 -Dcim.auth.enabled=true 验证。
+    # 认证开关，**默认开启**（与 rms-ap 同口径）：/api/** 与 /sys/notify/stream 未带有效 JWT
+    # 一律 401，身份只认令牌；前端启动时据 /api/v1/approval/me 的 authEnabled 自动走 IAM 登录中继。
+    # 无 IAM 的本地演示可临时关掉：--cim.auth.enabled=false（接口放行、身份由 userId/tenantId
+    # 查询参数表达，顶栏显示「身份切换」）。
     # ⚠️ 前端身份参数在认证态会被 CurrentUserResolver 忽略——保留它们只为兼容滚动发布期的旧后端。
-    enabled: false
+    enabled: true
     jwks-uri: http://localhost:8081/.well-known/jwks.json
     jwks-cache-ttl: 60m
     admission:
