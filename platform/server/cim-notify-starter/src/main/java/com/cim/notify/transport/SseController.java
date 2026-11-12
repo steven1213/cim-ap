@@ -6,6 +6,7 @@ import com.cim.spring.support.web.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -25,8 +26,15 @@ import java.util.stream.Collectors;
  * <p>以 {@code @Bean} 注册（库 jar 不依赖宿主组件扫描）。主体取自 {@link SecurityContextHolder}，
  * 租户取自 {@link TenantContext}（请求线程已写入）。端点须由宿主 ap 纳入 {@code authenticated()}。
  * dev 直连（{@code cim.notify.dev-accept-query-identity=true}）时允许 {@code ?userId=&tenantId=} 建连。</p>
+ *
+ * <p><b>类上的 {@code @ConditionalOnProperty} 与 {@code NotifyAutoConfiguration} 同条件，不是重复</b>：
+ * 本类是 {@code @RestController}（即 {@code @Component}）。宿主用
+ * {@code scanBasePackages="com.cim"}（{@code cim-bootstrap} 就是）时，组件扫描会绕过自动装配的总开关
+ * 直接注册它，而它需要 {@code SseRegistry}/{@code NotifyProperties}——开关一关，
+ * 这些 Bean 也不存在，启动直接失败，且报错不会提到「通知开关」。同一个条件写到类上，扫描阶段即跳过。</p>
  */
 @RestController
+@ConditionalOnProperty(prefix = "cim.notify", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SseController {
 
     public static final String STREAM = "/sys/notify/stream";

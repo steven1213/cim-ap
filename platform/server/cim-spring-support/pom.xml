@@ -79,5 +79,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 仅测试用：验「库内控制器怎么装配」需要真实 MVC 装配与嵌入式容器，
+             主代码刻意不强拉 starter-web（本库是 jar，容器由宿主提供）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

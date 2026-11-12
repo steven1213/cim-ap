@@ -5,6 +5,7 @@ import com.cim.spring.support.web.BizException;
 import com.cim.spring.support.web.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.boot.logging.LoggerConfiguration;
 import org.springframework.boot.logging.LoggingSystem;
@@ -30,9 +31,17 @@ import java.util.Map;
  * <p>⚠️ 由 {@code cim.jpa.sql-log.admin-enabled=true} 才装配（默认不装配）。
  * 该操作会改变进程日志级别并使参数值进入日志，生产须保持关闭或由宿主安全链收紧
  * {@code /sys/sql-log}。</p>
+ *
+ * <p><b>类上的 {@code @ConditionalOnProperty} 不是重复，是必需品</b>：本类是
+ * {@code @RestController}，也就是 {@code @Component}。宿主若用
+ * {@code scanBasePackages="com.cim"}（{@code cim-bootstrap} 就是），组件扫描会**绕过**自动装配的
+ * 开关直接注册它——而它的构造器要 {@code String loggerName}，没人能注入，
+ * 启动即 {@code No qualifying bean of type 'java.lang.String'}（已实测）。那个报错完全不提
+ * 「你只是没开 sql-log 开关」，排查成本极高。把同一个条件写到类上，扫描阶段就会跳过它。</p>
  */
 @Slf4j
 @RestController
+@ConditionalOnProperty(prefix = "cim.jpa.sql-log", name = "admin-enabled", havingValue = "true")
 public class SqlLogAdminController {
 
     /** 端点路径（宿主可用它配置安全链）。 */
