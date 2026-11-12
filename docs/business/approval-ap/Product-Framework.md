@@ -310,16 +310,18 @@
 |---|---|---|---|
 | 1. 退回业务流程（§2.2） | D4 驳回=终止 + 退回为唯一非终止打回路径 | ✅ 已交付 | `verify-return.mjs` |
 | 2. 通知渠道 SPI + 企微免登 | D1/D3/D9：事件→模板→渠道三层；InApp SSE + 企微 webhook；15min 免登令牌 | ✅ 已交付 | `verify-wecom.mjs` 12/12 |
-| 3. 权限与业务域 | **G1 权限码三层 + G3 appCode 业务域隔离 + G9 开放 API 安全**（D5/D6/D2） | ✅ 已交付（G3：通道闭合，数据分域随第二业务方接入） | `verify-security.mjs` 11/11 + `verify-g1.mjs` 6/6 + `SecurityGuardDomainScopeTest` 7/7 |
+| 3. 权限与业务域 | **G1 权限码三层 + G3 appCode 业务域隔离 + G9 开放 API 安全**（D5/D6/D2） | ✅ 已交付（G3：通道闭合，数据分域随第二业务方接入） | `verify-security.mjs` 17/17（认证态与 dev 态各跑一遍）+ `verify-g1.mjs` 6/6 + `OpenApiAuthChainTest` 4/4 + `SecurityGuardDomainScopeTest` 7/7 |
 | 3b. 回调注册收编（G2） | D6+体检#2：受信操作 + 重复注册同 appCode 二次确认 | ✅ 已交付 | `verify-g2.mjs` 14/14 |
 | 4. 契约层（M3：G4+G5） | D4 结果语义 + D7 displayFields + §2.2 状态机 | ✅ 已交付（后端实现 + 前端渲染 + verify-g5 15/15） | `Integration-API.md` §7/§8/§9 |
 | 5. 选人（M4：G6） | D8 角色选人：设计器节点配置 → BPMN 引用 `ccg_<nodeId>` → 发起注入 → 待办按 roles claim 命中 → 办理授权校验 | ✅ 已交付（G7/G8 已由切片2交付） | `verify-g6.mjs` 14/14 + 集成测试 9/9 |
 
 ### 切片3 落点（G1/G3/G9）
 - **G9 开放 API 安全**：`ApiAuthFilter`（`@ConditionalOnProperty approval.api.security.enabled`）。仅对携带 `X-App-Key` 的服务间调用生效，不影响 JWT 用户态 / dev 放行。校验链：未知 appKey → 缺/错签名 → 时间戳超重放窗口（默认 5min）→ IP 白名单 → 按 appCode 限流（默认 60/min）→ 跨业务域；任一失败 403 + `[API-SEC-ALERT]` 告警（`WebhookNotifyService`）。签名 = `HMAC-SHA256(timestamp|method|path|body)`，常量时间比较。
-- **G3 appCode 业务域隔离**：**域 = appCode**（与令牌 `apps` 同一命名空间，不是「租户」——租户 `tenantId` 是流程变量，一个租户下可有多个业务方）。域只有一个来源：`SecurityGuard.resolveDomainFilter(requested)` / `resolveDomain(requested)`；请求域必须落在「令牌 `apps` ∪ 令牌 `tenantId` ∪ 共享域 `default`」内，**越域 403**（不返回 404）；未指定域时**收敛为调用方的授权域集合**，而不是放开全量。五类查询落点：定义（deployment `tenantId`，`null` 视为全局共享）/ 实例与任务（流程变量 `tenantId`，经 `resolveDomain`）/ 审计与回调（`app_code` 列，`IN` 收敛）/ 统计（同实例域，含驳回率）。资源级（`detail` / BPMN XML / 复制 / 停用 / 撤回 / 催办）按归属域校验，避免 id 枚举绕过列表过滤。写入侧：`start` 时域先过令牌校验再落库，否则后续所有过滤都建在调用方自报的字段上。
+  - **必须注册进 Security 链**（`addFilterBefore(..., UsernamePasswordAuthenticationFilter.class)`），并在 `ApiAuthFilterRegistration` 里用 `FilterRegistrationBean#setEnabled(false)` 关掉容器级自动注册。原因：容器级 filter 早于 Security 链，而 `SecurityContextHolderFilter` 在链首会用 `SecurityContextRepository` 覆盖 SecurityContext，容器层设置的服务身份会被清掉——表现为「签名校验全过、接口仍 401」；不禁用自动注册还会执行两次，限流配额被双倍消耗。
+  - **服务身份的凭据是 appKey 而非 JWT**：校验通过后写一个 `UsernamePasswordAuthenticationToken(appCode, null, [])` 仅为满足 `/api/**` 的 `authenticated()`，权威留空；`actor`/`initiator` 由调用方代传（请求体与查询串已被 HMAC 覆盖，改不动）；`assertPermission` 在开放 API 下短路（签名/重放/IP/限流/域绑定已在过滤器完成），域隔离不受影响。
+- **G3 appCode 业务域隔离**：**域 = appCode**（与令牌 `apps` 同一命名空间，不是「租户」——租户 `tenantId` 是流程变量，一个租户下可有多个业务方）。域只有一个来源：`SecurityGuard.resolveDomainFilter(requested)` / `resolveDomain(requested)`；请求域必须落在「令牌 `apps` ∪ 令牌 `tenantId` ∪ 共享域 `default`」内，**越域 403**（不返回 404）；未指定域时**收敛为调用方的授权域集合**，而不是放开全量。五类查询落点：定义（deployment `tenantId`，空串/`null` 视为全局共享）/ 实例与任务（流程变量 `tenantId`，经 `resolveDomain`）/ 审计与回调（`app_code` 列，`IN` 收敛，含回调 KPI `/callbacks/outbox/stats`）/ 统计（同实例域，含驳回率）。资源级（`detail` / BPMN XML / 复制 / 停用 / 撤回 / 催办）按归属域校验，避免 id 枚举绕过列表过滤；`detail` 内的审批历史也按实例域收敛（同一 `businessKey` 可能被不同业务方复用）。写入侧：`start` 时域先过令牌校验再落库，否则后续所有过滤都建在调用方自报的字段上。
   - **共享域 `default` 恒放行**：未按业务方分域的历史数据全落在该域，不放行会让升级当天存量单据集体消失。代价是该域对所有已准入 ap 可读——这是显式妥协，真正隔离从「各 ap 以自身 appCode 发起新实例」开始生效，因此 G3 标记为**通道已闭合、数据分域待业务方接入**。
-- **G1 权限码三层**：`SecurityGuard.assertPermission` 接 cim-system 平台码（`approval:definition:manage` / `approval:callback:manage` / `approval:audit:view` / `approval:instance:admin`）；认证态按 Spring Security 权威校验，**平台超管（`ROLE_SUPER_ADMIN`，由 IAM `is_super` 展开）跨域**；dev 态 `dev-bypass` 默认放行、`dev-enforce` 可开启 deny 路径（`dev-super-admin` 白名单）。管理端点 deploy/suspend/回调注册/审计查看已加守卫。
+- **G1 权限码三层**：`SecurityGuard.assertPermission` 接 cim-system 平台码（`approval:definition:manage` / `approval:callback:manage` / `approval:audit:view` / `approval:instance:admin`）；认证态按 Spring Security 权威校验，**平台超管（`ROLE_SUPER_ADMIN`，由 IAM `is_super` 展开）跨域**；dev 态 `dev-bypass` 默认放行、`dev-enforce` 可开启 deny 路径（`dev-super-admin` 白名单）；开放 API 态短路（服务身份没有权限码，鉴权由 appKey 承担）。管理端点 deploy/suspend/回调注册/审计查看已加守卫。
 - **前端收敛**：域参数（`tenantId`）在两条通道下都由后端决定——统一登录态取自 `/me`（身份与域均来自 JWT，顶栏**不提供**切换器，`Layout.tsx` 的 `isDevChannel` 门控），dev 态由身份切换器承载。共享域取值抽为常量 `SHARED_DOMAIN`，与后端 `SecurityGuard.SHARED_DOMAIN` 同一值；两处不一致的后果是「登录成功但一条待办都看不到」，且不报错。
 
 ### G2 落点（回调注册收编为受信操作）

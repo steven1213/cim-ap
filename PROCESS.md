@@ -133,4 +133,14 @@
   - **资源级必须单独校验**：`detail` / BPMN `xml` / `duplicate` / `suspend` / `withdraw` / `urge` 按归属域断言，否则列表过滤被 id 枚举绕过。`duplicate` 还要继承源定义的域，否则复制即「洗白成全局」。
   - **实跑抓到的坑**：Flowable 的「无租户」存的是**空串**不是 `null`（`ACT_RE_PROCDEF.TENANT_ID_`），按 `null` 判全局定义 → 3 个内置定义全被过滤，接口 200 返回 `[]` 不报错；另 `HttpRequestMethodNotSupportedException` 被映射成 400/2004「当前状态不允许该操作」，用 GET 调 POST 接口时表现为「业务状态拦截」，容易误判。
   - 验证：真 IAM + 真 JWT，令牌 `apps=[approval-ap,iam-ap,rms-ap]`。`default` 与 `rms-ap` 200，`mes-ap` 在 todo/done/initiated/stats/definitions/audit/callbacks/outbox/start 全线 403；`/definitions` 不传参 200 且 3 条；发起→详情→撤回 200/200/200。后端 19/19（新增 `SecurityGuardDomainScopeTest` 7 例），`tsc` + `vite build` 通过。
-  - 仍未做：数据分域（存量都在 `default`，等第二个业务方接入）；`outbox/stats` 全局计数；E2E 缺「不传参只见本域」用例。
+  - 仍未做：数据分域（存量都在 `default`，等第二个业务方接入）；~~`outbox/stats` 全局计数~~、~~E2E 缺「不传参只见本域」用例~~（两项见续 8）。
+
+- **2026-11-12（续8）回调 KPI 收敛 + E2E 补洞，撞出「认证一开服务间面就断」**：
+  - **补 E2E 前先跑了一遍，11 条变红、清一色 401**：失败的是带着**合法签名**的开放 API 请求，日志里连 `[API-SEC-ALERT]` 都没有——说明签名/重放/限流/域绑定全过，被 Spring Security 挡下。结论：**开放 API 这条服务间通道从未在认证开启的形态下跑过**，上一轮把 `cim.auth.enabled` 默认改 true 后，整条面静默失效。
+  - **四段断链**：① `ApiAuthFilter` 只写 `RequestScopeHolder`，不写 SecurityContext → `/api/**` 的 `authenticated()` 判匿名；② 它是容器级 filter，而 `SecurityContextHolderFilter` 在链首用 repository **覆盖**上下文，容器层写了也白写；③ `CurrentUserResolver` 认证态只认 `CimUserPrincipal`，服务身份主体是 appCode → 「令牌缺少用户标识」；④ `assertPermission` 按权限码判定，服务身份没有码 → 管理端点 403。
+  - **修法**：过滤器移进 Security 链 + `FilterRegistrationBean#setEnabled(false)` 关掉容器注册（不禁用会跑两次、限流配额翻倍）；校验通过写一个空权威的最小身份仅为满足 `authenticated()`；`CurrentUserResolver` 与 `assertPermission` 都加开放 API 分支——**开放 API 的凭据是 appKey，不是 JWT**，`actor` 由调用方代传（HMAC 覆盖 body，改不动）。
+  - **顺带收尾**：`/callbacks/outbox/stats` 从全局计数改为按域收敛（多业务方接入后每方都能看到别方成功率）；`getDetail` 内审批历史按实例域收敛；删掉因此失去调用点的 `countByStatus` / `countByActionAndCreatedAtAfter` / `findByBusinessKeyAndAppCode...`。
+  - **E2E 改成全走 appKey**（`cim.auth.enabled` 默认开后「dev 放行」不存在），并补「不传参 → 收敛」双域用例：rms-ap 不传 `appCode` 查 mds-ap 的单号得 **0 条**、查自己的得 1 条。
+  - 验证：认证态 **17/17**、dev 态同一脚本 **17/17**；dev 下无凭据直连 `/definitions`、`/tasks/todo`、`/me` 仍 200；JWT 用户态回归 `/me` 200、`todo@default` 200、`todo@mes-ap` **403**；后端 **23/23**（新增 `OpenApiAuthChainTest` 4 例），`tsc` + `vite build` 通过。
+  - **新测试做过反向验证**：注释掉 `SecurityContextHolder.setContext` 重跑，`openApiPassesAuthenticatedChain` 立刻 expected 200 → was 401；恢复后转绿。不验这一步，「测试通过」可能只是没测到。
+  - 仍未做：**认证开 + JWT 用户态**的自动化（要自签 RS256 + 假 JWKS，`TestTokens` 在 starter 的 `src/test` 下且无 test-jar，需提到共享测试模块或复制一份）；`verify-security.mjs` 仍未进流水线。

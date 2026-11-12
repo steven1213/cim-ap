@@ -885,8 +885,57 @@ approval 与 rms 都补了 `/sys` 代理。
 ### 38.6 仍未做
 
 - **数据分域**：存量实例全在 `default`，因此「按域隔离」目前只在**通道**上成立；真实数据分域要等第二个业务方以自身 appCode 发起（D13 RMS 回调接线仍未启动）。
-- `/callbacks/outbox/stats` 仍是全局计数（无域参数），属运维 KPI，未纳入收敛。
-- `E2E`：`verify-security.mjs` 覆盖的是「传参跨域→403」，未覆盖「不传参→只见本域」，建议补双域用例。
+- ~~`/callbacks/outbox/stats` 仍是全局计数（无域参数），属运维 KPI，未纳入收敛。~~ → 已于 §39 收敛。
+- ~~`E2E` 未覆盖「不传参→只见本域」~~ → 已于 §39 补齐（17/17，含双域造数）。
+
+## 2026-11-12（续 11）认证一开，服务间面就断了
+
+### 39.1 现象
+
+认证改为默认开启后，`verify-security.mjs` 从「11/11 通过」变成 **6 通过 / 11 失败**：失败项清一色 `401`，而且**带合法签名**的请求也 401。日志里没有 `[API-SEC-ALERT]`——说明签名、重放窗口、限流、域绑定全部通过，是被 Spring Security 的授权链挡下的。
+
+也就是说：**开放 API（X-App-Key）这条服务间通道，从未在认证开启的形态下跑过**。此前所有 G9/G3 验证都在 dev 放行态完成，开关一翻，整条面失效。
+
+### 39.2 四段断链（逐段看才看得清）
+
+| # | 断点 | 表现 |
+|---|---|---|
+| 1 | `ApiAuthFilter` 只写 `RequestScopeHolder`（ThreadLocal 域作用域），**不写 `SecurityContext`** | `/api/**` 链是 `anyRequest().authenticated()` → 判为匿名 → 401 |
+| 2 | 它是 `@Component` + `@Order(HIGHEST_PRECEDENCE)` 的**容器级** filter，早于 Security 链执行；而 `SecurityContextHolderFilter` 在链首用 `SecurityContextRepository` **覆盖** SecurityContext | 就算在容器层写了身份，进链也会被清空 → 仍 401 |
+| 3 | `CurrentUserResolver` 认证态只认 `CimUserPrincipal` 类型的 principal | 服务身份主体是 appCode → `resolve()` 抛「未认证或令牌缺少用户标识」（发起、审批、撤回全挂） |
+| 4 | `assertPermission` 认证态按权限码判定 | 服务身份没有权限码 → 部署、审计、回调管理等端点 403 |
+
+### 39.3 设计：开放 API 的凭据是 appKey，不是 JWT
+
+- **注册位置**：`ApiAuthFilter` 移进 Security 链（`addFilterBefore(..., UsernamePasswordAuthenticationFilter.class)`，先于 JWT 过滤器），并新增 `ApiAuthFilterRegistration` 用 `FilterRegistrationBean#setEnabled(false)` **关闭容器级自动注册**——不禁用会执行两次，限流配额被双倍消耗，而且第二次仍在链外白跑。
+- **身份**：校验通过后写一个最小 `UsernamePasswordAuthenticationToken(appKey, null, [])`，只为满足 `authenticated()`；权威留空，不冒充任何用户。
+- **身份来源三分法**（`CurrentUserResolver`）：开放 API → 用调用方传的 `initiator`/`actor`（请求体与查询串已被 HMAC 覆盖，改不动）；认证态 → JWT；dev → 参数。
+- **权限**：`assertPermission` 在开放 API 下短路返回——签名/重放/IP/限流/域绑定已经在 `ApiAuthFilter` 做完，appKey 本身即服务级凭证；域隔离不受影响，仍由 `resolveDomainFilter` 断言。
+
+### 39.4 顺带收掉的两处 G3 尾巴
+
+- `/callbacks/outbox/stats` 原为全局计数（多业务方接入后每方都能看到别方成功率与积压量），改为 `resolveDomainFilter` 收敛；仓库里因此失去调用点的 `countByStatus`、`countByActionAndCreatedAtAfter`、`findByBusinessKeyAndAppCodeOrderBySeqAsc`、`listByBusinessKeyAndAppCode` 一并删除（避免留死方法）。
+- `getDetail` 内的审批历史原按 `businessKey` 取全量，同一单号被不同业务方复用时会把别域轨迹混进详情页；改为按实例归属域收敛。
+
+### 39.5 验证（同一套脚本跑两种形态）
+
+| 形态 | 结果 |
+|---|---|
+| 认证开启（默认，真 IAM + 真 JWT） | `verify-security.mjs` **17/17**：部署/发起/待办 200；缺签名/错签名/超重放 → 403；跨域 → 403；不传 `appCode` → 异域审计 **0 条**、本域 **1 条**；回调列表不含异域；KPI 不传参 200 / 传异域 403；限流 3 过 2 拒 |
+| 认证关闭（`--cim.auth.enabled=false`） | 同一脚本 **17/17**；另验无凭据直连 `/definitions`、`/tasks/todo`、`/me` 均 200（dev 通道未被破坏） |
+| JWT 用户态回归 | `/me` 200、`/definitions` 200、`todo@default` 200、`todo@mes-ap` **403**、`stats@default` 200、`outbox/stats` 200 |
+| 后端全量 / 前端 | **23/23**（新增 `OpenApiAuthChainTest` 4 例）；`tsc` 零错 + `vite build` 通过 |
+
+### 39.6 回归的自动化落点
+
+`OpenApiAuthChainTest` 补上了「认证开 + 真发 HTTP」这一层：无凭据 401、合法 appKey 200、跨域 403、错签名 403。它是唯一能抓住本轮 bug 的自动化——单元测试不装配 Security 链，dev 放行态不认证，两边都看不见。
+
+做过**反向验证**：把 `SecurityContextHolder.setContext(ctx)` 注释掉重跑，`openApiPassesAuthenticatedChain` 立刻变红（expected 200, was 401），恢复后转绿。不经这一步，「测试通过」也可能只是没测到。
+
+### 39.7 仍未做
+
+- **认证开 + JWT 用户态的自动化**：需要自签 RS256 + 假 JWKS。`TestTokens` 目前在 `cim-auth-starter` 的 `src/test` 下且未发布 test-jar，approval 侧拿不到；要么把它提到共享测试模块，要么复制一份。
+- **`verify-security.mjs` 仍未进流水线**：它覆盖的是「真服务 + 开放 API 全链路」（17 条），目前靠手工起服务跑。
 
 ## 通用风险
 - ~~本批次 mq / cache / platform 三项为前期会话产物，提交前未做全量回归，存在潜在的编译/测试漂移，建议尽快安排一次整仓 `mvn install` 回归。~~ **已于 2026-10-09 完成整仓回归，全部通过。**
