@@ -84,6 +84,15 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 认证态测试用「自签 RS256 + 假 JWKS」（cim-auth-starter 发布的 test-jar）。
+             不复制一份：密钥生成逻辑漂移会让测试表现成「令牌验不过」，而不是「测试写错了」。 -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-auth-starter</artifactId>
+            <version>${cim.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

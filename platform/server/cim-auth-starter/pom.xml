@@ -86,4 +86,28 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              发布 test-jar：把 it/TestTokens（自签 RS256 + 假 JWKS）暴露给下游 ap。
+
+              不这么做，每个要验「认证态」的业务 ap 都得复制一份签发逻辑——两份密钥生成代码
+              一旦漂移，测试会表现成「令牌验不过」而不是「测试写错了」，排查成本极高。
+              消费方写法见 business/approval-ap/server/pom.xml 与 JwtAuthChainTest。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
