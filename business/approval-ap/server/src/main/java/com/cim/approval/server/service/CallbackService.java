@@ -224,14 +224,22 @@ public class CallbackService {
         return Math.min(30L * (1L << Math.min(attempts, 6)), 600L); // 30s 起指数退避，封顶 10 分钟
     }
 
-    /** 回调投递统计（原型「回调管理」KPI）：成功/失败/重试中/成功率/平均耗时。 */
+    /**
+     * 回调投递统计（原型「回调管理」KPI）：成功/失败/重试中/成功率/平均耗时。
+     *
+     * @param domains 允许统计的域集合（G3）；含 {@code "*"} 表示不限（超管 / dev）。
+     *                由此前恒取全库改为按域收敛——否则多业务方接入后任一方都能读到别方的
+     *                成功率与积压量
+     */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public Map<String, Object> outboxStats() {
-        long sent = outboxRepository.countByStatus(CallbackOutbox.Status.SENT);
-        long dead = outboxRepository.countByStatus(CallbackOutbox.Status.DEAD);
-        long pending = outboxRepository.countByStatus(CallbackOutbox.Status.PENDING);
-        long total = sent + dead + pending;
-        List<CallbackOutbox> all = outboxRepository.findAll();
+    public Map<String, Object> outboxStats(List<String> domains) {
+        List<CallbackOutbox> all = domains.contains("*")
+                ? outboxRepository.findAll()
+                : outboxRepository.findByAppCodeIn(domains);
+        long sent = all.stream().filter(o -> o.getStatus() == CallbackOutbox.Status.SENT).count();
+        long dead = all.stream().filter(o -> o.getStatus() == CallbackOutbox.Status.DEAD).count();
+        long pending = all.stream().filter(o -> o.getStatus() == CallbackOutbox.Status.PENDING).count();
+        long total = all.size();
         double avgCostMs = all.stream()
                 .filter(o -> o.getStatus() == CallbackOutbox.Status.SENT)
                 .filter(o -> o.getSentAt() != null)

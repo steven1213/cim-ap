@@ -837,7 +837,12 @@ public class ApprovalProcessService {
             definitionName = def.getName();
         }
 
-        List<ApprovalAudit> auditList = auditService.listByBusinessKey(businessKey);
+        // 详情里的审批历史也按实例归属域收敛：同一 businessKey 可能被不同业务方各自使用，
+        // 只按单号取全量会把别域的审批轨迹混进本域单据的详情页。
+        String instanceDomain = domainOf(vars);
+        List<ApprovalAudit> auditList = isGlobalTenant(instanceDomain)
+                ? auditService.listByBusinessKey(businessKey)
+                : auditService.listByBusinessKeyAndAppCodes(businessKey, List.of(instanceDomain));
         List<AuditView> history = new ArrayList<>();
         for (ApprovalAudit a : auditList) {
             history.add(new AuditView(a.getId(), a.getSeq(), a.getBusinessKey(), a.getProcessInstanceId(),

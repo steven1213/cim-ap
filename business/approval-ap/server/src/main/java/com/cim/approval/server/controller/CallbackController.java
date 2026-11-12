@@ -73,10 +73,15 @@ public class CallbackController {
         return Result.ok();
     }
 
-    /** 回调投递统计：成功/失败/重试中/成功率/平均耗时（看板 KPI）。 */
+    /**
+     * 回调投递统计：成功/失败/重试中/成功率/平均耗时（看板 KPI）。
+     *
+     * <p>G3：原本恒返回全局计数——多业务方接入后每方都能看到别方的成功率与积压量。
+     * 现与其余回调查询同源收敛：未指定 {@code appCode} 时取调用方授权域集合，越域 403。</p>
+     */
     @GetMapping("/outbox/stats")
-    public Result<Map<String, Object>> outboxStats() {
-        return Result.ok(callbackService.outboxStats());
+    public Result<Map<String, Object>> outboxStats(@RequestParam(required = false) String appCode) {
+        return Result.ok(callbackService.outboxStats(securityGuard.resolveDomainFilter(appCode)));
     }
 
     /** 测试请求：向指定 appCode 发送一条 TEST 事件并立即投递，返回投递结果。 */

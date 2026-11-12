@@ -29,6 +29,4 @@ public interface CallbackOutboxRepository extends JpaRepository<CallbackOutbox, 
 
     /** 按域集合查询（G3）：认证态未指定 appCode 时收敛为调用方的授权域。 */
     List<CallbackOutbox> findByAppCodeIn(java.util.Collection<String> appCodes);
-
-    long countByStatus(com.cim.approval.server.domain.CallbackOutbox.Status status);
 }

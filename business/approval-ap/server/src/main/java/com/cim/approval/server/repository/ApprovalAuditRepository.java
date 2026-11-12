@@ -11,8 +11,6 @@ public interface ApprovalAuditRepository extends JpaRepository<ApprovalAudit, St
 
     List<ApprovalAudit> findByBusinessKeyOrderBySeqAsc(String businessKey);
 
-    List<ApprovalAudit> findByBusinessKeyAndAppCodeOrderBySeqAsc(String businessKey, String appCode);
-
     /**
      * 按域集合查询（G3）：认证态未指定 appCode 时收敛为「令牌域 ∪ 共享域」，
      * 用 IN 一次拿全，而不是先全量取回再内存过滤。
@@ -27,8 +25,6 @@ public interface ApprovalAuditRepository extends JpaRepository<ApprovalAudit, St
     java.util.Optional<ApprovalAudit> findTopByBusinessKeyOrderBySeqDesc(String businessKey);
 
     boolean existsByProcessInstanceIdAndActor(String processInstanceId, String actor);
-
-    long countByActionAndCreatedAtAfter(String action, java.time.Instant since);
 
     /** 按域统计动作次数（统计看板的驳回率，G3：不再跨域聚合）。 */
     long countByActionAndAppCodeAndCreatedAtAfter(String action, String appCode, java.time.Instant since);
