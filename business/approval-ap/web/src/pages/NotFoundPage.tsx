@@ -1,17 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { EmptyState, Panel } from '@cim/ui';
-import { IconShield } from '@/components/Icons';
+import { NotFoundState } from '@cim/ui';
 
+/** 404：地址不在审批中心的路由表内。 */
 export default function NotFoundPage() {
   const { t } = useTranslation();
   return (
-    <Panel>
-      <EmptyState large title="404" hint={t('notfound.desc')}>
-        <Link to="/" className="btn btn-sm">
-          <IconShield width={14} height={14} /> {t('notfound.back')}
-        </Link>
-      </EmptyState>
-    </Panel>
+    <NotFoundState titleKey="notfound.title" hintKey="notfound.desc">
+      <Link className="btn" to="/">
+        {t('notfound.back')}
+      </Link>
+    </NotFoundState>
   );
 }

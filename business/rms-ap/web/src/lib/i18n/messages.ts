@@ -11,6 +11,7 @@ export const zhCN: Record<string, string> = {
   'rms.shell.crypto': '统一身份 · 端到端加密',
   'rms.shell.toggleNav': '折叠/展开导航',
   'rms.shell.toggleGroup': '折叠/展开分组',
+  'rms.shell.toggleTheme': '切换主题',
   'rms.shell.adminBadge': '管理员',
   'rms.shell.adminHint': '您拥有本系统的管理权限',
   'rms.shell.theme.dark': '切换到深色',
@@ -376,7 +377,9 @@ export const zhCN: Record<string, string> = {
   'rms.comingSoon': '功能开发中',
   'rms.comingSoon.desc': '该模块已在路线图中，即将上线。',
   'rms.notFound': '页面不存在',
+  'rms.notFound.desc': '该地址不属于 RMS，或对应菜单已被移除。',
   'rms.forbidden': '无访问权限',
+  'rms.forbidden.desc': '该页面需要额外权限，如需访问请联系 IAM 管理员授予。',
 
   // ---- W3：签核流 / 比对 / 审计 ----
   'rms.common.refresh': '刷新',
@@ -884,6 +887,7 @@ export const enUS: Record<string, string> = {
   'rms.shell.crypto': 'Unified Identity · E2E Encrypted',
   'rms.shell.toggleNav': 'Toggle navigation',
   'rms.shell.toggleGroup': 'Toggle group',
+  'rms.shell.toggleTheme': 'Toggle theme',
   'rms.shell.adminBadge': 'Admin',
   'rms.shell.adminHint': 'You have administrative privileges',
   'rms.shell.theme.dark': 'Switch to dark',
@@ -1248,7 +1252,9 @@ export const enUS: Record<string, string> = {
   'rms.comingSoon': 'Coming Soon',
   'rms.comingSoon.desc': 'This module is on the roadmap and will be available soon.',
   'rms.notFound': 'Page not found',
+  'rms.notFound.desc': 'This URL is not part of RMS, or the menu entry has been removed.',
   'rms.forbidden': 'Access denied',
+  'rms.forbidden.desc': 'This page requires extra permission. Ask the IAM administrator to grant it.',
 
   // ---- W3: sign-off / compare / audit ----
   'rms.common.refresh': 'Refresh',

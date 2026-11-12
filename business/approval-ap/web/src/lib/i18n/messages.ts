@@ -21,6 +21,7 @@ export const zhCN: Record<string, string> = {
   // 外壳
   'shell.brandSub': 'Workflow Engine',
   'shell.toggleNav': '折叠/展开导航',
+  'shell.toggleGroup': '折叠/展开分组',
   'shell.toggleTheme': '切换主题',
   'shell.language': '语言',
   'shell.theme.dark': '切换到深色',
@@ -484,6 +485,7 @@ export const enUS: Record<string, string> = {
 
   'shell.brandSub': 'Workflow Engine',
   'shell.toggleNav': 'Toggle navigation',
+  'shell.toggleGroup': 'Toggle group',
   'shell.toggleTheme': 'Toggle theme',
   'shell.language': 'Language',
   'shell.theme.dark': 'Switch to dark',

@@ -15,7 +15,7 @@ import { ForbiddenState } from '@cim/ui';
 export default function ForbiddenPage() {
   const { t } = useTranslation();
   return (
-    <ForbiddenState title="403" hintKey="rms.forbidden">
+    <ForbiddenState titleKey="rms.forbidden" hintKey="rms.forbidden.desc">
       <Link className="btn" to="/">
         {t('rms.common.backHome')}
       </Link>
