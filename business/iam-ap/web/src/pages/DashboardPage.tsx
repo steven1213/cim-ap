@@ -148,7 +148,6 @@ function AdminOverview() {
 
       <Panel
         title={t('iam.dashboard.recentAudit')}
-        sub={t('iam.dashboard.recentAuditSub')}
         actions={
           <CimButton size="small" onClick={() => navigate('/audit')}>
             <IconList width={13} height={13} />
@@ -263,7 +262,7 @@ function PersonalOverview() {
       </KpiGrid>
 
       <div className="grid-2">
-        <Panel title={t('iam.dashboard.identityTitle')} sub={t('iam.dashboard.identitySub')}>
+        <Panel title={t('iam.dashboard.identityTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.dashboard.mk.userId')}</dt>
             <dd className="meta-v mono">{user.userId}</dd>
@@ -282,9 +281,8 @@ function PersonalOverview() {
           </dl>
         </Panel>
 
-        <Panel title={t('iam.dashboard.myOrgsTitle')} sub={t('iam.dashboard.myOrgsSub')}>
           <DataTable
-            flat
+            title={t('iam.dashboard.myOrgsTitle')}
             columns={orgColumns}
             rows={orgs}
             rowKey={(o) => o.orgId}
@@ -292,10 +290,9 @@ function PersonalOverview() {
             emptyHintKey="iam.dashboard.noOrgsHint"
             showCount={false}
           />
-        </Panel>
       </div>
 
-      <Panel title={t('iam.dashboard.sessionTitle')} sub={t('iam.dashboard.sessionSub')}>
+      <Panel title={t('iam.dashboard.sessionTitle')}>
         <dl className="meta">
           <dt className="meta-k">{t('iam.dashboard.mk.authSrc')}</dt>
           <dd className="meta-v">{t('iam.dashboard.v.localCred')}</dd>
@@ -312,7 +309,6 @@ function PersonalOverview() {
 
       <Panel
         title={t('iam.dashboard.matrixTitle')}
-        sub={t('iam.dashboard.matrixSub')}
         actions={<CimTag>{t('iam.dashboard.matrixCount', { n: apps.length })}</CimTag>}
       >
         <DataTable

@@ -1,61 +1,27 @@
-// 认证状态（zustand + persist 落地到 localStorage，刷新不丢登录态）。
+// IAM 的认证 store：实现在 `@cim/shell` 的 `createAuthStore`，本文件只声明属于 IAM 的五件事。
 //
-// ⚠️ `permissions` **只存内存、刻意不落盘**（见 `partialize`）：权限随角色变更即时变化，
-// 若落盘会出现「本机缓存的旧权限」在新会话里被当作真值——典型表现是「已撤权却仍看到按钮」。
-// 每次启动由 `loadPermissions()` 重新拉取（`/sys/me/permissions` 每请求回显当前授权，天然最新）。
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import * as api from '@/lib/api';
+// ⚠️ `permissions` 只存内存、刻意不落盘（工厂的 `partialize` 已保证）：权限随角色变更即时
+//    变化，落盘会出现「已撤权却仍看到按钮」——页面凭本机缓存的旧权限码放行，点下去才被后端拒。
+//
+// ⚠️ 与另外三端不同：**IAM 自己是 IdP**，登出走自己的 `/api/v1/logout`（吊销令牌 + 清
+//    SSO 会话 Cookie），不走 `idpLogout` —— 那条路径是给外部 RP 用的，在 IAM 里等于自己
+//    fetch 自己，还要多绕一次 CORS。
+import { createAuthStore } from '@cim/shell';
+import { httpClient, post } from '@/lib/api';
 import type { MeDto } from '@/types';
 
-interface AuthState {
-  token: string | null;
-  refreshToken: string | null;
-  user: MeDto | null;
-  /** 本 ap 权限码集（内存态，不落盘）。 */
-  permissions: string[];
-  /** 权限是否已拉取（用于区分「未加载」与「确实无权限」）。 */
-  permissionsLoaded: boolean;
-  setSession: (token: string, refreshToken: string) => void;
-  loadMe: () => Promise<void>;
-  /** 拉取本 ap 权限码集（平台端点 `/sys/me/permissions`）。 */
-  loadPermissions: () => Promise<void>;
-  logout: () => Promise<void>;
-  clear: () => void;
-}
-
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      token: null,
-      refreshToken: null,
-      user: null,
-      permissions: [],
-      permissionsLoaded: false,
-      setSession: (token, refreshToken) => set({ token, refreshToken }),
-      loadMe: async () => {
-        const me = await api.get<MeDto>('/me');
-        set({ user: me });
-      },
-      loadPermissions: async () => {
-        const codes = await api.rootGet<string[]>('/sys/me/permissions');
-        set({ permissions: codes ?? [], permissionsLoaded: true });
-      },
-      logout: async () => {
-        const rt = get().refreshToken;
-        try {
-          await api.post<void>('/logout', rt ? { refreshToken: rt } : undefined);
-        } catch {
-          // 登出接口失败也直接前端清态
-        }
-        get().clear();
-      },
-      clear: () => set({ token: null, refreshToken: null, user: null, permissions: [], permissionsLoaded: false }),
-    }),
-    {
-      name: 'iam-auth',
-      // 只落盘令牌（权限、用户档案每次启动重取）
-      partialize: (s) => ({ token: s.token, refreshToken: s.refreshToken }),
-    },
-  ),
-);
+export const useAuthStore = createAuthStore<MeDto>({
+  name: 'iam',
+  client: httpClient,
+  mePath: '/me',
+  // 权限码走平台前缀（`cim-system` 的 `/sys/me/permissions` 每请求回显当前授权，天然最新）
+  permissionsPath: '/sys/me/permissions',
+  permissionsOnPlatform: true,
+  logout: async ({ refreshToken }) => {
+    try {
+      await post<void>('/logout', refreshToken ? { refreshToken } : undefined);
+    } catch {
+      // 登出接口失败也直接前端清态
+    }
+  },
+});

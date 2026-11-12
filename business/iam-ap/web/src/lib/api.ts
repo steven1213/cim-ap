@@ -1,146 +1,35 @@
-// 统一 API 客户端：axios 实例 + 请求/响应拦截器。
+// IAM 的 HTTP 接线：传输层全在 `@cim/data` 的 `createHttpClient`，本文件只声明
+// 属于 IAM 的三件事——资源前缀、令牌从哪来、401 之后清谁。
 //
-// 本工程同时对接**两类后端路径前缀**，故有两个实例：
-//
-// - `api`     → baseURL `/api/v1`：IAM 自己的管理面（`/api/v1/admin/**`、`/login`、`/me` 等）。
-// - `rootApi` → baseURL ''      ：平台 `cim-system` 的端点**没有** `/api/v1` 前缀
-//   （`/sys/me/menus`、`/sys/menus` 等），以及 `cim-i18n-starter` 的公开端点 `/api/i18n/**`。
-//   axios 的 `buildFullPath` 只在 url 是**绝对 URL**（带 scheme）时才跳过 baseURL 拼接，
-//   光写 `/sys/...` 仍会被拼成 `/api/v1/sys/...`（实测踩坑），因此必须用独立实例而非改调用写法。
-//
-// 两者共用同一套拦截器语义（附带 Bearer、解包 Result<T>、401 清态跳登录）。
-import axios, { type AxiosInstance } from 'axios';
+// 两个实例的由来（平台 `cim-system` 的 `/sys/**` 与 i18n 的 `/api/i18n/**` **没有**
+// `/api/v1` 前缀，而 axios 只在 url 是绝对 URL 时才跳过 baseURL 拼接）在工厂里。
+import { createHttpClient } from '@cim/data';
 import { useAuthStore } from '@/store/authStore';
 
-/** 与 server 端 Result<T> 对齐。 */
-export interface Result<T> {
-  code: number;
-  msg: string;
-  data: T;
-  errors?: Record<string, string>;
-}
+export { type PageResult, type RequestOptions, type Result } from '@cim/data';
 
 /**
- * 当前语言（供 `Accept-Language` 请求头）。
- *
- * <p>由 `lib/i18n.ts` 在切换语言时写入。刻意用「可写变量 + setter」而非从 i18n 模块 import，
- * 以切断 `api ⇄ i18n` 的循环依赖（i18n 需要 api 拉译文包）。</p>
+ * ⚠️ 与 `store/authStore.ts` 是**循环 import**（它要 `httpClient` 拉档案与权限码）。
+ * 能成立是因为这里的 `getToken` / `onUnauthorized` 都是闭包，只在发请求时才求值——
+ * 那时两个模块都已初始化完毕。若要改成模块顶层直接读 store，就会踩 TDZ。
  */
-let acceptLanguage: string | null = null;
+export const httpClient = createHttpClient({
+  baseURL: '/api/v1',
+  getToken: () => useAuthStore.getState().token,
+  onUnauthorized: () => useAuthStore.getState().clear(),
+  loginPath: '/login',
+});
 
-/** 设置后续请求的 `Accept-Language`（由 i18n 模块调用）。 */
-export function setAcceptLanguage(lang: string | null): void {
-  acceptLanguage = lang;
-}
-
-function attachInterceptors(instance: AxiosInstance): void {
-  instance.interceptors.request.use((config) => {
-    const token = useAuthStore.getState().token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    if (acceptLanguage) {
-      config.headers['Accept-Language'] = acceptLanguage;
-    }
-    return config;
-  });
-
-  instance.interceptors.response.use(
-    (resp) => resp,
-    (error) => {
-      const status = error?.response?.status;
-      if (status === 401) {
-        useAuthStore.getState().clear();
-        if (window.location.pathname !== '/login') {
-          window.location.assign('/login');
-        }
-      }
-      const data = error?.response?.data;
-      if (data && typeof data === 'object' && 'code' in data) {
-        const e: any = new Error(data.msg || '请求失败');
-        e.code = data.code;
-        e.errors = data.errors;
-        return Promise.reject(e);
-      }
-      return Promise.reject(error);
-    },
-  );
-}
-
-// 后端所有 /api/v1 端点（见 server 各 Controller 的 @RequestMapping），
-// 故 baseURL 取 /api/v1；页面内调用只写资源段（如 '/login/salt'、'/admin/users'）。
-const http: AxiosInstance = axios.create({ baseURL: '/api/v1' });
-
-// 平台端点全局前缀实例（见文件头说明）。
-const rootHttp: AxiosInstance = axios.create({ baseURL: '' });
-
-attachInterceptors(http);
-attachInterceptors(rootHttp);
-
-function assertOk<T>(body: Result<T>): void {
-  if (body.code !== 0) {
-    const e: any = new Error(body.msg || '请求失败');
-    e.code = body.code;
-    e.errors = body.errors;
-    throw e;
-  }
-}
-
-/** 单次请求的可选项。目前只有 `signal`：让 `useResource` 在 deps 变化 / 卸载时真能中止在途请求。 */
-export interface RequestOptions {
-  signal?: AbortSignal;
-}
-
-async function request<T>(instance: AxiosInstance, method: string, url: string,
-                          payload?: unknown, opts?: RequestOptions): Promise<T> {
-  const r = await instance.request<Result<T>>({
-    method,
-    url,
-    ...(method === 'GET' ? { params: payload } : { data: payload }),
-    signal: opts?.signal,
-  });
-  assertOk(r.data);
-  return r.data.data;
-}
-
-// ----------------------------------------------------------------- /api/v1
-
-export function get<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
-  return request<T>(http, 'GET', url, params, opts);
-}
-
-export function post<T>(url: string, body?: unknown): Promise<T> {
-  return request<T>(http, 'POST', url, body);
-}
-
-export function put<T>(url: string, body?: unknown): Promise<T> {
-  return request<T>(http, 'PUT', url, body);
-}
-
-export function del<T>(url: string): Promise<T> {
-  return request<T>(http, 'DELETE', url);
-}
-
-// ------------------------------------------------------------ 平台路径（无 /api/v1）
-
-/** 平台端点 GET（`/sys/**`、`/api/i18n/**`）。 */
-export function rootGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
-  return request<T>(rootHttp, 'GET', url, params, opts);
-}
-
-/** 平台端点 POST。 */
-export function rootPost<T>(url: string, body?: unknown): Promise<T> {
-  return request<T>(rootHttp, 'POST', url, body);
-}
-
-/** 平台端点 PUT。 */
-export function rootPut<T>(url: string, body?: unknown): Promise<T> {
-  return request<T>(rootHttp, 'PUT', url, body);
-}
-
-/** 平台端点 DELETE。 */
-export function rootDel<T>(url: string): Promise<T> {
-  return request<T>(rootHttp, 'DELETE', url);
-}
+export const {
+  get,
+  post,
+  put,
+  del,
+  rootGet,
+  rootPost,
+  rootPut,
+  rootDel,
+  setAcceptLanguage,
+} = httpClient;
 
 export default { get, post, put, del, rootGet, rootPost, rootPut, rootDel };

@@ -67,52 +67,9 @@ table.data .cell-actions {
 
 /* ---------- 表单 ----------
    `.field*` 已上提到 `@cim/ui`（`.cim-field*`，由 `CimField` 组件承载）。
-   页面侧不再允许手写 `.field`，否则同一套排版会出现两份定义、改一边不生效。 */
-
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 7px 10px;
-  font-family: inherit;
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
-}
-input::placeholder,
-textarea::placeholder {
-  color: var(--muted);
-}
-input:hover:not(:disabled),
-select:hover:not(:disabled) {
-  border-color: var(--muted);
-}
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: var(--ring);
-}
-input:disabled {
-  background: var(--panel-3);
-  color: var(--muted);
-}
-select {
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-  padding-right: 28px;
-}
-input.mono {
-  font-family: var(--font-mono);
-}
+   页面侧不再允许手写 `.field`，否则同一套排版会出现两份定义、改一边不生效。
+   ⚠️ 原生 `input/select/textarea` 的外观（含 select 的下拉箭头）也在 `@cim/ui/base.css`，
+   此处**刻意不再重复**：MDS 漏抄这一段，语言下拉就渲染成了系统原生控件。 */
 
 .form-grid {
   display: grid;

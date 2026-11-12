@@ -73,7 +73,7 @@ export default function ProfilePage() {
   return (
     <Page>
       <div className="grid-2">
-        <Panel title={t('iam.profile.infoTitle')} sub={t('iam.profile.infoSub')}>
+        <Panel title={t('iam.profile.infoTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.profile.mk.userId')}</dt>
             <dd className="meta-v mono">{userId ?? '—'}</dd>
@@ -122,7 +122,7 @@ export default function ProfilePage() {
           </div>
         </Panel>
 
-        <Panel title={t('iam.profile.pwdTitle')} sub={t('iam.profile.pwdSub')}>
+        <Panel title={t('iam.profile.pwdTitle')}>
           <CimField label={t('iam.profile.f.old')} htmlFor="pw-old">
             <CimInput
               id="pw-old"

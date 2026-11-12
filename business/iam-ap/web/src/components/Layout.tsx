@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup } from '@cim/shell';
+import { ConsoleShell, useShellTabs, type ShellLabels, type ShellNavGroup, type ShellNavItem } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useMenuStore } from '@/store/menuStore';
 import { useTabStore } from '@/store/tabStore';
@@ -9,7 +9,7 @@ import { applyTheme, persistTheme, readTheme, type Theme } from '@/lib/theme';
 import { hasPermission, CONSOLE_ADMIN } from '@/lib/permissions';
 import { resolveIcon } from '@/lib/iconRegistry';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import type { MenuTreeNode, SysMenuDto } from '@/types';
+import type { MenuTreeNode } from '@/types';
 
 /**
  * 控制台外壳。
@@ -51,53 +51,53 @@ export default function Layout() {
   }, [pathname, flat, openTab]);
 
   /**
-   * 后端树 → 外壳的菜单模型：DIR 节点成为分组标题，其子 MENU 为条目；
-   * 顶级 MENU（如概览 / 我的）自成一档，不显示分组标题。
+   * 后端菜单树 → 外壳的菜单模型。**递归**，与 `sys_menu` 的层级一一对应：
+   * 顶级 DIR 成为分组标题（一级），其下 DIR 成为可展开的模块节点（二级），
+   * MENU 成为页面（三级或二级，取决于所在深度）；顶级 MENU（概览 / 我的）自成一档。
+   *
+   * <p>以前这里只取 DIR 的<b>直接</b> MENU 子节点——后端明明支持任意层级，
+   * 中间那层 DIR 一到前端就被静默丢弃（表现为「后端配了三层，界面上只有两层」）。
+   * 现在 DIR 套 DIR 原样落地；空目录（子项全隐或全无权限）不渲染。</p>
    */
   const groups = useMemo<ShellNavGroup[]>(() => {
-    const visibleMenus = (node: MenuTreeNode): SysMenuDto[] =>
-      (node.children ?? [])
-        .filter((c) => c.menu.type === 'MENU' && c.menu.visible)
-        .map((c) => c.menu);
+    const toItem = (node: MenuTreeNode): ShellNavItem | null => {
+      if (node.menu.type === 'BUTTON' || !node.menu.visible) return null;
+      const code = node.menu.i18nCode ?? '';
+      const Icon = resolveIcon(node.menu.icon);
+
+      const kids = (node.children ?? [])
+        .map(toItem)
+        .filter((x): x is ShellNavItem => x !== null);
+      // 有可用子项 → 上级节点：只展开不导航，且不带副标题（副标题是「页面说明」的语义）
+      if (kids.length > 0) {
+        return { key: node.menu.id, label: t(code), Icon, children: kids };
+      }
+      if (node.menu.type === 'MENU' && node.menu.path) {
+        return {
+          key: node.menu.id,
+          path: node.menu.path,
+          label: t(code),
+          // 副标题是 IAM 独有：菜单库给每个页面配一句说明，缺键时回退空串
+          desc: t(`${code}.desc`, { defaultValue: '' }),
+          Icon,
+        };
+      }
+      return null;
+    };
 
     const result: ShellNavGroup[] = [];
     for (const node of menuTree) {
       if (node.menu.type === 'BUTTON' || !node.menu.visible) continue;
       if (node.menu.type === 'DIR') {
-        const items = visibleMenus(node);
+        const items = (node.children ?? [])
+          .map(toItem)
+          .filter((x): x is ShellNavItem => x !== null);
         if (items.length > 0) {
-          result.push({
-            key: node.menu.id,
-            cap: t(node.menu.i18nCode ?? ''),
-            items: items.map((m) => {
-              const Icon = resolveIcon(m.icon);
-              const code = m.i18nCode ?? '';
-              return {
-                key: m.id,
-                path: m.path as string,
-                label: t(code),
-                // 副标题是 IAM 独有：菜单库给每个页面配一句说明，缺键时回退空串
-                desc: t(`${code}.desc`, { defaultValue: '' }),
-                Icon,
-              };
-            }),
-          });
+          result.push({ key: node.menu.id, cap: t(node.menu.i18nCode ?? ''), items });
         }
       } else if (node.menu.type === 'MENU') {
-        const code = node.menu.i18nCode ?? '';
-        const Icon = resolveIcon(node.menu.icon);
-        result.push({
-          key: node.menu.id,
-          items: [
-            {
-              key: node.menu.id,
-              path: node.menu.path as string,
-              label: t(code),
-              desc: t(`${code}.desc`, { defaultValue: '' }),
-              Icon,
-            },
-          ],
-        });
+        const item = toItem(node);
+        if (item) result.push({ key: node.menu.id, items: [item] });
       }
     }
     return result;

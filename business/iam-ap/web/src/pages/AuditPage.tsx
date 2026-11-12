@@ -132,7 +132,6 @@ export default function AuditPage() {
     <Page>
       <Panel
         title={t('iam.audit.title')}
-        sub={t('iam.audit.sub')}
         actions={
           <CimSelect
             value={type}
@@ -169,7 +168,7 @@ export default function AuditPage() {
         />
       </Panel>
 
-      <Panel title={t('iam.audit.scopeTitle')} sub={t('iam.audit.scopeSub')}>
+      <Panel title={t('iam.audit.scopeTitle')}>
         <div className="tag-list">
           {AUDIT_TYPES.map((v) => (
             <CimTag key={v} tone={toneOf(v)}>

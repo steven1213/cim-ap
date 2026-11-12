@@ -45,7 +45,6 @@ export default function RolesPage() {
     <Page>
       <Panel
         title={t('iam.rolesView.title')}
-        sub={t('iam.rolesView.sub')}
         actions={
           <>
             <CimTag>{t('iam.rolesView.countApps', { n: groups.length })}</CimTag>
@@ -68,7 +67,7 @@ export default function RolesPage() {
         />
       </Panel>
 
-      <Panel title={t('iam.rolesView.aboutTitle')} sub={t('iam.rolesView.aboutSub')}>
+      <Panel title={t('iam.rolesView.aboutTitle')}>
         <ul className="note-list">
           <li>{t('iam.rolesView.about1')}</li>
           <li>{t('iam.rolesView.about2')}</li>

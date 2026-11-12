@@ -206,7 +206,6 @@ export default function OrgGrantsPage() {
     <Page>
       <Panel
         title={t('iam.orgGrants.title')}
-        sub={t('iam.orgGrants.sub')}
         actions={<CimTag>{t('iam.orgGrants.count', { n: grants.length })}</CimTag>}
       >
         <DataTable<OrgGrantRow>
@@ -226,7 +225,7 @@ export default function OrgGrantsPage() {
       </Panel>
 
       <Can perm={GRANT_GRANT}>
-        <Panel title={t('iam.orgGrants.grantTitle')} sub={t('iam.orgGrants.grantSub')}>
+        <Panel title={t('iam.orgGrants.grantTitle')}>
           <div className="row">
             <CimField label={t('iam.orgGrants.f.org')}>
               <CimSelect
@@ -270,7 +269,7 @@ export default function OrgGrantsPage() {
         </Panel>
       </Can>
 
-      <Panel title={t('iam.orgGrants.divTitle')} sub={t('iam.orgGrants.divSub')}>
+      <Panel title={t('iam.orgGrants.divTitle')}>
         <ul className="note-list">
           <li>{t('iam.orgGrants.divPersonal')}</li>
           <li>{t('iam.orgGrants.divOrg')}</li>

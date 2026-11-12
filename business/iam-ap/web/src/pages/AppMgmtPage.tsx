@@ -146,7 +146,6 @@ export default function AppMgmtPage() {
     <Page>
       <Panel
         title={t('iam.appMgmt.title')}
-        sub={t('iam.appMgmt.sub')}
         actions={
           <>
             <CimTag>{t('iam.appMgmt.count', { n: apps.length })}</CimTag>
@@ -170,7 +169,7 @@ export default function AppMgmtPage() {
       </Panel>
 
       <Can perm={APP_CREATE}>
-        <Panel title={t('iam.appMgmt.registerTitle')} sub={t('iam.appMgmt.registerSub')}>
+        <Panel title={t('iam.appMgmt.registerTitle')}>
           <FormGrid<RegisterForm>
             fields={fields}
             value={form}
@@ -192,7 +191,7 @@ export default function AppMgmtPage() {
         </Panel>
       </Can>
 
-      <Panel title={t('iam.appMgmt.guideTitle')} sub={t('iam.appMgmt.guideSub')}>
+      <Panel title={t('iam.appMgmt.guideTitle')}>
         <ul className="note-list">
           <li>{t('iam.appMgmt.guide1')}</li>
           <li>{t('iam.appMgmt.guide2')}</li>

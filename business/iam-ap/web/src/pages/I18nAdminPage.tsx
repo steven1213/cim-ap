@@ -510,7 +510,6 @@ export default function I18nAdminPage() {
         <Panel
           className="scroll-y"
           title={t('iam.admin.i18n.locales')}
-          sub={t('iam.admin.i18n.clickToFilter')}
           flush
           actions={
             <>

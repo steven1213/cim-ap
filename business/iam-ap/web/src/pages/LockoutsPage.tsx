@@ -93,7 +93,6 @@ export default function LockoutsPage() {
     <Page>
       <Panel
         title={t('iam.lockouts.title')}
-        sub={t('iam.lockouts.sub')}
         actions={<CimTag tone={rows.length ? 'warn' : 'idle'}>{t('iam.lockouts.count', { n: rows.length })}</CimTag>}
       >
         <DataTable<LockRow>
@@ -111,7 +110,7 @@ export default function LockoutsPage() {
         />
       </Panel>
 
-      <Panel title={t('iam.lockouts.policyTitle')} sub={t('iam.lockouts.policySub')}>
+      <Panel title={t('iam.lockouts.policyTitle')}>
         <ul className="note-list">
           <li>{t('iam.lockouts.policy1')}</li>
           <li>{t('iam.lockouts.policy2')}</li>

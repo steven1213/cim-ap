@@ -276,7 +276,6 @@ export default function OrgPage() {
         <Panel
           className="scroll-y"
           title={t('iam.orgs.title')}
-          sub={t('iam.orgs.sub')}
           actions={
             <>
               <CimTag>{t('iam.orgs.count', { n: nodes.length })}</CimTag>

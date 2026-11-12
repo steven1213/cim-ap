@@ -446,7 +446,6 @@ export default function UsersPage() {
     <Page>
       <Panel
         title={t('iam.users.title')}
-        sub={t('iam.users.sub')}
         actions={
           <>
             <CimTag>{t('iam.users.count', { n: rows.length })}</CimTag>
@@ -649,7 +648,7 @@ export default function UsersPage() {
         </Panel>
       )}
 
-      <Panel title={t('iam.users.usageTitle')} sub={t('iam.users.usageSub')}>
+      <Panel title={t('iam.users.usageTitle')}>
         <ul className="note-list">
           <li>{t('iam.users.usageOnboard')}</li>
           <li>{t('iam.users.usageTransfer')}</li>

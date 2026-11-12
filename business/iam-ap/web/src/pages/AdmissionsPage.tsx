@@ -171,7 +171,7 @@ export default function AdmissionsPage() {
 
   return (
     <Page>
-      <Panel title={t('iam.admissions.title')} sub={t('iam.admissions.sub')}>
+      <Panel title={t('iam.admissions.title')}>
         <div className="row">
           <CimField label={t('iam.admissions.f.userId')} htmlFor="au">
             <CimInput
@@ -213,7 +213,7 @@ export default function AdmissionsPage() {
         </div>
       </Panel>
 
-      <Panel title={t('iam.admissions.impactTitle')} sub={t('iam.admissions.impactSub')}>
+      <Panel title={t('iam.admissions.impactTitle')}>
         <ul className="note-list">
           <li>{t('iam.admissions.impact1')}</li>
           <li>{t('iam.admissions.impact2')}</li>

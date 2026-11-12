@@ -68,7 +68,7 @@ export default function SettingsPage() {
   return (
     <Page>
       <div className="grid-2">
-        <Panel title={t('iam.settings.authTitle')} sub={t('iam.settings.authSub')}>
+        <Panel title={t('iam.settings.authTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.authSrc')}</dt>
             <dd className="meta-v mono">{s.authSource}</dd>
@@ -94,7 +94,7 @@ export default function SettingsPage() {
           </dl>
         </Panel>
 
-        <Panel title={t('iam.settings.tokenTitle')} sub={t('iam.settings.tokenSub')}>
+        <Panel title={t('iam.settings.tokenTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.accessTtl')}</dt>
             <dd className="meta-v mono">{t('iam.settings.v.minutes', { n: s.accessTokenTtlMinutes })}</dd>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid-2">
-        <Panel title={t('iam.settings.lockTitle')} sub={t('iam.settings.lockSub')}>
+        <Panel title={t('iam.settings.lockTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.threshold')}</dt>
             <dd className="meta-v mono">{t('iam.settings.v.times', { n: s.lockoutMaxAttempts })}</dd>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
           </dl>
         </Panel>
 
-        <Panel title={t('iam.settings.corsTitle')} sub={t('iam.settings.corsSub')}>
+        <Panel title={t('iam.settings.corsTitle')}>
           {s.webAllowedOrigins?.length ? (
             <div className="tag-list">
               {s.webAllowedOrigins.map((o) => (
@@ -146,7 +146,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid-2">
-        <Panel title={t('iam.settings.dirApiTitle')} sub={t('iam.settings.dirApiSub')}>
+        <Panel title={t('iam.settings.dirApiTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.dirApi')}</dt>
             <dd className="meta-v">
@@ -165,7 +165,7 @@ export default function SettingsPage() {
           </dl>
         </Panel>
 
-        <Panel title={t('iam.settings.adSyncTitle')} sub={t('iam.settings.adSyncSub')}>
+        <Panel title={t('iam.settings.adSyncTitle')}>
           <dl className="meta">
             <dt className="meta-k">{t('iam.settings.mk.syncSwitch')}</dt>
             <dd className="meta-v">
@@ -201,7 +201,7 @@ export default function SettingsPage() {
         </Panel>
       </div>
 
-      <Panel title={t('iam.settings.noteTitle')} sub={t('iam.settings.noteSub')}>
+      <Panel title={t('iam.settings.noteTitle')}>
         <ul className="note-list">
           <li>
             <b>{t('iam.settings.note1')}</b>

@@ -122,7 +122,6 @@ export default function SessionsPage() {
     <Page>
       <Panel
         title={t('iam.sessions.title')}
-        sub={t('iam.sessions.sub')}
         actions={<CimTag tone="run">{t('iam.sessions.count', { n: rows.length })}</CimTag>}
       >
         <DataTable<SessionRow>
@@ -143,7 +142,6 @@ export default function SessionsPage() {
       <Can perm={SESSION_KICK}>
         <Panel
           title={t('iam.sessions.kickTitle')}
-          sub={t('iam.sessions.kickSub')}
           actions={
             <CimTag tone="warn" size="small">
               {t('iam.sessions.highRisk')}

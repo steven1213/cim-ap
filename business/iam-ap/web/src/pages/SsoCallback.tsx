@@ -1,33 +1,23 @@
-import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { SsoRelay } from '@cim/shell';
+import { SsoCallbackPage } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 
 /**
  * SSO 回跳接收（IAM 控制台自身也走统一登录页）。
  *
- * <p>IAM 控制台 /login 会整页中继到 IAM 后端（8081）的 /login；登录成功后后端把 token 经
- * 查询参数带回本页（{@code <origin>/sso-callback}），此处写入 authStore 并跳首页。
- * 与 RMS 的 /sso 回调同构，确保「所有客户端共用同一登录页」。</p>
+ * <p>IAM 控制台 `/login` 会整页中继到 IAM 后端（8081）的 `/login`；登录成功后后端把 token 经
+ * 查询参数带回本页（{@code <origin>/sso-callback}）。逻辑与另外三端共用
+ * （`@cim/shell` 的 {@link SsoCallbackPage}），差别只有回跳路径——IAM 是 `/sso-callback`，
+ * 其余三端是 `/sso`。</p>
  */
 export default function SsoCallback() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const setSession = useAuthStore((s) => s.setSession);
-  const [params] = useSearchParams();
-
-  useEffect(() => {
-    const token = params.get('token');
-    const refreshToken = params.get('refreshToken');
-    if (token) {
-      setSession(token, refreshToken || token);
-      navigate('/', { replace: true });
-    } else {
-      navigate('/login', { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return <SsoRelay mark="IA" brand="CIM IAM" label={t('iam.login.submitting')} />;
+  return (
+    <SsoCallbackPage
+      mark="IA"
+      brand="CIM IAM"
+      label={t('iam.login.submitting')}
+      setSession={(token, refreshToken) => useAuthStore.getState().setSession(token, refreshToken)}
+    />
+  );
 }
