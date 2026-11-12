@@ -120,7 +120,8 @@ export function useAntdTheme(): ThemeConfig {
           rowHoverBg: panel2,
           bodySortBg: 'transparent',
           cellPaddingBlockSM: readPx(styles, '--cim-row-h', 34) > 40 ? 10 : 6,
-          cellPaddingInlineSM: 10,
+          // 12 = .cim-toolbar 的左右内边距，两者对齐后「搜索框左缘 / 表头文字左缘」同一条竖线
+          cellPaddingInlineSM: 12,
           cellFontSizeSM: fsSm,
           footerBg: panel2,
           stickyScrollBarBg: lineStrong,

@@ -29,17 +29,29 @@ import type { ComponentType, ReactNode } from 'react';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ShellIconCmp = ComponentType<any>;
 
-/** 一个侧栏条目。 */
+/**
+ * 一个侧栏条目。
+ *
+ * <p><b>树形 vs 平铺</b>：`children` 有值即为「上级节点」——渲染成可展开行，点击只展开/收起、
+ * 不导航；叶子节点的 `path` 必填。这条模型是从后端菜单树（`sys_menu.parent_id` +
+ * `MenuType.DIR`）照抄下来的：后端一直支持任意层级，只有外壳以前硬编码成
+ * 「分组标题 + 平铺条目」两层，多出来的 DIR 到了前端就没地方放。</p>
+ *
+ * <p>`path` 因此是可选的：上级节点没有自己的页面。叶子缺 `path` 属于配置错误，
+ * 渲染时打 warning 并跳过，不让它变成一个点了没反应的死链。</p>
+ */
 export interface ShellNavItem {
-  /** 唯一键（菜单 id 或路由路径），用于 React key。 */
+  /** 唯一键（菜单 id 或路由路径），用于 React key 与展开状态持久化。 */
   key: string;
-  /** 路由路径，交给 NavLink。 */
-  path: string;
+  /** 路由路径，交给 NavLink。上级节点不传。 */
+  path?: string;
   /** 已翻译的菜单名。 */
   label: string;
   /** 已翻译的副标题（IAM 用，其余 ap 不传即不渲染）。 */
   desc?: string;
   Icon: ShellIconCmp;
+  /** 子菜单。有值即渲染为可展开节点（二级），其子项为三级。 */
+  children?: ShellNavItem[];
 }
 
 /** 一个侧栏分组；`cap` 为空表示顶级菜单自成一档、不显示标题。 */

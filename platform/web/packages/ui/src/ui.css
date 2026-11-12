@@ -4,21 +4,22 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   flex: 1 0 auto; /* 撑满 .content 可视高度（内容超出时正常滚动） */
-  /* 初始顶部间距（.content 不能给 padding-top，会破坏 sticky 对齐，见 .content 注释） */
-  padding-top: 12px;
+  /* 初始顶部间距（.content 不能给 padding-top，会破坏 sticky 对齐，见 .content 注释）
+     12 → 16：页签栏是 38px 的薄条，下面立刻贴标题会显得挤压 */
+  padding-top: 16px;
 }
 
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px; /* 与 .page 的纵向节奏一致（14 与 16 混用会让并排卡之间比上下更紧） */
 }
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 /* ---------- 分栏（左树 / 右详情） ---------- */
@@ -57,7 +58,7 @@
 .panel.scroll-y {
   position: sticky;
   top: 0; /* 必须=0：否则页面滚动后左列钉在 12px、右列被滚动口裁到 0，左右顶部错 12px */
-  max-height: calc(100vh - var(--header-h) - 114px); /* topbar56 + tabbar 38 + footer ~40 + 内容底距 20 */
+  max-height: calc(100vh - var(--header-h) - 116px); /* topbar56 + tabbar 40 + footer ~40 + 内容底距 20 */
 }
 .panel.scroll-y .panel-body {
   flex: 1 1 auto;
@@ -68,6 +69,29 @@
   .panel.scroll-y {
     position: static;
   }
+}
+
+/* 列表页高度分配：最后一张表格卡片吃满剩余高度。
+   原来表格只有 3 行时卡片 180px、视口 900px → 页面底部 400px 空白，
+   一页里「内容结束得莫名其妙」。空白留在卡片内（读作「列表还没占满」）
+   比留在卡片外（读作「页面没做完」）更合理。
+   用 flex-grow 而非 100% 高度：行多时按内容撑高、页面正常滚动，不压缩。
+
+   概览页同样适用：实机看下来「卡片拉到底、表格下方留白」比「卡片按内容高、
+   页面底部一片 --bg 灰」更像做完了。曾用 :has 把概览页排除，反而更差，已回退。 */
+.page > .cim-datatable:last-child {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+.page > .cim-datatable:last-child > .panel {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+/* 并排的表格卡等高：grid 项被 stretch 到同一行高后，内部 .panel 也要跟着撑满，
+   否则「左边 5 行、右边 2 行」两张卡底部参差。空白落在卡内（读作「列表还有空间」）。 */
+.grid-2 > .cim-datatable > .panel,
+.grid-3 > .cim-datatable > .panel {
+  flex: 1 1 auto;
 }
 
 /* 分组清单的层级感：组头（side-cap）与其成员行缩进区分（权限点清单/角色授权组） */
@@ -278,62 +302,101 @@
 }
 
 /* ---------- KPI 指标块 ---------- */
+/* 指标带（原「KPI 卡片网格」）。
+ *
+ * 改的是形态，不只是取值。原实现 `repeat(auto-fit, minmax(168px, 1fr))` +
+ * 每张卡自带 2px 彩色左边条：卡片按容器等分被拉到 1/3~1/5 屏宽（1440 下约 230-380px），
+ * 而内容只有左侧 90px，右侧整片空白；张数越少越像「凑格子」的仪表盘模板。
+ *
+ * 现在是一整条带：宽度上限 780px（3 个指标时每格 260、5 个时每格 156），
+ * 格与格之间的分隔线画在格子自身（见 .kpi 的 box-shadow），不依赖 gap 露底色 ——
+ * 换行时最后一行可能是 2 格，靠 gap 会留一块灰色空区。
+ * 右边多出来的空白属于页面，而不是属于每一格。
+ *
+ * ⚠️ 语义色（ok/warn/err/info）不再画左边条 —— 每格一道彩条是模板味的来源之一，
+ * 且 5 个指标里 4 个是「正常」，染色等于满屏花。只对 warn/err 给数值着色。 */
 .kpi-grid {
+  /* 列数 = 指标个数，每列等分、始终铺满内容区宽度。
+   *
+   * 这里踩过两次坑，两次都是「按个数分支」的思路不对：
+   *   ① flex + wrap + width:fit-content → max-content 计算把 3 个排成 2 列再换行；
+   *   ② grid auto-fit minmax(150px,1fr) + max-width:780 → 5 个指标挤在 780px 里、
+   *      右边 500px 空白，6 个以上还得换行（换行的最后一行不满是另一处空白）。
+   * `grid-auto-flow: column` + `grid-auto-columns: 1fr` 让列数跟着子元素个数走：
+   * 3 个就是三等分，8 个就是八等分，永远一行、永远与上下内容左右对齐。
+   * 单格宽度由个数决定（1257 内容宽下 3 个 419px / 8 个 157px），不设写死的上下限。 */
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  gap: 10px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
 .kpi {
   display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 11px 13px;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--primary);
-  border-radius: var(--radius-sm);
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 14px 11px;
   background: var(--panel);
+  color: inherit; /* 兼容 <Link className="kpi"> 的导航型指标：不吃链接蓝 */
 }
-.kpi.ok {
-  border-left-color: var(--ok);
+/* 分隔线用相邻选择器画在左侧，最后一格不会多一道、也不依赖 gap 露底色
+   （gap 方案在换行时会留灰块，见上）。 */
+.kpi + .kpi {
+  border-left: 1px solid var(--line);
 }
-.kpi.warn {
-  border-left-color: var(--warn);
+/* KPI 带作为面板唯一内容时（approval 回调页的「统计」面板）：外框由面板提供，
+   带子不再自己画框，否则出现框套框；反向外扩到面板边缘，让格线顶到面板边框。 */
+.panel-body > .kpi-grid:only-child {
+  border: 0;
+  border-radius: 0;
+  margin: -16px;
 }
-.kpi.info {
-  border-left-color: var(--info);
+
+/* 导航型指标（整格是链接）给一点悬停反馈；静态格也看不出来，无需区分 */
+a.kpi:hover {
+  background: var(--panel-2);
 }
-/* `.kpi.err`：此前**没有**这条规则，而 approval 的 CallbacksPage 已经写了
-   `className={'kpi' + (stats.dead > 0 ? ' err' : '')}`——意图是死信超标标红，
-   但类名一直没落地，色条始终是主色。这里补上，让既有意图真正生效。 */
-.kpi.err {
-  border-left-color: var(--err);
+.kpi.warn .kpi-val {
+  color: var(--warn);
 }
+.kpi.err .kpi-val {
+  color: var(--err);
+}
+/* 图标：原来的 30px 灰底圆角方块是「卡片模板」的另一个记号，收到 16px 纯线条图标 */
 .kpi-ico {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
   flex: 0 0 auto;
-  border-radius: var(--radius-sm);
-  background: var(--panel-3);
-  color: var(--text-2);
+  color: var(--muted);
+}
+.kpi-ico svg {
+  width: 16px;
+  height: 16px;
 }
 .kpi-main {
   min-width: 0;
 }
 .kpi-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--text-2);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .kpi-val {
+  margin-top: 2px;
   font-family: var(--font-mono);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-metric);
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.15;
   letter-spacing: -0.01em;
   color: var(--text);
   overflow: hidden;
@@ -342,9 +405,11 @@
 }
 .kpi-sub {
   margin-top: 1px;
-  font-size: 10px;
+  font-size: var(--fs-micro);
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- 面板 ---------- */
@@ -361,8 +426,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 14px;
-  background: var(--panel-2);
+  padding: 10px 16px;
+  /* 灰底改成透明：一页里 3-4 个面板时会变成 4 条灰横条，是「卡片流」的典型观感。
+     只留底部分隔线，靠层级而不是靠底色区分标题区与内容区。 */
+  background: transparent;
   border-bottom: 1px solid var(--line);
 }
 .panel-heading {
@@ -387,7 +454,7 @@
   flex: 0 0 auto;
 }
 .panel-body {
-  padding: 14px;
+  padding: 16px;
 }
 .panel-body.flush {
   padding: 0;
@@ -406,10 +473,9 @@
 }
 .sub-title {
   margin-bottom: 9px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--muted);
 }
 
@@ -754,7 +820,10 @@ button:disabled {
 }
 /* 网格内由 gap 控距：必须禁掉纵向堆叠的相邻 margin，否则第 2/3 列整体下移错位。
    原 `.grid-2 > .field + .field` 的作用；换成组件后网格容器是 `.cim-form-grid`，
-   而页面里手写的 `.grid-2/.grid-3` 仍在用，两个都要覆盖。 */
+   而页面里手写的 `.grid-2/.grid-3` 仍在用，两个都要覆盖。
+   ⚠️ CSS 认不出「内联样式的 grid」——手写 `style={{display:'grid'}}` 的第二列会吃
+   到上面的 11px 顶边距（RMS ComparePage 右列整体下移 11px 就是这么来的）。
+   新页面一律用 `@cim/ui` 的 `FieldGrid`（渲染 .cim-form-grid，布局与豁免同生）。 */
 .cim-form-grid > .cim-field + .cim-field,
 .grid-2 > .cim-field + .cim-field,
 .grid-3 > .cim-field + .cim-field {

@@ -29,6 +29,7 @@ export {
   hasAnyPermission,
   hasAllPermissions,
 } from './permissions';
+export { createPermissionHooks, type PermissionHooks } from './permissionHooks';
 export {
   UiDictProvider,
   useDict,
@@ -72,6 +73,7 @@ export { CimCollapse, type CollapseItem, type CimCollapseProps } from './data/Co
 // ── form 表单 ──────────────────────────────────────────────────
 export { FormGrid, type FormField, type FormGridProps, type FormOption } from './form/FormGrid';
 export { CimField, type CimFieldProps } from './form/Field';
+export { FieldGrid, type FieldGridProps } from './form/FieldGrid';
 export { CimInput, type CimInputProps } from './form/Input';
 export { CimInputNumber, type CimInputNumberProps } from './form/InputNumber';
 export { CimSelect, type CimOption, type CimSelectProps } from './form/Select';

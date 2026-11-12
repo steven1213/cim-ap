@@ -11,7 +11,9 @@
 /* ---------- 页头 ---------- */
 .cim-page-head {
   display: flex;
-  align-items: flex-end;
+  /* 原来是 flex-end：右侧动作按钮的底边跟着**副标题**的底边走，
+     有副标题时按钮看起来比标题低半行。改为居中，动作区对整块标题居中。 */
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
@@ -21,12 +23,15 @@
 }
 .cim-page-head h1 {
   margin: 0;
-  font-size: var(--fs-xl);
-  font-weight: 680;
+  /* 20px 标题配 13px 正文落差过大，视觉上像营销页/看板首页；
+     压到 18px 后与下方 13px 面板标题形成两级而不是三级。 */
+  font-size: var(--fs-title);
+  font-weight: 640;
   letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 .cim-page-head-sub {
-  margin: 4px 0 0;
+  margin: 3px 0 0;
   font-size: var(--fs-sm);
   color: var(--muted);
 }
@@ -44,7 +49,12 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 10px 12px;
+}
+/* 表格的工具栏现在与表格同在一个 .panel 里（见 DataTable 结构），
+   给一条分隔线与表头分开；内边距 12 与单元格 inline padding 一致，控件左缘对齐表头文字。 */
+.panel > .cim-toolbar:first-child {
+  border-bottom: 1px solid var(--line);
 }
 .cim-toolbar-left,
 .cim-toolbar-right {
@@ -122,6 +132,15 @@
   border-radius: 0;
   background: transparent;
 }
+/* 最后一行去掉底边线：没有分页器时它会与卡片外框贴在一起，看着像双线 */
+.cim-datatable .ant-table-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+/* 表格贴卡片底边时不再叠一层内边距 */
+.cim-datatable > .panel > .ant-table-wrapper:last-child .ant-table {
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
 /* 表格内等宽文本（编码 / 时间戳） */
 .cim-mono {
   font-family: var(--font-mono);
@@ -149,14 +168,16 @@
   background: var(--cim-status-ok-soft);
 }
 
-/* 错误态：不吞错，整块可重试 */
+/* 错误态：不吞错，整块可重试。
+   已经嵌在 .cim-datatable > .panel 里（见 DataTable），外层已画框，
+   这里不再画自己的框，否则出现框套框。 */
 .cim-datatable-error {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 14px;
-  border: 1px solid var(--err);
-  border-radius: var(--radius);
+  padding: 14px 12px;
+  border: 0;
+  border-radius: 0;
   background: var(--err-soft);
   color: var(--text);
   font-size: var(--fs-sm);
@@ -172,7 +193,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  /* 最小高度：无数据时它落在 antd 的空 tbody 里，仅靠 padding 只有 ~70px 高，
+     表现为表头下一条细缝，看起来像表格渲染失败。160px 给空态一个「独立区块」的体量。 */
+  min-height: 160px;
   padding: 28px 12px;
   color: var(--muted);
   text-align: center;

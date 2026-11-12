@@ -2,7 +2,7 @@
   "name": "@cim/data",
   "version": "0.1.0",
   "private": true,
-  "description": "CIM 平台数据加载原语：useResource（竞态/取消/轮询暂停/保留旧数据）、useDebounced、ApiError 契约。只依赖 react，不认识 axios，也不认识任何业务端点——取数函数由页面传入，故各 ap 的 API 层保持独立。",
+  "description": "CIM 平台数据层：取数原语（useResource 的竞态/取消/轮询暂停/保留旧数据、useDebounced）+ 统一 HTTP 传输层（createHttpClient：Bearer、Accept-Language、Result 解包、401 回登录页）。不含任何业务端点——资源函数（listSites/listTodo…）仍由各 ap 的 lib/xxApi.ts 写，包只统一传输语义，不统一业务 API。",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -13,6 +13,7 @@
     "src"
   ],
   "peerDependencies": {
+    "axios": "^1.7.0",
     "react": "^18.3.0"
   }
 }

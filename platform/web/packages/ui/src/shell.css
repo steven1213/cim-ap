@@ -16,7 +16,7 @@
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%);
+  background: var(--sidebar-bg);
   color: var(--sidebar-fg);
   border-right: 1px solid rgba(0, 0, 0, 0.4);
   transition: width 0.2s ease;
@@ -39,13 +39,15 @@
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #fff;
-  background: linear-gradient(135deg, #2f6ae5, #5b4bd8);
+  /* 纯品牌色。此前的 135° 蓝紫渐变是「AI 生成后台」最典型的记号之一，
+     且与全站只有 --primary 一个主色的事实不符。 */
+  background: var(--primary);
 }
 
 .brand-text {
@@ -79,11 +81,12 @@
 .side-cap {
   display: block;
   padding: 2px 10px 8px;
-  font-size: 10px;
+  /* 中文分组名占多数：10px + 0.14em 字距 + uppercase 会让「场地主数据」散成五粒，
+     且 uppercase 对中文完全无效。改为 11px / 0.02em，只保留「灰、小、无图标」这一层区分。 */
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(142, 155, 177, 0.6);
+  letter-spacing: 0.02em;
+  color: rgba(142, 155, 177, 0.75);
 }
 
 /* 菜单分组：组间细分隔线，成组感更清晰 */
@@ -111,7 +114,7 @@ button.side-cap {
   font-size: 11px;
   font-weight: 650;
   text-transform: none;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--muted);
   cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease;
@@ -198,6 +201,80 @@ button.side-cap.page-cap {
   color: rgba(255, 255, 255, 0.62);
 }
 
+/* ---------- 三级菜单 ----------
+   结构：分组标题（一级）→ .side-node 上级节点（二级，可展开，不导航）→ .side-sub 内页面（三级）。
+   二级与一级的视觉区别：二级带图标、正文色、右侧 chevron；一级是不带图标的灰色小标题。
+   三层都不换字体大小，只靠「图标有无 + 缩进竖线 + 颜色深浅」区分——深色侧栏上字号差 1px 看不出来，
+   但缩进一眼就能认。 */
+.side-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--sidebar-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.side-node:hover {
+  background: var(--sidebar-hover);
+  color: #dfe6f3;
+}
+/* 子项激活时父项只提亮文字 + 图标，**不给整块底色**：
+   父项和子项同时铺深蓝底，看不出「我现在在哪一页」，只剩两块一样亮的方块。 */
+.side-node.active {
+  color: #fff;
+}
+.side-node.active .side-ico {
+  color: #6f9cff;
+}
+.side-node .tree-toggle {
+  margin-left: auto;
+  opacity: 0.55;
+}
+
+.side-sub {
+  position: relative;
+  margin: 1px 0 5px;
+  padding-left: 10px;
+}
+/* 层级竖线：从二级图标正下方垂下，等于把子项「挂在」父项图标上。
+   颜色比 --sidebar-line（0.07）略提——那条线是分组的横向分隔线，7% 在深底上够用；
+   竖线是唯一的结构提示，太淡就白写了。
+   ⚠️ `left` 必须落在子项行的盒子**之外**（`.side-link` 从 18px 起）：压在行内的 1px 线
+   会被 hover / active 的底色整段盖掉，表现为「有的行有线、有的行没有」。 */
+.side-sub::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 3px;
+  bottom: 3px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+/* 缩进量按「与父项文字左对齐」反算：父项文字起点 = 侧栏 8 + 行内 10 + 图标 18 + 间距 10 = 46，
+   子项容器从 8 + 本行 padding 28 起来正好齐平。
+   ⚠️ 别照抄「缩进 16px」这种拍脑袋值——那会让三级文字比二级**更靠左**，层级看起来是倒的。 */
+.side-link.sub {
+  padding: 6px 10px 6px 28px;
+  margin-bottom: 1px;
+}
+.side-link.sub .side-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+/* 三级激活态靠底色 + 白字，去掉左侧竖条：竖条会与层级线并排成两根，
+   在 232px 的侧栏里挤成一团。 */
+.side-sub .side-link.active::before {
+  display: none;
+}
+
 .sidebar-foot {
   flex: 0 0 auto;
   padding: 10px 14px 14px;
@@ -234,6 +311,19 @@ button.side-cap.page-cap {
   justify-content: center;
   padding: 9px 0;
 }
+/* 图标态只剩 18px 图标，子菜单无处安放：
+   隐藏 chevron 与子项；点二级节点时组件会先恢复侧栏宽度（见 ConsoleShell.clickBranch），
+   否则表现为「点了图标什么都没发生」。 */
+.shell.collapsed .side-node {
+  justify-content: center;
+  padding: 9px 0;
+}
+.shell.collapsed .side-node .tree-toggle {
+  display: none;
+}
+.shell.collapsed .side-sub {
+  display: none;
+}
 .shell.collapsed .side-link.active::before {
   left: 0;
 }
@@ -265,7 +355,7 @@ button.side-cap.page-cap {
   gap: 14px;
   height: var(--header-h);
   flex-shrink: 0; /* flex 列布局内禁止被挤压：短视口页面不得压缩 header */
-  padding: 0 18px;
+  padding: 0 20px;
   background: color-mix(in srgb, var(--panel) 88%, transparent);
   backdrop-filter: saturate(180%) blur(10px);
   border-bottom: 1px solid var(--line);
@@ -418,7 +508,7 @@ button.side-cap.page-cap {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 26px;
+  height: 28px; /* 与语言选择/图标按钮同高（同为 antd 控件 28px） */
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -434,15 +524,15 @@ button.side-cap.page-cap {
 .role-chip {
   display: inline-flex;
   align-items: center;
-  height: 22px;
+  height: 24px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--primary-soft);
   color: var(--primary);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+  /* 徽标内容多为中文（管理员/审批人），mono + 0.1em 字距会把三个字拆开 */
+  letter-spacing: 0.02em;
 }
 
 .user-chip {
@@ -465,7 +555,7 @@ button.side-cap.page-cap {
   font-size: 11px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #2f6ae5, #5b4bd8);
+  background: var(--primary); /* 同侧栏品牌块：去掉蓝紫渐变，全站只用 --primary */
 }
 .user-meta {
   display: flex;
@@ -477,8 +567,8 @@ button.side-cap.page-cap {
   font-weight: 600;
 }
 .user-meta small {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
+  /* 这一行是中文角色名（超级管理员），原来 9.5px + 等宽字体，实际读不出来 */
+  font-size: 10.5px;
   color: var(--muted);
 }
 
@@ -488,11 +578,13 @@ button.side-cap.page-cap {
   min-height: 0;
   overflow-y: auto;
   width: 100%;
-  max-width: none;
+  /* 超宽屏上限：此前 none，1920 下表格被拉到 1660，列宽全靠均分；
+     1680 之后居中，左右留白而不是继续稀释信息密度 */
+  max-width: 1680px;
   margin: 0 auto;
   /* ⚠️ 顶部不得加 padding：sticky 约束矩形按滚动容器 padding 内缩，
      会把吸顶左列钉在裁切线之下（与右列顶部错位）。初始间距由 .page 自己给 */
-  padding: 0 14px 20px;
+  padding: 0 20px 24px;
   /* flex 纵向链：.page 撑满可视高度，.split 再撑满 .page——页面不再在 footer 前留大白条 */
   display: flex;
   flex-direction: column;
@@ -503,11 +595,11 @@ button.side-cap.page-cap {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 20px;
+  padding: 9px 20px;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.02em;
 }
 .footer .dot {
@@ -517,15 +609,18 @@ button.side-cap.page-cap {
   background: var(--line-strong);
 }
 
-/* ---------- 页签栏（tags-view） ---------- */
+/* ---------- 页签栏（tags-view） ----------
+   下划线式页签：纯文字签 + 滑动的 2px 主色下划线（贴住栏底分隔线）。
+   相比色染胶囊：去块面、只留一条线——切换页面的「重量感」更轻，
+   与内容区扁平语言一致；几何测量与滑动动画都在 TabStrip.tsx，这里只管皮。 */
 .tabbar {
   display: flex;
-  align-items: center;
+  align-items: stretch; /* 滚动区/轨道/签都吃满栏高，下划线才有贴底落点 */
   gap: 2px;
-  height: 38px;
-  flex: 0 0 38px;
+  height: 40px;
+  flex: 0 0 40px;
   padding: 0 8px;
-  background: var(--panel); /* 与内容区同色：扁平，仅靠底部分隔线分界，色染签才有干净落点 */
+  background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
 
@@ -534,6 +629,7 @@ button.side-cap.page-cap {
   width: 24px;
   height: 24px;
   flex: 0 0 24px;
+  align-self: center;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -553,14 +649,13 @@ button.side-cap.page-cap {
   transform: rotate(180deg);
 }
 
-/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之）；顶部留白给右上角关闭徽标探出 */
+/* 滚动区：横向滚动但隐藏滚动条（左右箭头取代之） */
 .tabbar-scroll {
   flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  padding: 5px 8px 0 4px;
 }
 .tabbar-scroll::-webkit-scrollbar {
   display: none;
@@ -570,25 +665,25 @@ button.side-cap.page-cap {
 .tab-track {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
   width: max-content;
   min-width: 100%;
 }
 
-/* 滑动色染签：激活态 = 主题色淡染圆角矩形 + 内描边发丝线。
-   无外投影、无描边框——扁平克制，高级感来自色彩而非阴影堆砌；
-   从上一个签平滑滑来（ease-out-quint） */
+/* 滑动下划线：激活签底部一条 2px 主色线，贴住栏的分隔线。
+   签间距用 margin 而非 padding——指示器量的是 offsetWidth（不含 margin），
+   线宽正好齐文字内容，不会被两侧空白拉长 */
 .tab-indicator {
   position: absolute;
-  top: 0;
+  top: auto;
   bottom: 0;
   left: 0;
+  height: 2px;
   width: 0;
-  border-radius: 8px;
-  background: var(--primary-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
+  border-radius: 1px 1px 0 0;
+  background: var(--primary);
   opacity: 0;
   pointer-events: none;
 }
@@ -600,28 +695,24 @@ button.side-cap.page-cap {
     width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* 页签 chip：幽灵签——无边框无底色，仅文字；等宽 100px；
-   激活态由滑动胶囊承载（文字变色加重即可），相对定位承载右上角关闭徽标 */
+/* 页签：纯文字签（间距走 margin，见 .tab-indicator 注）；
+   激活态 = 文字主色加重 + 下划线滑到脚下，不再有任何块面底色 */
 .tab-item {
   position: relative;
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 10px;
-  width: 100px;
-  flex: 0 0 100px;
-  border-radius: 8px; /* 与选中态色染签同形（999px 全圆胶囊会与 8px 指示器不一致） */
-  font-size: var(--fs-xs);
+  padding: 0 2px;
+  margin: 0 10px;
+  max-width: 180px;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
 .tab-item:not(.active):hover {
-  background: var(--panel-3);
   color: var(--text);
 }
 .tab-item.active {
@@ -637,34 +728,40 @@ button.side-cap.page-cap {
   text-align: center;
 }
 
-/* 关闭徽标：骑在右上角的小圆钮（Chrome 页签风格）；悬停所在签时浮现。
-   必须完整重置全局 button 的蓝底白字，否则图标被色块吞掉 */
+/* 关闭钮：行内小圆钮（不再骑在签角上——浮动徽标是胶囊态的遗产，
+   下划线态里角上悬个圆点显乱）。平时隐藏，悬停所在签时浮现；
+   始终占位，浮现/隐藏不引起签宽抖动 */
 .tab-x {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  z-index: 2;
-  width: 15px;
-  height: 15px;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: 5px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line-strong);
+  border: 0;
   border-radius: 50%;
-  background: var(--panel);
+  background: none;
   color: var(--text-2);
-  box-shadow: 0 1px 3px rgba(13, 22, 38, 0.15);
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-.tab-item:hover .tab-x {
+.tab-item:hover .tab-x,
+.tab-item .tab-x:focus-visible {
   opacity: 1;
 }
 /* 三段类名压过全局 button:hover:not(:disabled) 的 (0,2,1) */
 .tab-item .tab-x:hover {
   background: var(--panel-3);
   color: var(--text);
+}
+/* 固定签没有关闭钮：补一个等宽占位，文字保持居中、与可关签节奏一致 */
+.tab-item.pinned::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 16px;
+  margin-left: 5px;
 }
 
 /* 页签右键菜单：跟随鼠标的固定定位浮层（关闭标签页 / 关闭其它 / 关闭右侧 / 关闭全部） */
@@ -727,6 +824,22 @@ button.side-cap.page-cap {
   .shell.collapsed .side-link {
     justify-content: flex-start;
     padding: 8px 10px;
+  }
+  /* 窄屏侧栏是抽屉、宽度足够，图标态的那些「隐藏」必须在媒体查询里还原，
+     否则抽屉里的三级菜单打不开。三级缩进也要补回来：上面的
+     `.shell.collapsed .side-link`（特异性 0,3,0）会盖掉 `.side-link.sub`（0,2,0）。 */
+  .shell.collapsed .side-link.sub {
+    padding: 6px 10px 6px 28px;
+  }
+  .shell.collapsed .side-node {
+    justify-content: flex-start;
+    padding: 8px 10px;
+  }
+  .shell.collapsed .side-node .tree-toggle {
+    display: inline-flex;
+  }
+  .shell.collapsed .side-sub {
+    display: block;
   }
   .shell.collapsed .side-link.active::before {
     left: -8px;
@@ -808,7 +921,7 @@ button.side-cap.page-cap {
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #fff;
-  background: linear-gradient(135deg, #2f6ae5, #5b4bd8);
+  background: var(--primary); /* 同侧栏品牌块：去掉蓝紫渐变，全站只用 --primary */
 }
 .sso-relay-id {
   display: flex;

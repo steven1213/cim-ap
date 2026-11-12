@@ -52,9 +52,7 @@ export interface SsoRelayProps {
   busy?: boolean;
   /** 卡片内的附加内容：错误提示、重试按钮、DEV 预览区等。 */
   children?: ReactNode;
-}
-
-/**
+}/**
  * SSO 中继页外壳：整页居中的一张小卡片。
  *
  * <p><b>不用控制台侧栏那套 `.brand-title` / `.brand-sub`</b>：它们的文字色是为深色侧栏定的
@@ -89,4 +87,108 @@ export function SsoRelay({ mark, brand, brandSub, label, hint, busy = true, chil
       </div>
     </div>
   );
+}
+
+// ─────────────────────────────── RP 绑定 ───────────────────────────────
+//
+// 上面三个是「怎么拼 URL / 怎么跳」，下面这个是「一个 ap 作为 RP 需要的那一整套」。
+//
+// 为什么还要这一层：`rms` / `approval` / `mds` 各写了一份 `lib/sso.ts`，里面除了
+// `ssoLoginUrl`（已在上面的纯函数里）还有 `idpLogout`（RP-initiated logout）与
+// `callbackUrl`——那部分逐字节相同却各留一份。`approval` 的注释甚至写着「已收进
+// `@cim/shell`」，而实际上登出逻辑还在本地，**注释比代码乐观**。三份登出＝三个出错点，
+// 而登出错了不会有人报障（令牌在有效期内仍可用，用户只是"以为"退出了）。
+
+/** 本 ap 在 SSO 里的三个地址与一处吊销能力。 */
+export interface SsoBinding {
+  /** 写进 `/login?app=` 的接入码（**只用于登录页标识，不是准入码**）。 */
+  app: string;
+  /** IdP 基址。 */
+  iamBase: string;
+  /** 登录成功后的回跳地址（本 ap 的回调页）。 */
+  callbackUrl(): string;
+  /** IAM 统一登录页地址。 */
+  loginUrl(app?: string): string;
+  /** 整页跳转到 IAM 统一登录页。 */
+  redirect(app?: string): void;
+  /** 请求 IdP 吊销当前会话；返回值表示 IdP 是否确认（网络/CORS 失败为 `false`）。 */
+  idpLogout(accessToken: string | null, refreshToken: string | null): Promise<boolean>;
+}
+
+export interface SsoBindingOptions {
+  /** 应用接入码，如 `RMS` / `APPROVAL` / `MDS`。 */
+  app: string;
+  /** 回跳路径，默认 `/sso`（IAM 自己是 `/sso-callback`）。 */
+  callbackPath?: string;
+  /** IdP 基址；缺省按 `VITE_IAM_LOGIN_BASE` → `VITE_IAM_BASE` → `http://localhost:8081` 解析。 */
+  iamBase?: string;
+}
+
+/**
+ * 解析 IdP 基址。
+ *
+ * <p>`import.meta.env` 在包里按 `@cim/ui` 的既有写法取（不强依赖 vite/client 类型）：
+ * 本包是**源码直引**，env 由引用它的应用在构建时静态替换，所以读到的就是各 ap 自己的配置。</p>
+ */
+export function resolveIamBase(): string {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  return env.VITE_IAM_LOGIN_BASE || env.VITE_IAM_BASE || 'http://localhost:8081';
+}
+
+/**
+ * 建一个 ap 的 SSO 绑定。
+ *
+ * <pre>{@code
+ * // app/src/lib/sso.ts —— 应用侧只剩这一行
+ * export const sso = createSsoBinding({ app: 'MDS' });
+ * }</pre>
+ */
+export function createSsoBinding(options: SsoBindingOptions): SsoBinding {
+  const { app, callbackPath = '/sso', iamBase = resolveIamBase() } = options;
+
+  const binding: SsoBinding = {
+    app,
+    iamBase,
+
+    callbackUrl: () => `${window.location.origin}${callbackPath}`,
+
+    loginUrl: (override) => ssoLoginUrl({ iamBase, app: override ?? app, callbackUrl: binding.callbackUrl() }),
+
+    redirect: (override) => {
+      window.location.assign(binding.loginUrl(override));
+    },
+
+    /**
+     * 请求 IdP 吊销当前会话（RP-initiated logout）。
+     *
+     * <p>⚠️ 登出必须回 IdP，不能只在本地「清一下 localStorage 就算登出」——那样
+     * accessToken/refreshToken 在有效期内仍然可用，属于典型的生产缺陷。</p>
+     *
+     * <p>同时带 accessToken（供 IAM 取 `jti`/`ver` 做黑名单或版本踢出）与 refreshToken，
+     * 并以 `credentials: 'include'` 让 IAM 能清掉 SSO 会话 Cookie——不带这个凭据，
+     * 服务端只会吊销令牌、SSO 会话还挂着，用户「换账号」时会被秒登回原账号。跨域要求
+     * IAM 侧 `cim.iam.web.allowed-origins` 含本 console 源且 CORS 开 allow-credentials。</p>
+     *
+     * <p>失败（网络不可达 / CORS 未放行）返回 `false` 而不抛：本地登出不能被 IdP 阻塞，
+     * 但调用方要知道服务端未确认吊销，否则「点了退出、令牌还有效」不会被任何人发现。</p>
+     */
+    async idpLogout(accessToken, refreshToken) {
+      try {
+        const resp = await fetch(`${iamBase}/api/v1/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ refreshToken }),
+          credentials: 'include',
+        });
+        return resp.ok;
+      } catch {
+        return false;
+      }
+    },
+  };
+
+  return binding;
 }

@@ -87,6 +87,26 @@ export interface DataTableProps<T> {
 
   emptyTitleKey?: string;
   emptyHintKey?: string;
+  /**
+   * 表格标题（i18n key / 已翻译文本）。
+   *
+   * <p>为什么放在组件里：此前「标题 + 表格」的做法是外层包一个 `<Panel titleKey flush>`，
+   * 而 DataTable 自己也有一行工具栏 → **两层头**（标题行 + 只有右侧「共 n / 刷新」的空行）。
+   * 传 `titleKey` 后计数/刷新/列设置并入标题行右侧，工具栏只在有动作/搜索时才出现。</p>
+   */
+  titleKey?: string;
+  title?: ReactNode;
+  /** 标题下方的小号说明。 */
+  subKey?: string;
+  sub?: ReactNode;
+  /**
+   * 标题行右侧的动作（如「查看全部」链接）。
+   *
+   * <p>与 `actions` 的区别：`actions` 在工具栏左侧（新建/导入这类**操作表格**的按钮），
+   * `headActions` 在标题行右侧（跳转到其它页面的入口）。此前这类入口只能靠
+   * `<Panel title actions>` 外包一层，于是又回到「标题行 + 空工具栏行」的两层头。</p>
+   */
+  headActions?: ReactNode;
   sticky?: boolean;
   size?: 'small' | 'middle';
   /** 横向滚动；列多且固定宽度时传 'max-content'。 */
@@ -153,6 +173,11 @@ export function DataTable<T>(props: DataTableProps<T>) {
     onSortChange,
     emptyTitleKey,
     emptyHintKey,
+    titleKey,
+    title,
+    subKey,
+    sub,
+    headActions,
     sticky = false,
     size = 'small',
     scrollX,
@@ -222,10 +247,17 @@ export function DataTable<T>(props: DataTableProps<T>) {
   const total = pagination?.total ?? rows.length;
   const selectedCount = selectedKeys?.length ?? 0;
 
-  const hasToolbar = !!actions || !!search || !!onRefresh || (!!settingsKey && columns.length > 1);
+  // 表格自带的标题头（替代外层 `<Panel titleKey>`，见 props 注释）
+  const headTitle = titleKey ? label(titleKey, titleKey) : title;
+  const headSub = subKey ? label(subKey, subKey) : sub;
+  const hasHead = !!(headTitle || headSub);
+
+  // 右侧工具（计数 / 刷新 / 列设置）：有标题头就并进头部，没有再单占一行工具栏
+  const hasRightTools = !!onRefresh || (!!settingsKey && columns.length > 1);
+  const hasToolbar = !!actions || !!search || (!hasHead && hasRightTools);
 
   const countNode =
-    showCount && hasToolbar ? (
+    showCount && (hasHead || hasToolbar) ? (
       <span className="cim-toolbar-count">
         {onSelectionChange && selectedCount > 0
           ? `${label('ui.table.selected', '已选')} ${selectedCount} / ${
@@ -321,34 +353,55 @@ export function DataTable<T>(props: DataTableProps<T>) {
     />
   );
 
+  // 工具栏与表体在**同一个** .panel 内：此前工具栏在面板外、直接坐在页面底色上，
+  // 于是「搜索框 + 共 n / 刷新」是一条无框的悬浮行，下面才开始一张白卡；
+  // 且工具栏 14px 内边距与单元格 12px 不一致，控件左缘比表头文字多缩进 2px。
+  // 现在共用一张卡：工具栏在卡内、带底部分隔线，内边距与单元格对齐。
   return (
     <div className={'cim-datatable' + (flat ? ' is-flat' : '')}>
-      {hasToolbar ? (
-        <div className="cim-toolbar">
-          <div className="cim-toolbar-left">
-            {actions}
-            {searchNode}
-          </div>
-          <div className="cim-toolbar-spacer" />
-          <div className="cim-toolbar-right">
-            {countNode}
-            {refreshNode}
-            {settingsNode}
-          </div>
-        </div>
-      ) : null}
+      <div className="panel">
+        {hasHead ? (
+          <header className="panel-head">
+            <div className="panel-heading">
+              {headTitle ? <h2 className="panel-title">{headTitle}</h2> : null}
+              {headSub ? <p className="panel-sub">{headSub}</p> : null}
+            </div>
+            <div className="panel-actions">
+              {headActions}
+              {countNode}
+              {refreshNode}
+              {settingsNode}
+            </div>
+          </header>
+        ) : null}
 
-      {error ? (
-        <div className="cim-datatable-error" role="alert">
-          <span className="cim-datatable-error-msg">{error}</span>
-          {onRetry ? (
-            <Button size="small" danger onClick={onRetry}>
-              {label('ui.table.retry', '重试')}
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="panel">
+        {hasToolbar ? (
+          <div className="cim-toolbar">
+            <div className="cim-toolbar-left">
+              {actions}
+              {searchNode}
+            </div>
+            <div className="cim-toolbar-spacer" />
+            {hasHead ? null : (
+              <div className="cim-toolbar-right">
+                {countNode}
+                {refreshNode}
+                {settingsNode}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="cim-datatable-error" role="alert">
+            <span className="cim-datatable-error-msg">{error}</span>
+            {onRetry ? (
+              <Button size="small" danger onClick={onRetry}>
+                {label('ui.table.retry', '重试')}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
           <Table<T>
             size={size}
             columns={antdColumns}
@@ -396,8 +449,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
                 : false
             }
           />
-        </div>
       )}
+      </div>
     </div>
   );
 }

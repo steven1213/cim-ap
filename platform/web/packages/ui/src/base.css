@@ -60,3 +60,58 @@ code,
   background: var(--muted);
   background-clip: content-box;
 }
+
+/* ---------- 表单控件基线 ----------
+   原生 input/select/textarea 的外观。**必须在平台层**：IAM / RMS / approval 三份
+   `styles.css` 里曾是逐字节相同的三段，MDS 新建时漏抄 → 它的语言下拉（`.lang-select`
+   只补宽高与箭头定位，外观全靠这里）渲染成系统原生控件：白底直角、Windows 灰箭头、
+   下拉列表蓝底高亮，和另外三个应用完全不是一套东西。
+   ⚠️ 与 antd 共存是安全的：antd 走 `.ant-input` / `.ant-select` 类选择器（特异性更高），
+   不会被元素选择器盖掉——三端这样共存已久。 */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+input:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--ring);
+}
+input:disabled {
+  background: var(--panel-3);
+  color: var(--muted);
+}
+/* 原生 select 的箭头：两层 45° 渐变拼出的「下三角」，纯 CSS 不引图。
+   垂直定位 14px 是按上面的 padding + 字号算的基线值；紧凑档（`.lang-select`）
+   在 shell.css 里按自身高度重算。 */
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+}
+input.mono {
+  font-family: var(--font-mono);
+}

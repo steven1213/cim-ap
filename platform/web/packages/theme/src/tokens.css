@@ -23,6 +23,8 @@
   --fs-base: 13px;
   --fs-md: 14px;
   --fs-lg: 16px;
+  --fs-title: 18px; /* 页面标题：20px 在 13px 正文旁像营销页，压到 18px */
+  --fs-metric: 19px; /* 指标数值：需显著大于正文、又小于标题 */
   --fs-xl: 20px;
 
   /* 中性色（浅色） */
@@ -63,8 +65,8 @@
   --header-h: 56px;
   --sidebar-w: 232px;
   --sidebar-w-collapsed: 64px;
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 6px; /* 面板级：8px 起每张卡都像「模板卡片」，收到 6px */
+  --radius-sm: 4px; /* 控件级：按钮/输入/标记，与面板拉出层级差 */
 
   --shadow-sm: 0 1px 2px rgba(13, 22, 38, 0.05);
   --shadow-md: 0 8px 24px -14px rgba(13, 22, 38, 0.24);
@@ -137,6 +139,8 @@ html[data-theme='dark'] {
   --fs-md: 13px;
   --fs-lg: 15px;
   --fs-xl: 18px;
+  --fs-title: 16px;
+  --fs-metric: 17px;
   --cim-hit: 24px;
   --cim-row-h: 28px;
 }
@@ -149,6 +153,8 @@ html[data-theme='dark'] {
   --fs-md: 17px;
   --fs-lg: 19px;
   --fs-xl: 24px;
+  --fs-title: 22px;
+  --fs-metric: 23px;
   --cim-hit: 40px;
   --cim-row-h: 52px;
 }

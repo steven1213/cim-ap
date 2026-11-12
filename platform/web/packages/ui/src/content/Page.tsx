@@ -67,7 +67,9 @@ export function Panel({
   actions,
   flush = false,
 }: {
-  children: ReactNode;
+  /** 不传时只渲染头部 —— 用于「标题 + 右侧动作」这类**一条**（如概览页的常用入口），
+      此前只能塞一个空 `<Toolbar/>` 进去，于是多出一行 16px 内边距的空区块。 */
+  children?: ReactNode;
   className?: string;
   style?: CSSProperties;
   titleKey?: string;
@@ -94,7 +96,9 @@ export function Panel({
           {actions ? <div className="panel-actions">{actions}</div> : null}
         </header>
       ) : null}
-      <div className={cx('panel-body', flush && 'flush')}>{children}</div>
+      {children ? (
+        <div className={cx('panel-body', flush && 'flush')}>{children}</div>
+      ) : null}
     </section>
   );
 }
