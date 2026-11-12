@@ -4,6 +4,7 @@ import com.cim.core.port.IdGenerator;
 import com.cim.iam.server.config.IamTokenProperties;
 import com.cim.iam.server.token.TokenIssuerService;
 import com.cim.iam.server.token.TokenIssueRequest;
+import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,8 @@ import java.util.UUID;
  * <ul>
  *   <li>签发时仅返回一次明文，库内只存 {@code SHA-256} 散列（明文不落库）；</li>
  *   <li>每次刷新轮转都会作废旧刷新令牌（防重放），并重签访问令牌（携带最新 {@code ver}）；</li>
- *   <li>校验失败（不存在 / 已作废 / 过期）统一抛 {@code noAdmission}，由全局异常映射为 403。</li>
+ *   <li>校验失败（不存在 / 已作废 / 过期）统一抛 {@code TOKEN_REVOKED}（401），
+ *       由全局异常映射为「令牌已失效，请重新登录」。</li>
  * </ul>
  */
 @Slf4j
@@ -64,14 +66,14 @@ public class RefreshTokenService {
 
     /**
      * 用刷新令牌换取新访问令牌 + 新刷新令牌（轮转）。
-     * 旧刷新令牌立即作废（防重放）。失败抛 {@code noAdmission}。
+     * 旧刷新令牌立即作废（防重放）。失败抛 {@code TOKEN_REVOKED}。
      */
     @Transactional
     public RefreshedTokens rotate(String plaintextRefreshToken) {
         RefreshToken rt = repository.findByTokenHash(hash(plaintextRefreshToken))
-                .orElseThrow(() -> BizException.noAdmission("刷新令牌无效或已失效"));
+                .orElseThrow(() -> new BizException(BizCode.TOKEN_REVOKED));
         if (rt.isRevoked() || rt.getExpiresAt().isBefore(Instant.now())) {
-            throw BizException.noAdmission("刷新令牌无效或已失效");
+            throw new BizException(BizCode.TOKEN_REVOKED);
         }
         rt.setRevoked(true);
         rt.setRevokedAt(Instant.now());

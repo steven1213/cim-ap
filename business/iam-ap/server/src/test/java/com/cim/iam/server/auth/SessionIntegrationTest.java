@@ -109,7 +109,7 @@ class SessionIntegrationTest {
         LoginResult lr2 = refresh(lr.refreshToken());
         assertThat(lr2.token()).isNotEqualTo(lr.token());
         assertThat(lr2.refreshToken()).isNotEqualTo(lr.refreshToken());
-        assertThat(refreshStatus(lr.refreshToken())).isEqualTo(HttpStatus.FORBIDDEN.value()); // 旧刷新已作废
+        assertThat(refreshStatus(lr.refreshToken())).isEqualTo(HttpStatus.UNAUTHORIZED.value()); // 旧刷新已作废
 
         // 3) 登出（携带访问令牌 + 刷新令牌）→ 200
         ResponseEntity<String> logoutResp = rest.postForEntity("/api/v1/logout",
@@ -122,8 +122,8 @@ class SessionIntegrationTest {
         // 5) 验证侧（IamTokenBlacklistChecker）现在拒绝该令牌 → 401
         assertThat(protectedStatusWithBearer(lr2.token())).isEqualTo(HttpStatus.UNAUTHORIZED.value());
 
-        // 6) 登出后，新刷新的刷新令牌也应已撤销 → 使用应 403
-        assertThat(refreshStatus(lr2.refreshToken())).isEqualTo(HttpStatus.FORBIDDEN.value());
+        // 6) 登出后，新刷新的刷新令牌也应已撤销 → 使用应 401（TOKEN_REVOKED）
+        assertThat(refreshStatus(lr2.refreshToken())).isEqualTo(HttpStatus.UNAUTHORIZED.value());
     }
 
     private LoginResult login(String username, String credential, String salt) {
@@ -140,10 +140,33 @@ class SessionIntegrationTest {
         return readLoginResult(resp.getBody());
     }
 
+    /**
+     * 读刷新端点状态码。
+     *
+     * <p><b>为什么不用 {@code TestRestTemplate}</b>：JDK 的 {@code HttpURLConnection} 收到 401、
+     * 且请求体是 chunked（无 Content-Length）时会抛
+     * 「cannot retry due to server authentication, in streaming mode」——状态码根本拿不到。
+     * 刷新令牌无效属凭证类失败（401），这条断言必须走得通，故改用 JDK {@code HttpClient}。</p>
+     */
     private int refreshStatus(String refreshToken) {
-        ResponseEntity<String> resp = rest.postForEntity("/api/v1/token/refresh",
-                jsonEntity(new RefreshRequest(refreshToken)), String.class);
-        return resp.getStatusCode().value();
+        String body;
+        try {
+            body = objectMapper().writeValueAsString(new RefreshRequest(refreshToken));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+        try {
+            java.net.http.HttpRequest req = java.net.http.HttpRequest
+                    .newBuilder(java.net.URI.create("http://localhost:" + PORT + "/api/v1/token/refresh"))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            return java.net.http.HttpClient.newHttpClient()
+                    .send(req, java.net.http.HttpResponse.BodyHandlers.ofString())
+                    .statusCode();
+        } catch (Exception e) {
+            throw new IllegalStateException("刷新端点请求失败", e);
+        }
     }
 
     /** 黑名单查询返回统一信封，这里取 data 并转成 "true"/"false" 以便断言直读。 */

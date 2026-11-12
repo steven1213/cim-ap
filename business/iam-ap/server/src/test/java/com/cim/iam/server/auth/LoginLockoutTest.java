@@ -61,11 +61,11 @@ class LoginLockoutTest {
         LoginCredentials right = new LoginCredentials("locky",
                 clientHashFor("secret", "salt-locky"), "salt-locky");
 
-        // 第 1 次错误：noAdmission，未锁定
+        // 第 1 次错误：BAD_CREDENTIALS，未锁定
         BizException e1 = assertThrows(BizException.class, () -> loginService.login(wrong));
-        assertThat(e1.getBizCode()).isEqualTo(BizCode.NO_ADMISSION);
+        assertThat(e1.getBizCode()).isEqualTo(BizCode.BAD_CREDENTIALS);
 
-        // 第 2 次错误：触发锁定（仍为 noAdmission，但已写入锁定）
+        // 第 2 次错误：触发锁定（仍为 BAD_CREDENTIALS，但已写入锁定）
         assertThatThrownBy(() -> loginService.login(wrong)).isInstanceOf(BizException.class);
 
         // 第 3 次即使口令正确也拒绝：账户已锁定

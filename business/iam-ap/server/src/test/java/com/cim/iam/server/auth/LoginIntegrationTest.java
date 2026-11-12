@@ -80,7 +80,7 @@ class LoginIntegrationTest {
     }
 
     @Test
-    void loginWrongPasswordReturnsForbidden() throws Exception {
+    void loginWrongPasswordReturnsUnauthorized() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
                 "username", "alice",
                 "credential", "wrong-client-hash"));
@@ -88,7 +88,7 @@ class LoginIntegrationTest {
         mvc.perform(post("/api/v1/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -87,13 +87,13 @@ class AdminConsoleTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
                 .andExpect(status().isOk());
 
-        // 禁用后即便口令正确也被拒（noAdmission → 403）
+        // 禁用后即便口令正确也被拒（BAD_CREDENTIALS → 401，不暴露「账号被停用」这一事实）
         String loginBody = objectMapper.writeValueAsString(Map.of(
                 "username", "victim",
                 "credential", PasswordDerivation.derive("Victim@123", salt, rounds()),
                 "clientSalt", salt));
         mvc.perform(post("/api/v1/login").contentType(MediaType.APPLICATION_JSON).content(loginBody))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

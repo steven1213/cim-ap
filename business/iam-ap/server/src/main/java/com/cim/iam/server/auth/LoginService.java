@@ -9,6 +9,7 @@ import com.cim.iam.server.token.TokenBlacklistService;
 import com.cim.iam.server.token.TokenIssueRequest;
 import com.cim.iam.server.token.TokenIssuerService;
 import com.cim.iam.server.token.TokenVersionService;
+import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -24,7 +25,7 @@ import java.util.List;
 /**
  * 登录编排（M-login + M-refresh 核心）。
  *
- * <p>流程：按 {@code cim.iam.auth.source} 选择认证源 → 认证失败抛 {@code noAdmission}
+ * <p>流程：按 {@code cim.iam.auth.source} 选择认证源 → 认证失败抛 {@code BAD_CREDENTIALS}
  * → 登录成功先 {@link TokenVersionService#bump(String) bump} 当前用户令牌版本（使旧令牌即时失效，
  * 单会话语义）→ 签发访问令牌 + 刷新令牌（刷新令牌库内仅存散列）。</p>
  *
@@ -65,7 +66,10 @@ public class LoginService {
             int remaining = accountLockService.remainingAttempts(creds.username());
             auditService.failure(AuditType.LOGIN_FAILURE, creds.username(), creds.username(),
                     "登录失败（剩余尝试 " + remaining + " 次）");
-            throw BizException.noAdmission("用户名或口令错误");
+            // 凭据不对不是「准入」问题：用 401 + BAD_CREDENTIALS，客户端才会提示
+            // 「用户名或密码错误」。此处原为 noAdmission（403/1403）——i18n 无该键时回落成
+            // 「无该应用的准入权限」，把人引去查准入配置（2026-11-12 由此倒查出来）。
+            throw new BizException(BizCode.BAD_CREDENTIALS);
         }
 
         // 登录成功：清零失败计数（解锁暴力破解防护）
