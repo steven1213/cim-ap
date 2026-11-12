@@ -1,17 +1,21 @@
 /**
- * 缺键上报：去重 + 攒批 + 有界重试。
+ * 缺键处理：dev 提示 + 去重攒批上报（有通道时）。
  *
  * <p>「缺键」= 四级兜底链全未命中（目标语言 → 默认语言 → 内置包 → humanize 之前），
- * 属**真缺口**，对应一张待翻译工单。三个约束决定了实现形态：</p>
+ * 属**真缺口**，对应一张待翻译工单。四个约束决定了实现形态：</p>
  *
  * <ol>
  *   <li>一次页面渲染会连续缺十几个键 → 必须攒批，不能一键一请求；</li>
  *   <li>同一键在一次会话里只该报一次 → 会话级去重；</li>
  *   <li>端点缺失/404 时不能每 3 秒空打一枪 → 重试有上限，超限丢弃。</li>
+ *   <li><b>{@link MissingReporterOptions.send} 可以不给</b>——纯内置包的应用（rms / approval）
+ *       没有上报端点，但**仍然需要开发态提示**。此前处理器只在有通道时才创建，
+ *       这两个应用因此连一行 warn 都没有，缺键完全静默。</li>
  * </ol>
  */
 export interface MissingReporterOptions {
-  send: (keys: string[], lang: string) => Promise<unknown>;
+  /** 上报通道；不给则只在 dev 打一行 warn（且不攒批、不重试） */
+  send?: (keys: string[], lang: string) => Promise<unknown>;
   /** 取当前语言：flush 时才取值，避免切换语言后把旧语言带上去 */
   currentLang: () => string;
   debounceMs?: number;
@@ -41,7 +45,7 @@ export function createMissingReporter(options: MissingReporterOptions): (key: st
 
   async function flush(): Promise<void> {
     timer = undefined;
-    if (pending.size === 0) return;
+    if (pending.size === 0 || !send) return;
     const keys = Array.from(pending);
     pending.clear();
     try {
@@ -65,13 +69,16 @@ export function createMissingReporter(options: MissingReporterOptions): (key: st
   return function report(key: string): void {
     // 不带点的键不报：多半是 antd/业务把 data-* 当 key 透传进来的噪音
     if (!key || !key.includes('.')) return;
+    // 生产 + 无上报通道：不记也不攒，避免 `seen` 随会话无界增长
+    if (!send && !dev) return;
     if (seen.has(key)) return;
     seen.add(key);
-    pending.add(key);
     if (dev) {
       // eslint-disable-next-line no-console
       console.warn(`[i18n] 缺失译文键：${key}`);
     }
+    if (!send) return; // 只提示，不攒批
+    pending.add(key);
     schedule();
   };
 }

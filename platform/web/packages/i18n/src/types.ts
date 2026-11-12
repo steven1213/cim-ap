@@ -32,7 +32,7 @@ export interface RemoteSource {
   loadBundle(ctx: { lang: string; version?: string }): Promise<BundlePayload | null>;
   /** 语言目录；缺省或抛错时退回 `CreateI18nOptions.locales` */
   loadLocales?(): Promise<LocaleInfo[]>;
-  /** 缺键上报；缺省则不装配 `missingKeyHandler`（也不开 `saveMissing`） */
+  /** 缺键上报；缺省则只做开发态提示（不攒批、不请求） */
   reportMissing?(keys: string[], lang: string): Promise<unknown>;
 }
 
@@ -57,7 +57,7 @@ export interface CreateI18nOptions {
   remote?: RemoteSource;
   /** 语言目录兜底（远端不可用 / 未提供 `loadLocales` 时使用） */
   locales?: LocaleInfo[];
-  /** 关掉缺键上报（即使 `remote.reportMissing` 存在）；默认开启 */
+  /** 关掉缺键**上报**（即使 `remote.reportMissing` 存在）；默认开启。不影响开发态提示 */
   missingReport?: boolean;
   /** 上报去抖，缺省 3000ms（一次页面渲染会连续缺十几个键，必须攒批） */
   missingDebounceMs?: number;
@@ -68,7 +68,12 @@ export interface CreateI18nOptions {
    * 本包不认识 axios，也不该认识。
    */
   onLanguageChange?: (lang: string) => void;
-  /** 开发态把缺键打到控制台、上报失败打 warn */
+  /**
+   * 开发态：缺键打到控制台（每键一次），且缺键占位用 `⟦key⟧` 而非 humanize。
+   *
+   * <p>为什么占位也分环境：humanize 的产物「看起来像译文」（`Desc` / `Callback failed`），
+   * 开发时反而看不出来；生产又不能让终端用户看方括号。两边要的东西不一样，只能分开。</p>
+   */
   dev?: boolean;
 }
 

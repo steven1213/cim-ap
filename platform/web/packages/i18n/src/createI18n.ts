@@ -1,7 +1,7 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { createBundleCache, createLangPreference } from './cache';
-import { humanize } from './humanize';
+import { humanize, markMissingKey } from './humanize';
 import { createMissingReporter } from './missing';
 import type { CimI18n, CreateI18nOptions, LocaleInfo } from './types';
 
@@ -14,8 +14,14 @@ import type { CimI18n, CreateI18nOptions, LocaleInfo } from './types';
  *   <li><b>默认语言</b>——`fallbackLng`。远端场景下服务端已把中文并入目标包，这一级主要
  *       兜「内置包只有中文」的应用；</li>
  *   <li><b>内置包</b>——随前端发版的 key 表，保证没有网络时界面完整；</li>
- *   <li><b>humanize(key)</b>——四级全空时的可读兜底，**绝不渲染裸 key**。</li>
+ *   <li><b>humanize(key)</b>——四级全空时的兜底，**绝不渲染裸 key**。生产用
+ *       {@link humanize}（`Toggle Theme`，对终端用户可读），开发态用
+ *       {@link markMissingKey}（`⟦rms.shell.toggleTheme⟧`，一眼可识别）——
+ *       humanize 的产物「看起来像译文」，`Desc` / `Callback failed` 这类能瞒过所有人。</li>
  * </ol>
+ *
+ * <p>缺键处理器**无条件**注册（不依赖上报通道）：发现缺口和上报工单是两件事，
+ * 纯内置包的应用没有端点，但仍然要在开发态喊出来。见 {@link createMissingReporter}。</p>
  *
  * <p>启动策略：`localStorage` 里的整包**同步**灌入（首帧就是上次的语言，不闪白）→
  * 再异步比对版本。⚠️ 缓存必须存整包，见 {@link createBundleCache}。</p>
@@ -39,15 +45,14 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
   const loaded = new Set<string>();
   let initialized = false;
 
-  const reportMissing = canReport
-    ? createMissingReporter({
-        send: (keys, lang) => remote!.reportMissing!(keys, lang),
-        currentLang: () => i18next.language || defaultLng,
-        debounceMs: missingDebounceMs,
-        retryLimit: missingRetryLimit,
-        dev,
-      })
-    : undefined;
+  const reportMissing = createMissingReporter({
+    // 没有上报端点（纯内置包应用）时只做 dev 提示，不攒批、不重试
+    send: canReport ? (keys, lang) => remote!.reportMissing!(keys, lang) : undefined,
+    currentLang: () => i18next.language || defaultLng,
+    debounceMs: missingDebounceMs,
+    retryLimit: missingRetryLimit,
+    dev,
+  });
 
   function ensureInit(): void {
     if (initialized) return;
@@ -77,15 +82,13 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
         // 远端包晚到时要触发重渲染，否则界面停在缓存版本
         bindI18nStore: 'added removed',
       },
-      saveMissing: canReport,
-      parseMissingKeyHandler: humanize,
-      ...(reportMissing
-        ? {
-            missingKeyHandler: (_lngs: readonly string[], _ns: string, key: string) => {
-              reportMissing(key);
-            },
-          }
-        : {}),
+      // 缺键处理器已无条件提供，故 saveMissing 直接开：否则 i18next 根本不回调它。
+      // 有 handler 时 i18next 不会退到 backendConnector（不会去找不存在的后端）。
+      saveMissing: true,
+      parseMissingKeyHandler: dev ? markMissingKey : humanize,
+      missingKeyHandler: (_lngs: readonly string[], _ns: string, key: string) => {
+        reportMissing(key);
+      },
       interpolation: { escapeValue: false },
       returnNull: false,
     });

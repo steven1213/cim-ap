@@ -17,7 +17,7 @@
  */
 export { createI18n } from './createI18n';
 export { createBundleCache, createLangPreference } from './cache';
-export { humanize } from './humanize';
+export { humanize, markMissingKey } from './humanize';
 export { createMissingReporter } from './missing';
 export type { MissingReporterOptions } from './missing';
 export type {

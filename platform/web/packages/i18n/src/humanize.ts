@@ -15,3 +15,17 @@ export function humanize(key: string): string {
   if (!spaced) return key;
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+/**
+ * 开发态缺键占位：把 key 原样夹进方括号，`⟦rms.shell.toggleTheme⟧`。
+ *
+ * <p>为什么两个环境用不同策略：{@link humanize} 的产物**看起来像译文**——
+ * `rms.notFound.desc` 会显示成一个孤零零的 `Desc`，`cb.event.callback_failed` 变成
+ * `Callback failed`，谁看都像「设计如此」。生产环境要这个「可读」，开发环境要「可识别」，
+ * 两者不可兼得，所以按环境分开，而不是选一个折中。</p>
+ *
+ * <p>顺带说明：dev 下 `⟦…⟧` 也提醒了「这个 key 拼得对不对」——humanize 会吃掉拼写错误。</p>
+ */
+export function markMissingKey(key: string): string {
+  return key ? `⟦${key}⟧` : '';
+}
