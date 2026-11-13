@@ -20,3 +20,159 @@
 .form-err {
   margin: 10px 0 0;
 }
+
+/* ============================================================
+   位置拓扑页（TopologyPage）：左树右详情
+   平台没有 Tree 组件；这套类只描述「缩进行 + 徽标 + 双栏布局」，
+   颜色/圆角/字号全部走平台令牌，不另起炉灶。
+   ============================================================ */
+.topo {
+  display: grid;
+  grid-template-columns: minmax(320px, 2fr) minmax(280px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.topo-tree,
+.topo-detail {
+  background: var(--panel);
+  border: 0.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  min-height: 320px;
+}
+
+.topo-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.topo-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.topo-nodes {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.topo-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--fs-sm);
+  line-height: 22px;
+}
+
+.topo-row:hover {
+  background: var(--primary-soft);
+}
+
+.topo-row.selected {
+  background: var(--primary-soft);
+  outline: 0.5px solid var(--primary);
+}
+
+.topo-row.off .topo-code,
+.topo-row.off .topo-name {
+  color: var(--muted);
+}
+
+.topo-caret {
+  display: inline-flex;
+  width: 14px;
+  justify-content: center;
+  flex: none;
+}
+
+/* 平台 IconChevron 是右箭头（树语义）：展开时转 90° 朝下 */
+.topo-caret svg {
+  transition: transform 0.15s ease;
+}
+
+.topo-caret.open svg {
+  transform: rotate(90deg);
+}
+
+.topo-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.topo-code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.topo-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topo-badge {
+  flex: none;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+}
+
+.dim-badge {
+  color: var(--muted);
+  background: var(--line);
+}
+
+.warn-badge {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.topo-empty {
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.topo-info-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-md);
+  padding: 4px 4px 10px;
+  border-bottom: 0.5px solid var(--line);
+}
+
+.topo-info-name {
+  color: var(--muted);
+}
+
+.topo-meta {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 6px 10px;
+  margin: 12px 4px;
+  font-size: var(--fs-sm);
+}
+
+.topo-meta dt {
+  color: var(--muted);
+}
+
+.topo-meta dd {
+  margin: 0;
+}
+
+.topo-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 4px;
+}

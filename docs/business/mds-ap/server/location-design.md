@@ -1,4 +1,4 @@
-# MDS-AP 位置主数据详细设计（Site / Fab / Area / Bay / SubBay）
+# MDS-AP 位置主数据详细设计（Site / Fab / Area / Bay / Stage）
 
 > 本文档为 `mds-ap` 业务域中「位置主数据」的**实现级详细设计**，承接 `docs/business/mds-ap/server/README.md` §1。
 > 同时对齐平台底座：通用数据模型（`BaseDefData` / `@History` / `cimTenantFilter` / T2.5 软删唯一约束 / 主历成对迁移），详见 `docs/platform/server/design.md` §2.1–§2.3、§6。
@@ -14,11 +14,11 @@
 | # | 问题 | 拍板结论 | 行业依据 |
 | - | ---- | -------- | -------- |
 | D1 | 层级是否固定（将来是否会冒出 SubFab/Room/Zone） | **标准五层 + `level` 枚举可扩展**；EQUIPMENT 不进入位置层级。新增层级只需加枚举值 + 闭包，不动表结构 | SEMI E148 设备层级、MES 工厂拓扑通用建模 |
-| D2 | Area 语义（工艺域 / 物理区 / 两者） | **AREA = 工艺/功能域**（Litho/Etch/…），物理落位由 BAY/SUBBAY 表达；Area 管「工艺归类」，Bay 管「物理落位」 | SEMI process area 与物理 bay 分离；晶圆厂现实（一工艺跨多物理区） |
+| D2 | Area 语义（工艺域 / 物理区 / 两者） | **AREA = 工艺/功能域**（Litho/Etch/…），物理落位由 BAY/STAGE 表达；Area 管「工艺归类」，Bay 管「物理落位」 | SEMI process area 与物理 bay 分离；晶圆厂现实（一工艺跨多物理区） |
 | D3 | 严格单父树还是多父 | **严格单父树**（每节点恰一父，SITE 为根）。跨区服务用独立「能力/分配」关联实体，不破坏树 | 向上 rollup（产能/在制/良率）与权限推演需无歧义 |
 | D4 | 是否需要 SCD2 生效日期 | **需要轻量 SCD2**：`effective_from` / `effective_to` + `status`。独立于 `@Version` 行锁与 `revision` 业务版本，也独立于 `{X}Hist` 变更审计流水 | 工厂拓扑随时间变更（Bay 重划、Area 更名、产线关停） |
 | D5 | code 唯一范围与编码规则 | **code 同租户全局唯一**（非仅兄弟唯一）；遵循 T2.5 软删唯一 `(code, tenant_id, deleted)`。推荐分层点分码规则（见 §3.4） | 位置 code 被 MES 派工/EAP/报表直接引用为自然键，全局唯一最稳 |
-| D6 | 机台与位置关系（谁管、搬迁轨迹用历史表还是事件表） | **设备由 MDS 主数据管理**，`mds_equipment.location_id` 指向 BAY/SUBBAY；**搬迁轨迹复用 `@History(SNAPSHOT)` → `mds_equipment_hist`**，可选叠加 `mds_equipment_move_event` 承载业务上下文 | 平台 M3 已落地快照历史，避免重复造轮子 |
+| D6 | 机台与位置关系（谁管、搬迁轨迹用历史表还是事件表） | **设备由 MDS 主数据管理**，`mds_equipment.location_id` 指向 BAY/STAGE；**搬迁轨迹复用 `@History(SNAPSHOT)` → `mds_equipment_hist`**，可选叠加 `mds_equipment_move_event` 承载业务上下文 | 平台 M3 已落地快照历史，避免重复造轮子 |
 
 ---
 
@@ -27,9 +27,9 @@
 ### 1.1 标准五层位置层级
 
 ```
-SITE ──> FAB ──> AREA ──> BAY ──> SUBBAY
+SITE ──> FAB ──> AREA ──> BAY ──> STAGE
                               │
-                              └──> EQUIPMENT（独立主数据，挂在 BAY/SUBBAY 上，非位置层级）
+                              └──> EQUIPMENT（独立主数据，挂在 BAY/STAGE 上，非位置层级）
 ```
 
 | 层级 | 含义 | 典型示例 | 关键属性 |
@@ -38,7 +38,7 @@ SITE ──> FAB ──> AREA ──> BAY ──> SUBBAY
 | `FAB` | 单一制造厂 / 晶圆厂建筑 | `F1` / `F2` / `C1` | fab 类型（前道/后道）、洁净等级 |
 | `AREA` | **工艺/功能域**（非物理分区） | `LITH` 光刻、`ETCH` 刻蚀、`DIFF` 扩散、`CMP`、`TF` 薄膜、`IMP` 注入、`INSP` 检验、`METL` 金属化 | 工艺阶段、是否黄光区 |
 | `BAY` | 物理作业区 / 湾（Area 内的物理分组） | `B01`…`B12` | 洁净室分区、安全等级 |
-| `SUBBAY` | 子区 / 作业单元（可选更细物理分组） | `01`… | 工具簇、缓冲区 |
+| `STAGE` | 子区 / 作业单元（可选更细物理分组） | `01`… | 工具簇、缓冲区 |
 | `EQUIPMENT` | 机台（独立主数据，不属位置层级） | `TK0001` | 型号、厂商、序列号、`location_id` |
 
 ### 1.2 关键语义澄清（D2）
@@ -46,8 +46,9 @@ SITE ──> FAB ──> AREA ──> BAY ──> SUBBAY
 - **AREA 是「工艺归类」，BAY 是「物理落位」**。同一工艺 AREA 可跨多个物理 BAY（例如光刻区分布在多个洁净室分区）；一个 BAY 内也可混排不同工艺（共享/通用区域）。二者解耦后，派工按 Area、物理寻址按 Bay，互不绑架。
 
 > **闭环下游**：工艺路线 `mds_route_operation.area_code` 引用 AREA（见 [route-design.md](route-design.md) §3.3），使 route 工序在设计期即落点工艺域；与 `mds_equipment_capability.area_code`（[设备设计 §3.7](equipment-design.md)）同源，保证「工序想做的工艺」与「设备能服务的工艺」一致。
-- **SUBBAY 为可选层**：多数产线只用到 BAY；仅当单 Bay 内仍需细分（如工具簇、缓冲岛）时启用，不强制。
-- **存储设施（Bank/Stocker）是独立主数据**：经 `location_id` 落到本层级（通常 BAY/SUBBAY，中央库可为 FAB），**并非 `level` 值**；与 EQUIPMENT 同构（落位于位置层级、自身不是位置层级）。详见 [仓库设计 bank-design.md](bank-design.md)。
+- **STAGE 为可选层**：多数产线只用到 BAY；仅当单 Bay 内仍需细分（如工具簇、缓冲岛）时启用，不强制。
+- **第五层定名 STAGE（2026-11-13 修订，原 SUBBAY）**：行业位置树惯用「Site → Fab → Area → Bay → Stage（设备位）」，设备落在 Stage（或无细分的 Bay）。**Module 不是位置层**——SEMI E157/E120 语境里 Module = 设备内部的工艺腔（Process Module，如 PM 腔 / Load Lock），属 `Equipment → Module` 设备域层级；MDS 位置树不得引入 Module，避免与设备域将来引入的工艺腔 Module 撞名。
+- **存储设施（Bank/Stocker）是独立主数据**：经 `location_id` 落到本层级（通常 BAY/STAGE，中央库可为 FAB），**并非 `level` 值**；与 EQUIPMENT 同构（落位于位置层级、自身不是位置层级）。详见 [仓库设计 bank-design.md](bank-design.md)。
 - **EQUIPMENT 不进入位置层级**：设备是带生命周期、型号、状态的企业级主数据，与「位置拓扑」正交。设备与位置通过 `equipment.location_id` 关联，而非作为位置树的叶子。
 
 ---
@@ -84,7 +85,7 @@ mds_location.clean_class_code ──> mds_clean_class(code)   (洁净等级，�
 | -- | ---- | ---- | ---- |
 | `id` | VARCHAR(32) | PK | 平台 `IdGenerator`（雪花/UUIDv7） |
 | `tenant_id` | VARCHAR(32) | NOT NULL | 租户（来自 `Auditable`） |
-| `level` | VARCHAR(16) | NOT NULL | 枚举：`SITE`/`FAB`/`AREA`/`BAY`/`SUBBAY` |
+| `level` | VARCHAR(16) | NOT NULL | 枚举：`SITE`/`FAB`/`AREA`/`BAY`/`STAGE` |
 | `code` | VARCHAR(64) | NOT NULL | 本地段编码（见 §3.4），同租户全局唯一 |
 | `name` | VARCHAR(128) | | 显示名（中/英） |
 | `parent_id` | VARCHAR(32) | NULL（SITE 为根） | 自引用 FK → `mds_location.id` |
@@ -129,7 +130,7 @@ mds_location.clean_class_code ──> mds_clean_class(code)   (洁净等级，�
 
 | 接触点 | 说明 |
 | --- | --- |
-| `mds_equipment.location_id → mds_location(id)` | 设备**当前物理位置**（落 BAY/SUBBAY）；完整字段见 [equipment-design §3.3](equipment-design.md) |
+| `mds_equipment.location_id → mds_location(id)` | 设备**当前物理位置**（落 BAY/STAGE）；完整字段见 [equipment-design §3.3](equipment-design.md) |
 | `@History(SNAPSHOT) → mds_equipment_hist` | 换 Bay 时经设备服务 `update` 自动落快照（含 `op_type`/`operator`/`op_time`/`trx_id`/`change_set_json`），**天然形成搬迁时间线** |
 
 - 设备**不从属于位置层级**（EQUIPMENT 不是 `level` 枚举值，见 D1）；`area` 不冗余存储，由 `location_id` 经闭包向上推导。
@@ -152,7 +153,7 @@ mds_location.clean_class_code ──> mds_clean_class(code)   (洁净等级，�
 
 ### 3.1 层级可扩展（D1）
 - 层级由 `level` 枚举表达，而非「每级一张表」。未来新增 `ROOM`/`ZONE`/`SUBFAB`：仅扩展枚举 + 在闭包中自然成层，**零表结构变更**。
-- 校验规则（应用层）：`SITE` 必须无父；`FAB` 父必须是 `SITE`；`AREA` 父必须是 `FAB`；`BAY` 父必须是 `AREA`；`SUBBAY` 父必须是 `BAY`。
+- 校验规则（应用层）：`SITE` 必须无父；`FAB` 父必须是 `SITE`；`AREA` 父必须是 `FAB`；`BAY` 父必须是 `AREA`；`STAGE` 父必须是 `BAY`。
 
 ### 3.2 严格单父（D3）
 - 每节点恰一 `parent_id`（SITE 为根 null）。**禁止多父**。
@@ -169,12 +170,12 @@ mds_location.clean_class_code ──> mds_clean_class(code)   (洁净等级，�
 
 ### 3.4 code 唯一性与编码规则（D5）
 - **唯一性**：`code` 同租户**全局唯一**（下游以 code 为自然键直引），约束 `(code, tenant_id, deleted)`。
-- **推荐编码（点分、段长固定、大写、数字补零）**：`{SITE}.{FAB}.{AREA}.{BAY}[.{SUBBAY}]`
+- **推荐编码（点分、段长固定、大写、数字补零）**：`{SITE}.{FAB}.{AREA}.{BAY}[.{STAGE}]`
   - SITE：2 字母（如 `SZ`/`SH`）
   - FAB：1–2 位（如 `F1`/`C1`）
   - AREA：3–4 字母工艺码（`LITH`/`ETCH`/`DIFF`/`CMP`/`TF`/`IMP`/`INSP`/`METL`）
   - BAY：字母+2 数字（`B01`）
-  - SUBBAY：可选 2 数字（`01`）
+  - STAGE：可选 2 数字（`01`）
 - `path` = `/` + 各级 code 拼接（如 `/SZ/F1/LITH/B03`），由系统在写入时物化并建唯一/索引；`code` 仅存本地段。
 - **编码生成由统一命名规则引擎驱动**：位置的点分码对应 `NamingRule` 的 `HIER` 段（沿父链拼祖先 code）+ `ATTR` 段（本层段），详细规则定义与生成时机见 [命名/编码规则设计](naming-rule-design.md)（§4.2）。
 
@@ -193,7 +194,7 @@ com.cim.mds.server
 │   ├── domain
 │   │   ├── Location.java            # @Entity 继承 BaseDefData；level=LocationLevel 枚举
 │   │   ├── LocationClosure.java      # @Entity 闭包表
-│   │   ├── LocationLevel.java        # 枚举 SITE/FAB/AREA/BAY/SUBBAY + 父级校验
+│   │   ├── LocationLevel.java        # 枚举 SITE/FAB/AREA/BAY/STAGE + 父级校验
 │   │   └── LocationRepo.java         # extends BaseRepository<Location,String>
 │   ├── service
 │   │   ├── LocationService.java      # extends AbstractJpaService<Location>
@@ -307,3 +308,69 @@ CREATE INDEX idx_closure_anc  ON mds_location_closure (ancestor_id);
 - **数据权限**（`@DataPermission(Scope.FACTORY)`）：按厂区/租户的数据行级权限接入平台 RBAC（M6）。
 - **种子数据 / 初始化**：SITE/FAB 由实施导入，Area/Bay 由工艺工程维护。
 - **T9 厂级轮廓（[99-backlog T9-5/T9-10](99-backlog.md)）**：§1.1 文案写 FAB 有「前道/后道、洁净等级」，表结构**无 `fab_type`**。**已拍板**：`fab_type` 落位（前道/后道）；**`wafer_sizes` 不落 location**——单一来源归 [OperatingProfile](operating-profile-design.md)（可 override 到设备/工序），避免与 [multi-site-design](multi-site-design.md) 双源。混线自动化挂 Area/设备，不能只挂 Fab。
+
+---
+
+## 8. 增补（2026-11-13）：编辑锁 / 表模型分叉 / 用户动线
+
+### 8.1 编辑锁（is_occupied / occupied_by / occupied_at）
+
+**语义：这是「人 vs 人」的编辑互斥锁，不是引用保护。** 防止两人同时编辑同一条主数据互相覆盖；
+「数据 vs 数据」的引用保护仍由 §3 的删除/归属校验承担，两者并存、不互替。
+
+三列加在位置五表（`cim_site` / `cim_fab` / `cim_area` / `cim_bay` / `cim_stage`）：
+
+| 列 | 类型 | 说明 |
+| -- | ---- | ---- |
+| `is_occupied` | BOOLEAN NOT NULL DEFAULT FALSE | 该条正被某人编辑 |
+| `occupied_by` | VARCHAR(64) NULL | 占用者账号（IAM username） |
+| `occupied_at` | TIMESTAMP NULL | 抢锁时间（超时判定依据） |
+
+**生命周期与规则：**
+
+| 环节 | 规则 |
+| ---- | ---- |
+| 点「编辑」 | 先原子抢锁：`UPDATE {表} SET is_occupied=1, occupied_by=:user, occupied_at=:now WHERE id=:id AND deleted=0 AND (is_occupied=0 OR occupied_by=:user OR occupied_at < :expire)`。影响行数=0 → 返回当前占用者，前端提示「{占用者} 正在编辑」不进表单 |
+| 占用者本人 | 再次打开/继续编辑**放行**（刷新 `occupied_at`） |
+| 保存成功 | 清锁与数据保存**同一事务**：`is_occupied=0, occupied_by=NULL, occupied_at=NULL` |
+| 取消/关闭弹窗 | 前端显式调释放接口（按 `occupied_by` 条件释放，只清自己的锁） |
+| 异常残留 | `occupied_at` 超过阈值（默认 30 分钟，可配）视为过期，他人可抢锁覆盖；管理员可强制解锁（走同一释放接口、跳过 `occupied_by` 条件） |
+| 删除 | 同样先判锁：被他人占用的记录拒绝删除（本人可删，记录消失锁随之消失） |
+| 保存兜底 | 服务层校验 `occupied_by` 仍是本人 + `@Version` 乐观锁双保险，防「锁被抢后旧窗口覆盖」 |
+
+实现形态：MDS 域内 `@MappedSuperclass EditLockDefData extends BaseDefData`（三列统一），抢锁/释放用
+JdbcTemplate 对五表统一实现（表名白名单），不污染平台基类。
+
+### 8.2 表模型分叉说明（实现 vs 本文 §2）
+
+本文 §2 的权威模型是 `mds_location` 单表 + `parent_id` + 闭包表。**当前 MDS 实现采用每层一表**
+（`cim_site` → `cim_fab` → `cim_area` → `cim_bay` → `cim_stage`，编码逻辑引用、不建物理 FK），分叉理由：
+
+1. 各层特有属性是强类型列（Fab 的 `fab_type`/`amhs_type`/`clean_grade`、Area 的 `area_type`），
+   单表模型只能塞 JSON 或另开扩展表，validate 成本与查询成本都更高。
+2. 6 英寸厂层级固定五层、数据量小（Site/Fab 个位数、Area/Bay/Stage 数十到数百），
+   闭包表的递归查询收益不存在，沿编码链向上走即可。
+3. 层间引用校验、引用保护（删上层先数下游）在应用层实现——跨域逻辑引用本就无 DB FK 可依。
+
+**约束沿用本文口径**：编码唯一范围按物理现实——`site_code` 全局唯一、`fab_code` 全局唯一、
+`area_code` Fab 内唯一、`bay_code` Fab 内唯一（物理湾道编号全厂不重复）、`stage_code` Bay 内唯一。
+本文 §2 单表模型保留为「层级扩展（加层）」时的演进目标。
+
+### 8.3 用户动线（树形拓扑页）
+
+前端收敛为**一页「位置拓扑」**（左树右详情），替代 Site/Fab/Area 三个平铺 CRUD 页：
+
+1. **进页即全貌**：左树 `Site → Fab → Area → Bay → Stage`，节点带状态徽标（停用 / 被编辑占用）。
+2. **新建从树发起**：选中节点 →「+ 下级」，父级自动带入并锁定；顶层「+ 基地」入口在工具条。
+3. **编辑先抢锁**：点「编辑」先 claim 锁——抢不到弹提示不进表单；弹窗内展示占用信息。
+4. **拦截前置**：删除 / 换归属被引用保护挡下时，确认框/弹窗内直接给出原因与下游数量，
+   不等提交后 toast 报错。
+5. **写操作守门**（应用层强制）：
+
+| 操作 | 规则 |
+| ---- | ---- |
+| 改名称/属性 | 随时允许（本人持锁） |
+| 换归属 | 新父必须存在且**启用**；本节点有下游子层时拒绝（先清空下游再搬） |
+| 停用 | 允许；但停用后不可被新子层引用（`requireActive*` 校验） |
+| 删除 | 有下游子层拒绝；被他人编辑锁占用拒绝 |
+

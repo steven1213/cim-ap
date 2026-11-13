@@ -49,9 +49,7 @@ function lazyRoute(Page: ComponentType, permCode?: string) {
 }
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
-const SitePage = lazy(() => import('@/pages/SitePage'));
-const FabPage = lazy(() => import('@/pages/FabPage'));
-const AreaPage = lazy(() => import('@/pages/AreaPage'));
+const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
 
 /**
  * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），再渲染受保护路由，
@@ -167,9 +165,7 @@ export default function App() {
           }
         >
           <Route path="/" element={lazyRoute(DashboardPage)} />
-          <Route path="/sites" element={lazyRoute(SitePage, 'mds:site:view')} />
-          <Route path="/fabs" element={lazyRoute(FabPage, 'mds:fab:view')} />
-          <Route path="/areas" element={lazyRoute(AreaPage, 'mds:area:view')} />
+          <Route path="/topology" element={lazyRoute(TopologyPage, 'mds:site:view')} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

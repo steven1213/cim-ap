@@ -172,18 +172,8 @@ export default function DashboardPage() {
             actions={
               <>
                 {canSite ? (
-                  <CimButton size="small" onClick={() => navigate('/sites')}>
-                    {t('mds.nav.sites')}
-                  </CimButton>
-                ) : null}
-                {canFab ? (
-                  <CimButton size="small" onClick={() => navigate('/fabs')}>
-                    {t('mds.nav.fabs')}
-                  </CimButton>
-                ) : null}
-                {canArea ? (
-                  <CimButton size="small" onClick={() => navigate('/areas')}>
-                    {t('mds.nav.areas')}
+                  <CimButton size="small" type="primary" onClick={() => navigate('/topology')}>
+                    {t('mds.nav.topology')}
                   </CimButton>
                 ) : null}
               </>

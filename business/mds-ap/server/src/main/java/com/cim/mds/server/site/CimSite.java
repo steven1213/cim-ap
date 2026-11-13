@@ -27,7 +27,7 @@ import lombok.Setter;
 @Table(name = "cim_site", uniqueConstraints = {
         @UniqueConstraint(name = "uk_cim_site_code", columnNames = {"site_code", "deleted"})
 })
-public class CimSite extends BaseDefData {
+public class CimSite extends EditLockDefData {
 
     /** 基地编码（唯一，例：CD-SITE、SH-SITE）。 */
     @Column(name = "site_code", length = 64, nullable = false)

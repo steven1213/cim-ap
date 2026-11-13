@@ -53,25 +53,43 @@ public final class MdsConsoleCatalog {
         List<MenuDef> m = new ArrayList<>();
         // —— 概览（不绑权限：登录后的落脚页）——
         m.add(menu("overview", null, "/", "Dashboard", "mds.nav.dashboard", "gauge", null, 10));
-        // —— 场地主数据（Site → Fab → Area）——
+        // —— 场地主数据（Site → Fab → Area → Bay → Stage）——
+        // 2026-11-13 收敛为一页「位置拓扑」（左树右详情），原 sites/fabs/areas 三菜单退场
         m.add(dir("grp.site", "mds.nav.group.site", 20));
-        m.add(menu("sites", "grp.site", "/sites", "Site", "mds.nav.sites", "apps",
-                MdsPermissions.SITE_VIEW, 10));
-        m.add(menu("fabs", "grp.site", "/fabs", "Fab", "mds.nav.fabs", "monitor",
-                MdsPermissions.FAB_VIEW, 20));
-        m.add(menu("areas", "grp.site", "/areas", "Area", "mds.nav.areas", "tree",
-                MdsPermissions.AREA_VIEW, 30));
+        m.add(menu("topology", "grp.site", "/topology", "Topology", "mds.nav.topology", "tree", null, 10));
 
         // 按钮节点：供授权界面按动作细分（前端菜单不渲染 BUTTON）
-        m.add(button("btn.site.create", "sites", "mds.nav.sites", MdsPermissions.SITE_CREATE, 10));
-        m.add(button("btn.site.update", "sites", "mds.nav.sites", MdsPermissions.SITE_UPDATE, 20));
-        m.add(button("btn.site.delete", "sites", "mds.nav.sites", MdsPermissions.SITE_DELETE, 30));
-        m.add(button("btn.fab.create", "fabs", "mds.nav.fabs", MdsPermissions.FAB_CREATE, 10));
-        m.add(button("btn.fab.update", "fabs", "mds.nav.fabs", MdsPermissions.FAB_UPDATE, 20));
-        m.add(button("btn.fab.delete", "fabs", "mds.nav.fabs", MdsPermissions.FAB_DELETE, 30));
-        m.add(button("btn.area.create", "areas", "mds.nav.areas", MdsPermissions.AREA_CREATE, 10));
-        m.add(button("btn.area.update", "areas", "mds.nav.areas", MdsPermissions.AREA_UPDATE, 20));
-        m.add(button("btn.area.delete", "areas", "mds.nav.areas", MdsPermissions.AREA_DELETE, 30));
+        // i18n 码须全库唯一，单菜单下五层动作显式命名 {layer}.{action}
+        m.add(button("btn.site.create", "topology", "mds.nav.topology.action.site.create",
+                MdsPermissions.SITE_CREATE, 10));
+        m.add(button("btn.site.update", "topology", "mds.nav.topology.action.site.update",
+                MdsPermissions.SITE_UPDATE, 20));
+        m.add(button("btn.site.delete", "topology", "mds.nav.topology.action.site.delete",
+                MdsPermissions.SITE_DELETE, 30));
+        m.add(button("btn.fab.create", "topology", "mds.nav.topology.action.fab.create",
+                MdsPermissions.FAB_CREATE, 40));
+        m.add(button("btn.fab.update", "topology", "mds.nav.topology.action.fab.update",
+                MdsPermissions.FAB_UPDATE, 50));
+        m.add(button("btn.fab.delete", "topology", "mds.nav.topology.action.fab.delete",
+                MdsPermissions.FAB_DELETE, 60));
+        m.add(button("btn.area.create", "topology", "mds.nav.topology.action.area.create",
+                MdsPermissions.AREA_CREATE, 70));
+        m.add(button("btn.area.update", "topology", "mds.nav.topology.action.area.update",
+                MdsPermissions.AREA_UPDATE, 80));
+        m.add(button("btn.area.delete", "topology", "mds.nav.topology.action.area.delete",
+                MdsPermissions.AREA_DELETE, 90));
+        m.add(button("btn.bay.create", "topology", "mds.nav.topology.action.bay.create",
+                MdsPermissions.BAY_CREATE, 100));
+        m.add(button("btn.bay.update", "topology", "mds.nav.topology.action.bay.update",
+                MdsPermissions.BAY_UPDATE, 110));
+        m.add(button("btn.bay.delete", "topology", "mds.nav.topology.action.bay.delete",
+                MdsPermissions.BAY_DELETE, 120));
+        m.add(button("btn.stage.create", "topology", "mds.nav.topology.action.stage.create",
+                MdsPermissions.STAGE_CREATE, 130));
+        m.add(button("btn.stage.update", "topology", "mds.nav.topology.action.stage.update",
+                MdsPermissions.STAGE_UPDATE, 140));
+        m.add(button("btn.stage.delete", "topology", "mds.nav.topology.action.stage.delete",
+                MdsPermissions.STAGE_DELETE, 150));
         return m;
     }
 
@@ -84,11 +102,9 @@ public final class MdsConsoleCatalog {
         return new MenuDef(key, null, MenuType.DIR, null, null, i18nCode, null, null, sortNo);
     }
 
-    /** 按钮节点的 i18n 码复用所属菜单名（{@code sys_menu.i18n_code} 需唯一，故加 {@code .action} 后缀）。 */
-    private static MenuDef button(String key, String parentKey, String parentI18n, String permCode, int sortNo) {
-        String action = permCode.substring(permCode.lastIndexOf(':') + 1);
-        return new MenuDef(key, parentKey, MenuType.BUTTON, null, null,
-                parentI18n + ".action." + action, null, permCode, sortNo);
+    /** 按钮节点：单菜单承载五层动作，i18n 码显式传入（sys_menu.i18n_code 全库唯一）。 */
+    private static MenuDef button(String key, String parentKey, String i18nCode, String permCode, int sortNo) {
+        return new MenuDef(key, parentKey, MenuType.BUTTON, null, null, i18nCode, null, permCode, sortNo);
     }
 
     // ================================================================ 权限
@@ -115,6 +131,16 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.AREA_CREATE, "Area 新建"));
         p.add(new PermDef(MdsPermissions.AREA_UPDATE, "Area 编辑"));
         p.add(new PermDef(MdsPermissions.AREA_DELETE, "Area 删除"));
+        // Bay
+        p.add(new PermDef(MdsPermissions.BAY_VIEW, "Bay 查看"));
+        p.add(new PermDef(MdsPermissions.BAY_CREATE, "Bay 新建"));
+        p.add(new PermDef(MdsPermissions.BAY_UPDATE, "Bay 编辑"));
+        p.add(new PermDef(MdsPermissions.BAY_DELETE, "Bay 删除"));
+        // Stage
+        p.add(new PermDef(MdsPermissions.STAGE_VIEW, "Stage 查看"));
+        p.add(new PermDef(MdsPermissions.STAGE_CREATE, "Stage 新建"));
+        p.add(new PermDef(MdsPermissions.STAGE_UPDATE, "Stage 编辑"));
+        p.add(new PermDef(MdsPermissions.STAGE_DELETE, "Stage 删除"));
         return p;
     }
 
@@ -138,10 +164,13 @@ public final class MdsConsoleCatalog {
         List<String> operator = List.of(
                 MdsPermissions.SITE_VIEW, MdsPermissions.SITE_CREATE, MdsPermissions.SITE_UPDATE,
                 MdsPermissions.FAB_VIEW, MdsPermissions.FAB_CREATE, MdsPermissions.FAB_UPDATE,
-                MdsPermissions.AREA_VIEW, MdsPermissions.AREA_CREATE, MdsPermissions.AREA_UPDATE);
+                MdsPermissions.AREA_VIEW, MdsPermissions.AREA_CREATE, MdsPermissions.AREA_UPDATE,
+                MdsPermissions.BAY_VIEW, MdsPermissions.BAY_CREATE, MdsPermissions.BAY_UPDATE,
+                MdsPermissions.STAGE_VIEW, MdsPermissions.STAGE_CREATE, MdsPermissions.STAGE_UPDATE);
         // 只读：各域 view
         List<String> viewer = List.of(
-                MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW);
+                MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW,
+                MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW);
         List<RoleDef> r = new ArrayList<>();
         r.add(new RoleDef(ROLE_ADMIN, "MDS 管理员", true, allPerms));
         r.add(new RoleDef(ROLE_OPERATOR, "MDS 操作员", false, operator));
@@ -167,19 +196,23 @@ public final class MdsConsoleCatalog {
         // —— 菜单与分组 ——
         t.add(new TextDef("mds.nav.dashboard", "概览", "Overview"));
         t.add(new TextDef("mds.nav.group.site", "场地主数据", "Site master data"));
-        t.add(new TextDef("mds.nav.sites", "基地", "Sites"));
-        t.add(new TextDef("mds.nav.fabs", "晶圆厂", "Fabs"));
-        t.add(new TextDef("mds.nav.areas", "区域", "Areas"));
-        // —— 按钮动作（授权界面回显用）——
-        t.add(new TextDef("mds.nav.sites.action.create", "基地·新建", "Site · create"));
-        t.add(new TextDef("mds.nav.sites.action.update", "基地·编辑", "Site · update"));
-        t.add(new TextDef("mds.nav.sites.action.delete", "基地·删除", "Site · delete"));
-        t.add(new TextDef("mds.nav.fabs.action.create", "Fab·新建", "Fab · create"));
-        t.add(new TextDef("mds.nav.fabs.action.update", "Fab·编辑", "Fab · update"));
-        t.add(new TextDef("mds.nav.fabs.action.delete", "Fab·删除", "Fab · delete"));
-        t.add(new TextDef("mds.nav.areas.action.create", "区域·新建", "Area · create"));
-        t.add(new TextDef("mds.nav.areas.action.update", "区域·编辑", "Area · update"));
-        t.add(new TextDef("mds.nav.areas.action.delete", "区域·删除", "Area · delete"));
+        t.add(new TextDef("mds.nav.topology", "位置拓扑", "Locations"));
+        // —— 按钮动作（授权界面回显用；单菜单五层，显式命名）——
+        t.add(new TextDef("mds.nav.topology.action.site.create", "基地·新建", "Site · create"));
+        t.add(new TextDef("mds.nav.topology.action.site.update", "基地·编辑", "Site · update"));
+        t.add(new TextDef("mds.nav.topology.action.site.delete", "基地·删除", "Site · delete"));
+        t.add(new TextDef("mds.nav.topology.action.fab.create", "Fab·新建", "Fab · create"));
+        t.add(new TextDef("mds.nav.topology.action.fab.update", "Fab·编辑", "Fab · update"));
+        t.add(new TextDef("mds.nav.topology.action.fab.delete", "Fab·删除", "Fab · delete"));
+        t.add(new TextDef("mds.nav.topology.action.area.create", "区域·新建", "Area · create"));
+        t.add(new TextDef("mds.nav.topology.action.area.update", "区域·编辑", "Area · update"));
+        t.add(new TextDef("mds.nav.topology.action.area.delete", "区域·删除", "Area · delete"));
+        t.add(new TextDef("mds.nav.topology.action.bay.create", "Bay·新建", "Bay · create"));
+        t.add(new TextDef("mds.nav.topology.action.bay.update", "Bay·编辑", "Bay · update"));
+        t.add(new TextDef("mds.nav.topology.action.bay.delete", "Bay·删除", "Bay · delete"));
+        t.add(new TextDef("mds.nav.topology.action.stage.create", "Stage·新建", "Stage · create"));
+        t.add(new TextDef("mds.nav.topology.action.stage.update", "Stage·编辑", "Stage · update"));
+        t.add(new TextDef("mds.nav.topology.action.stage.delete", "Stage·删除", "Stage · delete"));
         // —— 外壳 ——
         t.add(new TextDef("mds.shell.brandSub", "主数据服务", "Master Data Service"));
         t.add(new TextDef("mds.shell.tagline", "定义向下、实绩向上", "Definitions down, actuals up"));

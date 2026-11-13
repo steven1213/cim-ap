@@ -21,7 +21,7 @@ import lombok.Setter;
 @Table(name = "cim_area", uniqueConstraints = {
         @UniqueConstraint(name = "uk_cim_area_code", columnNames = {"fab_code", "area_code", "deleted"})
 })
-public class CimArea extends BaseDefData {
+public class CimArea extends EditLockDefData {
 
     /** Area 编码（Fab 内唯一，例：ETCH、PHOTO）。 */
     @Column(name = "area_code", length = 64, nullable = false)

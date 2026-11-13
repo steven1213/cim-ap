@@ -24,4 +24,16 @@ export const MDS_PERMS = {
     update: 'mds:area:update',
     delete: 'mds:area:delete',
   },
+  bay: {
+    view: 'mds:bay:view',
+    create: 'mds:bay:create',
+    update: 'mds:bay:update',
+    delete: 'mds:bay:delete',
+  },
+  stage: {
+    view: 'mds:stage:view',
+    create: 'mds:stage:create',
+    update: 'mds:stage:update',
+    delete: 'mds:stage:delete',
+  },
 } as const;

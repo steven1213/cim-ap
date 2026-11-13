@@ -2,7 +2,19 @@
 //
 // 所有端点都在 `/api/v1/mds/**` 下（见 server `SiteAdminController`）。
 import * as http from '@/lib/api';
-import type { Area, AreaPayload, Fab, FabPayload, Site, SitePayload } from '@/types';
+import type {
+  Area,
+  AreaPayload,
+  Bay,
+  BayPayload,
+  Fab,
+  FabPayload,
+  LockState,
+  Site,
+  SitePayload,
+  Stage,
+  StagePayload,
+} from '@/types';
 
 const BASE = '/mds';
 
@@ -58,4 +70,69 @@ export function updateArea(id: string, payload: AreaPayload): Promise<Area> {
 
 export function deleteArea(id: string): Promise<void> {
   return http.del<void>(`${BASE}/areas/${encodeURIComponent(id)}`);
+}
+
+// ---------- Bay ----------
+
+export function listBays(
+  params?: { fabCode?: string; areaCode?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<Bay[]> {
+  return http.get<Bay[]>(`${BASE}/bays`, params, { signal });
+}
+
+export function createBay(payload: BayPayload): Promise<Bay> {
+  return http.post<Bay>(`${BASE}/bays`, payload);
+}
+
+export function updateBay(id: string, payload: BayPayload): Promise<Bay> {
+  return http.put<Bay>(`${BASE}/bays/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteBay(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/bays/${encodeURIComponent(id)}`);
+}
+
+// ---------- Stage ----------
+
+export function listStages(
+  params?: { fabCode?: string; bayCode?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<Stage[]> {
+  return http.get<Stage[]>(`${BASE}/stages`, params, { signal });
+}
+
+export function createStage(payload: StagePayload): Promise<Stage> {
+  return http.post<Stage>(`${BASE}/stages`, payload);
+}
+
+export function updateStage(id: string, payload: StagePayload): Promise<Stage> {
+  return http.put<Stage>(`${BASE}/stages/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteStage(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/stages/${encodeURIComponent(id)}`);
+}
+
+// ---------- 编辑锁（site/fab/area/bay/stage 通用） ----------
+
+export type LocationType = 'site' | 'fab' | 'area' | 'bay' | 'stage';
+
+/** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
+export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {
+  return http.put<{ claimed: boolean }>(
+    `${BASE}/locations/${type}/${encodeURIComponent(id)}/lock`,
+    {},
+  );
+}
+
+/** 释放锁：默认只清自己的（服务端按 occupied_by 条件）。 */
+export function releaseLock(type: LocationType, id: string): Promise<void> {
+  return http.del<void>(`${BASE}/locations/${type}/${encodeURIComponent(id)}/lock`);
+}
+
+export function lockState(type: LocationType, id: string, signal?: AbortSignal): Promise<LockState> {
+  return http.get<LockState>(`${BASE}/locations/${type}/${encodeURIComponent(id)}/lock`, undefined, {
+    signal,
+  });
 }

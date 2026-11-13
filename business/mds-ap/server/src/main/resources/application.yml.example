@@ -75,6 +75,10 @@ cim:
       seed-admin-profile: true
       seed-english: true
       admin-display-name: MDS 管理员
+    location:
+      # 位置主数据编辑锁（location-design.md §8.1）：占用超过该时长视为残留锁，他人可抢锁覆盖。
+      # 单位分钟（Duration + @DurationUnit），也接受 PT30M。
+      edit-lock-timeout: 30
 
 # 排障：可执行 SQL 日志（参数已内联，可直接粘贴执行；见 platform/server/design.md §2.3）
 # 方式一：启动即输出

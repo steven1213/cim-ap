@@ -1,7 +1,5 @@
 import {
-  IconApps,
   IconGauge,
-  IconMonitor,
   IconTree,
 } from '@cim/ui';
 import type { ShellIconCmp } from '@cim/shell';
@@ -24,7 +22,7 @@ export interface NavGroup {
 /**
  * 分级导航：概览 / 场地主数据。
  *
- * <p>MDS 的业务是按「主数据域」长的：场地（Site/Fab/Area）→ 设备 → 产品 → 工艺路线 → 载具…
+ * <p>MDS 的业务是按「主数据域」长的：场地（五层拓扑一页维护）→ 设备 → 产品 → 工艺路线 → 载具…
  * 每开一个域，在这里加一个分组，同时在 {@code MdsConsoleCatalog.menus()} 里加同批菜单
  * （后端那份用于授权与动态菜单，两份的 i18n 键必须一致）。</p>
  */
@@ -36,9 +34,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     i18n: 'mds.nav.group.site',
     items: [
-      { to: '/sites', i18n: 'mds.nav.sites', Icon: IconApps },
-      { to: '/fabs', i18n: 'mds.nav.fabs', Icon: IconMonitor },
-      { to: '/areas', i18n: 'mds.nav.areas', Icon: IconTree },
+      // 2026-11-13 收敛：sites/fabs/areas 三页合一页「位置拓扑」（location-design.md §8.3）
+      { to: '/topology', i18n: 'mds.nav.topology', Icon: IconTree },
     ],
   },
 ];

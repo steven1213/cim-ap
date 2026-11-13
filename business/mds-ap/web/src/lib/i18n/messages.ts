@@ -29,14 +29,14 @@ export const zhCN: Record<string, string> = {
   'mds.shell.tabs.closeAll': '关闭全部',
 
   // ---------------- 菜单 ----------------
-  'mds.nav.sites': '基地',
-  'mds.nav.fabs': '晶圆厂',
-  'mds.nav.areas': '区域',
+  'mds.nav.topology': '位置拓扑',
 
   // ---------------- 通用 ----------------
   'mds.common.loading': '加载中…',
   'mds.common.retry': '重试',
   'mds.common.save': '保存',
+  'mds.common.created': '已创建',
+  'mds.common.updated': '已保存',
   'mds.common.cancel': '取消',
   'mds.common.delete': '删除',
   'mds.common.edit': '编辑',
@@ -80,6 +80,7 @@ export const zhCN: Record<string, string> = {
   'mds.dashboard.emptyHint': '还没有基地数据。先建基地，再往下建 Fab 与 Area——层级是 Site → Fab → Area。',
 
   // ---------------- 基地 ----------------
+  'mds.site.one': '基地',
   'mds.site.createNew': '新建基地',
   'mds.site.code': '基地编码',
   'mds.site.name': '基地名称',
@@ -87,9 +88,9 @@ export const zhCN: Record<string, string> = {
   'mds.site.contactPerson': '负责人',
   'mds.site.contactPhone': '联系电话',
   'mds.site.fabCount': 'Fab 数',
-  'mds.site.deleteBlocked': '该基地下还有 Fab，先把 Fab 删掉或改到其他基地，再删基地',
 
   // ---------------- 晶圆厂 ----------------
+  'mds.fab.one': 'Fab',
   'mds.fab.createNew': '新建 Fab',
   'mds.fab.code': 'Fab 编码',
   'mds.fab.name': 'Fab 名称',
@@ -98,15 +99,44 @@ export const zhCN: Record<string, string> = {
   'mds.fab.type': '工厂类型',
   'mds.fab.amhsType': 'AMHS 类型',
   'mds.fab.cleanGrade': '洁净等级',
-  'mds.fab.deleteBlocked': '该 Fab 下还有 Area，先把 Area 删掉或改到其他 Fab，再删 Fab',
 
   // ---------------- 区域 ----------------
+  'mds.area.one': '区域',
   'mds.area.createNew': '新建区域',
   'mds.area.code': '区域编码',
   'mds.area.name': '区域名称',
   'mds.area.fab': '所属 Fab',
   'mds.area.fabPlaceholder': '选择所属 Fab',
   'mds.area.type': '工艺大类',
+
+  // ---------------- 湾（Bay） ----------------
+  'mds.bay.one': 'Bay',
+  'mds.bay.createNew': '新建 Bay',
+  'mds.bay.code': 'Bay 编码',
+  'mds.bay.name': 'Bay 名称',
+  'mds.bay.area': '所属区域',
+  'mds.bay.areaPlaceholder': '选择所属区域',
+
+  // ---------------- 设备位（Stage） ----------------
+  'mds.stage.one': '设备位',
+  'mds.stage.createNew': '新建设备位',
+  'mds.stage.code': '设备位编码',
+  'mds.stage.name': '设备位名称',
+  'mds.stage.bay': '所属 Bay',
+  'mds.stage.bayPlaceholder': '选择所属 Bay',
+
+  // ---------------- 位置拓扑页 ----------------
+  'mds.topo.empty': '暂无数据',
+  'mds.topo.selectHint': '在左侧选择一个节点查看详情，或从树上发起新建',
+  'mds.topo.disabled': '已停用',
+  'mds.topo.enabled': '启用',
+  'mds.topo.level': '层级',
+  'mds.topo.status': '状态',
+  'mds.topo.editLock': '编辑锁',
+  'mds.topo.lockFree': '空闲',
+  'mds.topo.lockedBy': '{{user}} 正在编辑',
+  'mds.topo.lockedShort': '编辑中',
+  'mds.topo.addChild': '新增{{child}}',
 };
 
 export const enUS: Record<string, string> = {
@@ -132,14 +162,14 @@ export const enUS: Record<string, string> = {
   'mds.shell.tabs.closeAll': 'Close all',
 
   // ---------------- navigation ----------------
-  'mds.nav.sites': 'Sites',
-  'mds.nav.fabs': 'Fabs',
-  'mds.nav.areas': 'Areas',
+  'mds.nav.topology': 'Locations',
 
   // ---------------- common ----------------
   'mds.common.loading': 'Loading…',
   'mds.common.retry': 'Retry',
   'mds.common.save': 'Save',
+  'mds.common.created': 'Created',
+  'mds.common.updated': 'Saved',
   'mds.common.cancel': 'Cancel',
   'mds.common.delete': 'Delete',
   'mds.common.edit': 'Edit',
@@ -183,6 +213,7 @@ export const enUS: Record<string, string> = {
   'mds.dashboard.emptyHint': 'No site yet. Create a site first, then Fabs and Areas — the hierarchy is Site → Fab → Area.',
 
   // ---------------- sites ----------------
+  'mds.site.one': 'Site',
   'mds.site.createNew': 'New site',
   'mds.site.code': 'Site code',
   'mds.site.name': 'Site name',
@@ -190,9 +221,9 @@ export const enUS: Record<string, string> = {
   'mds.site.contactPerson': 'Owner',
   'mds.site.contactPhone': 'Phone',
   'mds.site.fabCount': 'Fabs',
-  'mds.site.deleteBlocked': 'This site still has fabs. Delete them or move them to another site first.',
 
   // ---------------- fabs ----------------
+  'mds.fab.one': 'Fab',
   'mds.fab.createNew': 'New fab',
   'mds.fab.code': 'Fab code',
   'mds.fab.name': 'Fab name',
@@ -201,13 +232,42 @@ export const enUS: Record<string, string> = {
   'mds.fab.type': 'Fab type',
   'mds.fab.amhsType': 'AMHS type',
   'mds.fab.cleanGrade': 'Clean grade',
-  'mds.fab.deleteBlocked': 'This fab still has areas. Delete them or move them to another fab first.',
 
   // ---------------- areas ----------------
+  'mds.area.one': 'Area',
   'mds.area.createNew': 'New area',
   'mds.area.code': 'Area code',
   'mds.area.name': 'Area name',
   'mds.area.fab': 'Fab',
   'mds.area.fabPlaceholder': 'Select a fab',
   'mds.area.type': 'Process family',
+
+  // ---------------- bays ----------------
+  'mds.bay.one': 'Bay',
+  'mds.bay.createNew': 'New bay',
+  'mds.bay.code': 'Bay code',
+  'mds.bay.name': 'Bay name',
+  'mds.bay.area': 'Area',
+  'mds.bay.areaPlaceholder': 'Select an area',
+
+  // ---------------- stages ----------------
+  'mds.stage.one': 'Stage',
+  'mds.stage.createNew': 'New stage',
+  'mds.stage.code': 'Stage code',
+  'mds.stage.name': 'Stage name',
+  'mds.stage.bay': 'Bay',
+  'mds.stage.bayPlaceholder': 'Select a bay',
+
+  // ---------------- topology page ----------------
+  'mds.topo.empty': 'No data yet',
+  'mds.topo.selectHint': 'Select a node on the left, or create from the tree',
+  'mds.topo.disabled': 'Disabled',
+  'mds.topo.enabled': 'Enabled',
+  'mds.topo.level': 'Level',
+  'mds.topo.status': 'Status',
+  'mds.topo.editLock': 'Edit lock',
+  'mds.topo.lockFree': 'Free',
+  'mds.topo.lockedBy': 'Being edited by {{user}}',
+  'mds.topo.lockedShort': 'Editing',
+  'mds.topo.addChild': 'Add {{child}}',
 };
