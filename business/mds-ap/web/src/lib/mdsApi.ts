@@ -9,10 +9,18 @@ import type {
   AreaPayload,
   Bay,
   BayPayload,
+  Capability,
+  CapabilityPayload,
   DictInfo,
   DictItem,
   DictItemPayload,
   DictPayload,
+  Equipment,
+  EquipmentPayload,
+  EquipmentType,
+  EquipmentTypePayload,
+  EquipmentUnit,
+  EquipmentUnitPayload,
   Fab,
   FabPayload,
   LockState,
@@ -254,7 +262,119 @@ export function deleteDictItem(dictId: string, id: string): Promise<void> {
   );
 }
 
-// ---------- 编辑锁（site/fab/area/areaGroup/bay/stage/technology/product 通用） ----------
+// ---------- 设备域（设备类型 / 设备 / 能力） ----------
+
+export function listEquipmentTypes(keyword?: string, signal?: AbortSignal): Promise<EquipmentType[]> {
+  return http.get<EquipmentType[]>(`${BASE}/equipment-types`, { keyword }, { signal });
+}
+
+export function createEquipmentType(payload: EquipmentTypePayload): Promise<EquipmentType> {
+  return http.post<EquipmentType>(`${BASE}/equipment-types`, payload);
+}
+
+export function updateEquipmentType(
+  id: string,
+  payload: Partial<EquipmentTypePayload>,
+): Promise<EquipmentType> {
+  return http.put<EquipmentType>(`${BASE}/equipment-types/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEquipmentType(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/equipment-types/${encodeURIComponent(id)}`);
+}
+
+/** 设备列表。view=process|amhs：两个页面共用一套 CRUD，按类型 category 过滤视图。 */
+export function listEquipments(
+  params?: { keyword?: string; typeCode?: string; view?: 'process' | 'amhs' },
+  signal?: AbortSignal,
+): Promise<Equipment[]> {
+  return http.get<Equipment[]>(`${BASE}/equipments`, params, { signal });
+}
+
+export function createEquipment(payload: EquipmentPayload): Promise<Equipment> {
+  return http.post<Equipment>(`${BASE}/equipments`, payload);
+}
+
+export function updateEquipment(id: string, payload: Partial<EquipmentPayload>): Promise<Equipment> {
+  return http.put<Equipment>(`${BASE}/equipments/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEquipment(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/equipments/${encodeURIComponent(id)}`);
+}
+
+/** 设备已关联的能力码集合。 */
+export function listEquipmentCapabilities(id: string, signal?: AbortSignal): Promise<string[]> {
+  return http.get<string[]>(`${BASE}/equipments/${encodeURIComponent(id)}/capabilities`, undefined, {
+    signal,
+  });
+}
+
+/** 全量替换设备能力关联（勾选提交）。 */
+export function setEquipmentCapabilities(id: string, capabilityCodes: string[]): Promise<string[]> {
+  return http.put<string[]>(
+    `${BASE}/equipments/${encodeURIComponent(id)}/capabilities`,
+    capabilityCodes,
+  );
+}
+
+export function listCapabilities(keyword?: string, signal?: AbortSignal): Promise<Capability[]> {
+  return http.get<Capability[]>(`${BASE}/capabilities`, { keyword }, { signal });
+}
+
+export function createCapability(payload: CapabilityPayload): Promise<Capability> {
+  return http.post<Capability>(`${BASE}/capabilities`, payload);
+}
+
+export function updateCapability(
+  id: string,
+  payload: Partial<CapabilityPayload>,
+): Promise<Capability> {
+  return http.put<Capability>(`${BASE}/capabilities/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteCapability(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/capabilities/${encodeURIComponent(id)}`);
+}
+
+// ---------- 设备子单元（E120 结构树：LoadPort / Chamber / Aligner / Robot…） ----------
+
+export function listEquipmentUnits(equipmentId: string, signal?: AbortSignal): Promise<EquipmentUnit[]> {
+  return http.get<EquipmentUnit[]>(
+    `${BASE}/equipments/${encodeURIComponent(equipmentId)}/units`,
+    undefined,
+    { signal },
+  );
+}
+
+export function createEquipmentUnit(
+  equipmentId: string,
+  payload: EquipmentUnitPayload,
+): Promise<EquipmentUnit> {
+  return http.post<EquipmentUnit>(
+    `${BASE}/equipments/${encodeURIComponent(equipmentId)}/units`,
+    payload,
+  );
+}
+
+export function updateEquipmentUnit(
+  equipmentId: string,
+  unitId: string,
+  payload: Partial<EquipmentUnitPayload>,
+): Promise<EquipmentUnit> {
+  return http.put<EquipmentUnit>(
+    `${BASE}/equipments/${encodeURIComponent(equipmentId)}/units/${encodeURIComponent(unitId)}`,
+    payload,
+  );
+}
+
+export function deleteEquipmentUnit(equipmentId: string, unitId: string): Promise<void> {
+  return http.del<void>(
+    `${BASE}/equipments/${encodeURIComponent(equipmentId)}/units/${encodeURIComponent(unitId)}`,
+  );
+}
+
+// ---------- 编辑锁（site/fab/area/areaGroup/bay/stage/technology/product/equipmentType/equipment/capability 通用） ----------
 
 export type LocationType =
   | 'site'
@@ -264,7 +384,10 @@ export type LocationType =
   | 'bay'
   | 'stage'
   | 'technology'
-  | 'product';
+  | 'product'
+  | 'equipmentType'
+  | 'equipment'
+  | 'capability';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {

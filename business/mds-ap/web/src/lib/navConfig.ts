@@ -1,7 +1,11 @@
 import {
   IconApps,
+  IconCheckCircle,
   IconGauge,
+  IconLink,
   IconList,
+  IconMonitor,
+  IconOrgGrant,
   IconSliders,
   IconTree,
 } from '@cim/ui';
@@ -39,6 +43,16 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       // 2026-11-13 收敛：sites/fabs/areas 三页合一页「位置拓扑」（location-design.md §8.3）
       { to: '/topology', i18n: 'mds.nav.topology', Icon: IconTree },
+    ],
+  },
+  {
+    // 设备管理：搬运设备 + 设备共用一张表的过滤视图；类型/能力是「类」与「能力字典」（grp.equipment 同构）
+    i18n: 'mds.nav.group.equipment',
+    items: [
+      { to: '/transport-equipments', i18n: 'mds.nav.transportEquipments', Icon: IconLink },
+      { to: '/equipments', i18n: 'mds.nav.equipments', Icon: IconMonitor },
+      { to: '/equipment-types', i18n: 'mds.nav.equipmentTypes', Icon: IconOrgGrant },
+      { to: '/capabilities', i18n: 'mds.nav.capabilities', Icon: IconCheckCircle },
     ],
   },
   {

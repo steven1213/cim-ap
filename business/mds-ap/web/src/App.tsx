@@ -54,6 +54,19 @@ const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
 const TechnologyPage = lazy(() => import('@/pages/TechnologyPage'));
 const ProductPage = lazy(() => import('@/pages/ProductPage'));
 const DictPage = lazy(() => import('@/pages/DictPage'));
+const EquipmentTypePage = lazy(() => import('@/pages/EquipmentTypePage'));
+const CapabilityPage = lazy(() => import('@/pages/CapabilityPage'));
+const EquipmentListPage = lazy(() => import('@/pages/EquipmentListPage'));
+
+/** 搬运设备页 = 设备列表的 AMHS 视图（TRANSPORT/STORAGE/BUFFER 类）。 */
+function TransportEquipmentsPage() {
+  return <EquipmentListPage view="amhs" />;
+}
+
+/** 设备页 = 设备列表的工艺视图（PROCESS 类）。 */
+function EquipmentsPage() {
+  return <EquipmentListPage view="process" />;
+}
 
 /**
  * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），再渲染受保护路由，
@@ -191,6 +204,16 @@ export default function App() {
           <Route path="/technologies" element={lazyRoute(TechnologyPage, 'mds:tech:view')} />
           <Route path="/products" element={lazyRoute(ProductPage, 'mds:product:view')} />
           <Route path="/dicts" element={lazyRoute(DictPage, 'sys:dict:list')} />
+          <Route
+            path="/transport-equipments"
+            element={lazyRoute(TransportEquipmentsPage, 'mds:equipment:view')}
+          />
+          <Route path="/equipments" element={lazyRoute(EquipmentsPage, 'mds:equipment:view')} />
+          <Route
+            path="/equipment-types"
+            element={lazyRoute(EquipmentTypePage, 'mds:equipmentType:view')}
+          />
+          <Route path="/capabilities" element={lazyRoute(CapabilityPage, 'mds:capability:view')} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

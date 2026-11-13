@@ -217,6 +217,120 @@ export interface ProductPayload {
   enabled?: boolean;
 }
 
+// ---------------------------------------------------------------- 设备域
+
+/** 设备大类（行业口径定稿 8 类；页面归属依据：MATERIAL→搬运设备页，其余→设备页）。 */
+export type EqKind =
+  | 'PROCESS'
+  | 'METRO'
+  | 'TEST'
+  | 'ASSY'
+  | 'MATERIAL'
+  | 'FACILITY'
+  | 'TOOL'
+  | 'OTHER';
+
+/** 设备类型（EquipmentType）：ISA-95 Kind→Type—Instance 的「类」，挂大类+细类。 */
+export interface EquipmentType {
+  id: string;
+  typeCode: string;
+  typeName: string;
+  kindCode: EqKind;
+  equipClassCode: string | null;
+  remark: string | null;
+  enabled: boolean;
+  description: string | null;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface EquipmentTypePayload {
+  typeCode: string;
+  typeName: string;
+  kindCode: EqKind;
+  equipClassCode?: string | null;
+  remark?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+/** 设备（Equipment）：实例主数据（一张表，按类型 kind 分页视图）。 */
+export interface Equipment {
+  id: string;
+  equipmentCode: string;
+  equipmentName: string;
+  typeCode: string;
+  typeName: string | null;
+  typeKind: string | null;
+  locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
+  locationId: string;
+  stateCode: string | null;
+  remark: string | null;
+  enabled: boolean;
+  description: string | null;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface EquipmentPayload {
+  equipmentCode: string;
+  equipmentName: string;
+  typeCode: string;
+  locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
+  locationId: string;
+  stateCode?: string | null;
+  remark?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+/** 设备子单元（EquipmentUnit）：设备结构树节点（SEMI E120 口径）。 */
+export interface EquipmentUnit {
+  id: string;
+  equipmentId: string;
+  unitCode: string;
+  unitName: string;
+  unitClass: 'MODULE' | 'SUBSYSTEM';
+  unitType: string;
+  stateCode: string | null;
+  portNo: number | null;
+  capacity: number | null;
+  enabled: boolean;
+  description: string | null;
+}
+
+export interface EquipmentUnitPayload {
+  unitCode: string;
+  unitName: string;
+  unitClass: 'MODULE' | 'SUBSYSTEM';
+  unitType: string;
+  stateCode?: string | null;
+  portNo?: number | null;
+  capacity?: number | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+/** 设备能力（Capability）：能力字典（「能不能做」；recipe 归 MES 不混）。 */
+export interface Capability {
+  id: string;
+  capabilityCode: string;
+  capabilityName: string;
+  remark: string | null;
+  enabled: boolean;
+  description: string | null;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface CapabilityPayload {
+  capabilityCode: string;
+  capabilityName: string;
+  remark?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
 // ---------------------------------------------------------------- 数据字典（平台 sys_dict）
 
 /** 字典（sys_dict）。isSystem=true 的不可删除（种子/内置枚举保护位）。 */

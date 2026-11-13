@@ -54,4 +54,22 @@ export const MDS_PERMS = {
     save: 'sys:dict:save',
     delete: 'sys:dict:remove',
   },
+  equipmentType: {
+    view: 'mds:equipmentType:view',
+    create: 'mds:equipmentType:create',
+    update: 'mds:equipmentType:update',
+    delete: 'mds:equipmentType:delete',
+  },
+  equipment: {
+    view: 'mds:equipment:view',
+    create: 'mds:equipment:create',
+    update: 'mds:equipment:update',
+    delete: 'mds:equipment:delete',
+  },
+  capability: {
+    view: 'mds:capability:view',
+    create: 'mds:capability:create',
+    update: 'mds:capability:update',
+    delete: 'mds:capability:delete',
+  },
 } as const;

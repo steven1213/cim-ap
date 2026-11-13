@@ -21,6 +21,14 @@
   margin: 10px 0 0;
 }
 
+/* 设备表单里「选中类型 → 大类/细类」联动展示行：只读信息，弱化视觉（小字、次要色），
+   不用 .cim-field（那是可输入字段）；颜色走平台令牌。 */
+.eqp-type-link {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--cim-text-secondary, #666);
+}
+
 /* ============================================================
    位置拓扑页（TopologyPage）：左树右详情
    平台没有 Tree 组件；这套类只描述「缩进行 + 徽标 + 双栏布局」，
@@ -43,6 +51,14 @@
 }
 
 .topo-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* 设备子单元弹窗工具行（新建/刷新） */
+.unit-toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -111,12 +127,16 @@
 .topo-code {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .topo-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .topo-badge {
@@ -225,4 +245,9 @@
 }
 .row-selected {
   background: var(--c-primary-bg, rgba(59, 130, 246, 0.08));
+}
+
+/* 设备列表页：树是过滤器、列表为主——与拓扑页（树 2fr 为主）反向 */
+.topo-equipment {
+  grid-template-columns: 250px minmax(0, 1fr);
 }

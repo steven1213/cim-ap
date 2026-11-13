@@ -41,7 +41,10 @@ const NO_STAGES: Stage[] = [];
 const NO_GROUPS: AreaGroup[] = [];
 
 /** 树上的物理层（areaGroup/technology 只是锁/表的 type，不是位置树的层）。 */
-type Level = Exclude<api.LocationType, 'areaGroup' | 'technology' | 'product'>;
+type Level = Exclude<
+  api.LocationType,
+  'areaGroup' | 'technology' | 'product' | 'equipmentType' | 'equipment' | 'capability'
+>;
 
 /** 每层的直接子层（stage 是位置树叶子）。 */
 const CHILD_LEVEL: Record<Level, Level | null> = {
