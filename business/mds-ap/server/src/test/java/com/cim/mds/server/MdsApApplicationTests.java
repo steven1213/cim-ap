@@ -78,13 +78,15 @@ class MdsApApplicationTests {
                 .filter(m -> m.getI18nCode() != null)
                 .collect(Collectors.toMap(SysMenu::getI18nCode, Function.identity(), (a, b) -> a));
 
+        // 2026-11-13 位置三页收敛为一页「位置拓扑」；产品管理（制程技术/产品/数据字典）上线
         assertThat(byI18n).containsKeys("mds.nav.dashboard", "mds.nav.group.site",
-                "mds.nav.sites", "mds.nav.fabs", "mds.nav.areas");
+                "mds.nav.topology", "mds.nav.group.product", "mds.nav.technology",
+                "mds.nav.products", "mds.nav.dicts");
 
-        SysMenu group = byI18n.get("mds.nav.group.site");
-        SysMenu sites = byI18n.get("mds.nav.sites");
-        assertThat(sites.getParentId()).isEqualTo(group.getId());
+        SysMenu group = byI18n.get("mds.nav.group.product");
+        SysMenu tech = byI18n.get("mds.nav.technology");
+        assertThat(tech.getParentId()).isEqualTo(group.getId());
         // 按钮节点只用于授权细分，不应出现在导航里
-        assertThat(byI18n.get("mds.nav.sites.action.create").getVisible()).isFalse();
+        assertThat(byI18n.get("mds.nav.technology.action.create").getVisible()).isFalse();
     }
 }

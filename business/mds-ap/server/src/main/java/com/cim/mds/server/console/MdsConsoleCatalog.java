@@ -2,6 +2,7 @@ package com.cim.mds.server.console;
 
 import com.cim.mds.server.security.MdsPermissions;
 import com.cim.system.menu.MenuType;
+import com.cim.system.support.PermissionCodes;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -90,6 +91,34 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.STAGE_UPDATE, 140));
         m.add(button("btn.stage.delete", "topology", "mds.nav.topology.action.stage.delete",
                 MdsPermissions.STAGE_DELETE, 150));
+
+        // —— 产品管理（Technology 先行；Product / Route 预留）——
+        m.add(dir("grp.product", "mds.nav.group.product", 30));
+        m.add(menu("technology", "grp.product", "/technologies", "Technologies",
+                "mds.nav.technology", "sliders", null, 10));
+        m.add(button("btn.technology.create", "technology", "mds.nav.technology.action.create",
+                MdsPermissions.TECH_CREATE, 10));
+        m.add(button("btn.technology.update", "technology", "mds.nav.technology.action.update",
+                MdsPermissions.TECH_UPDATE, 20));
+        m.add(button("btn.technology.delete", "technology", "mds.nav.technology.action.delete",
+                MdsPermissions.TECH_DELETE, 30));
+        m.add(menu("products", "grp.product", "/products", "Products",
+                "mds.nav.products", "flask", null, 20));
+        m.add(button("btn.product.create", "products", "mds.nav.products.action.create",
+                MdsPermissions.PRODUCT_CREATE, 10));
+        m.add(button("btn.product.update", "products", "mds.nav.products.action.update",
+                MdsPermissions.PRODUCT_UPDATE, 20));
+        m.add(button("btn.product.delete", "products", "mds.nav.products.action.delete",
+                MdsPermissions.PRODUCT_DELETE, 30));
+        // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
+        // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
+        m.add(dir("grp.system", "mds.nav.group.system", 40));
+        m.add(menu("dicts", "grp.system", "/dicts", "Dicts",
+                "mds.nav.dicts", "list", null, 10));
+        m.add(button("btn.dict.save", "dicts", "mds.nav.dicts.action.save",
+                PermissionCodes.DICT_SAVE, 10));
+        m.add(button("btn.dict.delete", "dicts", "mds.nav.dicts.action.delete",
+                PermissionCodes.DICT_REMOVE, 20));
         return m;
     }
 
@@ -116,16 +145,16 @@ public final class MdsConsoleCatalog {
     /** MDS 权限码目录。 */
     public static List<PermDef> permissions() {
         List<PermDef> p = new ArrayList<>();
-        // 基地
-        p.add(new PermDef(MdsPermissions.SITE_VIEW, "基地查看"));
-        p.add(new PermDef(MdsPermissions.SITE_CREATE, "基地新建"));
-        p.add(new PermDef(MdsPermissions.SITE_UPDATE, "基地编辑"));
-        p.add(new PermDef(MdsPermissions.SITE_DELETE, "基地删除"));
+        // 厂区
+        p.add(new PermDef(MdsPermissions.SITE_VIEW, "厂区查看"));
+        p.add(new PermDef(MdsPermissions.SITE_CREATE, "厂区新建"));
+        p.add(new PermDef(MdsPermissions.SITE_UPDATE, "厂区编辑"));
+        p.add(new PermDef(MdsPermissions.SITE_DELETE, "厂区删除"));
         // Fab
-        p.add(new PermDef(MdsPermissions.FAB_VIEW, "Fab 查看"));
-        p.add(new PermDef(MdsPermissions.FAB_CREATE, "Fab 新建"));
-        p.add(new PermDef(MdsPermissions.FAB_UPDATE, "Fab 编辑"));
-        p.add(new PermDef(MdsPermissions.FAB_DELETE, "Fab 删除"));
+        p.add(new PermDef(MdsPermissions.FAB_VIEW, "晶圆厂查看"));
+        p.add(new PermDef(MdsPermissions.FAB_CREATE, "晶圆厂新建"));
+        p.add(new PermDef(MdsPermissions.FAB_UPDATE, "晶圆厂编辑"));
+        p.add(new PermDef(MdsPermissions.FAB_DELETE, "晶圆厂删除"));
         // Area
         p.add(new PermDef(MdsPermissions.AREA_VIEW, "Area 查看"));
         p.add(new PermDef(MdsPermissions.AREA_CREATE, "Area 新建"));
@@ -141,6 +170,20 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.STAGE_CREATE, "Stage 新建"));
         p.add(new PermDef(MdsPermissions.STAGE_UPDATE, "Stage 编辑"));
         p.add(new PermDef(MdsPermissions.STAGE_DELETE, "Stage 删除"));
+        // Technology（产品管理域）
+        p.add(new PermDef(MdsPermissions.TECH_VIEW, "制程技术查看"));
+        p.add(new PermDef(MdsPermissions.TECH_CREATE, "制程技术新建"));
+        p.add(new PermDef(MdsPermissions.TECH_UPDATE, "制程技术编辑"));
+        p.add(new PermDef(MdsPermissions.TECH_DELETE, "制程技术删除"));
+        // Product（产品管理域）
+        p.add(new PermDef(MdsPermissions.PRODUCT_VIEW, "产品查看"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_CREATE, "产品新建"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_UPDATE, "产品编辑"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_DELETE, "产品删除"));
+        // 数据字典（平台域，码源 cim-system PermissionCodes）
+        p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
+        p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
+        p.add(new PermDef(PermissionCodes.DICT_REMOVE, "数据字典删除"));
         return p;
     }
 
@@ -166,11 +209,15 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.FAB_VIEW, MdsPermissions.FAB_CREATE, MdsPermissions.FAB_UPDATE,
                 MdsPermissions.AREA_VIEW, MdsPermissions.AREA_CREATE, MdsPermissions.AREA_UPDATE,
                 MdsPermissions.BAY_VIEW, MdsPermissions.BAY_CREATE, MdsPermissions.BAY_UPDATE,
-                MdsPermissions.STAGE_VIEW, MdsPermissions.STAGE_CREATE, MdsPermissions.STAGE_UPDATE);
+                MdsPermissions.STAGE_VIEW, MdsPermissions.STAGE_CREATE, MdsPermissions.STAGE_UPDATE,
+                MdsPermissions.TECH_VIEW, MdsPermissions.TECH_CREATE, MdsPermissions.TECH_UPDATE,
+                MdsPermissions.PRODUCT_VIEW, MdsPermissions.PRODUCT_CREATE, MdsPermissions.PRODUCT_UPDATE,
+                PermissionCodes.DICT_LIST, PermissionCodes.DICT_SAVE);
         // 只读：各域 view
         List<String> viewer = List.of(
                 MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW,
-                MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW);
+                MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW, MdsPermissions.TECH_VIEW,
+                MdsPermissions.PRODUCT_VIEW, PermissionCodes.DICT_LIST);
         List<RoleDef> r = new ArrayList<>();
         r.add(new RoleDef(ROLE_ADMIN, "MDS 管理员", true, allPerms));
         r.add(new RoleDef(ROLE_OPERATOR, "MDS 操作员", false, operator));
@@ -198,9 +245,9 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.group.site", "场地主数据", "Site master data"));
         t.add(new TextDef("mds.nav.topology", "位置拓扑", "Locations"));
         // —— 按钮动作（授权界面回显用；单菜单五层，显式命名）——
-        t.add(new TextDef("mds.nav.topology.action.site.create", "基地·新建", "Site · create"));
-        t.add(new TextDef("mds.nav.topology.action.site.update", "基地·编辑", "Site · update"));
-        t.add(new TextDef("mds.nav.topology.action.site.delete", "基地·删除", "Site · delete"));
+        t.add(new TextDef("mds.nav.topology.action.site.create", "厂区·新建", "Site · create"));
+        t.add(new TextDef("mds.nav.topology.action.site.update", "厂区·编辑", "Site · update"));
+        t.add(new TextDef("mds.nav.topology.action.site.delete", "厂区·删除", "Site · delete"));
         t.add(new TextDef("mds.nav.topology.action.fab.create", "Fab·新建", "Fab · create"));
         t.add(new TextDef("mds.nav.topology.action.fab.update", "Fab·编辑", "Fab · update"));
         t.add(new TextDef("mds.nav.topology.action.fab.delete", "Fab·删除", "Fab · delete"));
@@ -213,6 +260,21 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.topology.action.stage.create", "Stage·新建", "Stage · create"));
         t.add(new TextDef("mds.nav.topology.action.stage.update", "Stage·编辑", "Stage · update"));
         t.add(new TextDef("mds.nav.topology.action.stage.delete", "Stage·删除", "Stage · delete"));
+        // —— 产品管理 ——
+        t.add(new TextDef("mds.nav.group.product", "产品管理", "Products"));
+        t.add(new TextDef("mds.nav.group.system", "系统管理", "System"));
+        t.add(new TextDef("mds.nav.technology", "制程技术", "Technologies"));
+        t.add(new TextDef("mds.nav.technology.action.create", "制程技术·新建", "Technology · create"));
+        t.add(new TextDef("mds.nav.technology.action.update", "制程技术·编辑", "Technology · update"));
+        t.add(new TextDef("mds.nav.technology.action.delete", "制程技术·删除", "Technology · delete"));
+        t.add(new TextDef("mds.nav.products", "产品", "Products"));
+        t.add(new TextDef("mds.nav.products.action.create", "产品·新建", "Product · create"));
+        t.add(new TextDef("mds.nav.products.action.update", "产品·编辑", "Product · update"));
+        t.add(new TextDef("mds.nav.products.action.delete", "产品·删除", "Product · delete"));
+        // —— 数据字典 ——
+        t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
+        t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));
+        t.add(new TextDef("mds.nav.dicts.action.delete", "数据字典·删除", "Dictionary · delete"));
         // —— 外壳 ——
         t.add(new TextDef("mds.shell.brandSub", "主数据服务", "Master Data Service"));
         t.add(new TextDef("mds.shell.tagline", "定义向下、实绩向上", "Definitions down, actuals up"));

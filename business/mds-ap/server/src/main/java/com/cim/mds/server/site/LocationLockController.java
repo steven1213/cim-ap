@@ -41,8 +41,11 @@ public class LocationLockController {
             "site", MdsPermissions.SITE_UPDATE,
             "fab", MdsPermissions.FAB_UPDATE,
             "area", MdsPermissions.AREA_UPDATE,
+            "areaGroup", MdsPermissions.AREA_UPDATE,
             "bay", MdsPermissions.BAY_UPDATE,
-            "stage", MdsPermissions.STAGE_UPDATE);
+            "stage", MdsPermissions.STAGE_UPDATE,
+            "technology", MdsPermissions.TECH_UPDATE,
+            "product", MdsPermissions.PRODUCT_UPDATE);
 
     /** GET /locations/{type}/{id}/lock —— 锁状态（前端渲染「被谁编辑中」徽标）。 */
     @GetMapping("/{type}/{id}/lock")

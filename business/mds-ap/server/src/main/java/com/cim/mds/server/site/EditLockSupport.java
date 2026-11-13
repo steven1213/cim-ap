@@ -35,8 +35,11 @@ public class EditLockSupport {
             "site", "cim_site",
             "fab", "cim_fab",
             "area", "cim_area",
+            "areaGroup", "cim_area_group",
             "bay", "cim_bay",
-            "stage", "cim_stage");
+            "stage", "cim_stage",
+            "technology", "cim_technology",
+            "product", "cim_product");
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();

@@ -47,6 +47,18 @@ public final class MdsPermissions {
     public static final String STAGE_UPDATE = "mds:stage:update";
     public static final String STAGE_DELETE = "mds:stage:delete";
 
+    // ---------------- 制程技术（Technology，产品管理域） ----------------
+    public static final String TECH_VIEW = "mds:tech:view";
+    public static final String TECH_CREATE = "mds:tech:create";
+    public static final String TECH_UPDATE = "mds:tech:update";
+    public static final String TECH_DELETE = "mds:tech:delete";
+
+    // ---------------- 产品（Product，产品管理域） ----------------
+    public static final String PRODUCT_VIEW = "mds:product:view";
+    public static final String PRODUCT_CREATE = "mds:product:create";
+    public static final String PRODUCT_UPDATE = "mds:product:update";
+    public static final String PRODUCT_DELETE = "mds:product:delete";
+
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
         Set<String> codes = new LinkedHashSet<>();
@@ -70,6 +82,14 @@ public final class MdsPermissions {
         codes.add(STAGE_CREATE);
         codes.add(STAGE_UPDATE);
         codes.add(STAGE_DELETE);
+        codes.add(TECH_VIEW);
+        codes.add(TECH_CREATE);
+        codes.add(TECH_UPDATE);
+        codes.add(TECH_DELETE);
+        codes.add(PRODUCT_VIEW);
+        codes.add(PRODUCT_CREATE);
+        codes.add(PRODUCT_UPDATE);
+        codes.add(PRODUCT_DELETE);
         return codes;
     }
 }
