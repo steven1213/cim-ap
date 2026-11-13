@@ -36,4 +36,22 @@ export const MDS_PERMS = {
     update: 'mds:stage:update',
     delete: 'mds:stage:delete',
   },
+  tech: {
+    view: 'mds:tech:view',
+    create: 'mds:tech:create',
+    update: 'mds:tech:update',
+    delete: 'mds:tech:delete',
+  },
+  product: {
+    view: 'mds:product:view',
+    create: 'mds:product:create',
+    update: 'mds:product:update',
+    delete: 'mds:product:delete',
+  },
+  // 数据字典：码源在平台 cim-system PermissionCodes（sys:dict:*），MDS 目录入库沿用
+  dict: {
+    view: 'sys:dict:list',
+    save: 'sys:dict:save',
+    delete: 'sys:dict:remove',
+  },
 } as const;

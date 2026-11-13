@@ -1,10 +1,11 @@
-import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CimButton, CimSpin } from '@cim/ui';
+import { CimButton, CimSpin, UiDictProvider } from '@cim/ui';
 import { ProtectedRoute, RequirePermission, SsoRelay } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useHasPermission } from '@/lib/usePermission';
+import * as api from '@/lib/mdsApi';
 import Layout from '@/components/Layout';
 
 // 登录/回调/403/404 保持同步加载：未登录用户首屏就落在这几条上，
@@ -50,6 +51,9 @@ function lazyRoute(Page: ComponentType, permCode?: string) {
 
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
+const TechnologyPage = lazy(() => import('@/pages/TechnologyPage'));
+const ProductPage = lazy(() => import('@/pages/ProductPage'));
+const DictPage = lazy(() => import('@/pages/DictPage'));
 
 /**
  * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），再渲染受保护路由，
@@ -144,6 +148,22 @@ function BootGate({ children }: { children: ReactNode }) {
 
 export default function App() {
   const token = useAuthStore((s) => s.token);
+  const { t, i18n } = useTranslation();
+
+  /** 平台字典 loader：落库值=itemKey，显示优先 i18n（命中才用）否则 itemValue。 */
+  const dictLoader = useCallback(
+    async (code: string) => {
+      const items = await api.fetchDictItems(code);
+      return items.map((it) => ({
+        value: it.itemKey,
+        label:
+          it.i18nCode && i18n.exists(it.i18nCode)
+            ? t(it.i18nCode)
+            : (it.itemValue ?? it.itemKey),
+      }));
+    },
+    [t, i18n],
+  );
 
   return (
     <BrowserRouter>
@@ -159,13 +179,18 @@ export default function App() {
             // `<Navigate to="/login">`（不带 error）把原因吞掉，登录页便自动中继回 IAM → 往返。
             <BootGate>
               <ProtectedRoute authenticated={!!token}>
-                <Layout />
+                <UiDictProvider loader={dictLoader}>
+                  <Layout />
+                </UiDictProvider>
               </ProtectedRoute>
             </BootGate>
           }
         >
           <Route path="/" element={lazyRoute(DashboardPage)} />
           <Route path="/topology" element={lazyRoute(TopologyPage, 'mds:site:view')} />
+          <Route path="/technologies" element={lazyRoute(TechnologyPage, 'mds:tech:view')} />
+          <Route path="/products" element={lazyRoute(ProductPage, 'mds:product:view')} />
+          <Route path="/dicts" element={lazyRoute(DictPage, 'sys:dict:list')} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

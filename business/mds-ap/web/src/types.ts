@@ -50,6 +50,20 @@ export interface Area {
   fabName: string | null;
   areaName: string;
   areaType: string | null;
+  areaGroupId: string | null;
+  remark: string | null;
+  enabled: boolean;
+  description: string | null;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+/** 区域组（AreaGroup）—— Area 的统计口径分类（location-design.md §9.1）。 */
+export interface AreaGroup {
+  id: string;
+  groupCode: string;
+  fabCode: string;
+  groupName: string;
   remark: string | null;
   enabled: boolean;
   description: string | null;
@@ -115,6 +129,15 @@ export interface AreaPayload {
   fabCode: string;
   areaName: string;
   areaType?: string | null;
+  areaGroupId?: string | null;
+  remark?: string | null;
+  enabled?: boolean;
+}
+
+export interface AreaGroupPayload {
+  groupCode: string;
+  fabCode: string;
+  groupName: string;
   remark?: string | null;
   enabled?: boolean;
 }
@@ -142,4 +165,97 @@ export interface LockState {
   occupied: boolean;
   occupiedBy: string | null;
   occupiedAt: string | null;
+}
+
+// ---------------------------------------------------------------- 产品管理域
+
+/** 制程技术（Technology）：产品之上的技术节点分类（全局唯一编码）。 */
+export interface Technology {
+  id: string;
+  techCode: string;
+  techName: string;
+  techNode: string | null;
+  remark: string | null;
+  enabled: boolean;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface TechnologyPayload {
+  techCode: string;
+  techName: string;
+  techNode?: string | null;
+  remark?: string | null;
+  enabled?: boolean;
+}
+
+/** 产品（Product）：产品管理域主数据（tech_code 逻辑引用制程技术；类型 PROD=量产/NPW=陪片）。 */
+export interface Product {
+  id: string;
+  productCode: string;
+  productName: string;
+  techCode: string | null;
+  productType: 'PROD' | 'NPW';
+  productGroup: string | null;
+  waferType: string | null;
+  owner: string | null;
+  remark: string | null;
+  enabled: boolean;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ProductPayload {
+  productCode: string;
+  productName: string;
+  techCode?: string | null;
+  productType?: 'PROD' | 'NPW';
+  productGroup?: string | null;
+  waferType?: string | null;
+  owner?: string | null;
+  remark?: string | null;
+  enabled?: boolean;
+}
+
+// ---------------------------------------------------------------- 数据字典（平台 sys_dict）
+
+/** 字典（sys_dict）。isSystem=true 的不可删除（种子/内置枚举保护位）。 */
+export interface DictInfo {
+  id: string;
+  code: string;
+  name: string | null;
+  status: 'ENABLED' | 'DISABLED';
+  isSystem: boolean;
+  description: string | null;
+}
+
+/** 字典明细（sys_dict_item）。itemKey=落库值，itemValue=显示文案。 */
+export interface DictItem {
+  id: string;
+  dictId: string;
+  itemKey: string;
+  i18nCode: string | null;
+  itemValue: string | null;
+  sortNo: number | null;
+  status: 'ENABLED' | 'DISABLED';
+  isSystem: boolean;
+}
+
+/** 字典写入载荷（code 建后不可改，编辑时后端忽略）。 */
+export interface DictPayload {
+  code: string;
+  name?: string | null;
+  isSystem?: boolean;
+  status?: 'ENABLED' | 'DISABLED';
+  description?: string | null;
+}
+
+/** 字典明细写入载荷（itemKey 改动后端会重查重）。 */
+export interface DictItemPayload {
+  itemKey: string;
+  itemValue?: string | null;
+  i18nCode?: string | null;
+  sortNo?: number | null;
+  status?: 'ENABLED' | 'DISABLED';
+  isSystem?: boolean;
 }

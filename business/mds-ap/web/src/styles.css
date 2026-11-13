@@ -176,3 +176,53 @@
   gap: 8px;
   padding: 0 4px;
 }
+
+/* 区域组分节（TopologyPage，location-design.md §9.1）：虚线组头=虚拟分节，选中/操作与节点行同构（右侧详情面板） */
+.topo-group-row {
+  align-items: center;
+  background: transparent;
+  border: 0.5px dashed var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  font-size: var(--fs-sm);
+  gap: 6px;
+  margin: 3px 0;
+  padding: 3px 8px;
+  user-select: none;
+}
+
+.topo-group-row.static {
+  cursor: default;
+}
+
+.topo-group-row.selected {
+  background: var(--primary-soft);
+  border-style: solid;
+  outline: 0.5px solid var(--primary);
+}
+
+.topo-group-name {
+  font-weight: 500;
+}
+
+.topo-group-filter {
+  flex: none;
+  width: 148px;
+}
+
+/* 分组弹窗内的 Fab 归属提示（组必属某 Fab，表单里它是隐含上下文） */
+.topo-fab-hint {
+  font-size: var(--fs-sm);
+  margin: 0 0 8px;
+}
+
+/* 数据字典页：主从两表之间的小节标题 / 选中行高亮 */
+.dict-items-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+.row-selected {
+  background: var(--c-primary-bg, rgba(59, 130, 246, 0.08));
+}

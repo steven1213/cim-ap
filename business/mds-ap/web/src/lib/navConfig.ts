@@ -1,5 +1,8 @@
 import {
+  IconApps,
   IconGauge,
+  IconList,
+  IconSliders,
   IconTree,
 } from '@cim/ui';
 import type { ShellIconCmp } from '@cim/shell';
@@ -37,6 +40,19 @@ export const NAV_GROUPS: NavGroup[] = [
       // 2026-11-13 收敛：sites/fabs/areas 三页合一页「位置拓扑」（location-design.md §8.3）
       { to: '/topology', i18n: 'mds.nav.topology', Icon: IconTree },
     ],
+  },
+  {
+    // 产品管理：Technology + Product（Route 预留，MdsConsoleCatalog grp.product 同构）
+    i18n: 'mds.nav.group.product',
+    items: [
+      { to: '/technologies', i18n: 'mds.nav.technology', Icon: IconSliders },
+      { to: '/products', i18n: 'mds.nav.products', Icon: IconApps },
+    ],
+  },
+  {
+    // 系统管理：平台级参照数据（数据字典等，grp.system 同构）
+    i18n: 'mds.nav.group.system',
+    items: [{ to: '/dicts', i18n: 'mds.nav.dicts', Icon: IconList }],
   },
 ];
 
