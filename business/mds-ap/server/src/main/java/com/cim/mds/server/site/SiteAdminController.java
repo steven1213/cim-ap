@@ -31,6 +31,7 @@ import java.util.List;
 public class SiteAdminController {
 
     private final SiteAdminService service;
+    private final AreaGroupAdminService groupService;
 
     // ---------- 基地 ----------
 
@@ -115,6 +116,37 @@ public class SiteAdminController {
     @DeleteMapping("/areas/{id}")
     public Result<Void> deleteArea(@PathVariable String id) {
         service.deleteArea(id);
+        return Result.ok(null);
+    }
+
+    // ---------- 区域组（AreaGroup：Area 的统计口径分类，location-design.md §9.1；权限复用 mds:area:*） ----------
+
+    @PreAuthorize("hasAuthority('mds:area:view')")
+    @GetMapping("/area-groups")
+    public Result<List<AreaGroupAdminService.AreaGroupView>> areaGroups(
+            @RequestParam(required = false) String fabCode,
+            @RequestParam(required = false) String keyword) {
+        return Result.ok(groupService.list(fabCode, keyword));
+    }
+
+    @PreAuthorize("hasAuthority('mds:area:create')")
+    @PostMapping("/area-groups")
+    public Result<AreaGroupAdminService.AreaGroupView> createAreaGroup(
+            @RequestBody AreaGroupAdminService.AreaGroupReq req) {
+        return Result.ok(groupService.create(req));
+    }
+
+    @PreAuthorize("hasAuthority('mds:area:update')")
+    @PutMapping("/area-groups/{id}")
+    public Result<AreaGroupAdminService.AreaGroupView> updateAreaGroup(
+            @PathVariable String id, @RequestBody AreaGroupAdminService.AreaGroupReq req) {
+        return Result.ok(groupService.update(id, req));
+    }
+
+    @PreAuthorize("hasAuthority('mds:area:delete')")
+    @DeleteMapping("/area-groups/{id}")
+    public Result<Void> deleteAreaGroup(@PathVariable String id) {
+        groupService.delete(id);
         return Result.ok(null);
     }
 }

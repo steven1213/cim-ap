@@ -33,6 +33,9 @@ public class SiteAdminService {
     private final CimSiteRepository siteRepository;
     private final CimFabRepository fabRepository;
     private final CimAreaRepository areaRepository;
+
+    /** 区域组校验/解析（组与 Area 同 Fab、启用；§9.1）。 */
+    private final AreaGroupAdminService areaGroupAdminService;
     private final CimBayRepository bayRepository;
 
     // ------------------------------------------------------------------ 视图
@@ -50,8 +53,8 @@ public class SiteAdminService {
     }
 
     public record AreaView(String id, String areaCode, String fabCode, String fabName, String areaName,
-                           String areaType, String remark, Boolean enabled, String description,
-                           Boolean occupied, String occupiedBy) {
+                           String areaType, String areaGroupId, String remark, Boolean enabled,
+                           String description, Boolean occupied, String occupiedBy) {
     }
 
     // ------------------------------------------------------------------ 请求
@@ -65,7 +68,7 @@ public class SiteAdminService {
     }
 
     public record AreaReq(String areaCode, String fabCode, String areaName, String areaType,
-                          String remark, Boolean enabled, String description) {
+                          String areaGroupId, String remark, Boolean enabled, String description) {
     }
 
     // ------------------------------------------------------------------ Site
@@ -180,7 +183,7 @@ public class SiteAdminService {
         return areaRepository.search(blankToNull(fabCode), blankToNull(keyword)).stream()
                 .map(a -> new AreaView(a.getId(), a.getAreaCode(), a.getFabCode(),
                         fabNames.get(a.getFabCode()), a.getAreaName(), a.getAreaType(),
-                        a.getRemark(), a.getEnabled(), a.getDescription(),
+                        a.getAreaGroupId(), a.getRemark(), a.getEnabled(), a.getDescription(),
                         a.getOccupied(), a.getOccupiedBy()))
                 .toList();
     }
@@ -197,6 +200,8 @@ public class SiteAdminService {
         }
         CimArea entity = new CimArea();
         applyArea(entity, req);
+        entity.setAreaGroupId(areaGroupAdminService.resolveGroupIdForArea(
+                req.areaGroupId(), entity.getFabCode()));
         return toView(fabNameMap(), areaRepository.save(entity));
     }
 
@@ -218,6 +223,9 @@ public class SiteAdminService {
             entity.setFabCode(req.fabCode().trim());
         }
         applyArea(entity, req);
+        // 归属 Fab 可能刚被改过：组校验用最终 fabCode（组与 Area 必须同 Fab，§9.1）
+        entity.setAreaGroupId(areaGroupAdminService.resolveGroupIdForArea(
+                req.areaGroupId(), entity.getFabCode()));
         clearLock(entity);
         return toView(fabNameMap(), areaRepository.save(entity));
     }
@@ -354,8 +362,8 @@ public class SiteAdminService {
 
     private static AreaView toView(Map<String, String> fabNames, CimArea a) {
         return new AreaView(a.getId(), a.getAreaCode(), a.getFabCode(), fabNames.get(a.getFabCode()),
-                a.getAreaName(), a.getAreaType(), a.getRemark(), a.getEnabled(), a.getDescription(),
-                a.getOccupied(), a.getOccupiedBy());
+                a.getAreaName(), a.getAreaType(), a.getAreaGroupId(), a.getRemark(), a.getEnabled(),
+                a.getDescription(), a.getOccupied(), a.getOccupiedBy());
     }
 
     private static String blankToNull(String v) {

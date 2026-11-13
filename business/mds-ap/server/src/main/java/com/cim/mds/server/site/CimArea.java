@@ -39,6 +39,10 @@ public class CimArea extends EditLockDefData {
     @Column(name = "area_type", length = 32)
     private String areaType;
 
+    /** 所属区域组 id（可空逻辑引用 {@code cim_area_group.id}；统计口径分类，见 location-design.md §9.1）。 */
+    @Column(name = "area_group_id", length = 64)
+    private String areaGroupId;
+
     /** 备注。 */
     @Column(name = "remark", length = 512)
     private String remark;

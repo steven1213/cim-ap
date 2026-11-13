@@ -14,6 +14,9 @@ public interface CimAreaRepository extends JpaRepository<CimArea, String> {
 
     long countByFabCodeAndDeletedFalse(String fabCode);
 
+    /** 区域组删除守门：组内仍有 Area 时不可删（location-design.md §9.1）。 */
+    long countByAreaGroupIdAndDeletedFalse(String areaGroupId);
+
     /** 列表 + 归属过滤 + 关键字（{@code fabCode}/{@code kw} 皆可空）。 */
     @Query("""
             select a from CimArea a
