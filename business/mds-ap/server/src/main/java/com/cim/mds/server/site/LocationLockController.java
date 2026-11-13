@@ -37,15 +37,18 @@ public class LocationLockController {
     private final EditLockSupport lockSupport;
 
     /** type → 该层 update 权限码（type 来自 URL，必须过白名单）。 */
-    private static final Map<String, String> EDIT_PERM = Map.of(
-            "site", MdsPermissions.SITE_UPDATE,
-            "fab", MdsPermissions.FAB_UPDATE,
-            "area", MdsPermissions.AREA_UPDATE,
-            "areaGroup", MdsPermissions.AREA_UPDATE,
-            "bay", MdsPermissions.BAY_UPDATE,
-            "stage", MdsPermissions.STAGE_UPDATE,
-            "technology", MdsPermissions.TECH_UPDATE,
-            "product", MdsPermissions.PRODUCT_UPDATE);
+    private static final Map<String, String> EDIT_PERM = Map.ofEntries(
+            Map.entry("site", MdsPermissions.SITE_UPDATE),
+            Map.entry("fab", MdsPermissions.FAB_UPDATE),
+            Map.entry("area", MdsPermissions.AREA_UPDATE),
+            Map.entry("areaGroup", MdsPermissions.AREA_UPDATE),
+            Map.entry("bay", MdsPermissions.BAY_UPDATE),
+            Map.entry("stage", MdsPermissions.STAGE_UPDATE),
+            Map.entry("technology", MdsPermissions.TECH_UPDATE),
+            Map.entry("product", MdsPermissions.PRODUCT_UPDATE),
+            Map.entry("equipmentType", MdsPermissions.EQP_TYPE_UPDATE),
+            Map.entry("equipment", MdsPermissions.EQUIPMENT_UPDATE),
+            Map.entry("capability", MdsPermissions.CAPABILITY_UPDATE));
 
     /** GET /locations/{type}/{id}/lock —— 锁状态（前端渲染「被谁编辑中」徽标）。 */
     @GetMapping("/{type}/{id}/lock")

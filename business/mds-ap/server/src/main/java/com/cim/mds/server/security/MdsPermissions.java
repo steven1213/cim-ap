@@ -59,6 +59,24 @@ public final class MdsPermissions {
     public static final String PRODUCT_UPDATE = "mds:product:update";
     public static final String PRODUCT_DELETE = "mds:product:delete";
 
+    // ---------------- 设备类型（EquipmentType，设备管理域） ----------------
+    public static final String EQP_TYPE_VIEW = "mds:equipmentType:view";
+    public static final String EQP_TYPE_CREATE = "mds:equipmentType:create";
+    public static final String EQP_TYPE_UPDATE = "mds:equipmentType:update";
+    public static final String EQP_TYPE_DELETE = "mds:equipmentType:delete";
+
+    // ---------------- 设备（Equipment，设备管理域） ----------------
+    public static final String EQUIPMENT_VIEW = "mds:equipment:view";
+    public static final String EQUIPMENT_CREATE = "mds:equipment:create";
+    public static final String EQUIPMENT_UPDATE = "mds:equipment:update";
+    public static final String EQUIPMENT_DELETE = "mds:equipment:delete";
+
+    // ---------------- 设备能力（Capability，设备管理域） ----------------
+    public static final String CAPABILITY_VIEW = "mds:capability:view";
+    public static final String CAPABILITY_CREATE = "mds:capability:create";
+    public static final String CAPABILITY_UPDATE = "mds:capability:update";
+    public static final String CAPABILITY_DELETE = "mds:capability:delete";
+
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
         Set<String> codes = new LinkedHashSet<>();
@@ -90,6 +108,18 @@ public final class MdsPermissions {
         codes.add(PRODUCT_CREATE);
         codes.add(PRODUCT_UPDATE);
         codes.add(PRODUCT_DELETE);
+        codes.add(EQP_TYPE_VIEW);
+        codes.add(EQP_TYPE_CREATE);
+        codes.add(EQP_TYPE_UPDATE);
+        codes.add(EQP_TYPE_DELETE);
+        codes.add(EQUIPMENT_VIEW);
+        codes.add(EQUIPMENT_CREATE);
+        codes.add(EQUIPMENT_UPDATE);
+        codes.add(EQUIPMENT_DELETE);
+        codes.add(CAPABILITY_VIEW);
+        codes.add(CAPABILITY_CREATE);
+        codes.add(CAPABILITY_UPDATE);
+        codes.add(CAPABILITY_DELETE);
         return codes;
     }
 }

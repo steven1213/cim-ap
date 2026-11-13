@@ -110,6 +110,42 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.PRODUCT_UPDATE, 20));
         m.add(button("btn.product.delete", "products", "mds.nav.products.action.delete",
                 MdsPermissions.PRODUCT_DELETE, 30));
+        // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
+        // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
+        m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
+        m.add(menu("transportEquipments", "grp.equipment", "/transport-equipments", "TransportEquipments",
+                "mds.nav.transportEquipments", "monitor", null, 10));
+        m.add(menu("equipments", "grp.equipment", "/equipments", "Equipments",
+                "mds.nav.equipments", "monitor", null, 20));
+        m.add(menu("equipmentTypes", "grp.equipment", "/equipment-types", "EquipmentTypes",
+                "mds.nav.equipmentTypes", "sliders", null, 30));
+        m.add(menu("capabilities", "grp.equipment", "/capabilities", "Capabilities",
+                "mds.nav.capabilities", "shield", null, 40));
+        m.add(button("btn.transportEquipment.create", "transportEquipments", "mds.nav.transportEquipments.action.create",
+                MdsPermissions.EQUIPMENT_CREATE, 10));
+        m.add(button("btn.transportEquipment.update", "transportEquipments", "mds.nav.transportEquipments.action.update",
+                MdsPermissions.EQUIPMENT_UPDATE, 20));
+        m.add(button("btn.transportEquipment.delete", "transportEquipments", "mds.nav.transportEquipments.action.delete",
+                MdsPermissions.EQUIPMENT_DELETE, 30));
+        m.add(button("btn.equipment2.create", "equipments", "mds.nav.equipments.action.create",
+                MdsPermissions.EQUIPMENT_CREATE, 10));
+        m.add(button("btn.equipment2.update", "equipments", "mds.nav.equipments.action.update",
+                MdsPermissions.EQUIPMENT_UPDATE, 20));
+        m.add(button("btn.equipment2.delete", "equipments", "mds.nav.equipments.action.delete",
+                MdsPermissions.EQUIPMENT_DELETE, 30));
+        m.add(button("btn.equipmentType.create", "equipmentTypes", "mds.nav.equipmentTypes.action.create",
+                MdsPermissions.EQP_TYPE_CREATE, 10));
+        m.add(button("btn.equipmentType.update", "equipmentTypes", "mds.nav.equipmentTypes.action.update",
+                MdsPermissions.EQP_TYPE_UPDATE, 20));
+        m.add(button("btn.equipmentType.delete", "equipmentTypes", "mds.nav.equipmentTypes.action.delete",
+                MdsPermissions.EQP_TYPE_DELETE, 30));
+        m.add(button("btn.capability.create", "capabilities", "mds.nav.capabilities.action.create",
+                MdsPermissions.CAPABILITY_CREATE, 10));
+        m.add(button("btn.capability.update", "capabilities", "mds.nav.capabilities.action.update",
+                MdsPermissions.CAPABILITY_UPDATE, 20));
+        m.add(button("btn.capability.delete", "capabilities", "mds.nav.capabilities.action.delete",
+                MdsPermissions.CAPABILITY_DELETE, 30));
+
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
         m.add(dir("grp.system", "mds.nav.group.system", 40));
@@ -180,6 +216,21 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.PRODUCT_CREATE, "产品新建"));
         p.add(new PermDef(MdsPermissions.PRODUCT_UPDATE, "产品编辑"));
         p.add(new PermDef(MdsPermissions.PRODUCT_DELETE, "产品删除"));
+        // EquipmentType（设备管理域）
+        p.add(new PermDef(MdsPermissions.EQP_TYPE_VIEW, "设备类型查看"));
+        p.add(new PermDef(MdsPermissions.EQP_TYPE_CREATE, "设备类型新建"));
+        p.add(new PermDef(MdsPermissions.EQP_TYPE_UPDATE, "设备类型编辑"));
+        p.add(new PermDef(MdsPermissions.EQP_TYPE_DELETE, "设备类型删除"));
+        // Equipment（设备管理域）
+        p.add(new PermDef(MdsPermissions.EQUIPMENT_VIEW, "设备查看"));
+        p.add(new PermDef(MdsPermissions.EQUIPMENT_CREATE, "设备新建"));
+        p.add(new PermDef(MdsPermissions.EQUIPMENT_UPDATE, "设备编辑"));
+        p.add(new PermDef(MdsPermissions.EQUIPMENT_DELETE, "设备删除"));
+        // Capability（设备管理域）
+        p.add(new PermDef(MdsPermissions.CAPABILITY_VIEW, "设备能力查看"));
+        p.add(new PermDef(MdsPermissions.CAPABILITY_CREATE, "设备能力新建"));
+        p.add(new PermDef(MdsPermissions.CAPABILITY_UPDATE, "设备能力编辑"));
+        p.add(new PermDef(MdsPermissions.CAPABILITY_DELETE, "设备能力删除"));
         // 数据字典（平台域，码源 cim-system PermissionCodes）
         p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
         p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
@@ -212,12 +263,17 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.STAGE_VIEW, MdsPermissions.STAGE_CREATE, MdsPermissions.STAGE_UPDATE,
                 MdsPermissions.TECH_VIEW, MdsPermissions.TECH_CREATE, MdsPermissions.TECH_UPDATE,
                 MdsPermissions.PRODUCT_VIEW, MdsPermissions.PRODUCT_CREATE, MdsPermissions.PRODUCT_UPDATE,
+                MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQP_TYPE_CREATE, MdsPermissions.EQP_TYPE_UPDATE,
+                MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.EQUIPMENT_CREATE, MdsPermissions.EQUIPMENT_UPDATE,
+                MdsPermissions.CAPABILITY_VIEW, MdsPermissions.CAPABILITY_CREATE, MdsPermissions.CAPABILITY_UPDATE,
                 PermissionCodes.DICT_LIST, PermissionCodes.DICT_SAVE);
         // 只读：各域 view
         List<String> viewer = List.of(
                 MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW,
                 MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW, MdsPermissions.TECH_VIEW,
-                MdsPermissions.PRODUCT_VIEW, PermissionCodes.DICT_LIST);
+                MdsPermissions.PRODUCT_VIEW,
+                MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
+                PermissionCodes.DICT_LIST);
         List<RoleDef> r = new ArrayList<>();
         r.add(new RoleDef(ROLE_ADMIN, "MDS 管理员", true, allPerms));
         r.add(new RoleDef(ROLE_OPERATOR, "MDS 操作员", false, operator));
@@ -271,6 +327,24 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.products.action.create", "产品·新建", "Product · create"));
         t.add(new TextDef("mds.nav.products.action.update", "产品·编辑", "Product · update"));
         t.add(new TextDef("mds.nav.products.action.delete", "产品·删除", "Product · delete"));
+        // —— 设备管理 ——
+        t.add(new TextDef("mds.nav.group.equipment", "设备管理", "Equipment"));
+        t.add(new TextDef("mds.nav.transportEquipments", "搬运设备", "Transport equipment"));
+        t.add(new TextDef("mds.nav.transportEquipments.action.create", "搬运设备·新建", "Transport equipment · create"));
+        t.add(new TextDef("mds.nav.transportEquipments.action.update", "搬运设备·编辑", "Transport equipment · update"));
+        t.add(new TextDef("mds.nav.transportEquipments.action.delete", "搬运设备·删除", "Transport equipment · delete"));
+        t.add(new TextDef("mds.nav.equipments", "设备", "Equipment"));
+        t.add(new TextDef("mds.nav.equipments.action.create", "设备·新建", "Equipment · create"));
+        t.add(new TextDef("mds.nav.equipments.action.update", "设备·编辑", "Equipment · update"));
+        t.add(new TextDef("mds.nav.equipments.action.delete", "设备·删除", "Equipment · delete"));
+        t.add(new TextDef("mds.nav.equipmentTypes", "设备类型", "Equipment types"));
+        t.add(new TextDef("mds.nav.equipmentTypes.action.create", "设备类型·新建", "Equipment type · create"));
+        t.add(new TextDef("mds.nav.equipmentTypes.action.update", "设备类型·编辑", "Equipment type · update"));
+        t.add(new TextDef("mds.nav.equipmentTypes.action.delete", "设备类型·删除", "Equipment type · delete"));
+        t.add(new TextDef("mds.nav.capabilities", "设备能力", "Capabilities"));
+        t.add(new TextDef("mds.nav.capabilities.action.create", "设备能力·新建", "Capability · create"));
+        t.add(new TextDef("mds.nav.capabilities.action.update", "设备能力·编辑", "Capability · update"));
+        t.add(new TextDef("mds.nav.capabilities.action.delete", "设备能力·删除", "Capability · delete"));
         // —— 数据字典 ——
         t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
         t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));

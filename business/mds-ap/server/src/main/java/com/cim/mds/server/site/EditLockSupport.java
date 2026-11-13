@@ -31,15 +31,18 @@ import java.util.Set;
 public class EditLockSupport {
 
     /** 类型 → 表名白名单（type 来自 URL，绝不能拼进 SQL，必须过这张表）。 */
-    private static final Map<String, String> TABLES = Map.of(
-            "site", "cim_site",
-            "fab", "cim_fab",
-            "area", "cim_area",
-            "areaGroup", "cim_area_group",
-            "bay", "cim_bay",
-            "stage", "cim_stage",
-            "technology", "cim_technology",
-            "product", "cim_product");
+    private static final Map<String, String> TABLES = Map.ofEntries(
+            Map.entry("site", "cim_site"),
+            Map.entry("fab", "cim_fab"),
+            Map.entry("area", "cim_area"),
+            Map.entry("areaGroup", "cim_area_group"),
+            Map.entry("bay", "cim_bay"),
+            Map.entry("stage", "cim_stage"),
+            Map.entry("technology", "cim_technology"),
+            Map.entry("product", "cim_product"),
+            Map.entry("equipmentType", "cim_equipment_type"),
+            Map.entry("equipment", "cim_equipment"),
+            Map.entry("capability", "cim_capability"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();
