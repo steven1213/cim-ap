@@ -36,4 +36,7 @@ public class SysDictItemHist extends BaseHistoryData implements Historizable {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16)
     private EnableStatus status;
+
+    @Column(name = "is_system")
+    private Boolean isSystem;
 }

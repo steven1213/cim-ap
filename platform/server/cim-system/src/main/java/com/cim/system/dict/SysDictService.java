@@ -63,16 +63,49 @@ public class SysDictService extends AbstractJpaService<SysDict> {
     @Transactional
     @PreAuthorize("hasAuthority('" + PermissionCodes.DICT_SAVE + "')")
     public SysDict update(SysDict entity) {
-        return super.update(entity);
+        // 请求体是无 version 的裸实体：直接 save 会被 Spring Data 当「新实体」走 persist（主键冲突 500）。
+        // 与 MDS 各 AdminService 同款：加载托管实体拷贝字段；code 是引用键（业务表存 code）不可改。
+        SysDict existing = dictRepository.findById(entity.getId())
+                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "dict not found: " + entity.getId()));
+        if (entity.getName() != null) {
+            existing.setName(entity.getName());
+        }
+        if (entity.getStatus() != null) {
+            existing.setStatus(entity.getStatus());
+        }
+        if (entity.getDescription() != null) {
+            existing.setDescription(entity.getDescription());
+        }
+        if (entity.getIsSystem() != null) {
+            existing.setIsSystem(entity.getIsSystem());
+        }
+        return super.update(existing);
     }
 
     @Override
     @Transactional
     @PreAuthorize("hasAuthority('" + PermissionCodes.DICT_REMOVE + "')")
     public void remove(String id) {
+        SysDict dict = dictRepository.findById(id)
+                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "dict not found: " + id));
+        // 系统级字典不可删除（种子写入的行业固定枚举，删了业务表单就断下拉源）
+        if (Boolean.TRUE.equals(dict.getIsSystem())) {
+            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
+                    "system dict cannot be removed: " + dict.getCode());
+        }
         // 明细随字典一并逻辑删除，避免留下孤立明细被其它租户/后续编码复用而误读
         itemRepository.deleteByDictId(id);
         super.remove(id);
+    }
+
+    /** 全量字典列表（管理页主表用；量小不分页）。 */
+    @Transactional(readOnly = true)
+    @PreAuthorize("hasAuthority('" + PermissionCodes.DICT_LIST + "')")
+    public List<SysDict> list() {
+        return dictRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(SysDict::getCode,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .toList();
     }
 
     /** 按字典编码读取启用明细（前端下拉直接用）。 */

@@ -45,4 +45,13 @@ public class SysDict extends BaseDefData {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
     private EnableStatus status = EnableStatus.ENABLED;
+
+    /**
+     * 系统级标记：{@code true} 时不可删除（种子/平台内置字典的保护位）。
+     *
+     * <p>标记本身可在管理页设置/取消（{@code sys:dict:save}），删除守门只认
+     * 当前的标记值——勾上即受保护，取消即恢复可删。</p>
+     */
+    @Column(name = "is_system", nullable = false)
+    private Boolean isSystem = Boolean.FALSE;
 }

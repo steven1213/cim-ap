@@ -10,7 +10,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 字典管理接口（字典本体 CRUD + 按编码取明细）。 */
+/**
+ * 字典管理接口（字典本体 CRUD + 全量列表 + 按编码取明细）。
+ *
+ * <p>权限模型：{@code sys:dict:list}（读）/ {@code sys:dict:save}（写）/
+ * {@code sys:dict:remove}（删）；系统级字典（{@code is_system=true}）删除被守门。</p>
+ */
 @RestController
 @RequestMapping("/sys/dicts")
 public class SysDictController extends BaseController<SysDict, String> {
@@ -24,6 +29,12 @@ public class SysDictController extends BaseController<SysDict, String> {
     @Override
     protected CrudService<SysDict, String> service() {
         return dictService;
+    }
+
+    /** 全量字典列表（管理页主表用；字典量小不分页）。 */
+    @GetMapping
+    public Result<List<SysDict>> list() {
+        return Result.ok(dictService.list());
     }
 
     /**

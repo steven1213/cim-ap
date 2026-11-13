@@ -57,4 +57,8 @@ public class SysDictItem extends BaseDefData {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
     private EnableStatus status = EnableStatus.ENABLED;
+
+    /** 系统级标记：{@code true} 时该明细不可删除（保护种子写入的行业固定值）。 */
+    @Column(name = "is_system", nullable = false)
+    private Boolean isSystem = Boolean.FALSE;
 }
