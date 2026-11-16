@@ -43,7 +43,7 @@ const NO_GROUPS: AreaGroup[] = [];
 /** 树上的物理层（areaGroup/technology 只是锁/表的 type，不是位置树的层）。 */
 type Level = Exclude<
   api.LocationType,
-  'areaGroup' | 'technology' | 'product' | 'equipmentType' | 'equipment' | 'capability'
+  'areaGroup' | 'technology' | 'product' | 'equipmentType' | 'equipment' | 'capability' | 'stockerBank'
 >;
 
 /** 每层的直接子层（stage 是位置树叶子）。 */

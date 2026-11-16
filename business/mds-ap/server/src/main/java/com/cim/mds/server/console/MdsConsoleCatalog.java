@@ -110,6 +110,17 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.PRODUCT_UPDATE, 20));
         m.add(button("btn.product.delete", "products", "mds.nav.products.action.delete",
                 MdsPermissions.PRODUCT_DELETE, 30));
+        // —— 制造流程（Route 口径：XML 画布为源 + 拖拽编辑 + 图校验发布）——
+        m.add(menu("flows", "grp.product", "/flows", "Flows",
+                "mds.nav.flows", "tree", null, 30));
+        m.add(button("btn.flow.create", "flows", "mds.nav.flows.action.create",
+                MdsPermissions.FLOW_CREATE, 10));
+        m.add(button("btn.flow.save", "flows", "mds.nav.flows.action.save",
+                MdsPermissions.FLOW_UPDATE, 20));
+        m.add(button("btn.flow.publish", "flows", "mds.nav.flows.action.publish",
+                MdsPermissions.FLOW_UPDATE, 30));
+        m.add(button("btn.flow.delete", "flows", "mds.nav.flows.action.delete",
+                MdsPermissions.FLOW_DELETE, 40));
         // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
         // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
@@ -146,6 +157,16 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.capability.delete", "capabilities", "mds.nav.capabilities.action.delete",
                 MdsPermissions.CAPABILITY_DELETE, 30));
 
+        // —— 存储区 Bank（Stocker 内逻辑分区，SEMI E88 zone 口径；转运规则同页维护）——
+        m.add(menu("banks", "grp.equipment", "/banks", "Banks",
+                "mds.nav.banks", "inbox", null, 50));
+        m.add(button("btn.bank.create", "banks", "mds.nav.banks.action.create",
+                MdsPermissions.BANK_CREATE, 10));
+        m.add(button("btn.bank.update", "banks", "mds.nav.banks.action.update",
+                MdsPermissions.BANK_UPDATE, 20));
+        m.add(button("btn.bank.delete", "banks", "mds.nav.banks.action.delete",
+                MdsPermissions.BANK_DELETE, 30));
+
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
         m.add(dir("grp.system", "mds.nav.group.system", 40));
@@ -155,6 +176,28 @@ public final class MdsConsoleCatalog {
                 PermissionCodes.DICT_SAVE, 10));
         m.add(button("btn.dict.delete", "dicts", "mds.nav.dicts.action.delete",
                 PermissionCodes.DICT_REMOVE, 20));
+
+        // —— 状态模型（SEMI E30 状态机口径：状态集合 + 转换 allowlist；
+        //    模型/状态/矩阵均可页面维护，规则表轻量不走编辑锁）——
+        m.add(menu("stateModels", "grp.system", "/state-models", "StateModels",
+                "mds.nav.stateModels", "check", null, 20));
+        m.add(button("btn.stateModel.create", "stateModels", "mds.nav.stateModels.action.create",
+                MdsPermissions.STATE_MODEL_CREATE, 10));
+        m.add(button("btn.stateModel.save", "stateModels", "mds.nav.stateModels.action.save",
+                MdsPermissions.STATE_MODEL_UPDATE, 20));
+        m.add(button("btn.stateModel.delete", "stateModels", "mds.nav.stateModels.action.delete",
+                MdsPermissions.STATE_MODEL_DELETE, 30));
+
+        // —— 编码规则（配置化 Key Generation：模板段 + 分桶计数器；
+        //    各域 create 同事务占号/校验，规则表轻量不走编辑锁）——
+        m.add(menu("namingRules", "grp.system", "/naming-rules", "NamingRules",
+                "mds.nav.namingRules", "hash", null, 30));
+        m.add(button("btn.namingRule.create", "namingRules", "mds.nav.namingRules.action.create",
+                MdsPermissions.NAMING_RULE_CREATE, 10));
+        m.add(button("btn.namingRule.save", "namingRules", "mds.nav.namingRules.action.save",
+                MdsPermissions.NAMING_RULE_UPDATE, 20));
+        m.add(button("btn.namingRule.delete", "namingRules", "mds.nav.namingRules.action.delete",
+                MdsPermissions.NAMING_RULE_DELETE, 30));
         return m;
     }
 
@@ -216,6 +259,11 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.PRODUCT_CREATE, "产品新建"));
         p.add(new PermDef(MdsPermissions.PRODUCT_UPDATE, "产品编辑"));
         p.add(new PermDef(MdsPermissions.PRODUCT_DELETE, "产品删除"));
+        // 制造流程（产品管理域，Route 口径）
+        p.add(new PermDef(MdsPermissions.FLOW_VIEW, "制造流程查看"));
+        p.add(new PermDef(MdsPermissions.FLOW_CREATE, "制造流程新建/复制"));
+        p.add(new PermDef(MdsPermissions.FLOW_UPDATE, "制造流程维护/发布"));
+        p.add(new PermDef(MdsPermissions.FLOW_DELETE, "制造流程删除"));
         // EquipmentType（设备管理域）
         p.add(new PermDef(MdsPermissions.EQP_TYPE_VIEW, "设备类型查看"));
         p.add(new PermDef(MdsPermissions.EQP_TYPE_CREATE, "设备类型新建"));
@@ -231,6 +279,21 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.CAPABILITY_CREATE, "设备能力新建"));
         p.add(new PermDef(MdsPermissions.CAPABILITY_UPDATE, "设备能力编辑"));
         p.add(new PermDef(MdsPermissions.CAPABILITY_DELETE, "设备能力删除"));
+        // 存储区 Bank（SEMI E88 zone 口径）
+        p.add(new PermDef(MdsPermissions.BANK_VIEW, "存储区查看"));
+        p.add(new PermDef(MdsPermissions.BANK_CREATE, "存储区新建"));
+        p.add(new PermDef(MdsPermissions.BANK_UPDATE, "存储区编辑"));
+        p.add(new PermDef(MdsPermissions.BANK_DELETE, "存储区删除"));
+        // 状态模型（SEMI E30 状态机口径，模型/状态/转换矩阵页面维护）
+        p.add(new PermDef(MdsPermissions.STATE_MODEL_VIEW, "状态模型查看"));
+        p.add(new PermDef(MdsPermissions.STATE_MODEL_CREATE, "状态模型新建"));
+        p.add(new PermDef(MdsPermissions.STATE_MODEL_UPDATE, "状态模型维护"));
+        p.add(new PermDef(MdsPermissions.STATE_MODEL_DELETE, "状态模型删除"));
+        // 编码规则（配置化 Key Generation，各域 create 守门）
+        p.add(new PermDef(MdsPermissions.NAMING_RULE_VIEW, "编码规则查看"));
+        p.add(new PermDef(MdsPermissions.NAMING_RULE_CREATE, "编码规则新建"));
+        p.add(new PermDef(MdsPermissions.NAMING_RULE_UPDATE, "编码规则维护"));
+        p.add(new PermDef(MdsPermissions.NAMING_RULE_DELETE, "编码规则删除"));
         // 数据字典（平台域，码源 cim-system PermissionCodes）
         p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
         p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
@@ -263,16 +326,22 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.STAGE_VIEW, MdsPermissions.STAGE_CREATE, MdsPermissions.STAGE_UPDATE,
                 MdsPermissions.TECH_VIEW, MdsPermissions.TECH_CREATE, MdsPermissions.TECH_UPDATE,
                 MdsPermissions.PRODUCT_VIEW, MdsPermissions.PRODUCT_CREATE, MdsPermissions.PRODUCT_UPDATE,
+                MdsPermissions.FLOW_VIEW, MdsPermissions.FLOW_CREATE, MdsPermissions.FLOW_UPDATE,
                 MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQP_TYPE_CREATE, MdsPermissions.EQP_TYPE_UPDATE,
                 MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.EQUIPMENT_CREATE, MdsPermissions.EQUIPMENT_UPDATE,
                 MdsPermissions.CAPABILITY_VIEW, MdsPermissions.CAPABILITY_CREATE, MdsPermissions.CAPABILITY_UPDATE,
+                MdsPermissions.BANK_VIEW, MdsPermissions.BANK_CREATE, MdsPermissions.BANK_UPDATE,
+                MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.STATE_MODEL_CREATE, MdsPermissions.STATE_MODEL_UPDATE,
+                MdsPermissions.NAMING_RULE_VIEW, MdsPermissions.NAMING_RULE_CREATE, MdsPermissions.NAMING_RULE_UPDATE,
                 PermissionCodes.DICT_LIST, PermissionCodes.DICT_SAVE);
         // 只读：各域 view
         List<String> viewer = List.of(
                 MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW,
                 MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW, MdsPermissions.TECH_VIEW,
-                MdsPermissions.PRODUCT_VIEW,
+                MdsPermissions.PRODUCT_VIEW, MdsPermissions.FLOW_VIEW,
                 MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
+                MdsPermissions.BANK_VIEW,
+                MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
                 PermissionCodes.DICT_LIST);
         List<RoleDef> r = new ArrayList<>();
         r.add(new RoleDef(ROLE_ADMIN, "MDS 管理员", true, allPerms));
@@ -327,6 +396,11 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.products.action.create", "产品·新建", "Product · create"));
         t.add(new TextDef("mds.nav.products.action.update", "产品·编辑", "Product · update"));
         t.add(new TextDef("mds.nav.products.action.delete", "产品·删除", "Product · delete"));
+        t.add(new TextDef("mds.nav.flows", "制造流程", "Flows"));
+        t.add(new TextDef("mds.nav.flows.action.create", "制造流程·新建", "Flow · create"));
+        t.add(new TextDef("mds.nav.flows.action.save", "制造流程·维护", "Flow · save"));
+        t.add(new TextDef("mds.nav.flows.action.publish", "制造流程·发布", "Flow · publish"));
+        t.add(new TextDef("mds.nav.flows.action.delete", "制造流程·删除", "Flow · delete"));
         // —— 设备管理 ——
         t.add(new TextDef("mds.nav.group.equipment", "设备管理", "Equipment"));
         t.add(new TextDef("mds.nav.transportEquipments", "搬运设备", "Transport equipment"));
@@ -345,6 +419,18 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.capabilities.action.create", "设备能力·新建", "Capability · create"));
         t.add(new TextDef("mds.nav.capabilities.action.update", "设备能力·编辑", "Capability · update"));
         t.add(new TextDef("mds.nav.capabilities.action.delete", "设备能力·删除", "Capability · delete"));
+        t.add(new TextDef("mds.nav.banks", "存储区 Bank", "Stocker banks"));
+        t.add(new TextDef("mds.nav.banks.action.create", "存储区·新建", "Stocker bank · create"));
+        t.add(new TextDef("mds.nav.banks.action.update", "存储区·编辑", "Stocker bank · update"));
+        t.add(new TextDef("mds.nav.banks.action.delete", "存储区·删除", "Stocker bank · delete"));
+        t.add(new TextDef("mds.nav.stateModels", "状态模型", "State models"));
+        t.add(new TextDef("mds.nav.stateModels.action.create", "状态模型·新建", "State model · create"));
+        t.add(new TextDef("mds.nav.stateModels.action.save", "状态模型·维护", "State model · save"));
+        t.add(new TextDef("mds.nav.stateModels.action.delete", "状态模型·删除", "State model · delete"));
+        t.add(new TextDef("mds.nav.namingRules", "编码规则", "Naming rules"));
+        t.add(new TextDef("mds.nav.namingRules.action.create", "编码规则·新建", "Naming rule · create"));
+        t.add(new TextDef("mds.nav.namingRules.action.save", "编码规则·维护", "Naming rule · save"));
+        t.add(new TextDef("mds.nav.namingRules.action.delete", "编码规则·删除", "Naming rule · delete"));
         // —— 数据字典 ——
         t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
         t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));

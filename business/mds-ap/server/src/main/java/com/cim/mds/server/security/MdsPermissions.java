@@ -77,6 +77,30 @@ public final class MdsPermissions {
     public static final String CAPABILITY_UPDATE = "mds:capability:update";
     public static final String CAPABILITY_DELETE = "mds:capability:delete";
 
+    // ---------------- 存储区 Bank（StockerBank，设备管理域，SEMI E88 zone 口径） ----------------
+    public static final String BANK_VIEW = "mds:bank:view";
+    public static final String BANK_CREATE = "mds:bank:create";
+    public static final String BANK_UPDATE = "mds:bank:update";
+    public static final String BANK_DELETE = "mds:bank:delete";
+
+    // ---------------- 状态模型（StateModel，系统管理域，SEMI E30 状态机口径） ----------------
+    public static final String STATE_MODEL_VIEW = "mds:stateModel:view";
+    public static final String STATE_MODEL_CREATE = "mds:stateModel:create";
+    public static final String STATE_MODEL_UPDATE = "mds:stateModel:update";
+    public static final String STATE_MODEL_DELETE = "mds:stateModel:delete";
+
+    // ---------------- 编码规则（NamingRule，系统管理域，配置化 Key Generation 口径） ----------------
+    public static final String NAMING_RULE_VIEW = "mds:namingRule:view";
+    public static final String NAMING_RULE_CREATE = "mds:namingRule:create";
+    public static final String NAMING_RULE_UPDATE = "mds:namingRule:update";
+    public static final String NAMING_RULE_DELETE = "mds:namingRule:delete";
+
+    // ---------------- 制造流程（Flow，产品管理域，Route 口径：XML 画布 + 有向图） ----------------
+    public static final String FLOW_VIEW = "mds:flow:view";
+    public static final String FLOW_CREATE = "mds:flow:create";
+    public static final String FLOW_UPDATE = "mds:flow:update";
+    public static final String FLOW_DELETE = "mds:flow:delete";
+
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
         Set<String> codes = new LinkedHashSet<>();
@@ -120,6 +144,22 @@ public final class MdsPermissions {
         codes.add(CAPABILITY_CREATE);
         codes.add(CAPABILITY_UPDATE);
         codes.add(CAPABILITY_DELETE);
+        codes.add(BANK_VIEW);
+        codes.add(BANK_CREATE);
+        codes.add(BANK_UPDATE);
+        codes.add(BANK_DELETE);
+        codes.add(STATE_MODEL_VIEW);
+        codes.add(STATE_MODEL_CREATE);
+        codes.add(STATE_MODEL_UPDATE);
+        codes.add(STATE_MODEL_DELETE);
+        codes.add(NAMING_RULE_VIEW);
+        codes.add(NAMING_RULE_CREATE);
+        codes.add(NAMING_RULE_UPDATE);
+        codes.add(NAMING_RULE_DELETE);
+        codes.add(FLOW_VIEW);
+        codes.add(FLOW_CREATE);
+        codes.add(FLOW_UPDATE);
+        codes.add(FLOW_DELETE);
         return codes;
     }
 }

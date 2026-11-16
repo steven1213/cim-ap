@@ -129,7 +129,24 @@ public class MdsDictSeedService {
                     new ItemDef("EXECUTING", "加工中（E157）", 60),
                     new ItemDef("BUSY", "忙碌（E116）", 70),
                     new ItemDef("DOWN", "故障", 80),
-                    new ItemDef("PM", "保养中", 90))));
+                    new ItemDef("PM", "保养中", 90))),
+            new DictDef("mds.stocker_bank_type", "存储区类型", List.of(
+                    new ItemDef("RAW", "原料库", 10),
+                    new ItemDef("WIP", "WIP 在制品库", 20),
+                    new ItemDef("FG", "成品库（Die Bank）", 30),
+                    new ItemDef("SCRAP", "不良品库", 40),
+                    new ItemDef("CONTROL", "控片库", 50),
+                    new ItemDef("RECYCLE", "回收库", 60),
+                    new ItemDef("GENERAL", "普通暂存", 90))),
+            // 制造流程步骤类型（Flow 域，V12/V14）：业务步骤四类 + 结构节点——START/END 不进字典
+            new DictDef("mds.process_step_type", "流程步骤类型", List.of(
+                    new ItemDef("PROCESS", "加工（工艺机台作业）", 10),
+                    new ItemDef("INSPECT", "检验（量测/检测）", 20),
+                    new ItemDef("REWORK", "返工（重做工序）", 30),
+                    new ItemDef("DECISION", "决策（分档 Go/No-Go）", 40),
+                    new ItemDef("SUBFLOW", "子流程（嵌套引用）", 50),
+                    new ItemDef("SPLIT", "分批（批次拆分）", 60),
+                    new ItemDef("MERGE", "合批（支路汇合）", 70))));
 
     private final SysDictRepository dictRepository;
     private final SysDictItemRepository itemRepository;

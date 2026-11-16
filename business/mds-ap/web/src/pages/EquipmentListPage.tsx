@@ -8,6 +8,7 @@ import {
   DataTable,
   FormGrid,
   Page,
+  StatusTag,
   useConfirm,
   useDict,
   useToast,
@@ -69,16 +70,11 @@ const UNIT_CLASS_BY_TYPE: Record<string, 'MODULE' | 'SUBSYSTEM'> = {
   OTHER: 'SUBSYSTEM',
 };
 
-/** 形态 → 可选状态（E87 端口态 / E157 腔态 / E116 EPT，按形态过滤统一词表）。 */
-const UNIT_STATES_BY_TYPE: Record<string, string[]> = {
-  LOAD_PORT: ['READY_TO_LOAD', 'READY_TO_UNLOAD', 'TRANSFER_BLOCKED', 'OUT_OF_SERVICE'],
-  PROCESS_CHAMBER: ['IDLE', 'EXECUTING', 'DOWN', 'PM'],
-  ALIGNER: ['IDLE', 'BUSY', 'DOWN'],
-  ROBOT: ['IDLE', 'BUSY', 'DOWN'],
-  LOAD_LOCK: ['IDLE', 'BUSY', 'DOWN'],
-  BUFFER: ['IDLE', 'BUSY', 'DOWN'],
-  OTHER: ['IDLE', 'BUSY', 'DOWN'],
-};
+/**
+ * 形态 → 可选状态不再前端硬编码：由后端状态模型解析
+ * （api.resolveStateModel('EQUIPMENT_UNIT', unitType) → UNIT_LOAD_PORT /
+ * UNIT_CHAMBER / UNIT_GENERIC，states 即该形态状态集）。
+ */
 
 /** 子单元形态显示文案键（labelKey 形态，check-i18n 认）。 */
 const UNIT_TYPE_LABEL = {
@@ -263,7 +259,14 @@ export default function EquipmentListPage({ view }: { view: 'process' | 'amhs' }
         key: 'stateCode',
         titleKey: 'mds.equipment.state',
         width: 110,
-        render: (r) => <span className="mono">{stateDict.labelOf(r.stateCode)}</span>,
+        render: (r) => (
+          <StatusTag
+            dict="equipState"
+            value={r.stateCode}
+            label={stateDict.labelOf(r.stateCode)}
+            size="small"
+          />
+        ),
       },
       {
         key: 'enabled',
@@ -431,6 +434,7 @@ function EquipmentFormModal({
   const { t } = useTranslation();
   const kindDict = useDict('mds.equip_kind');
   const classDict = useDict('mds.equip_class');
+  const stateDict = useDict('mds.equip_state');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({
@@ -443,6 +447,23 @@ function EquipmentFormModal({
     remark: initial?.remark ?? '',
     enabled: initial?.enabled ?? true,
   });
+
+  // 状态下拉：编辑时只列「从当前状态出发的合法转换」（E30 口径，后端同款守门）；
+  // 新建无旧态不校验转换，给全词表。当前值永远保留在选项里（from==to 不算转换）。
+  const allowedRes = useResource(
+    ({ signal }) => api.listAllowedStateTargets('EQUIPMENT', initial?.stateCode ?? '', signal),
+    { deps: [initial?.stateCode ?? ''], enabled: !!initial?.stateCode },
+  );
+  const stateOptions = useMemo(() => {
+    const all = stateDict.items
+      .filter((i) => !i.disabled)
+      .map((i) => ({ value: i.value, label: i.label }));
+    if (!initial?.stateCode) return all;
+    const allowed = allowedRes.data;
+    if (!allowed) return all;
+    const keep = new Set<string>([...allowed, initial.stateCode]);
+    return all.filter((o) => keep.has(o.value));
+  }, [stateDict.items, initial?.stateCode, allowedRes.data]);
 
   // 类型选项（按页面视图过滤大类）+ 选中的类型对象（驱动大类/细类联动展示）
   const typeOptions = useMemo(
@@ -549,13 +570,13 @@ function EquipmentFormModal({
         kind: 'select' as const,
         key: 'state' as const,
         labelKey: 'mds.equipment.state',
-        dict: 'mds.equip_state',
+        options: stateOptions,
         allowClear: true,
       },
       { kind: 'text' as const, key: 'remark' as const, labelKey: 'mds.common.remark', span: 2 },
       { kind: 'switch' as const, key: 'enabled' as const, labelKey: 'mds.topo.status' },
     ],
-    [initial, typeOptions, locTypeOptions, locRecordOptions],
+    [initial, typeOptions, locTypeOptions, locRecordOptions, stateOptions],
   );
 
   async function submit() {
@@ -796,7 +817,14 @@ function EquipmentUnitModal({
         key: 'stateCode',
         titleKey: 'mds.unit.state',
         width: 120,
-        render: (r) => <span className="mono">{unitStateDict.labelOf(r.stateCode)}</span>,
+        render: (r) => (
+          <StatusTag
+            dict="unitState"
+            value={r.stateCode}
+            label={unitStateDict.labelOf(r.stateCode)}
+            size="small"
+          />
+        ),
       },
       {
         key: 'port',
@@ -905,13 +933,34 @@ function UnitFormModal({
     enabled: initial?.enabled ?? true,
   });
 
-  // 状态选项按形态过滤（词表统一、口径按形态收窄；E87 端口态 / E157 腔态 / E116 EPT）
+  // 状态选项由后端状态模型驱动：形态 → resolve（精确匹配 UNIT_LOAD_PORT/UNIT_CHAMBER，
+  // 其余形态落 UNIT_GENERIC 兜底），模型的 states 即该形态状态集（取代旧的前端硬编码映射）。
+  const modelRes = useResource(
+    ({ signal }) => api.resolveStateModel('EQUIPMENT_UNIT', form.unitType, signal),
+    { deps: [form.unitType] },
+  );
+  // 编辑时再收窄：只列「从当前状态出发的合法转换」（E30 口径，后端同款守门）
+  const currentState = initial?.stateCode ?? '';
+  const allowedRes = useResource(
+    ({ signal }) =>
+      api.listAllowedStateTargets(modelRes.data?.modelCode ?? '', currentState, signal),
+    {
+      deps: [modelRes.data?.modelCode ?? '', currentState],
+      enabled: !!currentState && !!modelRes.data,
+    },
+  );
   const stateOptions = useMemo(() => {
-    const allowed = UNIT_STATES_BY_TYPE[form.unitType] ?? [];
+    const states = modelRes.data?.states;
+    if (!states) return [];
+    let codes = states;
+    if (currentState && allowedRes.data) {
+      const keep = new Set<string>([...allowedRes.data, currentState]);
+      codes = states.filter((s) => keep.has(s));
+    }
     return unitStateDict.items
-      .filter((i) => allowed.includes(i.value) && !i.disabled)
+      .filter((i) => codes.includes(i.value) && !i.disabled)
       .map((i) => ({ value: i.value, label: i.label }));
-  }, [form.unitType, unitStateDict.items]);
+  }, [modelRes.data, allowedRes.data, currentState, unitStateDict.items]);
 
   const fields = useMemo<Array<FormField<typeof form>>>(
     () => [
@@ -952,7 +1001,7 @@ function UnitFormModal({
       { kind: 'switch' as const, key: 'enabled' as const, labelKey: 'mds.topo.status' },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initial, form.unitType, stateOptions],
+    [initial, form.unitType, stateOptions, modelRes.data?.modelCode],
   );
 
   async function submit() {

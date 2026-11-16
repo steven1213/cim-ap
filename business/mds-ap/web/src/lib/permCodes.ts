@@ -72,4 +72,31 @@ export const MDS_PERMS = {
     update: 'mds:capability:update',
     delete: 'mds:capability:delete',
   },
+  bank: {
+    view: 'mds:bank:view',
+    create: 'mds:bank:create',
+    update: 'mds:bank:update',
+    delete: 'mds:bank:delete',
+  },
+  // 状态模型：模型/状态集/转换矩阵均页面维护（SEMI E30 状态机口径）
+  stateModel: {
+    view: 'mds:stateModel:view',
+    create: 'mds:stateModel:create',
+    update: 'mds:stateModel:update',
+    delete: 'mds:stateModel:delete',
+  },
+  // 编码规则：配置化 Key Generation（模板段 + 分桶计数器），各域 create 同事务守门
+  namingRule: {
+    view: 'mds:namingRule:view',
+    create: 'mds:namingRule:create',
+    update: 'mds:namingRule:update',
+    delete: 'mds:namingRule:delete',
+  },
+  // 制造流程：Route 口径（XML 画布为源 + 拖拽编辑 + 图校验发布）
+  flow: {
+    view: 'mds:flow:view',
+    create: 'mds:flow:create',
+    update: 'mds:flow:update',
+    delete: 'mds:flow:delete',
+  },
 } as const;

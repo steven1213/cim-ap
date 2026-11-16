@@ -94,6 +94,34 @@ export const STATUS_TONES: Record<string, Record<string, StatusTone>> = {
     ACTIVE: 'ok',
     EXPIRED: 'err',
   },
+  /**
+   * MDS 设备状态（SEMI E10 六态）。
+   * 出处：`business/mds-ap` `MdsDictSeedService` 词表 `mds.equip_state`
+   * （PRD/SBY/ENG/SDT/UDT/NST，2026-11-13 落地）。
+   */
+  equipState: {
+    PRD: 'run', // 生产中——进行中
+    SBY: 'ok', // 待机——正常可用
+    ENG: 'warn', // 工程调试——非生产、需关注
+    SDT: 'idle', // 计划停机——计划内停用
+    UDT: 'err', // 非计划停机——故障
+    NST: 'idle', // 未排程——不在排程内
+  },
+  /**
+   * MDS 子单元状态（E87 端口 / E116 EPT / E157 腔体合并词表）。
+   * 出处：`MdsDictSeedService` 词表 `mds.unit_state`（九项，2026-11-13 落地）。
+   */
+  unitState: {
+    READY_TO_LOAD: 'ok', // 可放载具——可用
+    READY_TO_UNLOAD: 'ok', // 可取载具——可用
+    TRANSFER_BLOCKED: 'warn', // 交接阻塞——需人处理
+    OUT_OF_SERVICE: 'idle', // 停用
+    IDLE: 'ok', // 空闲——待命可用
+    EXECUTING: 'run', // 加工中
+    BUSY: 'run', // 忙碌
+    DOWN: 'err', // 故障
+    PM: 'warn', // 保养中——非生产、需关注
+  },
 };
 
 /** 取某枚举值的语义档；未登记的域/值一律回落 `idle`（不抛错，避免一处漏登记导致白屏）。 */

@@ -7,6 +7,8 @@ import type {
   AreaGroup,
   AreaGroupPayload,
   AreaPayload,
+  BankTransferRule,
+  BankTransferRulePayload,
   Bay,
   BayPayload,
   Capability,
@@ -28,10 +30,22 @@ import type {
   SitePayload,
   Stage,
   StagePayload,
+  StockerBank,
+  StockerBankPayload,
+  StateModel,
+  StateModelPayload,
+  StateTransition,
+  StateTransitionPayload,
   Technology,
   TechnologyPayload,
   Product,
   ProductPayload,
+  NamingRule,
+  NamingCounterView,
+  NamingRuleObjectSpec,
+  NamingRulePayload,
+  NamingRulePreviewReq,
+  NamingRulePreviewRes,
 } from '@/types';
 
 const BASE = '/mds';
@@ -337,6 +351,159 @@ export function deleteCapability(id: string): Promise<void> {
   return http.del<void>(`${BASE}/capabilities/${encodeURIComponent(id)}`);
 }
 
+// ---------- 存储区 Bank（SEMI E88 zone 口径：Stocker 内逻辑分区） ----------
+
+export function listStockerBanks(
+  params?: { equipmentId?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<StockerBank[]> {
+  return http.get<StockerBank[]>(`${BASE}/stocker-banks`, params, { signal });
+}
+
+export function createStockerBank(payload: StockerBankPayload): Promise<StockerBank> {
+  return http.post<StockerBank>(`${BASE}/stocker-banks`, payload);
+}
+
+export function updateStockerBank(
+  id: string,
+  payload: Partial<StockerBankPayload>,
+): Promise<StockerBank> {
+  return http.put<StockerBank>(`${BASE}/stocker-banks/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteStockerBank(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/stocker-banks/${encodeURIComponent(id)}`);
+}
+
+// ---------- Bank 间转运规则（from→to allowlist；目的地分配归 Host，E88 6.1.1） ----------
+
+export function listBankTransferRules(bankId?: string, signal?: AbortSignal): Promise<BankTransferRule[]> {
+  return http.get<BankTransferRule[]>(`${BASE}/bank-transfer-rules`, { bankId }, { signal });
+}
+
+export function createBankTransferRule(payload: BankTransferRulePayload): Promise<BankTransferRule> {
+  return http.post<BankTransferRule>(`${BASE}/bank-transfer-rules`, payload);
+}
+
+export function updateBankTransferRule(
+  id: string,
+  payload: Partial<BankTransferRulePayload>,
+): Promise<BankTransferRule> {
+  return http.put<BankTransferRule>(`${BASE}/bank-transfer-rules/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteBankTransferRule(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/bank-transfer-rules/${encodeURIComponent(id)}`);
+}
+
+// ---------- 状态模型（SEMI E30 状态机口径：状态集 + 转换 allowlist + 触发条件） ----------
+
+export function listStateModels(signal?: AbortSignal): Promise<StateModel[]> {
+  return http.get<StateModel[]>(`${BASE}/state-models`, undefined, { signal });
+}
+
+export function resolveStateModel(
+  objectType: string,
+  unitForm?: string,
+  signal?: AbortSignal,
+): Promise<StateModel> {
+  return http.get<StateModel>(`${BASE}/state-models/resolve`, { objectType, unitForm }, { signal });
+}
+
+export function listStateTransitions(modelCode: string, signal?: AbortSignal): Promise<StateTransition[]> {
+  return http.get<StateTransition[]>(
+    `${BASE}/state-models/${encodeURIComponent(modelCode)}/transitions`,
+    undefined,
+    { signal },
+  );
+}
+
+export function listAllowedStateTargets(
+  modelCode: string,
+  from: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  return http.get<string[]>(
+    `${BASE}/state-models/${encodeURIComponent(modelCode)}/allowed`,
+    { from },
+    { signal },
+  );
+}
+
+/** 矩阵勾选/取消（allowed=false 后端物理删该行）。 */
+export function setStateTransition(
+  modelCode: string,
+  payload: StateTransitionPayload,
+): Promise<StateTransition | null> {
+  return http.put<StateTransition | null>(
+    `${BASE}/state-models/${encodeURIComponent(modelCode)}/transitions`,
+    payload,
+  );
+}
+
+/** 新建状态模型（modelCode/dictCode/objectType 建后不可改）。 */
+export function createStateModel(payload: StateModelPayload): Promise<StateModel> {
+  return http.post<StateModel>(`${BASE}/state-models`, payload);
+}
+
+/** 更新模型（仅 modelName/unitForm/stateCodes 生效；状态收缩有转换引用守门）。 */
+export function updateStateModel(
+  modelCode: string,
+  payload: StateModelPayload,
+): Promise<StateModel> {
+  return http.put<StateModel>(
+    `${BASE}/state-models/${encodeURIComponent(modelCode)}`,
+    payload,
+  );
+}
+
+/** 删除模型（存在转换规则时后端拒绝）。 */
+export function deleteStateModel(modelCode: string): Promise<void> {
+  return http.del<void>(`${BASE}/state-models/${encodeURIComponent(modelCode)}`);
+}
+
+// ---------- 编码规则（有序段列表 + 段类型解析器 + 分桶计数器） ----------
+
+export function listNamingRules(signal?: AbortSignal): Promise<NamingRule[]> {
+  return http.get<NamingRule[]>(`${BASE}/naming-rules`, undefined, { signal });
+}
+
+/** 对象白名单（object_type → 中文名 / 父对象提示 / 段可用变量）。 */
+export function listNamingObjectTypes(signal?: AbortSignal): Promise<NamingRuleObjectSpec[]> {
+  return http.get<NamingRuleObjectSpec[]>(`${BASE}/naming-rules/object-types`, undefined, { signal });
+}
+
+/** 新建规则（objectType 建后不可改；同对象至多一条启用规则，重复启用 409）。 */
+export function createNamingRule(payload: NamingRulePayload): Promise<NamingRule> {
+  return http.post<NamingRule>(`${BASE}/naming-rules`, payload);
+}
+
+/** 更新规则（仅段列表/名称/启停生效；objectType 建后不可改，计数器保留不回退）。 */
+export function updateNamingRule(id: string, payload: NamingRulePayload): Promise<NamingRule> {
+  return http.put<NamingRule>(`${BASE}/naming-rules/${encodeURIComponent(id)}`, payload);
+}
+
+/** 删除规则（连同计数器物理删）。 */
+export function deleteNamingRule(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/naming-rules/${encodeURIComponent(id)}`);
+}
+
+/** 复制规则：名称加「·副本」、默认停用、不带计数器。 */
+export function copyNamingRule(id: string): Promise<NamingRule> {
+  return http.post<NamingRule>(`${BASE}/naming-rules/${encodeURIComponent(id)}/copy`);
+}
+
+/** 计数器只读查询（各 SEQ 段各桶当前值；号段只增不回收）。 */
+export function listNamingCounters(id: string, signal?: AbortSignal): Promise<NamingCounterView[]> {
+  return http.get<NamingCounterView[]>(
+    `${BASE}/naming-rules/${encodeURIComponent(id)}/counters`, undefined, { signal });
+}
+
+/** 试算：逐段渲染明细 + 示例编码 + 派生正则 + 缺失变量（不占号）。 */
+export function previewNamingRule(payload: NamingRulePreviewReq): Promise<NamingRulePreviewRes> {
+  return http.post<NamingRulePreviewRes>(`${BASE}/naming-rules/preview`, payload);
+}
+
 // ---------- 设备子单元（E120 结构树：LoadPort / Chamber / Aligner / Robot…） ----------
 
 export function listEquipmentUnits(equipmentId: string, signal?: AbortSignal): Promise<EquipmentUnit[]> {
@@ -374,7 +541,7 @@ export function deleteEquipmentUnit(equipmentId: string, unitId: string): Promis
   );
 }
 
-// ---------- 编辑锁（site/fab/area/areaGroup/bay/stage/technology/product/equipmentType/equipment/capability 通用） ----------
+// ---------- 编辑锁（site/fab/…/capability/stockerBank 通用） ----------
 
 export type LocationType =
   | 'site'
@@ -387,7 +554,8 @@ export type LocationType =
   | 'product'
   | 'equipmentType'
   | 'equipment'
-  | 'capability';
+  | 'capability'
+  | 'stockerBank';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {
@@ -406,4 +574,67 @@ export function lockState(type: LocationType, id: string, signal?: AbortSignal):
   return http.get<LockState>(`${BASE}/locations/${type}/${encodeURIComponent(id)}/lock`, undefined, {
     signal,
   });
+}
+
+// ---------- 制造流程（Flow，Route 口径：XML 画布为源 + 解析产物表） ----------
+
+import type {
+  FlowView,
+  FlowDetail,
+  FlowPayload,
+  FlowCanvasPayload,
+  FlowValidationResult,
+} from '@/types';
+
+export function listFlows(keyword?: string, signal?: AbortSignal): Promise<FlowView[]> {
+  return http.get<FlowView[]>(`${BASE}/flows`, { params: keyword ? { keyword } : undefined, signal });
+}
+
+export function getFlow(id: string, signal?: AbortSignal): Promise<FlowDetail> {
+  return http.get<FlowDetail>(`${BASE}/flows/${id}`, { signal });
+}
+
+export function createFlow(payload: FlowPayload): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows`, payload);
+}
+
+export function updateFlow(id: string, payload: FlowPayload): Promise<FlowView> {
+  return http.put<FlowView>(`${BASE}/flows/${id}`, payload);
+}
+
+export function deleteFlow(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/flows/${id}`);
+}
+
+/** 画布保存：整份 XML 回传，服务端解析重建解析产物表。 */
+export function saveFlowCanvas(id: string, payload: FlowCanvasPayload): Promise<FlowDetail> {
+  return http.put<FlowDetail>(`${BASE}/flows/${id}/canvas`, payload);
+}
+
+export function validateFlow(id: string): Promise<FlowValidationResult> {
+  return http.post<FlowValidationResult>(`${BASE}/flows/${id}/validate`, {});
+}
+
+/** 冻结（UNFROZEN → FROZEN，图校验前置）。 */
+export function freezeFlow(id: string): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows/${id}/freeze`, {});
+}
+
+/** 解冻（FROZEN → UNFROZEN）。 */
+export function unfreezeFlow(id: string): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows/${id}/unfreeze`, {});
+}
+
+/** 激活（FROZEN → ACTIVE，图校验前置；同族旧 ACTIVE 自动降级 FROZEN）。 */
+export function activateFlow(id: string): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows/${id}/activate`, {});
+}
+
+/** 禁用（FROZEN/ACTIVE → DISABLED）。 */
+export function disableFlow(id: string): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows/${id}/disable`, {});
+}
+
+export function copyFlow(id: string): Promise<FlowView> {
+  return http.post<FlowView>(`${BASE}/flows/${id}/copy`, {});
 }

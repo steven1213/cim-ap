@@ -53,10 +53,14 @@ const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
 const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
 const TechnologyPage = lazy(() => import('@/pages/TechnologyPage'));
 const ProductPage = lazy(() => import('@/pages/ProductPage'));
+const FlowPage = lazy(() => import('@/pages/FlowPage'));
 const DictPage = lazy(() => import('@/pages/DictPage'));
 const EquipmentTypePage = lazy(() => import('@/pages/EquipmentTypePage'));
 const CapabilityPage = lazy(() => import('@/pages/CapabilityPage'));
 const EquipmentListPage = lazy(() => import('@/pages/EquipmentListPage'));
+const BankPage = lazy(() => import('@/pages/BankPage'));
+const StateModelPage = lazy(() => import('@/pages/StateModelPage'));
+const NamingRulePage = lazy(() => import('@/pages/NamingRulePage'));
 
 /** 搬运设备页 = 设备列表的 AMHS 视图（TRANSPORT/STORAGE/BUFFER 类）。 */
 function TransportEquipmentsPage() {
@@ -203,7 +207,16 @@ export default function App() {
           <Route path="/topology" element={lazyRoute(TopologyPage, 'mds:site:view')} />
           <Route path="/technologies" element={lazyRoute(TechnologyPage, 'mds:tech:view')} />
           <Route path="/products" element={lazyRoute(ProductPage, 'mds:product:view')} />
+          <Route path="/flows" element={lazyRoute(FlowPage, 'mds:flow:view')} />
           <Route path="/dicts" element={lazyRoute(DictPage, 'sys:dict:list')} />
+          <Route
+            path="/state-models"
+            element={lazyRoute(StateModelPage, 'mds:stateModel:view')}
+          />
+          <Route
+            path="/naming-rules"
+            element={lazyRoute(NamingRulePage, 'mds:namingRule:view')}
+          />
           <Route
             path="/transport-equipments"
             element={lazyRoute(TransportEquipmentsPage, 'mds:equipment:view')}
@@ -214,6 +227,7 @@ export default function App() {
             element={lazyRoute(EquipmentTypePage, 'mds:equipmentType:view')}
           />
           <Route path="/capabilities" element={lazyRoute(CapabilityPage, 'mds:capability:view')} />
+          <Route path="/banks" element={lazyRoute(BankPage, 'mds:bank:view')} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

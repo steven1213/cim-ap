@@ -2,6 +2,8 @@ import {
   IconApps,
   IconCheckCircle,
   IconGauge,
+  IconInbox,
+  IconKey,
   IconLink,
   IconList,
   IconMonitor,
@@ -53,20 +55,26 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/equipments', i18n: 'mds.nav.equipments', Icon: IconMonitor },
       { to: '/equipment-types', i18n: 'mds.nav.equipmentTypes', Icon: IconOrgGrant },
       { to: '/capabilities', i18n: 'mds.nav.capabilities', Icon: IconCheckCircle },
+      { to: '/banks', i18n: 'mds.nav.banks', Icon: IconInbox },
     ],
   },
   {
-    // 产品管理：Technology + Product（Route 预留，MdsConsoleCatalog grp.product 同构）
+    // 产品管理：Technology + Product + Flow（Route 口径：XML 画布拖拽，MdsConsoleCatalog grp.product 同构）
     i18n: 'mds.nav.group.product',
     items: [
       { to: '/technologies', i18n: 'mds.nav.technology', Icon: IconSliders },
       { to: '/products', i18n: 'mds.nav.products', Icon: IconApps },
+      { to: '/flows', i18n: 'mds.nav.flows', Icon: IconTree },
     ],
   },
   {
-    // 系统管理：平台级参照数据（数据字典等，grp.system 同构）
+    // 系统管理：平台级参照数据（数据字典）+ 状态模型（词表转换规则）+ 编码规则（Key Generation）
     i18n: 'mds.nav.group.system',
-    items: [{ to: '/dicts', i18n: 'mds.nav.dicts', Icon: IconList }],
+    items: [
+      { to: '/dicts', i18n: 'mds.nav.dicts', Icon: IconList },
+      { to: '/state-models', i18n: 'mds.nav.stateModels', Icon: IconCheckCircle },
+      { to: '/naming-rules', i18n: 'mds.nav.namingRules', Icon: IconKey },
+    ],
   },
 ];
 

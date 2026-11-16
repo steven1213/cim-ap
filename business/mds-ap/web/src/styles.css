@@ -29,6 +29,33 @@
   color: var(--cim-text-secondary, #666);
 }
 
+/* 存储区 Bank 页（主从布局）：顶部设备过滤条 + 规则小节标题行。 */
+.bank-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.bank-rules-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0 8px;
+}
+
+.bank-rules-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bank-rule-context {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
 /* ============================================================
    位置拓扑页（TopologyPage）：左树右详情
    平台没有 Tree 组件；这套类只描述「缩进行 + 徽标 + 双栏布局」，
@@ -250,4 +277,473 @@
 /* 设备列表页：树是过滤器、列表为主——与拓扑页（树 2fr 为主）反向 */
 .topo-equipment {
   grid-template-columns: 250px minmax(0, 1fr);
+}
+/* ============================================================
+   状态模型（StateModelPage）：左列表右三块。
+   列表/信息表/状态表/弹窗/标签/复选框全部走 @cim/ui 公用组件，
+   这里只保留「布局网格 + 矩阵表格」两段结构性样式，颜色全走令牌。
+   ============================================================ */
+.state-model-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(0, 2.1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.state-model-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 转换矩阵：DataTable 的列头须是 i18n 键，动态状态表头进不去，
+   故矩阵保留原生 table，但只描述结构，不做主题。 */
+.state-model-matrix-wrap {
+  overflow-x: auto;
+}
+
+table.state-matrix {
+  border-collapse: collapse;
+}
+
+table.state-matrix th,
+table.state-matrix td {
+  border: 0.5px solid var(--line);
+  padding: 4px 10px;
+  text-align: center;
+  font-weight: 400;
+}
+
+table.state-matrix thead th,
+table.state-matrix tbody th {
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.state-matrix-corner {
+  min-width: 96px;
+}
+
+td.state-matrix-diag {
+  color: var(--text-tertiary, #999);
+}
+
+/* 新建模型弹窗内的初始状态标签区（CimCheckTag 流式排列） */
+.state-initial-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.state-editor-label {
+  margin: 4px 0 4px;
+  font-size: 12px;
+}
+
+/* ============================================================
+   编码规则（NamingRulePage）：段列表编辑器 + 段/试算明细小表。
+   与状态矩阵同口径的特例：段为动态嵌套结构（每段参数面随类型变化），
+   无对应公用组件——这里只描述布局结构，颜色/字号全走平台令牌。
+   ============================================================ */
+
+/* 段配置/试算逐段明细小表（只读） */
+table.naming-seg-table {
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+table.naming-seg-table th,
+table.naming-seg-table td {
+  border: 0.5px solid var(--line);
+  padding: 3px 10px;
+  text-align: left;
+  font-weight: 400;
+  font-size: var(--fs-sm);
+}
+
+table.naming-seg-table th {
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+/* 弹窗内的段卡片列表（可排序） */
+.naming-seg-hint {
+  margin: 10px 0 6px;
+  font-size: 12px;
+}
+
+.naming-seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.naming-seg-card {
+  border: 0.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+
+.naming-seg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.naming-seg-head .cim-select {
+  width: 140px;
+}
+
+.naming-seg-ops {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.naming-seg-ops .cim-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 段参数行：按类型 2-4 个小字段横排 */
+.naming-seg-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+}
+
+.naming-seg-body label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.naming-seg-body label > span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.naming-seg-body .cim-input,
+.naming-seg-body .cim-select {
+  width: 130px;
+}
+
+/* 「＋添加段」按钮行 */
+.naming-seg-add {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+
+/* ================================================================ 制造流程页（Flow 画布） */
+
+.flow-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.flow-left {
+  width: 520px;
+  min-width: 420px;
+  display: flex;
+  min-height: 0;
+}
+
+.flow-left > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.flow-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  min-height: 0;
+}
+
+.flow-canvas-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--cim-border, #d9d9d9);
+  border-radius: 8px;
+  color: var(--cim-text-secondary, #888);
+  background: var(--cim-bg-secondary, #fafafa);
+}
+
+.flow-canvas-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flow-toolbar-title {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.flow-dirty {
+  color: #d97706;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.flow-canvas-hint {
+  color: #94a3b8;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.flow-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+
+.flow-palette {
+  width: 148px;
+  flex-shrink: 0;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 10px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--cim-bg-secondary, #fafafa);
+}
+
+.flow-palette-title {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.flow-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: grab;
+  background: var(--cim-bg, #fff);
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.flow-palette-item:hover {
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.flow-palette-item:active {
+  cursor: grabbing;
+  transform: none;
+  box-shadow: none;
+}
+
+.flow-palette-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.flow-palette-hint {
+  font-size: 11px;
+  color: var(--cim-text-secondary, #888);
+  margin-top: 4px;
+}
+
+.flow-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 320px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+/* 流程状态徽标（四态：未冻结/已冻结/生效/已禁用） */
+.flow-status {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+.flow-status-unfrozen {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.flow-status-frozen {
+  color: #b45309;
+  background: rgba(217, 119, 6, 0.12);
+}
+
+.flow-status-active {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.flow-status-disabled {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.12);
+}
+
+/* 兼容旧类名（已废弃的草稿/发布/停用徽标） */
+.flow-status-draft,
+.flow-status-published,
+.flow-status-retired {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.12);
+}
+
+/* 列表选中行 */
+.flow-left .is-selected {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+/* ================================================================ X6 画布缩放控件 */
+
+.flow-canvas {
+  position: relative;
+}
+
+.flow-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10;
+}
+
+.flow-zoom button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 6px;
+  background: var(--cim-bg, #fff);
+  color: var(--cim-text-primary, #333);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flow-zoom button:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+/* ================================================================ 节点弹窗分组与 bin 编辑器 */
+
+.flow-field-group {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cim-text-secondary, #666);
+  border-bottom: 1px dashed var(--cim-border, #d9d9d9);
+}
+
+.flow-bin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 12px;
+}
+
+.flow-bin-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.flow-bin-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: var(--cim-bg, #fff);
+  color: var(--cim-text-primary, #333);
+}
+
+.flow-bin-hint {
+  font-size: 11px;
+  color: var(--cim-text-secondary, #888);
+}
+
+/* ================================================================ 跨站 Q-time 编辑器（V14） */
+
+.flow-qtime-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.flow-qtime-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.flow-qtime-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: var(--cim-bg, #fff);
+  color: var(--cim-text-primary, #333);
+}
+
+.flow-qtime-minutes {
+  flex: 0 0 90px;
+}
+
+.flow-qtime-action {
+  flex: 0 0 90px;
+}
+
+.flow-qtime-arrow {
+  color: var(--cim-text-secondary, #888);
+  flex-shrink: 0;
+}
+
+.flow-qtime-hint {
+  font-size: 11px;
+  color: var(--cim-text-secondary, #888);
 }
