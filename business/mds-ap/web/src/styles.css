@@ -451,8 +451,8 @@ table.naming-seg-table th {
 }
 
 .flow-left {
-  width: 520px;
-  min-width: 420px;
+  width: 380px;
+  min-width: 340px;
   display: flex;
   min-height: 0;
 }

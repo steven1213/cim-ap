@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Graph, type Edge as X6Edge, type KeyValue, type Node as X6Node } from '@antv/x6';
+// X6 本体与插件样式必须引入：Selection 的 widget 容器缺 CSS 时无 pointer-events:none，
+// 会以裸 div 铺满画布拦截全部真实鼠标事件（节点点不选/双击无效/「全是选中框」怪象的根因）
+import '@antv/x6/es/index.css';
+import '@antv/x6-plugin-selection/es/index.css';
+import '@antv/x6-plugin-snapline/es/index.css';
 import { Selection } from '@antv/x6-plugin-selection';
 import { Keyboard } from '@antv/x6-plugin-keyboard';
 import { Snapline } from '@antv/x6-plugin-snapline';
@@ -427,12 +432,11 @@ export default function FlowPage() {
     }
   }, []);
 
-  // 首次加载
-  const loadedRef = useRef(false);
-  if (!loadedRef.current) {
-    loadedRef.current = true;
+  // 首次加载（useEffect 而非 render 阶段触发：refreshList 同步 setLoading，
+  // render 里调用会报「state update on a component that hasn't mounted yet」）
+  useEffect(() => {
     void refreshList();
-  }
+  }, [refreshList]);
 
   const openDetail = useCallback(async (id: string) => {
     setSelectedId(id);
@@ -731,7 +735,9 @@ function CanvasPane({
         magnetAdsorbed: { name: 'stroke', args: { attrs: { stroke: '#2563eb', strokeWidth: 2 } } },
       },
     });
-    graph.use(new Selection({ enabled: true, multiple: true, rubberband: true, rubberNode: true, movable: true }));
+    // 框选绑定 Shift：无修饰键的左键空白拖拽让给 panning（两插件抢左键时 panning 会因
+    // selection.allowRubberband(strict) 判定让位——X6 源码口径：strict 判定「未按修饰键」为 true）
+    graph.use(new Selection({ enabled: true, multiple: true, rubberband: true, rubberNode: true, movable: true, modifiers: ['shift'] }));
     graph.use(new Snapline({ enabled: true }));
     graph.use(new Keyboard({ enabled: true }));
     graph.bindKey(['backspace', 'delete'], () => deleteSelectedRef.current());
@@ -762,9 +768,11 @@ function CanvasPane({
     });
     graph.on('node:dblclick', ({ node }: { node: X6Node }) => {
       if (editableRef.current) setNodeModal(node);
+      else toast.info(t('mds.flow.readonlyHint'));
     });
     graph.on('edge:dblclick', ({ edge }: { edge: X6Edge }) => {
       if (editableRef.current) setEdgeModal(edge);
+      else toast.info(t('mds.flow.readonlyHint'));
     });
     // hover 连线出全套编辑工具（拐点/段拖拽/改端点/删边）；
     // 离开延迟移除且跳过工具拖拽中——见 toolDragRef 说明
@@ -778,7 +786,11 @@ function CanvasPane({
         if (!toolDragRef.current && !cell.disposed) cell.removeTools();
       }, 120);
     });
-    graph.on('selection:changed', ({ cells }: { cells: Array<X6Node | X6Edge> }) => setSelCount(cells.length));
+    // ⚠️ selection:changed 的 payload 是 {added,removed,options,selected}，没有 cells 字段——
+    // 解构 cells 会在每次选中变化时抛 TypeError，异常中断 X6 mouseup 处理链（view 委托未恢复），
+    // 导致第一次点击后所有左键交互（点选/双击/框选/删除）永久失效、右键平移却正常。
+    graph.on('selection:changed', ({ selected }: { selected: Array<X6Node | X6Edge> }) =>
+      setSelCount(selected?.length ?? 0));
 
     return () => {
       document.removeEventListener('mousedown', onDocMouseDown, true);
@@ -819,7 +831,9 @@ function CanvasPane({
         });
         applyEdgeDecor(edge);
       }
-      g.centerContent();
+      // 初始定位：内容左上角对齐视口（留边距），流程自左向右展开。
+      // 不用 centerContent()——它依赖容器尺寸就绪时机，挂载早期尺寸不准会把内容推出视野外。
+      g.translate(24, 24);
     }
     setQtimes(parsed?.qtimes ?? []);
     loadingRef.current = false;
@@ -934,9 +948,11 @@ function CanvasPane({
           {dirty ? <em className="flow-dirty"> · {t('mds.flow.unsaved')}</em> : null}
           <em className="flow-canvas-hint"> · {t('mds.flow.canvasHint')}</em>
         </span>
-        <CimButton size="small" onClick={onEditMaster}>
-          {t('mds.common.edit')}
-        </CimButton>
+        {canUpdate && status === 'UNFROZEN' && (
+          <CimButton size="small" onClick={onEditMaster}>
+            {t('mds.common.edit')}
+          </CimButton>
+        )}
         {canUpdate && status === 'UNFROZEN' && (
           <>
             <CimButton size="small" type="primary" loading={busy} onClick={() => void doSave()}>
@@ -1110,17 +1126,21 @@ function FlowMasterModal({
     remark: initial?.remark ?? '',
   });
 
-  // 技术下拉（可空：流程可暂不挂技术）
-  const techLoadedRef = useRef(false);
-  if (!techLoadedRef.current) {
-    techLoadedRef.current = true;
+  // 技术下拉（可空：流程可暂不挂技术）；取数放 useEffect，不在 render 阶段发起副作用
+  useEffect(() => {
+    let alive = true;
     void api
       .listTechnologies()
-      .then((list) =>
-        setTechs(list.map((x) => ({ value: x.techCode, label: `${x.techCode} · ${x.techName}` }))),
-      )
-      .catch(() => setTechs([]));
-  }
+      .then((list) => {
+        if (alive) setTechs(list.map((x) => ({ value: x.techCode, label: `${x.techCode} · ${x.techName}` })));
+      })
+      .catch(() => {
+        if (alive) setTechs([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const fields = useMemo<Array<FormField<typeof form>>>(
     () => [
@@ -1237,21 +1257,26 @@ function NodeFormModal({
   const [bins, setBins] = useState<BinDef[]>(d.bins ?? []);
   const [publishedFlows, setPublishedFlows] = useState<FormOption[]>([]);
 
-  // 已发布流程下拉（SUBFLOW 引用候选；排除自身）
-  const flowsLoadedRef = useRef(false);
-  if (!flowsLoadedRef.current) {
-    flowsLoadedRef.current = true;
+  // 已发布流程下拉（SUBFLOW 引用候选；排除自身）；取数放 useEffect
+  useEffect(() => {
+    let alive = true;
     void api
       .listFlows()
-      .then((list) =>
-        setPublishedFlows(
-          list
-            .filter((f) => f.status === 'ACTIVE' && f.id !== excludeFlowId)
-            .map((f) => ({ value: f.flowCode, label: `${f.flowCode} · ${f.flowName}` })),
-        ),
-      )
-      .catch(() => setPublishedFlows([]));
-  }
+      .then((list) => {
+        if (alive)
+          setPublishedFlows(
+            list
+              .filter((f) => f.status === 'ACTIVE' && f.id !== excludeFlowId)
+              .map((f) => ({ value: f.flowCode, label: `${f.flowCode} · ${f.flowName}` })),
+          );
+      })
+      .catch(() => {
+        if (alive) setPublishedFlows([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [excludeFlowId]);
 
   const fields = useMemo<Array<FormField<typeof form>>>(
     () => [
