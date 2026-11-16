@@ -7,12 +7,14 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.mds.server.site.CimAreaRepository;
 import com.cim.mds.server.site.CimBayRepository;
 import com.cim.mds.server.site.CimFabRepository;
 import com.cim.mds.server.site.CimStageRepository;
 import com.cim.mds.server.site.EditLockDefData;
 import com.cim.mds.server.site.EditLockSupport;
+import com.cim.mds.server.statemodel.StateModelAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import com.cim.system.dict.SysDictService;
@@ -50,6 +52,8 @@ public class EquipmentAdminService {
     private final CimAreaRepository areaRepository;
     private final CimBayRepository bayRepository;
     private final CimStageRepository stageRepository;
+    private final StateModelAdminService stateModelService;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -83,14 +87,17 @@ public class EquipmentAdminService {
 
     @Transactional
     public EquipmentView create(EquipmentReq req) {
-        requireText(req.equipmentCode(), "equipmentCode");
         requireText(req.equipmentName(), "equipmentName");
-        if (equipmentRepository.existsByEquipmentCodeAndDeletedFalse(req.equipmentCode().trim())) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "设备编码已存在: " + req.equipmentCode());
-        }
         CimEquipmentType type = requireTypeByCode(req.typeCode());
         validateLocation(type, req.locationType(), req.locationId());
+        // 命名规则守门：ctx 带全位置链 + kind/type（EQUIPMENT 变量白名单最全）
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_EQUIPMENT,
+                req.equipmentCode(), namingCtx(type, req));
+        if (equipmentRepository.existsByEquipmentCodeAndDeletedFalse(code)) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "设备编码已存在: " + code);
+        }
         CimEquipment entity = new CimEquipment();
+        entity.setEquipmentCode(code);
         apply(entity, req);
         entity.setStateCode(requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode"));
         return toView(equipmentRepository.save(entity), type);
@@ -104,11 +111,15 @@ public class EquipmentAdminService {
         // equipmentCode 全局唯一主标识：建后不可改
         CimEquipmentType type = requireTypeByCode(req.typeCode());
         validateLocation(type, req.locationType(), req.locationId());
+        String newState = requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode");
+        // 状态转换守门（E30 口径）：仅在状态实际变化时校验（新建无旧态不校验）
+        stateModelService.validateTransition(StateModelAdminService.MODEL_EQUIPMENT,
+                entity.getStateCode(), newState);
         entity.setEquipmentName(req.equipmentName().trim());
         entity.setTypeCode(req.typeCode());
         entity.setLocationType(req.locationType());
         entity.setLocationId(req.locationId());
-        entity.setStateCode(requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode"));
+        entity.setStateCode(newState);
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setEnabled(req.enabled() == null || req.enabled());
@@ -178,6 +189,45 @@ public class EquipmentAdminService {
         requireText(typeCode, "typeCode");
         return typeRepository.findByTypeCodeAndDeletedFalse(typeCode.trim())
                 .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + typeCode));
+    }
+
+    /**
+     * 命名规则上下文：位置链码（按 locationId 上溯到 site）+ kind/type
+     * （EQUIPMENT 变量白名单 {site}{fab}{area}{bay}{stage}{kind}{type}{seq}）。
+     */
+    private Map<String, String> namingCtx(CimEquipmentType type, EquipmentReq req) {
+        Map<String, String> ctx = new java.util.HashMap<>();
+        ctx.put("kind", type.getKindCode());
+        ctx.put("type", type.getTypeCode());
+        if (req.locationId() != null && !req.locationId().isBlank()) {
+            switch (req.locationType()) {
+                case "FAB" -> fabRepository.findById(req.locationId())
+                        .filter(f -> !Boolean.TRUE.equals(f.getDeleted()))
+                        .ifPresent(f -> ctx.put("fab", f.getFabCode()));
+                case "AREA" -> areaRepository.findById(req.locationId())
+                        .filter(a -> !Boolean.TRUE.equals(a.getDeleted()))
+                        .ifPresent(a -> {
+                            ctx.put("area", a.getAreaCode());
+                            ctx.put("fab", a.getFabCode());
+                        });
+                case "BAY" -> bayRepository.findById(req.locationId())
+                        .filter(b -> !Boolean.TRUE.equals(b.getDeleted()))
+                        .ifPresent(b -> {
+                            ctx.put("bay", b.getBayCode());
+                            ctx.put("area", b.getAreaCode());
+                            ctx.put("fab", b.getFabCode());
+                        });
+                case "STAGE" -> stageRepository.findById(req.locationId())
+                        .filter(s -> !Boolean.TRUE.equals(s.getDeleted()))
+                        .ifPresent(s -> {
+                            ctx.put("stage", s.getStageCode());
+                            ctx.put("bay", s.getBayCode());
+                            ctx.put("fab", s.getFabCode());
+                        });
+                default -> { }
+            }
+        }
+        return ctx;
     }
 
     /** 位置校验：类型合法 + kind 规则（MATERIAL→FAB/AREA/BAY，其余→STAGE）+ 记录真实存在。 */

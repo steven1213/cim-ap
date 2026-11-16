@@ -1,7 +1,9 @@
 package com.cim.mds.server.site;
 
 import java.util.List;
+import java.util.Map;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 
@@ -22,6 +24,7 @@ public class TechnologyAdminService {
 
     private final CimTechnologyRepository technologyRepository;
     private final CimProductRepository productRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -47,12 +50,14 @@ public class TechnologyAdminService {
 
     @Transactional
     public TechnologyView create(TechnologyReq req) {
-        requireText(req.techCode(), "techCode");
         requireText(req.techName(), "techName");
-        if (technologyRepository.findByTechCodeAndDeletedFalse(req.techCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "制程技术编码已存在: " + req.techCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_TECHNOLOGY,
+                req.techCode(), Map.of());
+        if (technologyRepository.findByTechCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "制程技术编码已存在: " + code);
         }
         CimTechnology entity = new CimTechnology();
+        entity.setTechCode(code);
         apply(entity, req);
         return toView(technologyRepository.save(entity));
     }

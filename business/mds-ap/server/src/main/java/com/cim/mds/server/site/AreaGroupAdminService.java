@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 
@@ -25,6 +26,7 @@ public class AreaGroupAdminService {
     private final CimAreaGroupRepository areaGroupRepository;
     private final CimAreaRepository areaRepository;
     private final CimFabRepository fabRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -50,15 +52,17 @@ public class AreaGroupAdminService {
 
     @Transactional
     public AreaGroupView create(AreaGroupReq req) {
-        requireText(req.groupCode(), "groupCode");
         requireText(req.groupName(), "groupName");
         requireText(req.fabCode(), "fabCode");
         requireActiveFabByCode(req.fabCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_AREA_GROUP, req.groupCode(),
+                Map.of("fab", req.fabCode().trim()));
         if (areaGroupRepository.findByFabCodeAndGroupCodeAndDeletedFalse(
-                req.fabCode().trim(), req.groupCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下区域组编码已存在: " + req.groupCode());
+                req.fabCode().trim(), code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下区域组编码已存在: " + code);
         }
         CimAreaGroup entity = new CimAreaGroup();
+        entity.setGroupCode(code);
         apply(entity, req);
         return toView(areaGroupRepository.save(entity));
     }

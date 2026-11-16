@@ -1,5 +1,6 @@
 package com.cim.mds.server.site;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 
@@ -30,6 +31,7 @@ public class BayStageAdminService {
     private final CimAreaRepository areaRepository;
     private final CimBayRepository bayRepository;
     private final CimStageRepository stageRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图
 
@@ -71,17 +73,19 @@ public class BayStageAdminService {
 
     @Transactional
     public BayView createBay(BayReq req) {
-        requireText(req.bayCode(), "bayCode");
         requireText(req.fabCode(), "fabCode");
         requireText(req.areaCode(), "areaCode");
         requireText(req.bayName(), "bayName");
         requireActiveFabByCode(req.fabCode());
         requireActiveAreaInFab(req.fabCode(), req.areaCode());
-        if (bayRepository.findByFabCodeAndBayCodeAndDeletedFalse(req.fabCode().trim(), req.bayCode().trim())
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_BAY, req.bayCode(),
+                Map.of("fab", req.fabCode().trim(), "area", req.areaCode().trim()));
+        if (bayRepository.findByFabCodeAndBayCodeAndDeletedFalse(req.fabCode().trim(), code)
                 .isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下 Bay 编码已存在: " + req.bayCode());
+            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下 Bay 编码已存在: " + code);
         }
         CimBay entity = new CimBay();
+        entity.setBayCode(code);
         applyBay(entity, req);
         return toView(bayRepository.save(entity));
     }
@@ -136,16 +140,18 @@ public class BayStageAdminService {
 
     @Transactional
     public StageView createStage(StageReq req) {
-        requireText(req.stageCode(), "stageCode");
         requireText(req.fabCode(), "fabCode");
         requireText(req.bayCode(), "bayCode");
         requireText(req.stageName(), "stageName");
         requireActiveBayInFab(req.fabCode(), req.bayCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_STAGE, req.stageCode(),
+                Map.of("fab", req.fabCode().trim(), "bay", req.bayCode().trim()));
         if (stageRepository.findByFabCodeAndBayCodeAndStageCodeAndDeletedFalse(
-                req.fabCode().trim(), req.bayCode().trim(), req.stageCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "该 Bay 下 Stage 编码已存在: " + req.stageCode());
+                req.fabCode().trim(), req.bayCode().trim(), code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "该 Bay 下 Stage 编码已存在: " + code);
         }
         CimStage entity = new CimStage();
+        entity.setStageCode(code);
         applyStage(entity, req);
         return toView(stageRepository.save(entity));
     }

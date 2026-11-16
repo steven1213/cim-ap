@@ -3,6 +3,7 @@ package com.cim.mds.server.equipment;
 import java.util.List;
 import java.util.Map;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.mds.server.site.EditLockDefData;
 import com.cim.mds.server.site.EditLockSupport;
 import com.cim.spring.support.web.BizCode;
@@ -48,6 +49,7 @@ public class EquipmentTypeAdminService {
 
     private final CimEquipmentTypeRepository typeRepository;
     private final CimEquipmentRepository equipmentRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -75,14 +77,17 @@ public class EquipmentTypeAdminService {
 
     @Transactional
     public EquipmentTypeView create(EquipmentTypeReq req) {
-        requireText(req.typeCode(), "typeCode");
         requireText(req.typeName(), "typeName");
         requireKind(req.kindCode());
         requireClassBelongsToKind(req.kindCode(), req.equipClassCode());
-        if (typeRepository.findByTypeCodeAndDeletedFalse(req.typeCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "设备类型编码已存在: " + req.typeCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_EQUIPMENT_TYPE, req.typeCode(),
+                Map.of("kind", req.kindCode().trim(),
+                        "class", req.equipClassCode() == null ? "" : req.equipClassCode().trim()));
+        if (typeRepository.findByTypeCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "设备类型编码已存在: " + code);
         }
         CimEquipmentType entity = new CimEquipmentType();
+        entity.setTypeCode(code);
         apply(entity, req);
         return toView(typeRepository.save(entity));
     }

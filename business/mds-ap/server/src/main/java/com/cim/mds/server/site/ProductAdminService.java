@@ -1,8 +1,10 @@
 package com.cim.mds.server.site;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import com.cim.system.dict.SysDictService;
@@ -32,6 +34,7 @@ public class ProductAdminService {
     private final CimProductRepository productRepository;
     private final CimTechnologyRepository technologyRepository;
     private final SysDictService dictService;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -59,12 +62,16 @@ public class ProductAdminService {
 
     @Transactional
     public ProductView create(ProductReq req) {
-        requireText(req.productCode(), "productCode");
         requireText(req.productName(), "productName");
-        if (productRepository.findByProductCodeAndDeletedFalse(req.productCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "产品编码已存在: " + req.productCode());
+        Map<String, String> ctx = req.techCode() == null || req.techCode().isBlank()
+                ? Map.of() : Map.of("tech", req.techCode().trim());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_PRODUCT,
+                req.productCode(), ctx);
+        if (productRepository.findByProductCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "产品编码已存在: " + code);
         }
         CimProduct entity = new CimProduct();
+        entity.setProductCode(code);
         apply(entity, req);
         return toView(productRepository.save(entity));
     }
@@ -101,7 +108,10 @@ public class ProductAdminService {
     }
 
     private void apply(CimProduct entity, ProductReq req) {
-        entity.setProductCode(req.productCode().trim());
+        // code 由 create 的命名规则守门生成后先行落位（可能为 null），此处只兜底补
+        if (entity.getProductCode() == null) {
+            entity.setProductCode(req.productCode() == null ? null : req.productCode().trim());
+        }
         entity.setProductName(req.productName().trim());
         entity.setRemark(req.remark());
         entity.setDescription(req.description());

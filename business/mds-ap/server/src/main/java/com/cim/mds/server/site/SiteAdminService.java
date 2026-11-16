@@ -1,5 +1,6 @@
 package com.cim.mds.server.site;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 
@@ -37,6 +38,7 @@ public class SiteAdminService {
     /** 区域组校验/解析（组与 Area 同 Fab、启用；§9.1）。 */
     private final AreaGroupAdminService areaGroupAdminService;
     private final CimBayRepository bayRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图
 
@@ -80,12 +82,14 @@ public class SiteAdminService {
 
     @Transactional
     public SiteView createSite(SiteReq req) {
-        requireText(req.siteCode(), "siteCode");
         requireText(req.siteName(), "siteName");
-        if (siteRepository.findBySiteCodeAndDeletedFalse(req.siteCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "基地编码已存在: " + req.siteCode());
+        // 命名规则守门：留空+启用规则=自动占号；手填=校验模板形态；无规则=必须手填
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_SITE, req.siteCode(), Map.of());
+        if (siteRepository.findBySiteCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "基地编码已存在: " + code);
         }
         CimSite entity = new CimSite();
+        entity.setSiteCode(code);
         applySite(entity, req);
         return toView(siteRepository.save(entity));
     }
@@ -129,14 +133,16 @@ public class SiteAdminService {
 
     @Transactional
     public FabView createFab(FabReq req) {
-        requireText(req.fabCode(), "fabCode");
         requireText(req.fabName(), "fabName");
         requireText(req.siteCode(), "siteCode");
         requireActiveSiteByCode(req.siteCode());
-        if (fabRepository.findByFabCodeAndDeletedFalse(req.fabCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "Fab 编码已存在: " + req.fabCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_FAB, req.fabCode(),
+                Map.of("site", req.siteCode().trim()));
+        if (fabRepository.findByFabCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "Fab 编码已存在: " + code);
         }
         CimFab entity = new CimFab();
+        entity.setFabCode(code);
         applyFab(entity, req);
         return toView(siteRepository, fabRepository.save(entity));
     }
@@ -190,15 +196,17 @@ public class SiteAdminService {
 
     @Transactional
     public AreaView createArea(AreaReq req) {
-        requireText(req.areaCode(), "areaCode");
         requireText(req.areaName(), "areaName");
         requireText(req.fabCode(), "fabCode");
         requireActiveFabByCode(req.fabCode());
-        if (areaRepository.findByFabCodeAndAreaCodeAndDeletedFalse(req.fabCode().trim(), req.areaCode().trim())
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_AREA, req.areaCode(),
+                Map.of("fab", req.fabCode().trim()));
+        if (areaRepository.findByFabCodeAndAreaCodeAndDeletedFalse(req.fabCode().trim(), code)
                 .isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下 Area 编码已存在: " + req.areaCode());
+            throw new BizException(BizCode.DATA_DUPLICATE, "该 Fab 下 Area 编码已存在: " + code);
         }
         CimArea entity = new CimArea();
+        entity.setAreaCode(code);
         applyArea(entity, req);
         entity.setAreaGroupId(areaGroupAdminService.resolveGroupIdForArea(
                 req.areaGroupId(), entity.getFabCode()));

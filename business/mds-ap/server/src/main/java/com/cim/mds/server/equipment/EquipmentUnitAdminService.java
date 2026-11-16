@@ -3,7 +3,9 @@ package com.cim.mds.server.equipment;
 import java.util.List;
 import java.util.Set;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.mds.server.site.EditLockSupport;
+import com.cim.mds.server.statemodel.StateModelAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import com.cim.system.dict.SysDictService;
@@ -36,6 +38,8 @@ public class EquipmentUnitAdminService {
     private final CimEquipmentUnitRepository unitRepository;
     private final EquipmentAdminService equipmentService;
     private final SysDictService dictService;
+    private final StateModelAdminService stateModelService;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -65,16 +69,18 @@ public class EquipmentUnitAdminService {
     public EquipmentUnitView create(String equipmentId, EquipmentUnitReq req) {
         CimEquipment equipment = requireEquipment(equipmentId);
         assertParentNotLocked(equipment);
-        requireText(req.unitCode(), "unitCode");
         requireText(req.unitName(), "unitName");
         requireUnitClass(req.unitClass());
         requireUnitType(req.unitType());
-        if (unitRepository.existsByEquipmentIdAndUnitCodeAndDeletedFalse(
-                equipmentId, req.unitCode().trim())) {
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_EQUIPMENT_UNIT, req.unitCode(),
+                java.util.Map.of("eqp", equipment.getEquipmentCode(),
+                        "unitType", req.unitType()));
+        if (unitRepository.existsByEquipmentIdAndUnitCodeAndDeletedFalse(equipmentId, code)) {
             throw new BizException(BizCode.DATA_DUPLICATE,
-                    "子单元编码在该设备内已存在: " + req.unitCode());
+                    "子单元编码在该设备内已存在: " + code);
         }
         CimEquipmentUnit entity = new CimEquipmentUnit();
+        entity.setUnitCode(code);
         apply(entity, req);
         entity.setEquipmentId(equipmentId);
         entity.setStateCode(requireDictItem(DICT_UNIT_STATE, req.stateCode(), "stateCode"));
@@ -93,7 +99,14 @@ public class EquipmentUnitAdminService {
         entity.setUnitName(req.unitName().trim());
         entity.setUnitClass(req.unitClass());
         entity.setUnitType(req.unitType());
-        entity.setStateCode(requireDictItem(DICT_UNIT_STATE, req.stateCode(), "stateCode"));
+        String newState = requireDictItem(DICT_UNIT_STATE, req.stateCode(), "stateCode");
+        // 状态转换守门（E30 口径）：状态实际变化时按形态解析模型校验（新建无旧态不校验）
+        if (newState != null && !newState.equals(entity.getStateCode())) {
+            String modelCode = stateModelService.resolve(
+                    StateModelAdminService.OBJECT_EQUIPMENT_UNIT, req.unitType()).modelCode();
+            stateModelService.validateTransition(modelCode, entity.getStateCode(), newState);
+        }
+        entity.setStateCode(newState);
         entity.setPortNo(req.portNo());
         entity.setCapacity(req.capacity());
         entity.setEnabled(req.enabled() == null || req.enabled());

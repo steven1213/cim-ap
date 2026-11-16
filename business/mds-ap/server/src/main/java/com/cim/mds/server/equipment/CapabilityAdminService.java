@@ -2,6 +2,7 @@ package com.cim.mds.server.equipment;
 
 import java.util.List;
 
+import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.mds.server.site.EditLockDefData;
 import com.cim.mds.server.site.EditLockSupport;
 import com.cim.spring.support.web.BizCode;
@@ -22,6 +23,7 @@ public class CapabilityAdminService {
 
     private final CimCapabilityRepository capabilityRepository;
     private final CimEquipmentCapabilityRepository eqpCapRepository;
+    private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -47,12 +49,14 @@ public class CapabilityAdminService {
 
     @Transactional
     public CapabilityView create(CapabilityReq req) {
-        requireText(req.capabilityCode(), "capabilityCode");
         requireText(req.capabilityName(), "capabilityName");
-        if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(req.capabilityCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "能力编码已存在: " + req.capabilityCode());
+        String code = namingRuleService.apply(NamingRuleAdminService.OBJ_CAPABILITY,
+                req.capabilityCode(), java.util.Map.of());
+        if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(code).isPresent()) {
+            throw new BizException(BizCode.DATA_DUPLICATE, "能力编码已存在: " + code);
         }
         CimCapability entity = new CimCapability();
+        entity.setCapabilityCode(code);
         apply(entity, req);
         return toView(capabilityRepository.save(entity));
     }
