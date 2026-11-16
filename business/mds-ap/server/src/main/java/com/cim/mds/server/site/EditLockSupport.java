@@ -42,7 +42,8 @@ public class EditLockSupport {
             Map.entry("product", "cim_product"),
             Map.entry("equipmentType", "cim_equipment_type"),
             Map.entry("equipment", "cim_equipment"),
-            Map.entry("capability", "cim_capability"));
+            Map.entry("capability", "cim_capability"),
+            Map.entry("stockerBank", "cim_stocker_bank"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();
