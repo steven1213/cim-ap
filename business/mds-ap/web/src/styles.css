@@ -450,9 +450,10 @@ table.naming-seg-table th {
   gap: 12px;
 }
 
+/* 与列表列宽合计（≈478px）匹配：窄了会把表头/徽章挤成竖排换行 */
 .flow-left {
-  width: 380px;
-  min-width: 340px;
+  width: 480px;
+  min-width: 420px;
   display: flex;
   min-height: 0;
 }
@@ -488,6 +489,17 @@ table.naming-seg-table th {
   gap: 8px;
 }
 
+/* 画布全屏（覆盖层式而非 Fullscreen API）：fixed 铺满视口，工具栏/组件面板/画布
+   整块提升，编辑大流程时可视面积最大。z-index 低于 antd 弹层（1000+）——确认框、
+   Toast、节点/连线编辑弹窗在全屏里照常浮起。Esc 退出（见组件内 keydown）。 */
+.flow-canvas-pane.is-maximized {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  padding: 16px;
+  background: var(--cim-bg, #fff);
+}
+
 .flow-toolbar {
   display: flex;
   align-items: center;
@@ -508,10 +520,12 @@ table.naming-seg-table th {
 }
 
 .flow-canvas-hint {
+  margin-left: auto;
   color: #94a3b8;
   font-style: normal;
   font-weight: 400;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .flow-canvas-wrap {
@@ -578,6 +592,14 @@ table.naming-seg-table th {
   margin-top: 4px;
 }
 
+/* 画布外壳：缩放控件的定位锚点（X6 init 会清空其容器，控件绝不能放进 .flow-canvas 内） */
+.flow-canvas-shell {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
 .flow-canvas {
   flex: 1;
   min-width: 0;
@@ -593,6 +615,34 @@ table.naming-seg-table th {
   font-size: 12px;
   padding: 1px 8px;
   border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* 名称列：主行名称 + 副行挂载技术（技术不单独占列，省宽度） */
+.flow-name-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.flow-name-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-name-sub {
+  font-size: 11px;
+  color: var(--cim-text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 左列偏窄：操作按钮不换行（换行会把行高撑到两倍） */
+.flow-left .cell-actions {
+  flex-wrap: nowrap;
 }
 
 .flow-status-unfrozen {
@@ -637,7 +687,7 @@ table.naming-seg-table th {
 .flow-zoom {
   position: absolute;
   right: 12px;
-  bottom: 12px;
+  top: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -654,6 +704,10 @@ table.naming-seg-table th {
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .flow-zoom button:hover {

@@ -509,30 +509,44 @@ export default function FlowPage() {
     );
   }, [flows, keyword]);
 
+  // 列宽合计 ≈ 容器宽（.flow-left 480px）：「版本/步骤」合并一列、「挂载制程技术」
+  // 并入名称副行——上轮左列收窄给画布腾空间后，7 列（合计 786px）在窄容器里
+  // 表头与状态徽章全部竖排换行，这里按容器实际宽度重新分配。
   const columns = useMemo<Array<DataTableColumn<FlowView>>>(
     () => [
-      { key: 'flowCode', titleKey: 'mds.flow.field.flowCode', width: 130, mono: true },
-      { key: 'flowName', titleKey: 'mds.flow.field.flowName', width: 190 },
-      { key: 'techCode', titleKey: 'mds.flow.field.techCode', width: 100, mono: true, render: (r) => r.techCode ?? '—' },
+      { key: 'flowCode', titleKey: 'mds.flow.field.flowCode', width: 100, mono: true, ellipsis: true },
+      {
+        key: 'flowName',
+        titleKey: 'mds.flow.field.flowName',
+        width: 132,
+        ellipsis: true,
+        render: (r) => (
+          <span className="flow-name-cell" title={r.techCode ? `${r.flowName} · ${r.techCode}` : r.flowName}>
+            <span className="flow-name-main">{r.flowName}</span>
+            {r.techCode ? <span className="flow-name-sub">{r.techCode}</span> : null}
+          </span>
+        ),
+      },
       {
         key: 'status',
         titleKey: 'mds.flow.field.status',
-        width: 86,
+        width: 64,
         render: (r) => <span className={`flow-status flow-status-${r.status.toLowerCase()}`}>{t(`mds.flow.status.${r.status}`)}</span>,
       },
       {
         key: 'versionNo',
-        titleKey: 'mds.flow.field.versionNo',
-        width: 60,
-        render: (r) => `V${r.versionNo ?? 1}`,
+        titleKey: 'mds.flow.field.versionSteps',
+        width: 78,
+        mono: true,
+        render: (r) => `V${r.versionNo ?? 1} · ${r.stepCount}`,
       },
-      { key: 'stepCount', titleKey: 'mds.flow.field.stepCount', width: 60, render: (r) => String(r.stepCount) },
       {
         key: 'actions',
         titleKey: 'mds.common.actions',
-        width: 160,
+        width: 104,
+        // 行点击会打开详情：动作按钮先拦掉冒泡，避免「点删除/复制顺手把详情也切了」
         render: (r) => (
-          <span className="cell-actions">
+          <span className="cell-actions" onClick={(e) => e.stopPropagation()}>
             {(r.status === 'FROZEN' || r.status === 'ACTIVE') && (
               <Can perm={MDS_PERMS.flow.update}>
                 <CimButton size="small" onClick={() => void doDisable(r)}>
@@ -663,6 +677,31 @@ function CanvasPane({
   const [qtimeModal, setQtimeModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selCount, setSelCount] = useState(0);
+  // 画布全屏（覆盖层式 fixed 铺满视口，Esc 退出；组件按 flow id 重挂载，切流程自动复位）
+  const [maximized, setMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!maximized) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMaximized(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [maximized]);
+
+  // 进入/退出全屏容器尺寸剧变（autoResize 走 ResizeObserver 异步生效），稍候重新适配视野；
+  // 覆盖按钮与 Esc 两条路径（挂载首跑跳过——首载 fit 由画布加载 effect 负责）
+  const maximizedRef = useRef(false);
+  useEffect(() => {
+    if (maximizedRef.current === maximized) return;
+    maximizedRef.current = maximized;
+    const g = graphRef.current;
+    if (!g || g.disposed) return;
+    const t = window.setTimeout(() => {
+      if (!g.disposed) g.zoomToFit({ padding: 24, maxScale: 1 });
+    }, 240);
+    return () => window.clearTimeout(t);
+  }, [maximized]);
 
   // 跨站 Q-time（flow 级，不挂在节点上；存 state，保存时序列化进 XML）
   const [qtimes, setQtimes] = useState<QtimeDef[]>([]);
@@ -831,9 +870,13 @@ function CanvasPane({
         });
         applyEdgeDecor(edge);
       }
-      // 初始定位：内容左上角对齐视口（留边距），流程自左向右展开。
-      // 不用 centerContent()——它依赖容器尺寸就绪时机，挂载早期尺寸不准会把内容推出视野外。
-      g.translate(24, 24);
+      // 打开后自适应视野：内容大则缩到可视区内，小则 1:1 居中。等两帧再 fit——
+      // 容器尺寸就绪有延迟（挂载早期读尺寸不准会把内容推出视野外）。
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!g.disposed) g.zoomToFit({ padding: 24, maxScale: 1 });
+        }),
+      );
     }
     setQtimes(parsed?.qtimes ?? []);
     loadingRef.current = false;
@@ -938,7 +981,7 @@ function CanvasPane({
 
   const status = detail.flow.status;
   return (
-    <div className="flow-canvas-pane">
+    <div className={'flow-canvas-pane' + (maximized ? ' is-maximized' : '')}>
       <div className="flow-toolbar">
         <span className="flow-toolbar-title">
           {t('mds.flow.canvasTitle', { code: detail.flow.flowCode })}
@@ -946,7 +989,6 @@ function CanvasPane({
             {t(`mds.flow.status.${status}`)}
           </span>
           {dirty ? <em className="flow-dirty"> · {t('mds.flow.unsaved')}</em> : null}
-          <em className="flow-canvas-hint"> · {t('mds.flow.canvasHint')}</em>
         </span>
         {canUpdate && status === 'UNFROZEN' && (
           <CimButton size="small" onClick={onEditMaster}>
@@ -994,6 +1036,7 @@ function CanvasPane({
           </CimButton>
         )}
         {!editable && <span className="dim">{t('mds.flow.readonly')}</span>}
+        <em className="flow-canvas-hint">{t('mds.flow.canvasHint')}</em>
       </div>
       <div className="flow-canvas-wrap">
         {editable && (
@@ -1019,22 +1062,46 @@ function CanvasPane({
             <div className="flow-palette-hint">{t('mds.flow.paletteHint')}</div>
           </div>
         )}
-        <div
-          className="flow-canvas"
-          ref={wrapper}
-          onDrop={onDrop}
-          onDragOver={(e) => {
-            if (editableRef.current) e.preventDefault();
-          }}
-        >
+        {/* ⚠️ 缩放控件必须放在 X6 容器外：X6 init 会清空容器重建视图，
+            容器内子元素（此前 .flow-zoom 就挂在里面）会被整个吞掉不渲染 */}
+        <div className="flow-canvas-shell">
+          <div
+            className="flow-canvas"
+            ref={wrapper}
+            onDrop={onDrop}
+            onDragOver={(e) => {
+              if (editableRef.current) e.preventDefault();
+            }}
+          />
           <div className="flow-zoom">
             <button type="button" title="+" onClick={() => zoomBy(0.1)}>＋</button>
             <button type="button" title="−" onClick={() => zoomBy(-0.1)}>−</button>
             <button type="button" title="1:1" onClick={fitContent}>⌖</button>
+            <button
+              type="button"
+              title={maximized ? t('mds.flow.fullscreenExit') : t('mds.flow.fullscreen')}
+              onClick={() => setMaximized(!maximized)}
+            >
+              {/* 展开/收起角标图标（⛶ 字形字体覆盖不稳，用 SVG） */}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                {maximized ? (
+                  // 收起：两角向内
+                  <>
+                    <path d="M4.5 1v3.5H1" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M7.5 11V7.5H11" stroke="currentColor" strokeWidth="1.4" />
+                  </>
+                ) : (
+                  // 展开：两角向外
+                  <>
+                    <path d="M1 4.5h3.5V1" stroke="currentColor" strokeWidth="1.4" />
+                    <path d="M11 7.5H7.5V11" stroke="currentColor" strokeWidth="1.4" />
+                  </>
+                )}
+              </svg>
+            </button>
           </div>
         </div>
       </div>
-
       {qtimeModal && (
         <QtimeModal
           qtimes={qtimes}
