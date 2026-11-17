@@ -14,6 +14,9 @@ public interface CimFlowRepository extends JpaRepository<CimFlow, String> {
 
     boolean existsByFlowCodeAndDeletedFalse(String flowCode);
 
+    /** 按 id 取未删主档（规则层按 flowId 定位族锚点用）。 */
+    Optional<CimFlow> findByIdAndDeletedFalse(String id);
+
     /** 版本族内全部版本（版本号降序；复制取 max+1、激活降级扫旧 ACTIVE 用）。 */
     List<CimFlow> findByFamilyCodeAndDeletedFalse(String familyCode);
 

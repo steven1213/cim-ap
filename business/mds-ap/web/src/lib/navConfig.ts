@@ -65,6 +65,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/technologies', i18n: 'mds.nav.technology', Icon: IconSliders },
       { to: '/products', i18n: 'mds.nav.products', Icon: IconApps },
       { to: '/flows', i18n: 'mds.nav.flows', Icon: IconTree },
+      // V15 独立规则层：锚定流程版本族，evaluate 契约供 MES/MCS（grp.product 同构）
+      { to: '/flow-rules', i18n: 'mds.nav.flowRules', Icon: IconList },
     ],
   },
   {

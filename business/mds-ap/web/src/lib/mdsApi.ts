@@ -587,11 +587,11 @@ import type {
 } from '@/types';
 
 export function listFlows(keyword?: string, signal?: AbortSignal): Promise<FlowView[]> {
-  return http.get<FlowView[]>(`${BASE}/flows`, { params: keyword ? { keyword } : undefined, signal });
+  return http.get<FlowView[]>(`${BASE}/flows`, keyword ? { keyword } : undefined, { signal });
 }
 
 export function getFlow(id: string, signal?: AbortSignal): Promise<FlowDetail> {
-  return http.get<FlowDetail>(`${BASE}/flows/${id}`, { signal });
+  return http.get<FlowDetail>(`${BASE}/flows/${id}`, undefined, { signal });
 }
 
 export function createFlow(payload: FlowPayload): Promise<FlowView> {
@@ -637,4 +637,43 @@ export function disableFlow(id: string): Promise<FlowView> {
 
 export function copyFlow(id: string): Promise<FlowView> {
   return http.post<FlowView>(`${BASE}/flows/${id}/copy`, {});
+}
+
+// ---------------------------------------------------------------- 流程规则（V15）
+
+import type {
+  FlowRuleView,
+  FlowRulePayload,
+  FlowRuleEvaluatePayload,
+  FlowRuleEvaluateResult,
+} from '@/types';
+
+/** 某流程版本的规则清单（按 priority 升序）。 */
+export function listFlowRules(flowId: string, signal?: AbortSignal): Promise<FlowRuleView[]> {
+  return http.get<FlowRuleView[]>(`${BASE}/flow-rules`, { flowId }, { signal });
+}
+
+/** 新建规则（仅 UNFROZEN 版本；ruleCode 族内同版唯一）。 */
+export function createFlowRule(flowId: string, payload: FlowRulePayload): Promise<FlowRuleView> {
+  return http.post<FlowRuleView>(`${BASE}/flow-rules${'?flowId=' + encodeURIComponent(flowId)}`, payload);
+}
+
+/** 更新规则。 */
+export function updateFlowRule(id: string, payload: FlowRulePayload): Promise<FlowRuleView> {
+  return http.put<FlowRuleView>(`${BASE}/flow-rules/${id}`, payload);
+}
+
+/** 删除规则（软删；仅 UNFROZEN 版本）。 */
+export function deleteFlowRule(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/flow-rules/${id}`);
+}
+
+/** 套用内置模板（QTIME_OVER_HOLD / BIN_ROUTE）。 */
+export function applyFlowRuleTemplate(flowId: string, templateKey: string): Promise<FlowRuleView[]> {
+  return http.post<FlowRuleView[]>(`${BASE}/flow-rules/apply-template`, { flowId, templateKey });
+}
+
+/** evaluate 契约（运行期调用 + 页面调试面板）。 */
+export function evaluateFlowRules(payload: FlowRuleEvaluatePayload): Promise<FlowRuleEvaluateResult> {
+  return http.post<FlowRuleEvaluateResult>(`${BASE}/flow-rules/evaluate`, payload);
 }

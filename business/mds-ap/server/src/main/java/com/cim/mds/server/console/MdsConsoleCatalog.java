@@ -121,6 +121,15 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.FLOW_UPDATE, 30));
         m.add(button("btn.flow.delete", "flows", "mds.nav.flows.action.delete",
                 MdsPermissions.FLOW_DELETE, 40));
+        // —— 流程规则（V15：独立规则层，锚定版本族，evaluate 契约供 MES/MCS）——
+        m.add(menu("flowRules", "grp.product", "/flow-rules", "FlowRules",
+                "mds.nav.flowRules", "branch", null, 40));
+        m.add(button("btn.flowRule.create", "flowRules", "mds.nav.flowRules.action.create",
+                MdsPermissions.FLOW_UPDATE, 10));
+        m.add(button("btn.flowRule.save", "flowRules", "mds.nav.flowRules.action.save",
+                MdsPermissions.FLOW_UPDATE, 20));
+        m.add(button("btn.flowRule.delete", "flowRules", "mds.nav.flowRules.action.delete",
+                MdsPermissions.FLOW_UPDATE, 30));
         // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
         // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
@@ -401,6 +410,10 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.flows.action.save", "制造流程·维护", "Flow · save"));
         t.add(new TextDef("mds.nav.flows.action.publish", "制造流程·发布", "Flow · publish"));
         t.add(new TextDef("mds.nav.flows.action.delete", "制造流程·删除", "Flow · delete"));
+        t.add(new TextDef("mds.nav.flowRules", "流程规则", "Flow rules"));
+        t.add(new TextDef("mds.nav.flowRules.action.create", "流程规则·新建", "Flow rule · create"));
+        t.add(new TextDef("mds.nav.flowRules.action.save", "流程规则·维护", "Flow rule · save"));
+        t.add(new TextDef("mds.nav.flowRules.action.delete", "流程规则·删除", "Flow rule · delete"));
         // —— 设备管理 ——
         t.add(new TextDef("mds.nav.group.equipment", "设备管理", "Equipment"));
         t.add(new TextDef("mds.nav.transportEquipments", "搬运设备", "Transport equipment"));

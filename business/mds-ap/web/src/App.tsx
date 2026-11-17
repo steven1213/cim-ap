@@ -54,6 +54,7 @@ const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
 const TechnologyPage = lazy(() => import('@/pages/TechnologyPage'));
 const ProductPage = lazy(() => import('@/pages/ProductPage'));
 const FlowPage = lazy(() => import('@/pages/FlowPage'));
+const FlowRulePage = lazy(() => import('@/pages/FlowRulePage'));
 const DictPage = lazy(() => import('@/pages/DictPage'));
 const EquipmentTypePage = lazy(() => import('@/pages/EquipmentTypePage'));
 const CapabilityPage = lazy(() => import('@/pages/CapabilityPage'));
@@ -208,6 +209,7 @@ export default function App() {
           <Route path="/technologies" element={lazyRoute(TechnologyPage, 'mds:tech:view')} />
           <Route path="/products" element={lazyRoute(ProductPage, 'mds:product:view')} />
           <Route path="/flows" element={lazyRoute(FlowPage, 'mds:flow:view')} />
+          <Route path="/flow-rules" element={lazyRoute(FlowRulePage, 'mds:flow:view')} />
           <Route path="/dicts" element={lazyRoute(DictPage, 'sys:dict:list')} />
           <Route
             path="/state-models"

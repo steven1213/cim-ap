@@ -629,3 +629,73 @@ export interface FlowValidationResult {
   valid: boolean;
   problems: string[];
 }
+
+/** 流程规则视图（V15：锚定版本族 familyCode + versionNo）。 */
+export interface FlowRuleView {
+  id: string;
+  flowId: string;
+  familyCode: string;
+  versionNo: number;
+  ruleCode: string;
+  ruleName?: string | null;
+  /** BEFORE_STEP_ENTER / AFTER_STEP_COMPLETE / BEFORE_DISPATCH。 */
+  joinPoint: string;
+  stepCode?: string | null;
+  nodeId?: string | null;
+  edgeType?: string | null;
+  conditionExpr?: string | null;
+  /** ALLOW / HOLD / SCRAP / ROUTE_OVERRIDE / INSERT_SEQUENCE。 */
+  effect: string;
+  effectParam?: string | null;
+  priority: number;
+  enabled: boolean;
+  templateKey?: string | null;
+}
+
+/** 规则新建/更新请求。 */
+export interface FlowRulePayload {
+  ruleCode: string;
+  ruleName?: string | null;
+  joinPoint: string;
+  stepCode?: string | null;
+  nodeId?: string | null;
+  edgeType?: string | null;
+  conditionExpr?: string | null;
+  effect: string;
+  effectParam?: string | null;
+  priority?: number | null;
+  enabled?: boolean | null;
+}
+
+/** 规则评估请求（vars = 运行期变量，MES/MCS 传入）。 */
+export interface FlowRuleEvaluatePayload {
+  flowId: string;
+  joinPoint: string;
+  stepCode?: string | null;
+  nodeId?: string | null;
+  edgeType?: string | null;
+  vars?: Record<string, string | number | boolean> | null;
+}
+
+/** 单条命中。 */
+export interface FlowRuleHit {
+  ruleCode: string;
+  ruleName?: string | null;
+  effect: string;
+  effectParam?: string | null;
+  priority: number;
+  conditionExpr?: string | null;
+  unknownVars: string[];
+}
+
+/** 评估决策：ALLOW（含隐式放行）/ HOLD / SCRAP / ROUTE / INSERT。 */
+export interface FlowRuleDecision {
+  action: string;
+  ruleCode?: string | null;
+  param?: string | null;
+}
+
+export interface FlowRuleEvaluateResult {
+  matched: FlowRuleHit[];
+  decision: FlowRuleDecision;
+}

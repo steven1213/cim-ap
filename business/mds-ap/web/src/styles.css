@@ -678,6 +678,35 @@ table.naming-seg-table th {
   background: rgba(37, 99, 235, 0.06);
 }
 
+/* ================================================================ 流程规则页（V15） */
+
+.flow-rule-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.flow-rule-picker label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.flow-rule-picker-ops {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flow-rule-eval-run {
+  margin: 8px 0;
+}
+
 /* ================================================================ X6 画布缩放控件 */
 
 .flow-canvas {
