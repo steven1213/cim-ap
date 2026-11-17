@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(prefix = "cim.notify", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SseController {
 
-    public static final String STREAM = "/sys/notify/stream";
+    public static final String STREAM = "/api/v1/sys/notify/stream";
 
     private static final Logger log = LoggerFactory.getLogger(SseController.class);
 

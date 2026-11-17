@@ -24,7 +24,7 @@ import java.util.Set;
  * <p>身份 → 本地档案的映射走 {@link LocalUserResolver}，与认证期同一个解析器。</p>
  */
 @RestController
-@RequestMapping("/sys/me")
+@RequestMapping("/api/v1/sys/me")
 @PreAuthorize("isAuthenticated()")
 public class SysMeController {
 

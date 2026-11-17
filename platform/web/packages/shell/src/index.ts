@@ -24,7 +24,13 @@ export {
 export { SsoLoginPage, type SsoLoginPageLabels, type SsoLoginPageProps } from './SsoLoginPage';
 export { SsoCallbackPage, type SsoCallbackPageProps } from './SsoCallbackPage';
 export { createTabStore, type TabItem, type TabState } from './createTabStore';
-export { createAuthStore, type AuthSession, type AuthState, type CreateAuthStoreOptions } from './createAuthStore';
+export { createAuthStore, type AuthSession, type AuthState, type CreateAuthStoreOptions, type CimMenuNode } from './createAuthStore';
+export {
+  createMenuRoutes,
+  type CreateMenuRoutesOptions,
+  type MenuRoute,
+  type PageRegistry,
+} from './menuRoutes';
 export { useShellTabs, type UseShellTabsOptions } from './useShellTabs';
 export {
   LocaleSwitcher,

@@ -2,6 +2,9 @@ package com.cim.mds.server.security;
 
 import com.cim.auth.principal.CimUserPrincipal;
 import com.cim.spring.support.web.Result;
+import com.cim.system.menu.MenuNode;
+import com.cim.system.rbac.LocalUserResolver;
+import com.cim.system.rbac.SysRbacService;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,7 +19,8 @@ import java.util.Set;
  * 当前登录用户与权限端点（对齐 IAM / RMS 的同名端点，前缀收敛到 {@code /api/v1/mds}）。
  *
  * <p>前端 {@code authStore} 启动后拉取：{@code /me} 拿用户档案（写入 UI），
- * {@code /permissions} 拿本 ap 权限码集（用于 {@code <Can>} 门禁）。
+ * {@code /permissions} 拿本 ap 权限码集（用于 {@code <Can>} 门禁），
+ * {@code /me/menus} 拿按角色过滤的菜单树（动态侧栏 + 菜单驱动路由的唯一数据源）。
  * 权限码严格来自 {@link CimUserPrincipal#authoritiesSet()}（即本 ap 的
  * {@code DbLocalAuthorityLoader} 查 {@code sys_role_perm} 解析的结果），
  * 与后端 {@code @PreAuthorize} 同源，避免「有按钮却 403」。</p>
@@ -24,6 +28,14 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/v1/mds")
 public class MeController {
+
+    private final LocalUserResolver userResolver;
+    private final SysRbacService rbacService;
+
+    public MeController(LocalUserResolver userResolver, SysRbacService rbacService) {
+        this.userResolver = userResolver;
+        this.rbacService = rbacService;
+    }
 
     private CimUserPrincipal principal() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -55,6 +67,24 @@ public class MeController {
         CimUserPrincipal p = principal();
         Set<String> auths = p == null || p.authoritiesSet() == null ? Set.of() : p.authoritiesSet();
         return Result.ok(auths);
+    }
+
+    /**
+     * GET /api/v1/mds/me/menus —— 当前用户可见菜单树（含 DIR/MENU，<b>不含 BUTTON</b>）。
+     *
+     * <p>按 {@code sys_role_menu} 过滤（后端裁剪，前端不重复过滤）；BUTTON 节点是
+     * 授权粒度，侧栏与路由都不消费，不随包下发。未在本 ap 建档时返回空树
+     * （前端回退：无菜单=无侧栏项，不会报错）。</p>
+     */
+    @GetMapping("/me/menus")
+    public Result<List<MenuNode>> myMenus() {
+        CimUserPrincipal p = principal();
+        if (p == null) {
+            return Result.ok(List.of());
+        }
+        return userResolver.resolve(p.userId(), p.username())
+                .map(user -> Result.ok(rbacService.menuTree(user.getId(), false)))
+                .orElseGet(() -> Result.ok(List.of()));
     }
 
     /** 当前用户档案传输对象（前端 {@code types.ts} 的 {@code MeDto} 与之对应）。 */

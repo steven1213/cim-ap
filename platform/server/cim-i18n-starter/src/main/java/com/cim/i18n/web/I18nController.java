@@ -1,8 +1,10 @@
 package com.cim.i18n.web;
 
 import com.cim.i18n.model.SysLocale;
+import com.cim.i18n.model.SysI18n;
 import com.cim.i18n.service.I18nService;
 import com.cim.i18n.source.MissingI18nReporter;
+import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.Result;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,12 +19,19 @@ import java.util.Map;
 /**
  * 国际化运行时接口（前端启动时拉取译文包）。
  *
- * <p><b>公开访问</b>：译文属展示层内容不含敏感信息，且<b>登录页也需要</b>（未认证）。
- * 宿主 ap 需在安全配置中放行 {@code /api/i18n/**}。</p>
+ * <p><b>读公开、写守门</b>：译文属展示层内容不含敏感信息，且<b>登录页也需要</b>（未认证），
+ * 宿主 ap 需在安全配置中放行 {@code /api/v1/i18n/**} 的 GET；写端点（在线改菜单名等）
+ * 用权限码守门，码值与 {@code cim-system} 的 {@code PermissionCodes} 对齐——本 starter
+ * 刻意不依赖 cim-system（保持依赖方向），故以本地常量声明。</p>
  */
 @RestController
-@RequestMapping("/api/i18n")
+@RequestMapping("/api/v1/i18n")
 public class I18nController {
+
+    /** 译文保存权限（= {@code PermissionCodes.I18N_SAVE}）。 */
+    public static final String SAVE_AUTH = "sys:i18n:save";
+    /** 译文删除权限（= {@code PermissionCodes.I18N_REMOVE}）。 */
+    public static final String REMOVE_AUTH = "sys:i18n:remove";
 
     private final I18nService i18nService;
     private final MissingI18nReporter reporter;
@@ -75,6 +84,35 @@ public class I18nController {
             }
         });
         return Result.ok(report.keys().size());
+    }
+
+    /**
+     * 覆盖式保存译文（在线改菜单名/按钮名等，{@code (locale, code)} 定位 upsert）。
+     *
+     * <p>与种子（{@code seedMessages} 不覆盖已存在行）相反，本端点是「管理端保存」：
+     * 维护页显式保存的文案要落库生效。保存后缓存失效，前端下次拉包即拿到新值
+     * （版本号变化 → 前端缓存自动刷新）。</p>
+     */
+    @PostMapping("/messages")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('" + SAVE_AUTH + "')")
+    public Result<SysI18n> saveMessage(@RequestBody SaveMessageRequest req) {
+        if (req == null || isBlank(req.locale()) || isBlank(req.code())) {
+            return Result.fail(BizCode.PARAM_INVALID, "locale 与 code 必填");
+        }
+        SysI18n message = new SysI18n();
+        message.setLocaleCode(req.locale());
+        message.setCode(req.code());
+        message.setContent(req.content());
+        message.setModule(req.module());
+        return Result.ok(i18nService.saveMessage(message));
+    }
+
+    /** 保存译文请求体（module/scope 缺省由服务端按键名推断）。 */
+    public record SaveMessageRequest(String locale, String code, String content, String module) {
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     private String firstLocaleOrDefault() {

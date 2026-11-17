@@ -14,5 +14,7 @@ export const useAuthStore = createAuthStore<MeDto>({
   client: httpClient,
   mePath: '/mds/me',
   permissionsPath: '/mds/permissions',
+  // 动态菜单树（后端按角色过滤）：侧栏与路由的唯一数据源（navConfig 已退场）
+  menusPath: '/mds/me/menus',
   logout: ({ token, refreshToken }) => sso.idpLogout(token, refreshToken),
 });

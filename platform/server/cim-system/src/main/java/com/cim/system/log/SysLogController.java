@@ -19,7 +19,7 @@ import java.util.List;
  * 不提供 HTTP 写入端点，避免日志被外部伪造。</p>
  */
 @RestController
-@RequestMapping("/sys/logs")
+@RequestMapping("/api/v1/sys/logs")
 public class SysLogController {
 
     private final OperationLogService operationLogService;

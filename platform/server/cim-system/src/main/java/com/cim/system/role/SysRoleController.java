@@ -23,7 +23,7 @@ import java.util.List;
  * 重新耦合，正是 §21.1 要避免的退化。</p>
  */
 @RestController
-@RequestMapping("/sys/roles")
+@RequestMapping("/api/v1/sys/roles")
 public class SysRoleController extends BaseController<SysRole, String> {
 
     private final SysRoleService roleService;

@@ -40,7 +40,7 @@ export function fetchMe(): Promise<MeDto | null> {
  * 会把它还原成 Bearer 头再走同一套 JWT 过滤器。</p>
  */
 export function notificationsStreamUrl(): string {
-  return httpClient.streamUrl('/sys/notify/stream');
+  return httpClient.streamUrl('/api/v1/sys/notify/stream');
 }
 
 export default { fetchMe, get, post, put, del, notificationsStreamUrl, setAcceptLanguage };

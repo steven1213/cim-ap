@@ -1,5 +1,7 @@
 package com.cim.mds.server.security;
 
+import com.cim.system.support.PermissionCodes;
+
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -107,6 +109,14 @@ public final class MdsPermissions {
     public static final String REASON_UPDATE = "mds:reason:update";
     public static final String REASON_DELETE = "mds:reason:delete";
 
+    // ---------------- 平台管理域（菜单维护页用；端点来自 cim-system，码值与 PermissionCodes 对齐） ----------------
+    public static final String SYS_MENU_LIST = PermissionCodes.MENU_LIST;
+    public static final String SYS_MENU_SAVE = PermissionCodes.MENU_SAVE;
+    public static final String SYS_MENU_REMOVE = PermissionCodes.MENU_REMOVE;
+    public static final String SYS_ROLE_LIST = PermissionCodes.ROLE_LIST;
+    public static final String SYS_ROLE_GRANT = PermissionCodes.ROLE_GRANT;
+    public static final String SYS_I18N_SAVE = "sys:i18n:save";
+
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
         Set<String> codes = new LinkedHashSet<>();
@@ -170,6 +180,12 @@ public final class MdsPermissions {
         codes.add(REASON_CREATE);
         codes.add(REASON_UPDATE);
         codes.add(REASON_DELETE);
+        codes.add(SYS_MENU_LIST);
+        codes.add(SYS_MENU_SAVE);
+        codes.add(SYS_MENU_REMOVE);
+        codes.add(SYS_ROLE_LIST);
+        codes.add(SYS_ROLE_GRANT);
+        codes.add(SYS_I18N_SAVE);
         return codes;
     }
 }

@@ -92,7 +92,11 @@ public class ApprovalSecurityConfig {
                 .securityMatcher("/api/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+                // 平台译文包公开（登录页也要拉）；其余 /api/** 一律认证
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/i18n/**")
+                        .permitAll()
+                        .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->
                         response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized")))
                 // EventSource(SSE) 与 <a download> 无法携带 Authorization 头：允许 ?token=<JWT> 注入

@@ -130,7 +130,7 @@ class NotifyRedisFanoutTest {
         ExecutorService reader = Executors.newSingleThreadExecutor();
 
         reader.submit(() -> {
-            String url = "http://localhost:" + port + "/sys/notify/stream?userId=" + userId + "&tenantId=" + tenant;
+            String url = "http://localhost:" + port + "/api/v1/sys/notify/stream?userId=" + userId + "&tenantId=" + tenant;
             restTemplate.execute(url, HttpMethod.GET, null, (ClientHttpResponse resp) -> {
                 try (BufferedReader r = new BufferedReader(
                         new InputStreamReader(resp.getBody(), StandardCharsets.UTF_8))) {

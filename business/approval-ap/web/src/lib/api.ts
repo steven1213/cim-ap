@@ -317,11 +317,11 @@ export function listAudit(businessKey: string, opts?: RequestOptions): Promise<A
 export function notificationsStreamUrl(): string {
   const { mode, token } = useAuthStore.getState();
   if (mode === 'sso' && token) {
-    return `/sys/notify/stream?token=${encodeURIComponent(token)}`;
+    return `/api/v1/sys/notify/stream?token=${encodeURIComponent(token)}`;
   }
   const { userId, tenantId } = useIdentityStore.getState();
   const params = new URLSearchParams({ userId, tenantId });
-  return `/sys/notify/stream?${params.toString()}`;
+  return `/api/v1/sys/notify/stream?${params.toString()}`;
 }
 
 // ---------- 企微免登（G8 / D9） ----------

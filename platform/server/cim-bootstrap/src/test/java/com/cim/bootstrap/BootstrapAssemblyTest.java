@@ -78,7 +78,7 @@ class BootstrapAssemblyTest {
 
     @Test
     void protectedBusinessEndpointWithoutToken401() {
-        ResponseEntity<String> resp = rest.getForEntity("/sys/users/page", String.class);
+        ResponseEntity<String> resp = rest.getForEntity("/api/v1/sys/users/page", String.class);
         assertThat(resp.getStatusCode().value())
                 .as("方法级 @PreAuthorize 对匿名请求应返回 401")
                 .isEqualTo(401);
@@ -91,7 +91,7 @@ class BootstrapAssemblyTest {
         //    IllegalArgumentException("Name for argument ... not specified") → 500；
         // ② 字典不存在应映射为 404（BizException DATA_NOT_FOUND），而非被兜底成 500。
         ResponseEntity<String> resp =
-                rest.getForEntity("/sys/dicts/code/not-a-dict/items", String.class);
+                rest.getForEntity("/api/v1/sys/dicts/code/not-a-dict/items", String.class);
         assertThat(resp.getStatusCode().value())
                 .as("@PathVariable 应被正确解析且业务异常映射为 404")
                 .isEqualTo(404);

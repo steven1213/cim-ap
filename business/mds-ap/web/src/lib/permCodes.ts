@@ -107,3 +107,13 @@ export const MDS_PERMS = {
     delete: 'mds:reason:delete',
   },
 } as const;
+
+/** 平台管理码（端点在 cim-system，与后端 PermissionCodes 对齐——菜单维护页双闸门之一）。 */
+export const SYS = {
+  MENU_LIST: 'sys:menu:list',
+  MENU_SAVE: 'sys:menu:save',
+  MENU_REMOVE: 'sys:menu:remove',
+  ROLE_LIST: 'sys:role:list',
+  ROLE_GRANT: 'sys:role:grant',
+  I18N_SAVE: 'sys:i18n:save',
+} as const;

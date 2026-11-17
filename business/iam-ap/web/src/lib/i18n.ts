@@ -34,11 +34,11 @@ const cim = createI18n({
     async loadBundle({ lang, version }) {
       const params: Record<string, unknown> = { lang };
       if (version) params.v = version;
-      const bundle = await rootGet<I18nBundle>('/api/i18n/messages', params);
+      const bundle = await rootGet<I18nBundle>('/i18n/messages', params);
       return { version: bundle.version, lang: bundle.lang, messages: bundle.messages ?? {} };
     },
     async loadLocales() {
-      const list = await rootGet<SysLocaleDto[]>('/api/i18n/locales');
+      const list = await rootGet<SysLocaleDto[]>('/i18n/locales');
       // 后端 name 可空（未填中文名），这里落成「自称缺失时用 code」，避免下拉出现空行
       return (list ?? []).map((l) => ({
         code: l.code,
@@ -48,7 +48,7 @@ const cim = createI18n({
         status: l.status,
       }));
     },
-    reportMissing: (keys, lang) => rootPost<number>('/api/i18n/missing', { keys, lang }),
+    reportMissing: (keys, lang) => rootPost<number>('/i18n/missing', { keys, lang }),
   },
 });
 

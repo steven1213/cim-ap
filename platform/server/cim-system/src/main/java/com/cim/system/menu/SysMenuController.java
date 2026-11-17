@@ -14,7 +14,7 @@ import java.util.List;
 
 /** 菜单管理接口（含管理视角的全量菜单树，供角色授权界面选树）。 */
 @RestController
-@RequestMapping("/sys/menus")
+@RequestMapping("/api/v1/sys/menus")
 public class SysMenuController extends BaseController<SysMenu, String> {
 
     private final SysMenuService menuService;

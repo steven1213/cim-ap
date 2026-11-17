@@ -760,3 +760,63 @@ export function listWipReasonEvents(
 export function createWipReasonEvent(payload: WipReasonEventPayload): Promise<WipReasonEventView> {
   return http.post<WipReasonEventView>(`${BASE}/wip-reason-events`, payload);
 }
+
+// ---------------------------------------------------------------- 平台菜单管理（V17 动态菜单）
+
+import type { MenuTreeNode, SysMenuDto, SysRoleDto, I18nBundleDto } from '@/types';
+
+/** 管理视角全量菜单树（含 BUTTON 节点，授权面板用；sys:menu:list）。 */
+export function listMenuTree(signal?: AbortSignal): Promise<MenuTreeNode[]> {
+  return http.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal });
+}
+
+export function createMenu(payload: Partial<SysMenuDto>): Promise<SysMenuDto> {
+  return http.rootPost<SysMenuDto>('/sys/menus', payload);
+}
+
+/** 整体提交更新（保留审计列；sys:menu:save）。 */
+export function updateMenu(entity: SysMenuDto): Promise<SysMenuDto> {
+  return http.rootPut<SysMenuDto>('/sys/menus', entity);
+}
+
+export function deleteMenu(id: string): Promise<void> {
+  return http.rootDel<void>(`/sys/menus/${encodeURIComponent(id)}`);
+}
+
+/** 角色清单（sys:role:list）。 */
+export function listRoles(): Promise<SysRoleDto[]> {
+  return http.rootGet<SysRoleDto[]>('/sys/roles');
+}
+
+/** 角色已授权菜单 id（sys:role:list）。 */
+export function listRoleMenus(roleId: string): Promise<string[]> {
+  return http.rootGet<string[]>(`/sys/roles/${encodeURIComponent(roleId)}/menus`);
+}
+
+/** 保存角色-菜单授权（sys:role:grant）。 */
+export function assignRoleMenus(roleId: string, menuIds: string[]): Promise<void> {
+  return http.rootPut<void>(`/sys/roles/${encodeURIComponent(roleId)}/menus`, menuIds);
+}
+
+/** 角色已授权权限码（sys:role:list）。 */
+export function listRolePermissions(roleId: string): Promise<string[]> {
+  return http.rootGet<string[]>(`/sys/roles/${encodeURIComponent(roleId)}/permissions`);
+}
+
+/** 保存角色-权限授权（sys:role:grant）。 */
+export function assignRolePermissions(roleId: string, permIds: string[]): Promise<void> {
+  return http.rootPut<void>(`/sys/roles/${encodeURIComponent(roleId)}/permissions`, permIds);
+}
+
+/** 译文包（公开端点 /i18n/messages；version 传缓存版本可省流量）。 */
+export function fetchI18nBundle(lang: string, version?: string): Promise<I18nBundleDto> {
+  return http.rootGet<I18nBundleDto>(
+    '/i18n/messages',
+    version ? { lang, v: version } : { lang },
+  );
+}
+
+/** 覆盖式保存译文（sys:i18n:save；菜单名在线改名走这里）。 */
+export function saveI18nMessage(locale: string, code: string, content: string): Promise<void> {
+  return http.rootPost<void>('/i18n/messages', { locale, code, content });
+}

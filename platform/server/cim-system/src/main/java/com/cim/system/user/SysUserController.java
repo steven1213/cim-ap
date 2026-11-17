@@ -22,7 +22,7 @@ import java.util.List;
  * DELETE），校验与鉴权在 {@link SysUserService}；本类只补「角色授予」这类控制器专属端点。</p>
  */
 @RestController
-@RequestMapping("/sys/users")
+@RequestMapping("/api/v1/sys/users")
 public class SysUserController extends BaseController<SysUser, String> {
 
     private final SysUserService userService;

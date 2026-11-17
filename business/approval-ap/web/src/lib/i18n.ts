@@ -2,8 +2,10 @@
 //
 // 运行时骨架（整包缓存防闪白、四级兜底、切语言不刷新）都在 `@cim/i18n`；
 // 本文件只声明两件属于本应用的事：
-//   1. 译文从哪来：**内置包**（随前端发版，见 `lib/i18n/messages.ts`）；
+//   1. 译文从哪来：**内置包**（随前端发版，见 `lib/i18n/messages.ts`）打底 +
+//      **远端包**（sys_i18n，`/api/v1/i18n/messages` 公开端点）逐键覆盖；
 //   2. 本应用没有 `setAcceptLanguage`（api 层不带语言头），故不接 onLanguageChange。
+import axios from 'axios';
 import { createI18n } from '@cim/i18n';
 import { zhCN, enUS } from '@/lib/i18n/messages';
 
@@ -17,6 +19,18 @@ const cim = createI18n({
     { code: 'zh-CN', name: '简体中文' },
     { code: 'en-US', name: 'English' },
   ],
+  remote: {
+    // 公开端点（登录页也要用），裸 axios 直取、不走业务 client（避免 401 拦截器误清态）。
+    loadBundle: async ({ lang, version }) => {
+      const r = await axios.get('/api/v1/i18n/messages', {
+        params: version ? { lang, v: version } : { lang },
+      });
+      const body = r.data as { code?: number; data?: { version: string; lang: string; messages: Record<string, string> } };
+      const payload = body && body.code === 0 ? body.data : undefined;
+      if (!payload || !payload.messages) return null;
+      return { version: payload.version, lang: payload.lang || lang, messages: payload.messages };
+    },
+  },
   dev: import.meta.env.DEV,
 });
 

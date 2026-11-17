@@ -50,12 +50,9 @@ export interface HttpClientOptions {
   /** 业务端点前缀，默认 `/api/v1`（approval 用 `/api/v1/approval`）。 */
   baseURL?: string;
   /**
-   * 平台端点前缀，默认 `''`。
-   *
-   * <p>平台 `cim-system` 的端点**没有** `/api/v1`（`/sys/me/menus`、`/sys/me/permissions`），
-   * `cim-i18n-starter` 的公开端点也在 `/api/i18n/**`。axios 的 `buildFullPath` 只在 url 是
-   * **绝对 URL**（带 scheme）时才跳过 baseURL 拼接——光写 `/sys/...` 仍会被拼成
-   * `/api/v1/sys/...`（实测踩坑），所以必须用独立实例，而不是改调用写法。</p>
+   * ⚠️ 已废弃（保留参数避免调用点报错）：平台端点现统一挂 `/api/v1` 前缀
+   * （`/api/v1/sys/**`、`/api/v1/i18n/**`），`root*` 系列与 `get` 等同实现，
+   * 不再需要独立实例。现有 `rootGet('/sys/...')` 调用自动拼成 `/api/v1/sys/...`。
    */
   platformBaseURL?: string;
   /** 当前 access token（各 ap 从自己的 store 读）。 */
@@ -73,7 +70,7 @@ export interface HttpClient {
   post<T>(url: string, body?: unknown, opts?: RequestOptions): Promise<T>;
   put<T>(url: string, body?: unknown, opts?: RequestOptions): Promise<T>;
   del<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T>;
-  /** 平台端点（无 `/api/v1` 前缀）。 */
+  /** 平台端点——与 `get` 等同实现（平台端点已统一挂 `/api/v1`，保留只为兼容既有调用点）。 */
   rootGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T>;
   rootPost<T>(url: string, body?: unknown, opts?: RequestOptions): Promise<T>;
   rootPut<T>(url: string, body?: unknown, opts?: RequestOptions): Promise<T>;
@@ -137,7 +134,6 @@ function normalizeError(error: unknown): ApiError {
 export function createHttpClient(options: HttpClientOptions): HttpClient {
   const {
     baseURL = '/api/v1',
-    platformBaseURL = '',
     getToken,
     onUnauthorized,
     loginPath = '/login',
@@ -175,9 +171,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
   }
 
   const http: AxiosInstance = axios.create({ baseURL });
-  const rootHttp: AxiosInstance = axios.create({ baseURL: platformBaseURL });
   attachInterceptors(http);
-  attachInterceptors(rootHttp);
 
   async function request<T>(
     instance: AxiosInstance,
@@ -220,14 +214,16 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     del: <T,>(url: string, params?: Record<string, unknown>, opts?: RequestOptions) =>
       request<T>(http, 'DELETE', url, params, opts),
 
+    // 平台端点已统一挂 /api/v1 前缀：root* 与 get* 同实例同实现（兼容别名）。
+    // 调用点无需改动——`rootGet('/sys/me/permissions')` 自动拼成 `/api/v1/sys/me/permissions`。
     rootGet: <T,>(url: string, params?: Record<string, unknown>, opts?: RequestOptions) =>
-      request<T>(rootHttp, 'GET', url, params, opts),
+      request<T>(http, 'GET', url, params, opts),
     rootPost: <T,>(url: string, body?: unknown, opts?: RequestOptions) =>
-      request<T>(rootHttp, 'POST', url, body, opts),
+      request<T>(http, 'POST', url, body, opts),
     rootPut: <T,>(url: string, body?: unknown, opts?: RequestOptions) =>
-      request<T>(rootHttp, 'PUT', url, body, opts),
+      request<T>(http, 'PUT', url, body, opts),
     rootDel: <T,>(url: string, params?: Record<string, unknown>, opts?: RequestOptions) =>
-      request<T>(rootHttp, 'DELETE', url, params, opts),
+      request<T>(http, 'DELETE', url, params, opts),
 
     async downloadBlob(url, params, opts) {
       const r = await http.request<Blob>({

@@ -25,6 +25,29 @@ export interface AuthSession {
   refreshToken: string | null;
 }
 
+/**
+ * 菜单树节点（后端 `MenuNode{menu, children}` 展平后的前端模型）。
+ *
+ * <p>`menu` 信封在 store 里拆掉，消费方（侧栏 / 动态路由）直接拿字段。
+ * `type`：`DIR` 目录（仅分组） / `MENU` 可路由菜单 / `BUTTON` 按钮授权节点（侧栏不渲染）。</p>
+ */
+export interface CimMenuNode {
+  id: string;
+  parentId: string | null;
+  type: 'DIR' | 'MENU' | 'BUTTON';
+  /** 前端路由（DIR/BUTTON 为 null）。 */
+  path: string | null;
+  /** 组件标识：缺省时路由工厂按 path 命名约定解析（见 {@link createMenuRoutes}）。 */
+  component: string | null;
+  i18nCode: string;
+  icon: string | null;
+  permCode: string | null;
+  sortNo: number;
+  visible: boolean;
+  status: 'ENABLED' | 'DISABLED';
+  children: CimMenuNode[];
+}
+
 export interface AuthState<TMe> {
   token: string | null;
   refreshToken: string | null;
@@ -33,9 +56,17 @@ export interface AuthState<TMe> {
   permissions: string[];
   /** 权限是否已拉取（用于区分「未加载」与「确实无权限」）。 */
   permissionsLoaded: boolean;
+  /**
+   * 当前用户可见菜单树（**内存态，不落盘**，随 permissions 同批重取）。
+   * 后端已按角色过滤——前端不再做权限裁剪，避免两份过滤逻辑漂移。
+   */
+  menus: CimMenuNode[];
+  /** 菜单是否已拉取（未配置 menusPath 时恒 false，消费方按空树处理）。 */
+  menusLoaded: boolean;
   setSession: (token: string, refreshToken: string) => void;
   loadMe: () => Promise<void>;
   loadPermissions: () => Promise<void>;
+  loadMenus: () => Promise<void>;
   logout: () => Promise<void>;
   clear: () => void;
 }
@@ -69,6 +100,15 @@ export interface CreateAuthStoreOptions {
   /** 权限码走平台前缀（IAM 的 `/sys/me/permissions`）。 */
   permissionsOnPlatform?: boolean;
   /**
+   * 当前用户菜单树路径，如 `/mds/me/menus`。
+   *
+   * <p>不传表示本 ap 仍走静态导航（菜单概念未数据库化），`loadMenus()` 是空操作、
+   * `menus` 恒为 `[]`。后端返回 `MenuNode{menu, children}` 结构，这里拆信封展平。</p>
+   */
+  menusPath?: string;
+  /** 菜单树走平台前缀（`/sys/me/menus`）。 */
+  menusOnPlatform?: boolean;
+  /**
    * 登出实现。缺省只清本地态。
    *
    * <p>返回 `false` 表示 IdP 未确认吊销（网络不可达 / CORS 未放行）：本地照清，但会
@@ -95,7 +135,50 @@ export interface CreateAuthStoreOptions {
  * }</pre>
  */
 export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
-  const { name, client, mePath, meOnPlatform, permissionsPath, permissionsOnPlatform, logout } = options;
+  const { name, client, mePath, meOnPlatform, permissionsPath, permissionsOnPlatform, menusPath, menusOnPlatform, logout } =
+    options;
+
+  /** 后端 `MenuNode{menu, children}` 的信封形状（只取前端关心的字段）。 */
+  interface RawMenuNode {
+    menu?: {
+      id?: string;
+      parentId?: string | null;
+      type?: 'DIR' | 'MENU' | 'BUTTON';
+      path?: string | null;
+      component?: string | null;
+      i18nCode?: string;
+      icon?: string | null;
+      permCode?: string | null;
+      sortNo?: number;
+      visible?: boolean;
+      status?: 'ENABLED' | 'DISABLED';
+    } | null;
+    children?: RawMenuNode[] | null;
+  }
+
+  function flatten(nodes: RawMenuNode[] | null | undefined): CimMenuNode[] {
+    if (!nodes) return [];
+    const out: CimMenuNode[] = [];
+    for (const n of nodes) {
+      const m = n.menu;
+      if (!m?.id) continue;
+      out.push({
+        id: m.id,
+        parentId: m.parentId ?? null,
+        type: m.type ?? 'MENU',
+        path: m.path ?? null,
+        component: m.component ?? null,
+        i18nCode: m.i18nCode ?? '',
+        icon: m.icon ?? null,
+        permCode: m.permCode ?? null,
+        sortNo: m.sortNo ?? 0,
+        visible: m.visible !== false,
+        status: m.status ?? 'ENABLED',
+        children: flatten(n.children),
+      });
+    }
+    return out;
+  }
 
   return create<AuthState<TMe>>()(
     persist(
@@ -105,6 +188,8 @@ export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
         user: null,
         permissions: [],
         permissionsLoaded: false,
+        menus: [],
+        menusLoaded: false,
 
         setSession: (token, refreshToken) => set({ token, refreshToken }),
 
@@ -121,6 +206,14 @@ export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
           set({ permissions: codes ?? [], permissionsLoaded: true });
         },
 
+        loadMenus: async () => {
+          if (!menusPath) return;
+          const raw = menusOnPlatform
+            ? await client.rootGet<RawMenuNode[]>(menusPath)
+            : await client.get<RawMenuNode[]>(menusPath);
+          set({ menus: flatten(raw ?? []), menusLoaded: true });
+        },
+
         logout: async () => {
           const { token, refreshToken } = get();
           if (logout) {
@@ -134,7 +227,15 @@ export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
         },
 
         clear: () =>
-          set({ token: null, refreshToken: null, user: null, permissions: [], permissionsLoaded: false }),
+          set({
+            token: null,
+            refreshToken: null,
+            user: null,
+            permissions: [],
+            permissionsLoaded: false,
+            menus: [],
+            menusLoaded: false,
+          }),
       }),
       {
         name: `${name}-auth`,

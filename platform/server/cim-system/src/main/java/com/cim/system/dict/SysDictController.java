@@ -17,7 +17,7 @@ import java.util.List;
  * {@code sys:dict:remove}（删）；系统级字典（{@code is_system=true}）删除被守门。</p>
  */
 @RestController
-@RequestMapping("/sys/dicts")
+@RequestMapping("/api/v1/sys/dicts")
 public class SysDictController extends BaseController<SysDict, String> {
 
     private final SysDictService dictService;

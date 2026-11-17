@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>同一个键在两条链上的表现必须能区分开，这正是本测试的核心断言：</p>
  * <ul>
- *   <li>{@code GET /api/i18n/messages?lang=en-US} —— <b>合并后</b>的整包，键「命中中文」，
+ *   <li>{@code GET /api/v1/i18n/messages?lang=en-US} —— <b>合并后</b>的整包，键「命中中文」，
  *       前端与 i18next 都不会报缺键；</li>
  *   <li>{@code GET /api/v1/admin/i18n/coverage} —— 按<b>原始值</b>比，看得见这条缺译。</li>
  * </ul>
@@ -69,7 +69,7 @@ class I18nCoverageEndpointTest {
         i18nService.saveMessage(onlyZh);
 
         // ① 前端整包：键是「命中」的——英文包里出现中文，没有任何错误信号
-        String bundle = mvc.perform(get("/api/i18n/messages").param("lang", "en-US"))
+        String bundle = mvc.perform(get("/api/v1/i18n/messages").param("lang", "en-US"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         JsonNode bundleNode = objectMapper.readTree(bundle).path("data").path("messages");

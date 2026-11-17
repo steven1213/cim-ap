@@ -53,11 +53,12 @@ public final class MdsConsoleCatalog {
     public static List<MenuDef> menus() {
         List<MenuDef> m = new ArrayList<>();
         // —— 概览（不绑权限：登录后的落脚页）——
-        m.add(menu("overview", null, "/", "Dashboard", "mds.nav.dashboard", "gauge", null, 10));
+        m.add(menu("overview", null, "/", "DashboardPage", "mds.nav.dashboard", "gauge", null, 10));
         // —— 场地主数据（Site → Fab → Area → Bay → Stage）——
         // 2026-11-13 收敛为一页「位置拓扑」（左树右详情），原 sites/fabs/areas 三菜单退场
         m.add(dir("grp.site", "mds.nav.group.site", 20));
-        m.add(menu("topology", "grp.site", "/topology", "Topology", "mds.nav.topology", "tree", null, 10));
+        m.add(menu("topology", "grp.site", "/topology", "TopologyPage", "mds.nav.topology", "tree",
+                MdsPermissions.SITE_VIEW, 10));
 
         // 按钮节点：供授权界面按动作细分（前端菜单不渲染 BUTTON）
         // i18n 码须全库唯一，单菜单下五层动作显式命名 {layer}.{action}
@@ -94,16 +95,16 @@ public final class MdsConsoleCatalog {
 
         // —— 产品管理（Technology 先行；Product / Route 预留）——
         m.add(dir("grp.product", "mds.nav.group.product", 30));
-        m.add(menu("technology", "grp.product", "/technologies", "Technologies",
-                "mds.nav.technology", "sliders", null, 10));
+        m.add(menu("technology", "grp.product", "/technologies", "TechnologyPage",
+                "mds.nav.technology", "sliders", MdsPermissions.TECH_VIEW, 10));
         m.add(button("btn.technology.create", "technology", "mds.nav.technology.action.create",
                 MdsPermissions.TECH_CREATE, 10));
         m.add(button("btn.technology.update", "technology", "mds.nav.technology.action.update",
                 MdsPermissions.TECH_UPDATE, 20));
         m.add(button("btn.technology.delete", "technology", "mds.nav.technology.action.delete",
                 MdsPermissions.TECH_DELETE, 30));
-        m.add(menu("products", "grp.product", "/products", "Products",
-                "mds.nav.products", "flask", null, 20));
+        m.add(menu("products", "grp.product", "/products", "ProductPage",
+                "mds.nav.products", "flask", MdsPermissions.PRODUCT_VIEW, 20));
         m.add(button("btn.product.create", "products", "mds.nav.products.action.create",
                 MdsPermissions.PRODUCT_CREATE, 10));
         m.add(button("btn.product.update", "products", "mds.nav.products.action.update",
@@ -111,8 +112,8 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.product.delete", "products", "mds.nav.products.action.delete",
                 MdsPermissions.PRODUCT_DELETE, 30));
         // —— 制造流程（Route 口径：XML 画布为源 + 拖拽编辑 + 图校验发布）——
-        m.add(menu("flows", "grp.product", "/flows", "Flows",
-                "mds.nav.flows", "tree", null, 30));
+        m.add(menu("flows", "grp.product", "/flows", "FlowPage",
+                "mds.nav.flows", "tree", MdsPermissions.FLOW_VIEW, 30));
         m.add(button("btn.flow.create", "flows", "mds.nav.flows.action.create",
                 MdsPermissions.FLOW_CREATE, 10));
         m.add(button("btn.flow.save", "flows", "mds.nav.flows.action.save",
@@ -122,8 +123,8 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.flow.delete", "flows", "mds.nav.flows.action.delete",
                 MdsPermissions.FLOW_DELETE, 40));
         // —— 流程规则（V15：独立规则层，锚定版本族，evaluate 契约供 MES/MCS）——
-        m.add(menu("flowRules", "grp.product", "/flow-rules", "FlowRules",
-                "mds.nav.flowRules", "branch", null, 40));
+        m.add(menu("flowRules", "grp.product", "/flow-rules", "FlowRulePage",
+                "mds.nav.flowRules", "branch", MdsPermissions.FLOW_VIEW, 40));
         m.add(button("btn.flowRule.create", "flowRules", "mds.nav.flowRules.action.create",
                 MdsPermissions.FLOW_UPDATE, 10));
         m.add(button("btn.flowRule.save", "flowRules", "mds.nav.flowRules.action.save",
@@ -133,14 +134,14 @@ public final class MdsConsoleCatalog {
         // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
         // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
-        m.add(menu("transportEquipments", "grp.equipment", "/transport-equipments", "TransportEquipments",
-                "mds.nav.transportEquipments", "monitor", null, 10));
-        m.add(menu("equipments", "grp.equipment", "/equipments", "Equipments",
-                "mds.nav.equipments", "monitor", null, 20));
-        m.add(menu("equipmentTypes", "grp.equipment", "/equipment-types", "EquipmentTypes",
-                "mds.nav.equipmentTypes", "sliders", null, 30));
-        m.add(menu("capabilities", "grp.equipment", "/capabilities", "Capabilities",
-                "mds.nav.capabilities", "shield", null, 40));
+        m.add(menu("transportEquipments", "grp.equipment", "/transport-equipments", "TransportEquipmentsPage",
+                "mds.nav.transportEquipments", "monitor", MdsPermissions.EQUIPMENT_VIEW, 10));
+        m.add(menu("equipments", "grp.equipment", "/equipments", "EquipmentsPage",
+                "mds.nav.equipments", "monitor", MdsPermissions.EQUIPMENT_VIEW, 20));
+        m.add(menu("equipmentTypes", "grp.equipment", "/equipment-types", "EquipmentTypePage",
+                "mds.nav.equipmentTypes", "sliders", MdsPermissions.EQP_TYPE_VIEW, 30));
+        m.add(menu("capabilities", "grp.equipment", "/capabilities", "CapabilityPage",
+                "mds.nav.capabilities", "shield", MdsPermissions.CAPABILITY_VIEW, 40));
         m.add(button("btn.transportEquipment.create", "transportEquipments", "mds.nav.transportEquipments.action.create",
                 MdsPermissions.EQUIPMENT_CREATE, 10));
         m.add(button("btn.transportEquipment.update", "transportEquipments", "mds.nav.transportEquipments.action.update",
@@ -167,8 +168,8 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.CAPABILITY_DELETE, 30));
 
         // —— 存储区 Bank（Stocker 内逻辑分区，SEMI E88 zone 口径；转运规则同页维护）——
-        m.add(menu("banks", "grp.equipment", "/banks", "Banks",
-                "mds.nav.banks", "inbox", null, 50));
+        m.add(menu("banks", "grp.equipment", "/banks", "BankPage",
+                "mds.nav.banks", "inbox", MdsPermissions.BANK_VIEW, 50));
         m.add(button("btn.bank.create", "banks", "mds.nav.banks.action.create",
                 MdsPermissions.BANK_CREATE, 10));
         m.add(button("btn.bank.update", "banks", "mds.nav.banks.action.update",
@@ -179,8 +180,8 @@ public final class MdsConsoleCatalog {
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
         m.add(dir("grp.system", "mds.nav.group.system", 40));
-        m.add(menu("dicts", "grp.system", "/dicts", "Dicts",
-                "mds.nav.dicts", "list", null, 10));
+        m.add(menu("dicts", "grp.system", "/dicts", "DictPage",
+                "mds.nav.dicts", "list", PermissionCodes.DICT_LIST, 10));
         m.add(button("btn.dict.save", "dicts", "mds.nav.dicts.action.save",
                 PermissionCodes.DICT_SAVE, 10));
         m.add(button("btn.dict.delete", "dicts", "mds.nav.dicts.action.delete",
@@ -188,8 +189,8 @@ public final class MdsConsoleCatalog {
 
         // —— 状态模型（SEMI E30 状态机口径：状态集合 + 转换 allowlist；
         //    模型/状态/矩阵均可页面维护，规则表轻量不走编辑锁）——
-        m.add(menu("stateModels", "grp.system", "/state-models", "StateModels",
-                "mds.nav.stateModels", "check", null, 20));
+        m.add(menu("stateModels", "grp.system", "/state-models", "StateModelPage",
+                "mds.nav.stateModels", "check", MdsPermissions.STATE_MODEL_VIEW, 20));
         m.add(button("btn.stateModel.create", "stateModels", "mds.nav.stateModels.action.create",
                 MdsPermissions.STATE_MODEL_CREATE, 10));
         m.add(button("btn.stateModel.save", "stateModels", "mds.nav.stateModels.action.save",
@@ -199,8 +200,8 @@ public final class MdsConsoleCatalog {
 
         // —— 编码规则（配置化 Key Generation：模板段 + 分桶计数器；
         //    各域 create 同事务占号/校验，规则表轻量不走编辑锁）——
-        m.add(menu("namingRules", "grp.system", "/naming-rules", "NamingRules",
-                "mds.nav.namingRules", "hash", null, 30));
+        m.add(menu("namingRules", "grp.system", "/naming-rules", "NamingRulePage",
+                "mds.nav.namingRules", "hash", MdsPermissions.NAMING_RULE_VIEW, 30));
         m.add(button("btn.namingRule.create", "namingRules", "mds.nav.namingRules.action.create",
                 MdsPermissions.NAMING_RULE_CREATE, 10));
         m.add(button("btn.namingRule.save", "namingRules", "mds.nav.namingRules.action.save",
@@ -209,18 +210,28 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.NAMING_RULE_DELETE, 30));
 
         // —— 原因码（V16：WIP 事件归因主数据；树即码 + 事件快照治理演示）——
-        m.add(menu("reasonCodes", "grp.system", "/reason-codes", "ReasonCodes",
-                "mds.nav.reasonCodes", "list", null, 40));
+        m.add(menu("reasonCodes", "grp.system", "/reason-codes", "ReasonCodePage",
+                "mds.nav.reasonCodes", "list", MdsPermissions.REASON_VIEW, 40));
         m.add(button("btn.reason.create", "reasonCodes", "mds.nav.reasonCodes.action.create",
                 MdsPermissions.REASON_CREATE, 10));
         m.add(button("btn.reason.save", "reasonCodes", "mds.nav.reasonCodes.action.save",
                 MdsPermissions.REASON_UPDATE, 20));
         m.add(button("btn.reason.delete", "reasonCodes", "mds.nav.reasonCodes.action.delete",
                 MdsPermissions.REASON_DELETE, 30));
-        m.add(menu("wipEvents", "grp.system", "/wip-events", "WipEvents",
-                "mds.nav.wipEvents", "inbox", null, 50));
+        m.add(menu("wipEvents", "grp.system", "/wip-events", "WipEventPage",
+                "mds.nav.wipEvents", "inbox", MdsPermissions.REASON_VIEW, 50));
         m.add(button("btn.wipEvent.create", "wipEvents", "mds.nav.wipEvents.action.create",
                 MdsPermissions.REASON_UPDATE, 10));
+
+        // —— 菜单管理（sys_menu 在线维护 + 角色授权联动；平台权限码，端点来自 cim-system）——
+        m.add(menu("menuAdmin", "grp.system", "/menus", "MenuPage",
+                "mds.nav.menus", "layers", MdsPermissions.SYS_MENU_LIST, 60));
+        m.add(button("btn.menu.save", "menuAdmin", "mds.nav.menus.action.save",
+                MdsPermissions.SYS_MENU_SAVE, 10));
+        m.add(button("btn.menu.delete", "menuAdmin", "mds.nav.menus.action.delete",
+                MdsPermissions.SYS_MENU_REMOVE, 20));
+        m.add(button("btn.menu.grant", "menuAdmin", "mds.nav.menus.action.grant",
+                MdsPermissions.SYS_ROLE_GRANT, 30));
         return m;
     }
 
@@ -326,6 +337,13 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
         p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
         p.add(new PermDef(PermissionCodes.DICT_REMOVE, "数据字典删除"));
+        // 菜单管理（平台域：sys_menu 在线维护 + 角色授权联动 + 译文改名）
+        p.add(new PermDef(MdsPermissions.SYS_MENU_LIST, "菜单查看"));
+        p.add(new PermDef(MdsPermissions.SYS_MENU_SAVE, "菜单维护"));
+        p.add(new PermDef(MdsPermissions.SYS_MENU_REMOVE, "菜单删除"));
+        p.add(new PermDef(MdsPermissions.SYS_ROLE_LIST, "角色查看"));
+        p.add(new PermDef(MdsPermissions.SYS_ROLE_GRANT, "角色授权"));
+        p.add(new PermDef(MdsPermissions.SYS_I18N_SAVE, "译文维护"));
         return p;
     }
 
@@ -472,6 +490,10 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.reasonCodes.action.delete", "原因码·删除", "Reason code · delete"));
         t.add(new TextDef("mds.nav.wipEvents", "WIP 事件", "WIP events"));
         t.add(new TextDef("mds.nav.wipEvents.action.create", "WIP 事件·新建", "WIP event · create"));
+        t.add(new TextDef("mds.nav.menus", "菜单管理", "Menus"));
+        t.add(new TextDef("mds.nav.menus.action.save", "菜单·维护", "Menu · save"));
+        t.add(new TextDef("mds.nav.menus.action.delete", "菜单·删除", "Menu · delete"));
+        t.add(new TextDef("mds.nav.menus.action.grant", "菜单·授权", "Menu · grant"));
         // —— 数据字典 ——
         t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
         t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));

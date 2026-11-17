@@ -785,3 +785,45 @@ export interface WipReasonEventPayload {
   occurredAt?: string | null;
   operator?: string | null;
 }
+
+// ---------------------------------------------------------------- 平台菜单管理（/menus 维护页）
+
+export type MenuNodeType = 'DIR' | 'MENU' | 'BUTTON';
+
+/** 平台菜单节点（sys_menu 行；管理视角 CRUD 用）。 */
+export interface SysMenuDto {
+  id: string;
+  parentId?: string | null;
+  path?: string | null;
+  component?: string | null;
+  i18nCode?: string | null;
+  icon?: string | null;
+  permCode?: string | null;
+  sortNo?: number;
+  visible?: boolean;
+  status?: 'ENABLED' | 'DISABLED';
+  type: MenuNodeType;
+  [k: string]: unknown;
+}
+
+/** 管理视角菜单树节点（MenuNode{menu, children} 信封）。 */
+export interface MenuTreeNode {
+  menu: SysMenuDto;
+  children?: MenuTreeNode[];
+}
+
+/** 平台角色（角色授权面板用）。 */
+export interface SysRoleDto {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  status?: string | null;
+  [k: string]: unknown;
+}
+
+/** 译文包（/i18n/messages 公开端点）。 */
+export interface I18nBundleDto {
+  version: string;
+  lang: string;
+  messages: Record<string, string>;
+}

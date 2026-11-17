@@ -1,8 +1,8 @@
-import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { Suspense, useMemo, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CimButton, CimSpin, UiDictProvider } from '@cim/ui';
-import { ProtectedRoute, RequirePermission, SsoRelay } from '@cim/shell';
+import { ProtectedRoute, RequirePermission, SsoRelay, createMenuRoutes, type PageRegistry } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import { useHasPermission } from '@/lib/usePermission';
 import * as api from '@/lib/mdsApi';
@@ -14,6 +14,46 @@ import LoginPage from '@/pages/LoginPage';
 import SsoCallback from '@/pages/SsoCallback';
 import NotFoundPage from '@/pages/NotFoundPage';
 import ForbiddenPage from '@/pages/ForbiddenPage';
+
+/**
+ * 页面注册表：Vite 构建期静态收集 `pages/` 下所有页面文件。
+ *
+ * <p>路由不再手写——后端菜单树（`/mds/me/menus`，按角色过滤）每条 MENU 节点
+ * 经 {@link createMenuRoutes} 解析出组件（`sys_menu.component` 显式指定优先，
+ * 缺省按「/reason-codes → ReasonCodePage」命名约定兜底）。**新增页面 = 建一个
+ * tsx + 后端目录种子加一行菜单，本文件零改动**。</p>
+ */
+const PAGES = import.meta.glob('./pages/*.tsx') as PageRegistry;
+
+/**
+ * 菜单驱动的业务路由：后端菜单树（`/mds/me/menus`，按角色过滤）经 {@link createMenuRoutes}
+ * 解析出 Route 元素。**注意必须把结果内联展开在 `<Routes>` 的子级**——react-router 要求
+ * `<Routes>` 的孩子只能是 `<Route>`/Fragment，包一层自定义组件会在运行时抛
+ * 「is not a Route component」。菜单来自后端已按角色过滤，这里再按 `menu.permCode`
+ * 包一层 PermGate（纵深防御）。组件解析失败的菜单已在工厂里 warn + 跳过——
+ * 直连其 URL 落 `*` 的 NotFound，不会白屏。
+ */
+function useMenuRoutes(): Array<{ path: string; element: ReactNode }> {
+  const menus = useAuthStore((s) => s.menus);
+  return useMemo(
+    () =>
+      createMenuRoutes(menus, PAGES).map((r) => ({
+        path: r.path,
+        element: (
+          <Suspense fallback={<CimSpin block height={320} />}>
+            {r.menu.permCode ? (
+              <PermGate code={r.menu.permCode}>
+                <r.Component />
+              </PermGate>
+            ) : (
+              <r.Component />
+            )}
+          </Suspense>
+        ),
+      })),
+    [menus],
+  );
+}
 
 /**
  * 路由级权限门：未授权跳 `/403`（URL 变，可分享、可后退）。
@@ -31,59 +71,15 @@ function PermGate({ code, children }: { code: string; children: ReactNode }) {
 }
 
 /**
- * 业务页面按路由拆包：不拆的话整个应用（含 antd、所有页面）打成一个 chunk，
- * 打开「区域」也要先下载「基地」的代码。Suspense 层级在 Layout 的 `<Outlet/>` 内部，
- * 切页时外壳不卸载，只有内容区显示加载态。
- */
-function lazyRoute(Page: ComponentType, permCode?: string) {
-  return (
-    <Suspense fallback={<CimSpin block height={320} />}>
-      {permCode ? (
-        <PermGate code={permCode}>
-          <Page />
-        </PermGate>
-      ) : (
-        <Page />
-      )}
-    </Suspense>
-  );
-}
-
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
-const TopologyPage = lazy(() => import('@/pages/TopologyPage'));
-const TechnologyPage = lazy(() => import('@/pages/TechnologyPage'));
-const ProductPage = lazy(() => import('@/pages/ProductPage'));
-const FlowPage = lazy(() => import('@/pages/FlowPage'));
-const FlowRulePage = lazy(() => import('@/pages/FlowRulePage'));
-const DictPage = lazy(() => import('@/pages/DictPage'));
-const EquipmentTypePage = lazy(() => import('@/pages/EquipmentTypePage'));
-const CapabilityPage = lazy(() => import('@/pages/CapabilityPage'));
-const EquipmentListPage = lazy(() => import('@/pages/EquipmentListPage'));
-const BankPage = lazy(() => import('@/pages/BankPage'));
-const StateModelPage = lazy(() => import('@/pages/StateModelPage'));
-const NamingRulePage = lazy(() => import('@/pages/NamingRulePage'));
-const ReasonCodePage = lazy(() => import('@/pages/ReasonCodePage'));
-const WipEventPage = lazy(() => import('@/pages/WipEventPage'));
-
-/** 搬运设备页 = 设备列表的 AMHS 视图（TRANSPORT/STORAGE/BUFFER 类）。 */
-function TransportEquipmentsPage() {
-  return <EquipmentListPage view="amhs" />;
-}
-
-/** 设备页 = 设备列表的工艺视图（PROCESS 类）。 */
-function EquipmentsPage() {
-  return <EquipmentListPage view="process" />;
-}
-
-/**
- * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），再渲染受保护路由，
- * 避免「首帧权限为空 → 误判 403」。
+ * 启动闸门：已登录时先拉取用户档案、权限码与菜单树（内存态，不落盘），再渲染受保护路由，
+ * 避免「首帧权限为空 → 误判 403」「菜单未到 → 直连 URL 误判 404」。
  */
 function BootGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const token = useAuthStore((s) => s.token);
   const loadMe = useAuthStore((s) => s.loadMe);
   const loadPermissions = useAuthStore((s) => s.loadPermissions);
+  const loadMenus = useAuthStore((s) => s.loadMenus);
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [failure, setFailure] = useState<{ kind: 'admission' | 'unavailable' | 'auth'; detail: string } | null>(
@@ -98,7 +94,7 @@ function BootGate({ children }: { children: ReactNode }) {
     let alive = true;
     setReady(false);
     setFailure(null);
-    Promise.all([loadMe(), loadPermissions()])
+    Promise.all([loadMe(), loadPermissions(), loadMenus()])
       .then(() => {
         if (alive) setReady(true);
       })
@@ -130,7 +126,7 @@ function BootGate({ children }: { children: ReactNode }) {
       alive = false;
     };
     // attempt：点「重试」时 +1，重新拉一次
-  }, [token, attempt, loadMe, loadPermissions]);
+  }, [token, attempt, loadMe, loadPermissions, loadMenus]);
 
   // 准入失败：带 error=admission 落回 /login，登录页据此**停住**不再自动中继
   // （否则 IAM 侧会话仍在，会拿同一枚令牌再弹回 /sso，两端无限往返）。
@@ -169,6 +165,7 @@ function BootGate({ children }: { children: ReactNode }) {
 export default function App() {
   const token = useAuthStore((s) => s.token);
   const { t, i18n } = useTranslation();
+  const menuRoutes = useMenuRoutes();
 
   /** 平台字典 loader：落库值=itemKey，显示优先 i18n（命中才用）否则 itemValue。 */
   const dictLoader = useCallback(
@@ -206,34 +203,9 @@ export default function App() {
             </BootGate>
           }
         >
-          <Route path="/" element={lazyRoute(DashboardPage)} />
-          <Route path="/topology" element={lazyRoute(TopologyPage, 'mds:site:view')} />
-          <Route path="/technologies" element={lazyRoute(TechnologyPage, 'mds:tech:view')} />
-          <Route path="/products" element={lazyRoute(ProductPage, 'mds:product:view')} />
-          <Route path="/flows" element={lazyRoute(FlowPage, 'mds:flow:view')} />
-          <Route path="/flow-rules" element={lazyRoute(FlowRulePage, 'mds:flow:view')} />
-          <Route path="/dicts" element={lazyRoute(DictPage, 'sys:dict:list')} />
-          <Route
-            path="/state-models"
-            element={lazyRoute(StateModelPage, 'mds:stateModel:view')}
-          />
-          <Route
-            path="/naming-rules"
-            element={lazyRoute(NamingRulePage, 'mds:namingRule:view')}
-          />
-          <Route path="/reason-codes" element={lazyRoute(ReasonCodePage, 'mds:reason:view')} />
-          <Route path="/wip-events" element={lazyRoute(WipEventPage, 'mds:reason:view')} />
-          <Route
-            path="/transport-equipments"
-            element={lazyRoute(TransportEquipmentsPage, 'mds:equipment:view')}
-          />
-          <Route path="/equipments" element={lazyRoute(EquipmentsPage, 'mds:equipment:view')} />
-          <Route
-            path="/equipment-types"
-            element={lazyRoute(EquipmentTypePage, 'mds:equipmentType:view')}
-          />
-          <Route path="/capabilities" element={lazyRoute(CapabilityPage, 'mds:capability:view')} />
-          <Route path="/banks" element={lazyRoute(BankPage, 'mds:bank:view')} />
+          {menuRoutes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

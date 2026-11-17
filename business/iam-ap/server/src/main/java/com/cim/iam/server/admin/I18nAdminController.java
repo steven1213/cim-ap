@@ -25,7 +25,7 @@ import java.util.Map;
  *
  * <p><b>为什么由 IAM 提供而不是 i18n starter</b>：语言/译文的管理属「某个 ap 的内部权限」，
  * 权限码与菜单应由各 ap 自己的域定义（starter 只给 {@link I18nService} 服务与公开的
- * {@code /api/i18n/**} 运行时接口）。见 {@code console-menu-perm-i18n.md} §6。</p>
+ * {@code /api/v1/i18n/**} 运行时接口）。见 {@code console-menu-perm-i18n.md} §6。</p>
  *
  * <p>类级保留 {@code iam:console:admin} 兜底（未逐个标注的方法退回该码），
  * 方法级为细粒度权限码——方法级优先于类级。</p>

@@ -46,6 +46,10 @@ public final class PermissionCodes {
     /** 日志查询。 */
     public static final String LOG_LIST = "sys:log:list";
 
+    /** 国际化文案维护（菜单名/按钮名等在线编辑译文；读公开——登录页也要用）。 */
+    public static final String I18N_SAVE = "sys:i18n:save";
+    public static final String I18N_REMOVE = "sys:i18n:remove";
+
     private PermissionCodes() {
     }
 

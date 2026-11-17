@@ -8,7 +8,7 @@
 // 后续若本库接上 `cim-i18n-starter` 并灌入 `sys_i18n` 种子，只需在这里加 `remote`：
 // 远端包会以逐键覆盖的方式叠在内置包之上，内置包永远兜得住，不会出现空界面。
 import { createI18n } from '@cim/i18n';
-import { setAcceptLanguage } from '@/lib/api';
+import { httpClient, setAcceptLanguage } from '@/lib/api';
 import { zhCN, enUS } from '@/lib/i18n/messages';
 
 export const DEFAULT_LANG = 'zh-CN';
@@ -21,6 +21,19 @@ const cim = createI18n({
     { code: 'zh-CN', name: '简体中文' },
     { code: 'en-US', name: 'English' },
   ],
+  remote: {
+    // `/i18n/messages` 公开端点（平台已统一 /api/v1 前缀）；版本一致时后端只回版本号、
+    // messages 为空包，运行时按「空包 = 保留缓存」处理。
+    loadBundle: async ({ lang, version }) => {
+      const payload = await httpClient.rootGet<{
+        version: string;
+        lang: string;
+        messages: Record<string, string>;
+      }>('/i18n/messages', { lang, ...(version ? { v: version } : {}) });
+      if (!payload || !payload.messages) return null;
+      return { version: payload.version, lang: payload.lang || lang, messages: payload.messages };
+    },
+  },
   onLanguageChange: setAcceptLanguage,
   dev: import.meta.env.DEV,
 });

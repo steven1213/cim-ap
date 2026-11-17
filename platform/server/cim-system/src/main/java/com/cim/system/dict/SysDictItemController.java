@@ -19,7 +19,7 @@ import java.util.List;
  * 管理带字典归属校验与系统级守门，逻辑在 {@link SysDictItemService}，端点只做转发。</p>
  */
 @RestController
-@RequestMapping("/sys/dicts/{dictId}/items")
+@RequestMapping("/api/v1/sys/dicts/{dictId}/items")
 public class SysDictItemController {
 
     private final SysDictItemService itemService;

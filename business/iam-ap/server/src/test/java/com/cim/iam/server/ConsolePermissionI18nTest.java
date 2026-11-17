@@ -130,7 +130,7 @@ class ConsolePermissionI18nTest {
     @Test
     void mePermissionsExposeIamAndSysCodesForAdmin() throws Exception {
         String token = login("admin", "Admin@123456");
-        String resp = json(mvc.perform(get("/sys/me/permissions").header("Authorization", "Bearer " + token))
+        String resp = json(mvc.perform(get("/api/v1/sys/me/permissions").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn());
         JsonNode data = objectMapper.readTree(resp).path("data");
@@ -150,7 +150,7 @@ class ConsolePermissionI18nTest {
     @Test
     void meMenusReturnsBackendDrivenTree() throws Exception {
         String token = login("admin", "Admin@123456");
-        String resp = json(mvc.perform(get("/sys/me/menus").header("Authorization", "Bearer " + token))
+        String resp = json(mvc.perform(get("/api/v1/sys/me/menus").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andReturn());
         // 菜单由后端下发：含 i18n_code（前端据此翻译展示），不含 BUTTON 节点（include-buttons=false）
@@ -161,7 +161,7 @@ class ConsolePermissionI18nTest {
     @Test
     void protectedAdminEndpointRequiresAuthentication() throws Exception {
         mvc.perform(get("/api/v1/admin/overview")).andExpect(status().isUnauthorized());
-        mvc.perform(get("/sys/me/permissions")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/sys/me/permissions")).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -186,16 +186,16 @@ class ConsolePermissionI18nTest {
         String token = login("admin", "Admin@123456");
         String auth = "Bearer " + token;
 
-        mvc.perform(get("/sys/menus/tree").param("includeButtons", "true")
+        mvc.perform(get("/api/v1/sys/menus/tree").param("includeButtons", "true")
                 .header("Authorization", auth)).andExpect(status().isOk());
 
-        String permResp = json(mvc.perform(get("/sys/permissions/page")
+        String permResp = json(mvc.perform(get("/api/v1/sys/permissions/page")
                         .param("page", "1").param("size", "500").param("sort", "code,asc")
                         .header("Authorization", auth))
                 .andExpect(status().isOk()).andReturn());
         assertThat(permResp).contains(com.cim.system.support.PermissionCodes.MENU_LIST);
 
-        String roleResp = json(mvc.perform(get("/sys/roles/page")
+        String roleResp = json(mvc.perform(get("/api/v1/sys/roles/page")
                         .param("page", "1").param("size", "500").param("sort", "sortNo,asc")
                         .header("Authorization", auth))
                 .andExpect(status().isOk()).andReturn());
@@ -204,9 +204,9 @@ class ConsolePermissionI18nTest {
 
         String adminRoleId = roleRepository.findFirstByCodeOrderByCreateTimeAsc("IAM_ADMIN")
                 .orElseThrow().getId();
-        mvc.perform(get("/sys/roles/" + adminRoleId + "/permissions")
+        mvc.perform(get("/api/v1/sys/roles/" + adminRoleId + "/permissions")
                 .header("Authorization", auth)).andExpect(status().isOk());
-        mvc.perform(get("/sys/roles/" + adminRoleId + "/menus")
+        mvc.perform(get("/api/v1/sys/roles/" + adminRoleId + "/menus")
                 .header("Authorization", auth)).andExpect(status().isOk());
     }
 
@@ -240,18 +240,18 @@ class ConsolePermissionI18nTest {
 
     @Test
     void englishBundleServedAndUnknownLocaleFallsBackToChinese() throws Exception {
-        String en = json(mvc.perform(get("/api/i18n/messages").param("lang", "en-US"))
+        String en = json(mvc.perform(get("/api/v1/i18n/messages").param("lang", "en-US"))
                 .andExpect(status().isOk())
                 .andReturn());
         assertThat(readMessage(en, "iam.menu.orgs")).isEqualTo("Organization");
 
-        String zh = json(mvc.perform(get("/api/i18n/messages").param("lang", "zh-CN"))
+        String zh = json(mvc.perform(get("/api/v1/i18n/messages").param("lang", "zh-CN"))
                 .andExpect(status().isOk())
                 .andReturn());
         assertThat(readMessage(zh, "iam.menu.orgs")).isEqualTo("组织架构");
 
         // 未知语言：四级兜底链回落到 zh-CN（「只要有中文就一定看得懂」）
-        String fr = json(mvc.perform(get("/api/i18n/messages").param("lang", "fr-FR"))
+        String fr = json(mvc.perform(get("/api/v1/i18n/messages").param("lang", "fr-FR"))
                 .andExpect(status().isOk())
                 .andReturn());
         assertThat(readMessage(fr, "iam.menu.orgs")).isEqualTo("组织架构");

@@ -58,13 +58,13 @@ export default function NotificationBell() {
     let url: string;
     let getToken: () => string | null;
     if (token) {
-      url = '/sys/notify/stream';
+      url = '/api/v1/sys/notify/stream';
       getToken = () => useAuthStore.getState().token;
     } else {
       // dev 直连（cim.auth.enabled=false + dev-accept-query-identity=true）
       const uid = user?.userId ?? 'anonymous';
       const tid = user?.tenantId ?? 'default';
-      url = `/sys/notify/stream?userId=${encodeURIComponent(uid)}&tenantId=${encodeURIComponent(tid)}`;
+      url = `/api/v1/sys/notify/stream?userId=${encodeURIComponent(uid)}&tenantId=${encodeURIComponent(tid)}`;
       getToken = () => null;
     }
     const client = new SseClient({

@@ -42,7 +42,7 @@ import java.util.Optional;
  * 见 {@code docs/platform/web/component-adoption-audit.md} §8.3）。</p>
  *
  * <p><b>文案契约</b>：页面不硬编码文案，运行时拉同一后端的 i18n bundle
- * （{@code GET /api/i18n/messages?lang=}，公开端点），键名与控制台一致（{@code iam.login.*}）。
+ * （{@code GET /api/v1/i18n/messages?lang=}，公开端点），键名与控制台一致（{@code iam.login.*}）。
  * 因此改文案不发版。内置词典只留 zh-CN 兜底。</p>
  *
  * <p><b>登录契约</b>：{@code GET /api/v1/login/salt} 取客户端盐 → 浏览器内 PBKDF2WithHmacSHA256
@@ -51,7 +51,7 @@ import java.util.Optional;
  *
  * <p><b>安全</b>：本端点无令牌即可访问（安全链 {@code anyRequest().permitAll()}，JWT 过滤器对无令牌
  * 请求直接放行），其依赖的 {@code /api/v1/login}、{@code /api/v1/login/salt}、
- * {@code /api/i18n/messages} 同为公开端点。页面同源调用，不涉及跨域。{@code crypto.subtle}
+ * {@code /api/v1/i18n/messages} 同为公开端点。页面同源调用，不涉及跨域。{@code crypto.subtle}
  * 要求安全上下文——localhost 视为安全上下文，生产须 HTTPS。回跳地址须在
  * {@code allowed-redirect-hosts} 白名单内，防开放重定向。</p>
  */

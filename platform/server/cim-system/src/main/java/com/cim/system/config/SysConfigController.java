@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 参数配置接口（CRUD 继承自 {@link BaseController}，鉴权在 {@link SysConfigService}）。 */
 @RestController
-@RequestMapping("/sys/configs")
+@RequestMapping("/api/v1/sys/configs")
 public class SysConfigController extends BaseController<SysConfig, String> {
 
     private final SysConfigService configService;

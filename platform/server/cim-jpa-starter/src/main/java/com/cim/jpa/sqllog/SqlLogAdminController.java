@@ -45,7 +45,7 @@ import java.util.Map;
 public class SqlLogAdminController {
 
     /** 端点路径（宿主可用它配置安全链）。 */
-    public static final String PATH = "/sys/sql-log";
+    public static final String PATH = "/api/v1/sys/sql-log";
 
     private final String loggerName;
     private final int maxSqlLength;
