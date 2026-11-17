@@ -122,6 +122,21 @@ export const STATUS_TONES: Record<string, Record<string, StatusTone>> = {
     DOWN: 'err', // 故障
     PM: 'warn', // 保养中——非生产、需关注
   },
+  /**
+   * MDS WIP 原因事件类型（V16，八类语义域）。
+   * 出处：`business/mds-ap` `CimReasonCodeType` 常量 +
+   * `ReasonTypeSeed.SeedService.TYPES` 种子（2026-11-17 落地）。
+   */
+  wipEventType: {
+    HOLD: 'warn', // 挂起——需人处理
+    RELEASE: 'ok', // 释放——恢复正常
+    SCRAP: 'err', // 报废
+    REWORK: 'run', // 返工——重新流转
+    OFF_FLOW: 'warn', // 跳离流程——需人处理
+    PAUSE: 'warn', // 暂停——需人处理
+    DEFECT: 'err', // 缺陷
+    LOSS: 'err', // 损耗
+  },
 };
 
 /** 取某枚举值的语义档；未登记的域/值一律回落 `idle`（不抛错，避免一处漏登记导致白屏）。 */

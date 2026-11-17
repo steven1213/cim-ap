@@ -62,6 +62,7 @@ public class NamingRuleAdminService {
     public static final String OBJ_PRODUCT = "PRODUCT";
     public static final String OBJ_CAPABILITY = "CAPABILITY";
     public static final String OBJ_FLOW = "FLOW";
+    public static final String OBJ_REASON_CODE = "REASON_CODE";
 
     // ---------------------------------------------------------------- 对象注册表
 
@@ -76,7 +77,7 @@ public class NamingRuleAdminService {
     public record ObjectSpec(String code, String label, String parentVar, List<String> vars) {
     }
 
-    /** 十四对象白名单（新增域接入时在此注册 + 对应 create 点调 {@link #apply}）。 */
+    /** 十五对象白名单（新增域接入时在此注册 + 对应 create 点调 {@link #apply}）。 */
     public static List<ObjectSpec> objectSpecs() {
         return List.of(
                 new ObjectSpec("SITE", "厂区", null, List.of()),
@@ -93,7 +94,8 @@ public class NamingRuleAdminService {
                 new ObjectSpec("TECHNOLOGY", "制程技术", null, List.of()),
                 new ObjectSpec("PRODUCT", "产品", "tech", List.of("tech")),
                 new ObjectSpec("CAPABILITY", "设备能力", null, List.of()),
-                new ObjectSpec("FLOW", "制造流程", null, List.of("tech")));
+                new ObjectSpec("FLOW", "制造流程", null, List.of("tech")),
+                new ObjectSpec("REASON_CODE", "原因码", "type", List.of("type")));
     }
 
     private static ObjectSpec requireSpec(String objectType) {

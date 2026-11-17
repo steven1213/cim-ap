@@ -677,3 +677,86 @@ export function applyFlowRuleTemplate(flowId: string, templateKey: string): Prom
 export function evaluateFlowRules(payload: FlowRuleEvaluatePayload): Promise<FlowRuleEvaluateResult> {
   return http.post<FlowRuleEvaluateResult>(`${BASE}/flow-rules/evaluate`, payload);
 }
+
+// ---------------------------------------------------------------- 原因码（V16）
+
+import type {
+  ReasonCodeTypeView,
+  ReasonCodeTypePayload,
+  ReasonCodeView,
+  ReasonCodeCreatePayload,
+  ReasonCodeUpdatePayload,
+  WipReasonEventView,
+  WipReasonEventPayload,
+} from '@/types';
+
+/** 类型清单（含挂靠码计数）。 */
+export function listReasonCodeTypes(signal?: AbortSignal): Promise<ReasonCodeTypeView[]> {
+  return http.get<ReasonCodeTypeView[]>(`${BASE}/reason-code-types`, undefined, { signal });
+}
+
+export function createReasonCodeType(payload: ReasonCodeTypePayload): Promise<ReasonCodeTypeView> {
+  return http.post<ReasonCodeTypeView>(`${BASE}/reason-code-types`, payload);
+}
+
+/** 更新类型（typeKey 建后不可改，后端拒绝改键）。 */
+export function updateReasonCodeType(
+  id: string,
+  payload: Partial<ReasonCodeTypePayload>,
+): Promise<ReasonCodeTypeView> {
+  return http.put<ReasonCodeTypeView>(
+    `${BASE}/reason-code-types/${encodeURIComponent(id)}`,
+    payload,
+  );
+}
+
+/** 删除类型（类型下仍有码时后端拒绝）。 */
+export function deleteReasonCodeType(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/reason-code-types/${encodeURIComponent(id)}`);
+}
+
+/** 码清单（typeKey 过滤 + keyword 模糊；node_path 升序 = 树展开序）。 */
+export function listReasonCodes(
+  params?: { typeKey?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<ReasonCodeView[]> {
+  return http.get<ReasonCodeView[]>(`${BASE}/reason-codes`, params, { signal });
+}
+
+/** WIP 下拉口径：type 匹配 + 启用。 */
+export function listEnabledReasonCodes(
+  typeKey: string,
+  signal?: AbortSignal,
+): Promise<ReasonCodeView[]> {
+  return http.get<ReasonCodeView[]>(`${BASE}/reason-codes/enabled`, { typeKey }, { signal });
+}
+
+export function createReasonCode(payload: ReasonCodeCreatePayload): Promise<ReasonCodeView> {
+  return http.post<ReasonCodeView>(`${BASE}/reason-codes`, payload);
+}
+
+/** 更新码（reasonCode/typeKey 建后不可改；改父节点时子树路径由后端整段重算）。 */
+export function updateReasonCode(
+  id: string,
+  payload: ReasonCodeUpdatePayload,
+): Promise<ReasonCodeView> {
+  return http.put<ReasonCodeView>(`${BASE}/reason-codes/${encodeURIComponent(id)}`, payload);
+}
+
+/** 删除码（软删；有子节点或被事件引用时后端拒绝）。 */
+export function deleteReasonCode(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/reason-codes/${encodeURIComponent(id)}`);
+}
+
+/** WIP 事件履历（lotId 可选过滤；按发生时间倒序）。 */
+export function listWipReasonEvents(
+  lotId?: string,
+  signal?: AbortSignal,
+): Promise<WipReasonEventView[]> {
+  return http.get<WipReasonEventView[]>(`${BASE}/wip-reason-events`, { lotId }, { signal });
+}
+
+/** 创建事件（快照五件套同事务落库）。 */
+export function createWipReasonEvent(payload: WipReasonEventPayload): Promise<WipReasonEventView> {
+  return http.post<WipReasonEventView>(`${BASE}/wip-reason-events`, payload);
+}

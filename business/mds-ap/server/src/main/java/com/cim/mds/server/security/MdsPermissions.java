@@ -101,6 +101,12 @@ public final class MdsPermissions {
     public static final String FLOW_UPDATE = "mds:flow:update";
     public static final String FLOW_DELETE = "mds:flow:delete";
 
+    // ---------------- 原因码（ReasonCode，系统管理域：WIP 事件归因主数据 + 快照治理） ----------------
+    public static final String REASON_VIEW = "mds:reason:view";
+    public static final String REASON_CREATE = "mds:reason:create";
+    public static final String REASON_UPDATE = "mds:reason:update";
+    public static final String REASON_DELETE = "mds:reason:delete";
+
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
         Set<String> codes = new LinkedHashSet<>();
@@ -160,6 +166,10 @@ public final class MdsPermissions {
         codes.add(FLOW_CREATE);
         codes.add(FLOW_UPDATE);
         codes.add(FLOW_DELETE);
+        codes.add(REASON_VIEW);
+        codes.add(REASON_CREATE);
+        codes.add(REASON_UPDATE);
+        codes.add(REASON_DELETE);
         return codes;
     }
 }

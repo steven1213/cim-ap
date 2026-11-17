@@ -138,6 +138,17 @@ public class MdsDictSeedService {
                     new ItemDef("CONTROL", "控片库", 50),
                     new ItemDef("RECYCLE", "回收库", 60),
                     new ItemDef("GENERAL", "普通暂存", 90))),
+            // 原因码归属部门（V16）：只表达「归谁统计改善」，不表达处置权限；
+            // 组织调整时改字典即可，不动码表与树
+            new DictDef("mds.owning_dept", "归属部门", List.of(
+                    new ItemDef("EQP", "设备部", 10),
+                    new ItemDef("PE", "工艺部（PE）", 20),
+                    new ItemDef("QC", "质量部（QC）", 30),
+                    new ItemDef("PROD", "生产部", 40),
+                    new ItemDef("MAT", "物料仓储部", 50),
+                    new ItemDef("PLAN", "计划部", 60),
+                    new ItemDef("ENG", "工程部", 70),
+                    new ItemDef("OTHER", "其他", 90))),
             // 制造流程步骤类型（Flow 域，V12/V14）：业务步骤四类 + 结构节点——START/END 不进字典
             new DictDef("mds.process_step_type", "流程步骤类型", List.of(
                     new ItemDef("PROCESS", "加工（工艺机台作业）", 10),

@@ -830,3 +830,29 @@ table.naming-seg-table th {
   font-size: 11px;
   color: var(--cim-text-secondary, #888);
 }
+
+/* ============================================================
+   原因码（ReasonCodePage）：左类型列表 + 右码表（树展开序）。
+   与 .state-model-layout 同构的左右两栏，只写结构不做主题。
+   ============================================================ */
+.reason-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(0, 2.1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.reason-main {
+  min-width: 0;
+}
+
+.reason-main .panel {
+  height: 100%;
+}
+
+/* WIP 事件页：创建表单的提交按钮行（右对齐，与 .page 纵向节奏一致） */
+.reason-event-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}

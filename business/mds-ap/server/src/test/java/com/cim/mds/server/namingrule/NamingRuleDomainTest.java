@@ -126,10 +126,10 @@ class NamingRuleDomainTest {
     @Test
     @Order(1)
     void objectTypesAndSegmentValidation() throws Exception {
-        // 十四对象白名单可见（V12 起 FLOW 接入）
+        // 十五对象白名单可见（V12 起 FLOW 接入；V16 起 REASON_CODE 接入）
         mvc.perform(get("/api/v1/mds/naming-rules/object-types"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(14));
+                .andExpect(jsonPath("$.data.length()").value(15));
 
         // 空段列表 → 400
         mvc.perform(post("/api/v1/mds/naming-rules/preview")

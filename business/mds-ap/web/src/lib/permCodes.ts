@@ -99,4 +99,11 @@ export const MDS_PERMS = {
     update: 'mds:flow:update',
     delete: 'mds:flow:delete',
   },
+  // 原因码：WIP 事件归因主数据（树即码 + 事件快照治理）
+  reason: {
+    view: 'mds:reason:view',
+    create: 'mds:reason:create',
+    update: 'mds:reason:update',
+    delete: 'mds:reason:delete',
+  },
 } as const;

@@ -207,6 +207,20 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.NAMING_RULE_UPDATE, 20));
         m.add(button("btn.namingRule.delete", "namingRules", "mds.nav.namingRules.action.delete",
                 MdsPermissions.NAMING_RULE_DELETE, 30));
+
+        // —— 原因码（V16：WIP 事件归因主数据；树即码 + 事件快照治理演示）——
+        m.add(menu("reasonCodes", "grp.system", "/reason-codes", "ReasonCodes",
+                "mds.nav.reasonCodes", "list", null, 40));
+        m.add(button("btn.reason.create", "reasonCodes", "mds.nav.reasonCodes.action.create",
+                MdsPermissions.REASON_CREATE, 10));
+        m.add(button("btn.reason.save", "reasonCodes", "mds.nav.reasonCodes.action.save",
+                MdsPermissions.REASON_UPDATE, 20));
+        m.add(button("btn.reason.delete", "reasonCodes", "mds.nav.reasonCodes.action.delete",
+                MdsPermissions.REASON_DELETE, 30));
+        m.add(menu("wipEvents", "grp.system", "/wip-events", "WipEvents",
+                "mds.nav.wipEvents", "inbox", null, 50));
+        m.add(button("btn.wipEvent.create", "wipEvents", "mds.nav.wipEvents.action.create",
+                MdsPermissions.REASON_UPDATE, 10));
         return m;
     }
 
@@ -303,6 +317,11 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.NAMING_RULE_CREATE, "编码规则新建"));
         p.add(new PermDef(MdsPermissions.NAMING_RULE_UPDATE, "编码规则维护"));
         p.add(new PermDef(MdsPermissions.NAMING_RULE_DELETE, "编码规则删除"));
+        // 原因码（WIP 事件归因主数据 + 快照治理）
+        p.add(new PermDef(MdsPermissions.REASON_VIEW, "原因码查看"));
+        p.add(new PermDef(MdsPermissions.REASON_CREATE, "原因码新建"));
+        p.add(new PermDef(MdsPermissions.REASON_UPDATE, "原因码维护"));
+        p.add(new PermDef(MdsPermissions.REASON_DELETE, "原因码删除"));
         // 数据字典（平台域，码源 cim-system PermissionCodes）
         p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
         p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
@@ -342,6 +361,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.BANK_VIEW, MdsPermissions.BANK_CREATE, MdsPermissions.BANK_UPDATE,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.STATE_MODEL_CREATE, MdsPermissions.STATE_MODEL_UPDATE,
                 MdsPermissions.NAMING_RULE_VIEW, MdsPermissions.NAMING_RULE_CREATE, MdsPermissions.NAMING_RULE_UPDATE,
+                MdsPermissions.REASON_VIEW, MdsPermissions.REASON_CREATE, MdsPermissions.REASON_UPDATE,
                 PermissionCodes.DICT_LIST, PermissionCodes.DICT_SAVE);
         // 只读：各域 view
         List<String> viewer = List.of(
@@ -351,6 +371,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
                 MdsPermissions.BANK_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
+                MdsPermissions.REASON_VIEW,
                 PermissionCodes.DICT_LIST);
         List<RoleDef> r = new ArrayList<>();
         r.add(new RoleDef(ROLE_ADMIN, "MDS 管理员", true, allPerms));
@@ -444,6 +465,13 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.namingRules.action.create", "编码规则·新建", "Naming rule · create"));
         t.add(new TextDef("mds.nav.namingRules.action.save", "编码规则·维护", "Naming rule · save"));
         t.add(new TextDef("mds.nav.namingRules.action.delete", "编码规则·删除", "Naming rule · delete"));
+        // —— 原因码 ——
+        t.add(new TextDef("mds.nav.reasonCodes", "原因码", "Reason codes"));
+        t.add(new TextDef("mds.nav.reasonCodes.action.create", "原因码·新建", "Reason code · create"));
+        t.add(new TextDef("mds.nav.reasonCodes.action.save", "原因码·维护", "Reason code · save"));
+        t.add(new TextDef("mds.nav.reasonCodes.action.delete", "原因码·删除", "Reason code · delete"));
+        t.add(new TextDef("mds.nav.wipEvents", "WIP 事件", "WIP events"));
+        t.add(new TextDef("mds.nav.wipEvents.action.create", "WIP 事件·新建", "WIP event · create"));
         // —— 数据字典 ——
         t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
         t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));

@@ -71,11 +71,14 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     // 系统管理：平台级参照数据（数据字典）+ 状态模型（词表转换规则）+ 编码规则（Key Generation）
+    // + 原因码（WIP 事件归因主数据）与其快照治理演示（WIP 事件）
     i18n: 'mds.nav.group.system',
     items: [
       { to: '/dicts', i18n: 'mds.nav.dicts', Icon: IconList },
       { to: '/state-models', i18n: 'mds.nav.stateModels', Icon: IconCheckCircle },
       { to: '/naming-rules', i18n: 'mds.nav.namingRules', Icon: IconKey },
+      { to: '/reason-codes', i18n: 'mds.nav.reasonCodes', Icon: IconOrgGrant },
+      { to: '/wip-events', i18n: 'mds.nav.wipEvents', Icon: IconInbox },
     ],
   },
 ];

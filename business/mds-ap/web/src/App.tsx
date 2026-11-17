@@ -62,6 +62,8 @@ const EquipmentListPage = lazy(() => import('@/pages/EquipmentListPage'));
 const BankPage = lazy(() => import('@/pages/BankPage'));
 const StateModelPage = lazy(() => import('@/pages/StateModelPage'));
 const NamingRulePage = lazy(() => import('@/pages/NamingRulePage'));
+const ReasonCodePage = lazy(() => import('@/pages/ReasonCodePage'));
+const WipEventPage = lazy(() => import('@/pages/WipEventPage'));
 
 /** 搬运设备页 = 设备列表的 AMHS 视图（TRANSPORT/STORAGE/BUFFER 类）。 */
 function TransportEquipmentsPage() {
@@ -219,6 +221,8 @@ export default function App() {
             path="/naming-rules"
             element={lazyRoute(NamingRulePage, 'mds:namingRule:view')}
           />
+          <Route path="/reason-codes" element={lazyRoute(ReasonCodePage, 'mds:reason:view')} />
+          <Route path="/wip-events" element={lazyRoute(WipEventPage, 'mds:reason:view')} />
           <Route
             path="/transport-equipments"
             element={lazyRoute(TransportEquipmentsPage, 'mds:equipment:view')}

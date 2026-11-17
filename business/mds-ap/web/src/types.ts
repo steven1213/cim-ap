@@ -699,3 +699,89 @@ export interface FlowRuleEvaluateResult {
   matched: FlowRuleHit[];
   decision: FlowRuleDecision;
 }
+
+/** 原因码类型视图（V16：WIP 事务语义域；codeCount 供删除守门提示）。 */
+export interface ReasonCodeTypeView {
+  id: string;
+  typeKey: string;
+  typeName: string;
+  sortNo: number;
+  description?: string | null;
+  codeCount: number;
+}
+
+/** 类型新建/更新请求（typeKey 建后不可改）。 */
+export interface ReasonCodeTypePayload {
+  typeKey: string;
+  typeName: string;
+  sortNo?: number | null;
+  description?: string | null;
+}
+
+/** 原因码视图（node_path 升序 = 树深度优先展开序）。 */
+export interface ReasonCodeView {
+  id: string;
+  reasonCode: string;
+  typeKey: string;
+  shortName?: string | null;
+  owningDept?: string | null;
+  parentId?: string | null;
+  parentCode?: string | null;
+  nodePath: string;
+  levelNo: number;
+  enabled: boolean;
+  sortNo: number;
+  description?: string | null;
+}
+
+/** 原因码新建请求（reasonCode 走命名规则守门；typeKey/parentId 建后不可改）。 */
+export interface ReasonCodeCreatePayload {
+  reasonCode: string;
+  typeKey: string;
+  shortName?: string | null;
+  owningDept?: string | null;
+  parentId?: string | null;
+  sortNo?: number | null;
+  description?: string | null;
+  enabled?: boolean | null;
+}
+
+/** 原因码更新请求（只吃治理属性与树位）。 */
+export interface ReasonCodeUpdatePayload {
+  shortName?: string | null;
+  owningDept?: string | null;
+  parentId?: string | null;
+  sortNo?: number | null;
+  description?: string | null;
+  enabled?: boolean | null;
+}
+
+/** WIP 原因事件视图（展示全部走快照字段，不随主数据演进变化）。 */
+export interface WipReasonEventView {
+  id: string;
+  lotId: string;
+  waferId?: string | null;
+  operationCode?: string | null;
+  equipmentCode?: string | null;
+  eventType: string;
+  reasonId: string;
+  occurredAt: string;
+  operator?: string | null;
+  reasonCodeSnapshot: string;
+  reasonTypeSnapshot: string;
+  reasonPathSnapshot: string;
+  owningDeptSnapshot?: string | null;
+  reasonNameSnapshot?: string | null;
+}
+
+/** WIP 事件创建请求（occurredAt 空 = 当前时刻）。 */
+export interface WipReasonEventPayload {
+  lotId: string;
+  waferId?: string | null;
+  operationCode?: string | null;
+  equipmentCode?: string | null;
+  eventType: string;
+  reasonId: string;
+  occurredAt?: string | null;
+  operator?: string | null;
+}
