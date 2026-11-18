@@ -14,4 +14,7 @@ public interface CimFlowStepRepository extends JpaRepository<CimFlowStep, String
     Optional<CimFlowStep> findByIdAndFlowIdAndDeletedFalse(String id, String flowId);
 
     boolean existsByFlowIdAndStepCodeAndDeletedFalse(String flowId, String stepCode);
+
+    /** 工序引用守门查据：是否有路线步骤引用该工序（工序库删/禁用守门用，V20）。 */
+    boolean existsByOperationCodeAndDeletedFalse(String operationCode);
 }

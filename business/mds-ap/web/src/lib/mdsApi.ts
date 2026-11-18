@@ -598,6 +598,8 @@ import type {
   FlowPayload,
   FlowCanvasPayload,
   FlowValidationResult,
+  OperationView,
+  OperationPayload,
 } from '@/types';
 
 export function listFlows(keyword?: string, signal?: AbortSignal): Promise<FlowView[]> {
@@ -618,6 +620,56 @@ export function updateFlow(id: string, payload: FlowPayload): Promise<FlowView> 
 
 export function deleteFlow(id: string): Promise<void> {
   return http.del<void>(`${BASE}/flows/${id}`);
+}
+
+// ================================================================ 工序库（Operation，V20）
+
+/** 工序列表（关键字模糊：编码/名称/工艺编码）。 */
+export function listOperations(keyword?: string, signal?: AbortSignal): Promise<OperationView[]> {
+  return http.get<OperationView[]>(`${BASE}/operations`, keyword ? { keyword } : undefined, { signal });
+}
+
+/** 生效工序清单（路线画布「选工序」下拉用；仅 ACTIVE）。 */
+export function listActiveOperations(signal?: AbortSignal): Promise<OperationView[]> {
+  return http.get<OperationView[]>(`${BASE}/operations/active`, undefined, { signal });
+}
+
+export function createOperation(payload: OperationPayload): Promise<OperationView> {
+  return http.post<OperationView>(`${BASE}/operations`, payload);
+}
+
+export function updateOperation(id: string, payload: OperationPayload): Promise<OperationView> {
+  return http.put<OperationView>(`${BASE}/operations/${id}`, payload);
+}
+
+export function deleteOperation(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/operations/${id}`);
+}
+
+/** 冻结（UNFROZEN → FROZEN）。 */
+export function freezeOperation(id: string): Promise<OperationView> {
+  return http.post<OperationView>(`${BASE}/operations/${id}/freeze`, {});
+}
+
+/** 解冻（FROZEN → UNFROZEN）。 */
+export function unfreezeOperation(id: string): Promise<OperationView> {
+  return http.post<OperationView>(`${BASE}/operations/${id}/unfreeze`, {});
+}
+
+/** 激活（FROZEN → ACTIVE；同族旧 ACTIVE 自动降级 FROZEN）。 */
+export function activateOperation(id: string): Promise<OperationView> {
+  return http.post<OperationView>(`${BASE}/operations/${id}/activate`, {});
+}
+
+/** 禁用（FROZEN/ACTIVE → DISABLED；被引用禁禁用）。 */
+export function disableOperation(id: string): Promise<OperationView> {
+  return http.post<OperationView>(`${BASE}/operations/${id}/disable`, {});
+}
+
+/** 复制为同族新版本（opCode 手填必填）。 */
+export function copyOperation(id: string, newOpCode: string): Promise<OperationView> {
+  return http.post<OperationView>(
+    `${BASE}/operations/${id}/copy?newOpCode=${encodeURIComponent(newOpCode)}`, {});
 }
 
 /** 画布保存：整份 XML 回传，服务端解析重建解析产物表。 */

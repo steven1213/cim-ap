@@ -99,6 +99,13 @@ export const MDS_PERMS = {
     update: 'mds:flow:update',
     delete: 'mds:flow:delete',
   },
+  // 工序库：P-T-R-O 四层建模 O 层（Operation 独立主数据，跨路线复用；V20）
+  operation: {
+    view: 'mds:operation:view',
+    create: 'mds:operation:create',
+    update: 'mds:operation:update',
+    delete: 'mds:operation:delete',
+  },
   // 原因码：WIP 事件归因主数据（树即码 + 事件快照治理）
   reason: {
     view: 'mds:reason:view',

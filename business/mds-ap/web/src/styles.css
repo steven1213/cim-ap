@@ -1101,3 +1101,24 @@ table.naming-seg-table th {
   white-space: pre-wrap;
   font-size: 13px;
 }
+
+/* 工序库（V20） */
+.op-search {
+  height: 26px;
+  padding: 0 8px;
+  border: 0.5px solid var(--cim-border, rgba(128, 128, 128, 0.25));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12.5px;
+  width: 200px;
+}
+.op-ref-yes {
+  color: var(--cim-status-ok, #16a34a);
+  font-size: 12px;
+}
+.op-error {
+  color: var(--cim-status-err, #dc2626);
+  font-size: 12.5px;
+  margin: 0 0 8px;
+}

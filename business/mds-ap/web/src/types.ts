@@ -533,6 +533,71 @@ export interface NamingCounterView {
 // ================================================================ 制造流程（Flow，Route 口径）
 
 /**
+ * 工序生命周期（V20，与 Flow 同款四态）：UNFROZEN 未冻结（草稿）/ FROZEN 已冻结（待激活）/
+ * ACTIVE 生效（同族唯一）/ DISABLED 禁用。
+ */
+export type OperationStatus = 'UNFROZEN' | 'FROZEN' | 'ACTIVE' | 'DISABLED';
+
+/**
+ * 工序库主数据（Operation，V20）——P-T-R-O 四层建模 O 层：独立主数据跨路线复用。
+ * 术语纪律：Operation = 工序（本类型）；Step = 路线内工序实例（FlowStepView）。
+ */
+export interface OperationView {
+  id: string;
+  opCode: string;
+  opName: string;
+  /** PROCESS 加工 / INSPECT 检验 / REWORK 返工（业务工序三类；结构工件不入库）。 */
+  opType: 'PROCESS' | 'INSPECT' | 'REWORK';
+  techCode?: string | null;
+  status: OperationStatus;
+  opFamilyCode?: string | null;
+  versionNo?: number | null;
+  recipeRef?: string | null;
+  equipType?: string | null;
+  qtimeMin?: number | null;
+  qtimeMax?: number | null;
+  reworkLimit?: number | null;
+  holdPoint?: boolean | null;
+  holdReason?: string | null;
+  batchMode?: string | null;
+  batchSize?: number | null;
+  inspectPlan?: string | null;
+  samplingRate?: number | null;
+  /** 12 寸预留（建列不启用）：光罩 / CP 测试程序 / 污染互斥组 / 监测片计划 / 腔体约束。 */
+  reticleRef?: string | null;
+  testProgram?: string | null;
+  inhibitGroup?: string | null;
+  npwPlan?: string | null;
+  chamberSelect?: string | null;
+  remark?: string | null;
+  description?: string | null;
+  /** 是否被路线步骤引用（禁删/禁禁用按钮判据）。 */
+  referenced: boolean;
+}
+
+/** 工序新建/更新请求（opCode 仅新建生效；建后不可改）。 */
+export interface OperationPayload {
+  opCode?: string | null;
+  opName: string;
+  opType: 'PROCESS' | 'INSPECT' | 'REWORK';
+  techCode?: string | null;
+  recipeRef?: string | null;
+  equipType?: string | null;
+  qtimeMin?: number | null;
+  qtimeMax?: number | null;
+  reworkLimit?: number | null;
+  holdPoint?: boolean | null;
+  holdReason?: string | null;
+  batchMode?: string | null;
+  batchSize?: number | null;
+  inspectPlan?: string | null;
+  samplingRate?: number | null;
+  remark?: string | null;
+  description?: string | null;
+}
+
+
+/**
  * 流程版本生命周期（V14）：UNFROZEN 未冻结（草稿，可编辑）/ FROZEN 已冻结（待激活）/
  * ACTIVE 生效（生产线现行，同族唯一）/ DISABLED 禁用（淘汰）。
  */

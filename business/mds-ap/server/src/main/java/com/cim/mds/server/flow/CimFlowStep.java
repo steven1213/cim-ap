@@ -51,6 +51,14 @@ public class CimFlowStep extends BaseDefData {
     @Column(name = "flow_id", length = 64, nullable = false)
     private String flowId;
 
+    /**
+     * 引用工序库编码（V20；逻辑引用 cim_operation.op_code，可空 = 手工步骤不引用工序库）。
+     * 引用即从工序库带出标准卡控属性，本路线内可局部覆盖（覆盖只影响本步骤副本）；
+     * 守门：引用须存在且 ACTIVE（{@code FlowAdminService.saveXml}）。
+     */
+    @Column(name = "operation_code", length = 64)
+    private String operationCode;
+
     /** XML 节点 id（画布内唯一；边解析产物 from/to 引用它，保存画布后保持稳定）。 */
     @Column(name = "node_id", length = 64, nullable = false)
     private String nodeId;

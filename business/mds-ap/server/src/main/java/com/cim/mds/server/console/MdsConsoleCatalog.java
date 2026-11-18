@@ -131,6 +131,15 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.FLOW_UPDATE, 20));
         m.add(button("btn.flowRule.delete", "flowRules", "mds.nav.flowRules.action.delete",
                 MdsPermissions.FLOW_UPDATE, 30));
+        // —— 工序库（V20：P-T-R-O 四层建模 O 层；Operation 独立主数据，跨路线复用）——
+        m.add(menu("operations", "grp.product", "/operations", "OperationsPage",
+                "mds.nav.operations", "layers", MdsPermissions.OPERATION_VIEW, 35));
+        m.add(button("btn.operation.create", "operations", "mds.nav.operations.action.create",
+                MdsPermissions.OPERATION_CREATE, 10));
+        m.add(button("btn.operation.update", "operations", "mds.nav.operations.action.update",
+                MdsPermissions.OPERATION_UPDATE, 20));
+        m.add(button("btn.operation.delete", "operations", "mds.nav.operations.action.delete",
+                MdsPermissions.OPERATION_DELETE, 30));
         // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
         // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
@@ -364,6 +373,11 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.FLOW_CREATE, "制造流程新建/复制"));
         p.add(new PermDef(MdsPermissions.FLOW_UPDATE, "制造流程维护/发布"));
         p.add(new PermDef(MdsPermissions.FLOW_DELETE, "制造流程删除"));
+        // 工序库（产品管理域，P-T-R-O 四层 O 层）
+        p.add(new PermDef(MdsPermissions.OPERATION_VIEW, "工序库查看"));
+        p.add(new PermDef(MdsPermissions.OPERATION_CREATE, "工序新建/复制"));
+        p.add(new PermDef(MdsPermissions.OPERATION_UPDATE, "工序维护/生命周期"));
+        p.add(new PermDef(MdsPermissions.OPERATION_DELETE, "工序删除"));
         // EquipmentType（设备管理域）
         p.add(new PermDef(MdsPermissions.EQP_TYPE_VIEW, "设备类型查看"));
         p.add(new PermDef(MdsPermissions.EQP_TYPE_CREATE, "设备类型新建"));
@@ -553,6 +567,10 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.flowRules.action.create", "流程规则·新建", "Flow rule · create"));
         t.add(new TextDef("mds.nav.flowRules.action.save", "流程规则·维护", "Flow rule · save"));
         t.add(new TextDef("mds.nav.flowRules.action.delete", "流程规则·删除", "Flow rule · delete"));
+        t.add(new TextDef("mds.nav.operations", "工序库", "Operations"));
+        t.add(new TextDef("mds.nav.operations.action.create", "工序·新建", "Operation · create"));
+        t.add(new TextDef("mds.nav.operations.action.update", "工序·编辑", "Operation · update"));
+        t.add(new TextDef("mds.nav.operations.action.delete", "工序·删除", "Operation · delete"));
         // —— 设备管理 ——
         t.add(new TextDef("mds.nav.group.equipment", "设备管理", "Equipment"));
         t.add(new TextDef("mds.nav.transportEquipments", "搬运设备", "Transport equipment"));

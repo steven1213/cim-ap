@@ -103,6 +103,12 @@ public final class MdsPermissions {
     public static final String FLOW_UPDATE = "mds:flow:update";
     public static final String FLOW_DELETE = "mds:flow:delete";
 
+    // ---------------- 工序库（Operation，产品管理域，P-T-R-O 四层建模 O 层：V20） ----------------
+    public static final String OPERATION_VIEW = "mds:operation:view";
+    public static final String OPERATION_CREATE = "mds:operation:create";
+    public static final String OPERATION_UPDATE = "mds:operation:update";
+    public static final String OPERATION_DELETE = "mds:operation:delete";
+
     // ---------------- 原因码（ReasonCode，系统管理域：WIP 事件归因主数据 + 快照治理） ----------------
     public static final String REASON_VIEW = "mds:reason:view";
     public static final String REASON_CREATE = "mds:reason:create";
@@ -202,6 +208,10 @@ public final class MdsPermissions {
         codes.add(FLOW_CREATE);
         codes.add(FLOW_UPDATE);
         codes.add(FLOW_DELETE);
+        codes.add(OPERATION_VIEW);
+        codes.add(OPERATION_CREATE);
+        codes.add(OPERATION_UPDATE);
+        codes.add(OPERATION_DELETE);
         codes.add(REASON_VIEW);
         codes.add(REASON_CREATE);
         codes.add(REASON_UPDATE);

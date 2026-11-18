@@ -86,6 +86,7 @@ public class FlowAdminService {
     private final CimFlowQtimeRepository qtimeRepository;
     private final CimTechnologyRepository technologyRepository;
     private final CimEquipmentTypeRepository equipmentTypeRepository;
+    private final CimOperationRepository operationRepository;
     private final NamingRuleAdminService namingRuleService;
 
     // ------------------------------------------------------------------ 视图 / 请求
@@ -97,9 +98,9 @@ public class FlowAdminService {
                            String familyCode, Integer versionNo) {
     }
 
-    /** 解析产物节点视图（stepNo = XML 原顺序； nodeId = 边引用锚点）。 */
+    /** 解析产物节点视图（stepNo = XML 原顺序； nodeId = 边引用锚点；operationCode = 引用工序库，V20）。 */
     public record StepView(String id, String nodeId, String stepCode, String stepName,
-                           String stepType, Integer stepNo, String recipeRef, String equipType,
+                           String stepType, String operationCode, Integer stepNo, String recipeRef, String equipType,
                            Integer qtimeMin, Integer qtimeMax, Integer reworkLimit,
                            String flowRef, String batchMode, Integer batchSize,
                            Boolean holdPoint, String holdReason,
@@ -247,6 +248,30 @@ public class FlowAdminService {
             }
             if (!stepCodes.add(n.stepCode())) {
                 throw new BizException(BizCode.DATA_DUPLICATE, "步骤编码重复: " + n.stepCode());
+            }
+            // 工序引用守门（V20）：仅业务工序三类可引用；须存在且 ACTIVE；
+            // 带出标准值由前端在「选工序」时回填（后端只存引用，不静默合并覆盖值）
+            if (n.operationCode() != null && !n.operationCode().isBlank()) {
+                if (!CimFlowStep.TYPE_PROCESS.equals(n.stepType())
+                        && !CimFlowStep.TYPE_INSPECT.equals(n.stepType())
+                        && !CimFlowStep.TYPE_REWORK.equals(n.stepType())) {
+                    throw new BizException(BizCode.PARAM_INVALID,
+                            "仅 PROCESS/INSPECT/REWORK 步骤可引用工序库: " + n.stepCode());
+                }
+                CimOperation op = operationRepository
+                        .findByOpCodeAndDeletedFalse(n.operationCode().trim())
+                        .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND,
+                                "引用的工序不存在: " + n.operationCode().trim()));
+                if (!CimOperation.STATUS_ACTIVE.equals(op.getStatus())) {
+                    throw new BizException(BizCode.PARAM_INVALID,
+                            "引用的工序不是生效版本: " + n.operationCode().trim()
+                                    + "（当前 " + op.getStatus() + "）");
+                }
+                if (CimFlowStep.TYPE_INSPECT.equals(n.stepType())
+                        && !CimOperation.TYPE_INSPECT.equals(op.getOpType())) {
+                    throw new BizException(BizCode.PARAM_INVALID,
+                            "INSPECT 步骤只能引用检验类工序: " + n.operationCode().trim());
+                }
             }
             if (n.equipType() != null
                     && equipmentTypeRepository.findByTypeCodeAndDeletedFalse(n.equipType()).isEmpty()) {
@@ -417,6 +442,8 @@ public class FlowAdminService {
             entity.setStepName(n.stepName());
             entity.setStepType(n.stepType());
             entity.setStepNo(i + 1); // XML 原顺序（1..n）
+            entity.setOperationCode(n.operationCode() == null || n.operationCode().isBlank()
+                    ? null : n.operationCode().trim());
             entity.setRecipeRef(n.recipeRef());
             entity.setEquipType(n.equipType());
             entity.setQtimeMin(parseNullableInt(n.qtimeMin(), "qtimeMin", n.stepCode()));
@@ -577,6 +604,7 @@ public class FlowAdminService {
             clone.setStepName(s.getStepName());
             clone.setStepType(s.getStepType());
             clone.setStepNo(s.getStepNo());
+            clone.setOperationCode(s.getOperationCode());
             clone.setRecipeRef(s.getRecipeRef());
             clone.setEquipType(s.getEquipType());
             clone.setQtimeMin(s.getQtimeMin());
@@ -998,7 +1026,7 @@ public class FlowAdminService {
 
     private static StepView toStepView(CimFlowStep s) {
         return new StepView(s.getId(), s.getNodeId(), s.getStepCode(), s.getStepName(),
-                s.getStepType(), s.getStepNo(), s.getRecipeRef(), s.getEquipType(),
+                s.getStepType(), s.getOperationCode(), s.getStepNo(), s.getRecipeRef(), s.getEquipType(),
                 s.getQtimeMin(), s.getQtimeMax(), s.getReworkLimit(),
                 s.getFlowRef(), s.getBatchMode(), s.getBatchSize(),
                 s.getHoldPoint(), s.getHoldReason(),

@@ -25,7 +25,7 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useHasPermission } from '@/lib/usePermission';
-import type { FlowDetail, FlowView } from '@/types';
+import type { FlowDetail, FlowView, OperationView } from '@/types';
 
 /**
  * 制造流程（Flow）——产品管理域 Route 口径页面：左列表右画布。
@@ -98,6 +98,8 @@ interface StepNodeData extends Record<string, unknown> {
   stepCode: string;
   stepName?: string;
   stepType: string;
+  /** 引用工序库编码（V20；可空 = 手工步骤。引用即带出标准值，本节点内可覆盖）。 */
+  operationCode?: string;
   recipeRef?: string;
   equipType?: string;
   qtimeMin?: string;
@@ -160,7 +162,7 @@ function serializeCanvasXml(graph: Graph, qtimes: QtimeDef[]): string {
     const d = n.getData() as StepNodeData;
     const pos = n.getPosition();
     const open = `    <node id="${esc(n.id)}" stepCode="${esc(d.stepCode)}" stepName="${esc(d.stepName)}"`
-      + ` stepType="${esc(d.stepType)}" recipeRef="${esc(d.recipeRef)}" equipType="${esc(d.equipType)}"`
+      + ` stepType="${esc(d.stepType)}" operationCode="${esc(d.operationCode)}" recipeRef="${esc(d.recipeRef)}" equipType="${esc(d.equipType)}"`
       + ` qtimeMin="${esc(d.qtimeMin)}" qtimeMax="${esc(d.qtimeMax)}" reworkLimit="${esc(d.reworkLimit)}"`
       + ` flowRef="${esc(d.flowRef)}" batchMode="${esc(d.batchMode)}" batchSize="${esc(d.batchSize)}"`
       + ` holdPoint="${d.holdPoint ? 'true' : 'false'}" holdReason="${esc(d.holdReason)}"`
@@ -225,6 +227,7 @@ function parseCanvasXml(xml: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
         stepCode: get('stepCode') ?? '',
         stepName: get('stepName'),
         stepType: get('stepType') ?? 'PROCESS',
+        operationCode: get('operationCode'),
         recipeRef: get('recipeRef'),
         equipType: get('equipType'),
         qtimeMin: get('qtimeMin'),
@@ -357,6 +360,7 @@ function nodeAttrs(d: StepNodeData, t: (k: string) => string): KeyValue {
   const typeText = t(`mds.flow.stepType.${d.stepType}`);
   const tipParts = [`${typeText} ${d.stepCode ?? ''}`];
   if (secondLine) tipParts.push(secondLine);
+  if (d.operationCode) tipParts.push(`OP: ${d.operationCode}`);
   if (d.recipeRef) tipParts.push(`Recipe: ${d.recipeRef}`);
   if (d.equipType) tipParts.push(`Equip: ${d.equipType}`);
   if (d.inspectPlan) {
@@ -1308,6 +1312,7 @@ function NodeFormModal({
     stepCode: d.stepCode,
     stepName: d.stepName ?? '',
     stepType: d.stepType,
+    operationCode: d.operationCode ?? '',
     recipeRef: d.recipeRef ?? '',
     equipType: d.equipType ?? '',
     batchMode: d.batchMode ?? '',
@@ -1323,6 +1328,23 @@ function NodeFormModal({
   });
   const [bins, setBins] = useState<BinDef[]>(d.bins ?? []);
   const [publishedFlows, setPublishedFlows] = useState<FormOption[]>([]);
+  // 工序库下拉（V20）：仅 ACTIVE 工序；INSPECT 节点只列检验类工序
+  const [activeOps, setActiveOps] = useState<OperationView[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .listActiveOperations()
+      .then((list) => {
+        if (alive) setActiveOps(list);
+      })
+      .catch(() => {
+        if (alive) setActiveOps([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // 已发布流程下拉（SUBFLOW 引用候选；排除自身）；取数放 useEffect
   useEffect(() => {
@@ -1357,6 +1379,17 @@ function NodeFormModal({
         options: STEP_TYPES.map((st) => ({ value: st, labelKey: `mds.flow.stepType.${st}` })),
       },
       // ---- 加工属性
+      {
+        kind: 'select' as const,
+        key: 'operationCode' as const,
+        labelKey: 'mds.flow.field.operationCode',
+        options: activeOps
+          .filter((o) => (isInspect ? o.opType === 'INSPECT' : o.opType !== 'INSPECT'))
+          .map((o) => ({ value: o.opCode, label: `${o.opCode} · ${o.opName}` })),
+        showSearch: true,
+        allowClear: true,
+        hidden: structural || isDecision || isSubflow,
+      },
       { kind: 'text' as const, key: 'recipeRef' as const, labelKey: 'mds.flow.field.recipeRef', mono: true },
       { kind: 'text' as const, key: 'equipType' as const, labelKey: 'mds.flow.field.equipType', mono: true },
       {
@@ -1395,7 +1428,7 @@ function NodeFormModal({
         hidden: !isSubflow,
       },
     ],
-    [structural, isSubflow, isInspect, publishedFlows],
+    [structural, isSubflow, isInspect, publishedFlows, activeOps],
   );
 
   /** bin 行更新。 */
@@ -1443,6 +1476,7 @@ function NodeFormModal({
       stepCode: code,
       stepName: form.stepName.trim() || undefined,
       stepType: structural ? d.stepType : form.stepType,
+      operationCode: structural || isDecision || isSubflow ? undefined : form.operationCode || undefined,
       recipeRef: form.recipeRef.trim() || undefined,
       equipType: form.equipType.trim() || undefined,
       batchMode: (form.batchMode || undefined) as StepNodeData['batchMode'],
@@ -1469,7 +1503,36 @@ function NodeFormModal({
       cancelKey="mds.common.cancel"
       width={560}
     >
-      <FormGrid fields={fields} value={form} onChange={(patch) => setForm((p) => ({ ...p, ...patch }))} columns={2} />
+      <FormGrid
+        fields={fields}
+        value={form}
+        onChange={(patch) =>
+          setForm((p) => {
+            const next = { ...p, ...patch } as typeof p;
+            // 选工序：从工序库带出标准值（仅填空字段，已填的本地覆盖值不动）
+            if (patch.operationCode !== undefined && patch.operationCode !== p.operationCode) {
+              const op = activeOps.find((o) => o.opCode === patch.operationCode);
+              if (op) {
+                if (!p.recipeRef && op.recipeRef) next.recipeRef = op.recipeRef;
+                if (!p.equipType && op.equipType) next.equipType = op.equipType;
+                if (p.qtimeMin === '' && op.qtimeMin != null) next.qtimeMin = String(op.qtimeMin);
+                if (p.qtimeMax === '' && op.qtimeMax != null) next.qtimeMax = String(op.qtimeMax);
+                if (p.reworkLimit === '' && op.reworkLimit != null) next.reworkLimit = String(op.reworkLimit);
+                if (!p.holdPoint && op.holdPoint) next.holdPoint = true;
+                if (!p.holdReason && op.holdReason) next.holdReason = op.holdReason;
+                if (!p.batchMode && op.batchMode) next.batchMode = op.batchMode;
+                if (p.batchSize === '' && op.batchSize != null) next.batchSize = String(op.batchSize);
+                if (!p.inspectPlan && op.inspectPlan) next.inspectPlan = op.inspectPlan;
+                if (p.samplingRate === '' && op.samplingRate != null) next.samplingRate = String(op.samplingRate);
+              } else {
+                // 清空引用：保留已填字段（本地覆盖值是独立事实，不回滚）
+              }
+            }
+            return next;
+          })
+        }
+        columns={2}
+      />
       {isDecision && (
         <>
           <FieldGroup labelKey="mds.flow.bin.group" />

@@ -115,13 +115,13 @@ export default function ShiftSwapsPage() {
       {
         key: 'swapType',
         titleKey: 'mds.shiftSwap.type',
-        width: 90,
+        width: 110,
         render: (r) => t(r.swapType === 'SWAP' ? 'mds.shiftSwap.typeSwap' : 'mds.shiftSwap.typeSubstitute'),
       },
       {
         key: 'initiator',
         titleKey: 'mds.shiftSwap.initiator',
-        width: 130,
+        width: 210,
         render: (r) => (
           <span>
             {r.initiatorName ?? r.initiatorId}
@@ -132,7 +132,7 @@ export default function ShiftSwapsPage() {
       {
         key: 'target',
         titleKey: 'mds.shiftSwap.target',
-        width: 170,
+        width: 210,
         render: (r) => (
           <span>
             {r.targetName ?? r.targetId}
@@ -146,7 +146,7 @@ export default function ShiftSwapsPage() {
       {
         key: 'status',
         titleKey: 'mds.shiftSwap.status',
-        width: 110,
+        width: 100,
         render: (r) => (
           <StatusTag dict="swapStatus" value={r.status} label={t(`mds.shiftSwap.status.${r.status}`)} />
         ),
@@ -154,7 +154,7 @@ export default function ShiftSwapsPage() {
       {
         key: 'result',
         titleKey: 'mds.shiftSwap.result',
-        width: 170,
+        width: 200,
         render: (r) => {
           if (r.status === 'APPLIED') {
             return <span className="dim">{t('mds.shiftSwap.appliedAt')} {r.appliedAt?.replace('T', ' ').slice(0, 16)}</span>;

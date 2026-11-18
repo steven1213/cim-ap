@@ -20,7 +20,7 @@ import com.cim.spring.support.web.BizCode;
  * <canvas version="1">
  *   <nodes>
  *     <node id="n1" stepCode="STP010" stepName="光刻显影" stepType="PROCESS"
- *           recipeRef="" equipType="LITHO" qtimeMin="" qtimeMax="" reworkLimit=""
+ *           operationCode="OP-LITHO-DEV" recipeRef="" equipType="LITHO" qtimeMin="" qtimeMax="" reworkLimit=""
  *           flowRef="" batchMode="BATCH" batchSize="12" holdPoint="true" holdReason=""
  *           inspectPlan="EDC-01" samplingRate="25" x="120" y="80">
  *       <bin code="GOOD" name="良品" type="PASS"/>
@@ -49,6 +49,7 @@ public final class CanvasXmlSupport {
 
     /** 解析出的画布节点（XML 原顺序）。 */
     public record CanvasNode(String id, String stepCode, String stepName, String stepType,
+                             String operationCode,
                              String recipeRef, String equipType, String qtimeMin,
                              String qtimeMax, String reworkLimit, String x, String y,
                              String flowRef, String batchMode, String batchSize,
@@ -105,6 +106,7 @@ public final class CanvasXmlSupport {
             String stepCode = attr(el, "stepCode", i, "node");
             String stepType = attr(el, "stepType", i, "node");
             nodes.add(new CanvasNode(id, stepCode, opt(el, "stepName"), stepType,
+                    opt(el, "operationCode"),
                     opt(el, "recipeRef"), opt(el, "equipType"), opt(el, "qtimeMin"),
                     opt(el, "qtimeMax"), opt(el, "reworkLimit"), opt(el, "x"), opt(el, "y"),
                     opt(el, "flowRef"), opt(el, "batchMode"), opt(el, "batchSize"),
