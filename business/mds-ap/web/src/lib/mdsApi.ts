@@ -58,6 +58,8 @@ import type {
   ShiftLogView,
   ShiftLogPayload,
   ControlSwitchView,
+  ShiftSwapView,
+  ShiftSwapPayload,
 } from '@/types';
 
 const BASE = '/mds';
@@ -881,4 +883,33 @@ export function setControlSwitch(code: string, enabled: boolean): Promise<Contro
     `${BASE}/control-switches/${code}?enabled=${enabled}`,
     {},
   );
+}
+
+// ============================================================ 换班申请（V19）
+
+/** 换班申请清单（status 过滤可选；create_time 倒序）。 */
+export function listShiftSwaps(status?: string, signal?: AbortSignal): Promise<ShiftSwapView[]> {
+  return http.get<ShiftSwapView[]>(`${BASE}/shift-swaps`, { status }, { signal });
+}
+
+/** 发起换班/代班申请（落 PENDING）。 */
+export function applyShiftSwap(payload: ShiftSwapPayload): Promise<ShiftSwapView> {
+  return http.post<ShiftSwapView>(`${BASE}/shift-swaps`, payload);
+}
+
+/** 对方确认（本期确认即生效，排班同事务落库）。 */
+export function confirmShiftSwap(id: string, note?: string): Promise<ShiftSwapView> {
+  const q = note ? `?note=${encodeURIComponent(note)}` : '';
+  return http.post<ShiftSwapView>(`${BASE}/shift-swaps/${id}/confirm${q}`, {});
+}
+
+/** 对方拒绝（PENDING → REJECTED）。 */
+export function rejectShiftSwap(id: string, reason?: string): Promise<ShiftSwapView> {
+  const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+  return http.post<ShiftSwapView>(`${BASE}/shift-swaps/${id}/reject${q}`, {});
+}
+
+/** 发起人取消（PENDING → CANCELLED）。 */
+export function cancelShiftSwap(id: string): Promise<ShiftSwapView> {
+  return http.post<ShiftSwapView>(`${BASE}/shift-swaps/${id}/cancel`, {});
 }

@@ -21,6 +21,7 @@ import {
   IconOrgGrant,
   IconShield,
   IconSliders,
+  IconSync,
   IconTree,
   IconUser,
   IconUsers,
@@ -56,6 +57,7 @@ const REGISTRY: Record<string, IconComponent> = {
   clock: IconClock,
   calendar: IconCalendar,
   file: IconFile,
+  sync: IconSync,
 };
 
 /** 解析图标标识；未知返回回退图标。 */

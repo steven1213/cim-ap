@@ -135,6 +135,10 @@ public final class MdsPermissions {
     public static final String SHIFTLOG_VIEW = "mds:shiftlog:view";
     public static final String SHIFTLOG_SAVE = "mds:shiftlog:save";
 
+    // ---------------- 换班申请（ShiftSwap：员工自助发起，全员可写，与排班管理员分开） ----------------
+    public static final String SHIFTSWAP_VIEW = "mds:shiftswap:view";
+    public static final String SHIFTSWAP_SAVE = "mds:shiftswap:save";
+
     // ---------------- 目录只读（组织/人员；主数据在 IAM，本系统只读——经代理取目录 API） ----------------
     public static final String ORG_VIEW = "mds:org:view";
     public static final String USER_VIEW = "mds:user:view";
@@ -208,6 +212,8 @@ public final class MdsPermissions {
         codes.add(SHIFT_DELETE);
         codes.add(SHIFTLOG_VIEW);
         codes.add(SHIFTLOG_SAVE);
+        codes.add(SHIFTSWAP_VIEW);
+        codes.add(SHIFTSWAP_SAVE);
         codes.add(SYS_MENU_LIST);
         codes.add(SYS_MENU_SAVE);
         codes.add(SYS_MENU_REMOVE);

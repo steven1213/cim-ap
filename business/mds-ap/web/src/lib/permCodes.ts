@@ -118,6 +118,11 @@ export const MDS_PERMS = {
     view: 'mds:shiftlog:view',
     save: 'mds:shiftlog:save',
   },
+  // 换班申请（V19）：员工自助发起，全员可写，与排班管理员分开
+  shiftswap: {
+    view: 'mds:shiftswap:view',
+    save: 'mds:shiftswap:save',
+  },
 } as const;
 
 /** 平台管理码（端点在 cim-system，与后端 PermissionCodes 对齐——菜单维护页双闸门之一）。 */

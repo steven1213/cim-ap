@@ -919,3 +919,36 @@ export interface ControlSwitchView {
   enabled: boolean;
   description?: string | null;
 }
+
+/** 换班申请行（V19）。 */
+export interface ShiftSwapView {
+  id: string;
+  swapType: 'SWAP' | 'SUBSTITUTE';
+  status: 'PENDING' | 'TARGET_CONFIRMED' | 'APPROVING' | 'APPLIED' | 'REJECTED' | 'CANCELLED';
+  initiatorId: string;
+  initiatorName?: string | null;
+  targetId: string;
+  targetName?: string | null;
+  initiatorWorkDate: string;
+  initiatorShiftCode: string;
+  targetWorkDate?: string | null;
+  targetShiftCode?: string | null;
+  reason?: string | null;
+  targetConfirmName?: string | null;
+  targetConfirmAt?: string | null;
+  rejectReason?: string | null;
+  appliedAt?: string | null;
+  version: number;
+}
+
+/** 换班申请请求（SWAP 另需对方班定位；SUBSTITUTE 不填对方班）。 */
+export interface ShiftSwapPayload {
+  swapType: 'SWAP' | 'SUBSTITUTE';
+  targetId: string;
+  targetName?: string;
+  myWorkDate: string;
+  myShiftCode: string;
+  targetWorkDate?: string | null;
+  targetShiftCode?: string | null;
+  reason?: string;
+}

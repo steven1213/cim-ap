@@ -137,6 +137,19 @@ export const STATUS_TONES: Record<string, Record<string, StatusTone>> = {
     DEFECT: 'err', // 缺陷
     LOSS: 'err', // 损耗
   },
+  /**
+   * MDS 换班申请状态（V19）。
+   * 出处：`business/mds-ap` `ShiftSwapService` 状态机常量（2026-11-18 落地）——
+   * TARGET_CONFIRMED / APPROVING 为班长审批预留档（本期确认即生效，不落此态）。
+   */
+  swapStatus: {
+    PENDING: 'warn', // 待对方确认——需人处理
+    TARGET_CONFIRMED: 'run', // 对方已确认（预留档）
+    APPROVING: 'warn', // 审批中（预留档）
+    APPLIED: 'ok', // 已生效——排班已落库
+    REJECTED: 'err', // 已拒绝
+    CANCELLED: 'idle', // 已取消——发起人撤回
+  },
 };
 
 /** 取某枚举值的语义档；未登记的域/值一律回落 `idle`（不抛错，避免一处漏登记导致白屏）。 */

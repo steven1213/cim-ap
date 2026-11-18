@@ -196,6 +196,15 @@ public final class MdsConsoleCatalog {
                 "mds.nav.schedule", "calendar", MdsPermissions.SHIFT_VIEW, 20));
         m.add(button("btn.schedule.save", "schedule", "mds.nav.schedule.action.save",
                 MdsPermissions.SHIFT_UPDATE, 10));
+        // 换班申请（V19）：员工自助动线，独立 shiftswap 码组（与交接记录同理全员可写）
+        m.add(menu("shiftSwaps", "grp.shift", "/shift-swaps", "ShiftSwapsPage",
+                "mds.nav.shiftSwaps", "sync", MdsPermissions.SHIFTSWAP_VIEW, 25));
+        m.add(button("btn.shiftSwap.apply", "shiftSwaps", "mds.nav.shiftSwaps.action.apply",
+                MdsPermissions.SHIFTSWAP_SAVE, 10));
+        m.add(button("btn.shiftSwap.confirm", "shiftSwaps", "mds.nav.shiftSwaps.action.confirm",
+                MdsPermissions.SHIFTSWAP_SAVE, 20));
+        m.add(button("btn.shiftSwap.cancel", "shiftSwaps", "mds.nav.shiftSwaps.action.cancel",
+                MdsPermissions.SHIFTSWAP_SAVE, 30));
         m.add(menu("shiftLogs", "grp.shift", "/shift-logs", "ShiftLogsPage",
                 "mds.nav.shiftLogs", "file", MdsPermissions.SHIFTLOG_VIEW, 30));
         m.add(button("btn.shiftLog.save", "shiftLogs", "mds.nav.shiftLogs.action.save",
@@ -416,6 +425,8 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.SHIFT_DELETE, "班次/班制删除"));
         p.add(new PermDef(MdsPermissions.SHIFTLOG_VIEW, "交接班记录查看"));
         p.add(new PermDef(MdsPermissions.SHIFTLOG_SAVE, "交接班记录提交/签收"));
+        p.add(new PermDef(MdsPermissions.SHIFTSWAP_VIEW, "换班申请查看"));
+        p.add(new PermDef(MdsPermissions.SHIFTSWAP_SAVE, "换班申请发起/确认/取消"));
         p.add(new PermDef(MdsPermissions.ORG_VIEW, "组织目录查看（只读，主数据在 IAM）"));
         p.add(new PermDef(MdsPermissions.USER_VIEW, "人员目录查看（只读，主数据在 IAM）"));
         return p;
@@ -516,6 +527,10 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.shiftDefs.action.save", "班次·维护", "Shift · save"));
         t.add(new TextDef("mds.nav.shiftDefs.action.delete", "班次·删除", "Shift · delete"));
         t.add(new TextDef("mds.nav.shiftDefs.action.control", "班次·卡控", "Shift · control"));
+        t.add(new TextDef("mds.nav.shiftSwaps", "换班申请", "Shift swaps"));
+        t.add(new TextDef("mds.nav.shiftSwaps.action.apply", "换班·申请", "Swap · apply"));
+        t.add(new TextDef("mds.nav.shiftSwaps.action.confirm", "换班·确认", "Swap · confirm"));
+        t.add(new TextDef("mds.nav.shiftSwaps.action.cancel", "换班·取消", "Swap · cancel"));
         t.add(new TextDef("mds.nav.schedule", "排班安排", "Schedule"));
         t.add(new TextDef("mds.nav.schedule.action.save", "排班·维护", "Schedule · save"));
         t.add(new TextDef("mds.nav.shiftLogs", "交接班记录", "Shift logs"));
