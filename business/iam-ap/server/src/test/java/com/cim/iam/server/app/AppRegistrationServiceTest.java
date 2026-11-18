@@ -15,7 +15,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // 各测试类独立上下文 + 独立 H2 命名库（H2 命名内存库为 JVM 级共享，须用不同库名隔离，避免数据串扰）
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:iam-app;DB_CLOSE_DELAY=-1;MODE=MySQL")
+@TestPropertySource(properties = {"cim.iam.auth.bootstrap.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:iam-app;DB_CLOSE_DELAY=-1;MODE=MySQL"})
 class AppRegistrationServiceTest {
 
     @Autowired

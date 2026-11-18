@@ -21,6 +21,7 @@ export default defineConfig({
       '@cim/data': path.resolve(__dirname, '../../../platform/web/packages/data/src'),
       '@cim/shell': path.resolve(__dirname, '../../../platform/web/packages/shell/src'),
       '@cim/i18n': path.resolve(__dirname, '../../../platform/web/packages/i18n/src'),
+      '@cim/admin': path.resolve(__dirname, '../../../platform/web/packages/admin/src'),
       // antd 装在**本应用**的 node_modules：@cim/ui 是源码直引，其内部的 `import 'antd'`
       // 会从 shared 包所在目录向上查找，找不到业务的 node_modules，故显式指向本地副本。
       // 这样 antd 内部 `import 'react'` 也能解析到本应用的 React，不会出现两份 React。

@@ -23,6 +23,26 @@ public final class ApprovalPermissions {
     /** 实例管理：强制终止 / 管理员干预等。 */
     public static final String INSTANCE_ADMIN = "approval:instance:admin";
 
+    // ---------------- 平台管理域（系统配置组；端点来自 cim-system / 本 ap i18n 管理控制器，码值与 PermissionCodes 对齐） ----------------
+    public static final String SYS_MENU_LIST = com.cim.system.support.PermissionCodes.MENU_LIST;
+    public static final String SYS_MENU_SAVE = com.cim.system.support.PermissionCodes.MENU_SAVE;
+    public static final String SYS_MENU_REMOVE = com.cim.system.support.PermissionCodes.MENU_REMOVE;
+    public static final String SYS_ROLE_LIST = com.cim.system.support.PermissionCodes.ROLE_LIST;
+    public static final String SYS_ROLE_SAVE = com.cim.system.support.PermissionCodes.ROLE_SAVE;
+    public static final String SYS_ROLE_REMOVE = com.cim.system.support.PermissionCodes.ROLE_REMOVE;
+    public static final String SYS_ROLE_GRANT = com.cim.system.support.PermissionCodes.ROLE_GRANT;
+    public static final String SYS_PERM_LIST = com.cim.system.support.PermissionCodes.PERMISSION_LIST;
+    public static final String SYS_PERM_SAVE = com.cim.system.support.PermissionCodes.PERMISSION_SAVE;
+    public static final String SYS_PERM_REMOVE = com.cim.system.support.PermissionCodes.PERMISSION_REMOVE;
+    public static final String SYS_I18N_LIST = com.cim.system.support.PermissionCodes.I18N_LIST;
+    public static final String SYS_I18N_SAVE = com.cim.system.support.PermissionCodes.I18N_SAVE;
+    public static final String SYS_I18N_REMOVE = com.cim.system.support.PermissionCodes.I18N_REMOVE;
+    public static final String SYS_I18N_LOCALE = com.cim.system.support.PermissionCodes.I18N_LOCALE;
+
+    // ---------------- 目录只读（组织/人员；主数据在 IAM，本系统只读——经代理取目录 API） ----------------
+    public static final String ORG_VIEW = "approval:org:view";
+    public static final String USER_VIEW = "approval:user:view";
+
     /** 平台超管权威（IAM is_super 展开）。 */
     public static final String ROLE_SUPER_ADMIN = "ROLE_SUPER_ADMIN";
 

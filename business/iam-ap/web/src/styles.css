@@ -137,3 +137,23 @@ table.data .cell-actions {
 .tree-pad {
   padding: 8px 10px 12px;
 }
+
+/* 六页系统配置（@cim/admin 共享包）：菜单页显示名编辑行（语言标签 + 输入框水平排布） */
+.menu-names {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-name-lang {
+  width: 52px;
+  flex: none;
+  font-size: 12px;
+  color: var(--cim-text-dim, #888);
+}

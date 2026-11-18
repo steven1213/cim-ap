@@ -1,8 +1,8 @@
-import { Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CimButton, CimSpin } from '@cim/ui';
-import { SsoRelay } from '@cim/shell';
+import { SsoRelay, createMenuRoutes, type PageRegistry } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -16,49 +16,44 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import ForbiddenPage from '@/pages/ForbiddenPage';
 
 /**
- * 业务页面一律按路由拆包。
+ * 页面注册表：Vite 构建期静态收集 `pages/` 下所有页面文件。
  *
- * <p>不拆的话整个应用（含 antd、22 个页面、xlsx 之类的工具）打成一个 1.47 MB 的 chunk，
- * 用户打开「设备区域」也要先下载「配方比对」的代码。拆开后首屏只拉布局与登录态，
- * 页面各自成 chunk，按需加载。</p>
- *
- * <p>{@link lazyRoute} 把「Suspense + 权限守卫 + 页面」包成一个路由 element：
- * Suspense 层级在 Layout 的 `<Outlet/>` **内部**，切页时外壳不卸载，
- * 只有内容区显示加载态（放在 Routes 外层写会连侧边栏一起闪掉）。</p>
+ * <p>路由不再手写——后端菜单树（`/rms/me/menus`，按角色过滤）每条 MENU 节点
+ * 经 {@link createMenuRoutes} 解析出组件（`sys_menu.component` 显式指定优先，
+ * 缺省按「/reason-codes → ReasonCodePage」命名约定兜底）。**新增页面 = 建一个
+ * tsx + 后端目录种子加一行菜单，本文件零改动**。</p>
  */
-function lazyRoute(Page: ComponentType, permCode?: string) {
-  return (
-    <Suspense fallback={<CimSpin block height={320} />}>
-      {permCode ? (
-        <RequirePerm code={permCode}>
-          <Page />
-        </RequirePerm>
-      ) : (
-        <Page />
-      )}
-    </Suspense>
+const PAGES = import.meta.glob('./pages/*.tsx') as PageRegistry;
+
+/**
+ * 菜单驱动的业务路由：后端菜单树（`/rms/me/menus`）经 {@link createMenuRoutes} 解析出
+ * Route 元素。**注意必须把结果内联展开在 `<Routes>` 的子级**——react-router 要求
+ * `<Routes>` 的孩子只能是 `<Route>`/Fragment，包一层自定义组件会在运行时抛
+ * 「is not a Route component」。组件解析失败的菜单已在工厂里 warn + 跳过——
+ * 直连其 URL 落 `*` 的 NotFound，不会白屏。每条按 `menu.permCode` 包一层
+ * RequirePerm（纵深防御；Suspense 层级在 Layout 的 `<Outlet/>` 内部，切页不闪外壳）。
+ */
+function useMenuRoutes(): Array<{ path: string; element: ReactNode }> {
+  const menus = useAuthStore((s) => s.menus);
+  return useMemo(
+    () =>
+      createMenuRoutes(menus, PAGES).map((r) => ({
+        path: r.path,
+        element: (
+          <Suspense fallback={<CimSpin block height={320} />}>
+            {r.menu.permCode ? (
+              <RequirePerm code={r.menu.permCode}>
+                <r.Component />
+              </RequirePerm>
+            ) : (
+              <r.Component />
+            )}
+          </Suspense>
+        ),
+      })),
+    [menus],
   );
 }
-
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
-const RecipeLibraryPage = lazy(() => import('@/pages/RecipeLibraryPage'));
-const DeviceRecipePage = lazy(() => import('@/pages/DeviceRecipePage'));
-const DeviceTypePage = lazy(() => import('@/pages/DeviceTypePage'));
-const DeviceAreaPage = lazy(() => import('@/pages/DeviceAreaPage'));
-const DevicePage = lazy(() => import('@/pages/DevicePage'));
-const SignoffPage = lazy(() => import('@/pages/SignoffPage'));
-const ComparePage = lazy(() => import('@/pages/ComparePage'));
-const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
-const SpecPage = lazy(() => import('@/pages/SpecPage'));
-const SpecTemplatePage = lazy(() => import('@/pages/SpecTemplatePage'));
-const EcSvPage = lazy(() => import('@/pages/EcSvPage'));
-const DeviceAuthPage = lazy(() => import('@/pages/DeviceAuthPage'));
-const BypassPage = lazy(() => import('@/pages/BypassPage'));
-const QualificationPage = lazy(() => import('@/pages/QualificationPage'));
-const GoldenPage = lazy(() => import('@/pages/GoldenPage'));
-const IntegrationPage = lazy(() => import('@/pages/IntegrationPage'));
-const BodyTemplatePage = lazy(() => import('@/pages/BodyTemplatePage'));
-const ExperimentPage = lazy(() => import('@/pages/ExperimentPage'));
 
 /**
  * 启动闸门：已登录时先拉取用户档案与权限码（内存态，不落盘），
@@ -69,6 +64,7 @@ function BootGate({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token);
   const loadMe = useAuthStore((s) => s.loadMe);
   const loadPermissions = useAuthStore((s) => s.loadPermissions);
+  const loadMenus = useAuthStore((s) => s.loadMenus);
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [failure, setFailure] = useState<{ kind: 'admission' | 'unavailable' | 'auth'; detail: string } | null>(null);
@@ -81,7 +77,7 @@ function BootGate({ children }: { children: ReactNode }) {
     let alive = true;
     setReady(false);
     setFailure(null);
-    Promise.all([loadMe(), loadPermissions()])
+    Promise.all([loadMe(), loadPermissions(), loadMenus()])
       .then(() => {
         if (alive) setReady(true);
       })
@@ -114,7 +110,7 @@ function BootGate({ children }: { children: ReactNode }) {
       alive = false;
     };
     // attempt：点「重试」时 +1，重新拉一次
-  }, [token, attempt, loadMe, loadPermissions]);
+  }, [token, attempt, loadMe, loadPermissions, loadMenus]);
 
   // 准入失败：带 error=admission 落回 /login，登录页据此**停住**不再自动中继
   // （否则 IAM 侧会话仍在，会拿同一枚令牌再弹回 /sso，两端无限往返）。
@@ -151,6 +147,7 @@ function BootGate({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const menuRoutes = useMenuRoutes();
   return (
     <BrowserRouter>
       <Routes>
@@ -170,25 +167,9 @@ export default function App() {
             </BootGate>
           }
         >
-          <Route path="/" element={lazyRoute(DashboardPage)} />
-          <Route path="/recipes" element={lazyRoute(RecipeLibraryPage, 'rms:recipe:view')} />
-          <Route path="/device-types" element={lazyRoute(DeviceTypePage, 'rms:device-type:view')} />
-          <Route path="/device-areas" element={lazyRoute(DeviceAreaPage, 'rms:device-area:view')} />
-          <Route path="/device-recipes" element={lazyRoute(DeviceRecipePage, 'rms:recipe:view')} />
-          <Route path="/devices" element={lazyRoute(DevicePage, 'rms:device:view')} />
-          <Route path="/signoff" element={lazyRoute(SignoffPage, 'rms:signoff:view')} />
-          <Route path="/compare" element={lazyRoute(ComparePage, 'rms:compare:view')} />
-          <Route path="/audit" element={lazyRoute(AuditLogPage, 'rms:audit:view')} />
-          <Route path="/specs" element={lazyRoute(SpecPage, 'rms:spec:view')} />
-          <Route path="/spec-templates" element={lazyRoute(SpecTemplatePage, 'rms:spec:view')} />
-          <Route path="/ecsv" element={lazyRoute(EcSvPage, 'rms:ecsv:view')} />
-          <Route path="/device-auth" element={lazyRoute(DeviceAuthPage, 'rms:device-auth:view')} />
-          <Route path="/bypasses" element={lazyRoute(BypassPage, 'rms:bypass:view')} />
-          <Route path="/qualifications" element={lazyRoute(QualificationPage, 'rms:qualification:view')} />
-          <Route path="/golden" element={lazyRoute(GoldenPage, 'rms:golden:view')} />
-          <Route path="/integration" element={lazyRoute(IntegrationPage, 'rms:integration:view')} />
-          <Route path="/body-templates" element={lazyRoute(BodyTemplatePage, 'rms:btemplate:view')} />
-          <Route path="/experiments" element={lazyRoute(ExperimentPage, 'rms:experiment:view')} />
+          {menuRoutes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

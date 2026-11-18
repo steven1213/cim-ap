@@ -1,35 +1,32 @@
+// 人员与档案（共享，六页系统配置之一）。
+//
+// 与 OrgPage 同构：IAM 宿主全 CRUD（口令双层派生不出浏览器，见 ../crypto）；
+// 业务系统 readOnly=true 走目录代理——表格只读（无操作列、无新建/启停/重置/
+// 解锁/删除），补 email/mobile 两列（目录档案含联系方式）。
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
-  Can,
+  CimButton,
   CimCheckbox,
   CimInput,
   CimSelect,
   CimTag,
   DataTable,
+  InlineAlert,
   Page,
   Panel,
+  CimField,
   useConfirm,
   useToast,
   type DataTableColumn,
-  CimButton,
-  CimField,
 } from '@cim/ui';
-import * as api from '@/lib/api';
-import type { AdminUserRow, OrgNode } from '@/types';
-import { deriveClientHash, randomClientSalt } from '@/lib/crypto';
-import { fmtDateTime, orgTypeLabel, originLabel } from '@/lib/format';
-import {
-  USER_CREATE,
-  USER_DELETE,
-  USER_ORGS,
-  USER_RESET_PWD,
-  USER_STATUS,
-  USER_UNLOCK,
-  USER_UPDATE,
-} from '@/lib/permCodes';
-import { IconBan, IconEdit, IconKey, IconPlus, IconPower, IconTree, IconTrash } from '@/components/Icons';
+import { useAdminHasAll, useAdminHttp } from '../context';
+import { IAM_CREATE_PERMS, USER_PERMS, type AdminPermOverrides } from '../perms';
+import type { AdminUserRow, OrgNode } from '../types';
+import { deriveClientHash, randomClientSalt } from '../crypto';
+import { fmtDateTime, orgTypeLabel, originLabel } from '../format';
+import { IconBan, IconEdit, IconKey, IconPlus, IconPower, IconTree, IconTrash } from '@cim/ui';
 
 type PanelMode = null | 'create' | 'reset' | 'profile' | 'orgs';
 
@@ -38,17 +35,33 @@ interface Bundle {
   orgs: OrgNode[];
 }
 
-/**
- * 用户与档案。
- *
- * <p>把「本地凭证账号」与「用户档案」合并成统一视图：AD 同步来的员工（无本地凭证）也会出现，
- * 每行标注档案来源与组织归属。口令相关操作沿用与登录一致的两层派生——浏览器内先做第一层 PBKDF2，
- * 仅上传 clientHash + 随机盐，明文口令不出浏览器。</p>
- */
-export default function UsersPage() {
+export interface UsersPageProps {
+  /** 只读模式（业务系统）：无任何写操作。 */
+  readOnly?: boolean;
+  perms?: AdminPermOverrides;
+  /** 人员端点前缀（缺省 /admin/users）。 */
+  usersPath?: string;
+  /** 组织端点前缀（缺省 /admin/orgs）。 */
+  orgsPath?: string;
+  /** 档案端点前缀（缺省 /admin/profiles）。 */
+  profilesPath?: string;
+}
+
+/** 人员页（六页共享）。 */
+export default function UsersPage({ readOnly = false, perms, usersPath = '/admin/users', orgsPath = '/admin/orgs', profilesPath = '/admin/profiles' }: UsersPageProps) {
   const { t } = useTranslation();
+  const http = useAdminHttp();
+  const hasAll = useAdminHasAll();
   const toast = useToast();
   const confirm = useConfirm();
+  const p = { ...USER_PERMS, ...IAM_CREATE_PERMS, ...perms };
+  const canCreate = !readOnly && hasAll(p.userCreate ?? ['iam:user:create']);
+  const canUpdate = !readOnly && hasAll(p.save ?? []);
+  const canOrgs = !readOnly && hasAll(p.member ?? []);
+  const canStatus = !readOnly && hasAll(p.status ?? []);
+  const canResetPwd = !readOnly && hasAll(p.resetPwd ?? []);
+  const canUnlock = !readOnly && hasAll(p.unlock ?? []);
+  const canRemove = !readOnly && hasAll(p.remove ?? []);
 
   const [panel, setPanel] = useState<PanelMode>(null);
   const [target, setTarget] = useState<AdminUserRow | null>(null);
@@ -78,10 +91,10 @@ export default function UsersPage() {
 
   const bundleRes = useResource<Bundle>(async ({ signal }) => {
     const [users, orgs] = await Promise.all([
-      api.get<AdminUserRow[]>('/admin/users', undefined, { signal }),
-      api.get<OrgNode[]>('/admin/orgs', undefined, { signal }),
+      http.get<AdminUserRow[]>(usersPath, undefined, { signal }),
+      http.get<OrgNode[]>(orgsPath, undefined, { signal }),
     ]);
-    return { users, orgs };
+    return { users: users ?? [], orgs: orgs ?? [] };
   });
 
   const rows = bundleRes.data?.users ?? [];
@@ -89,12 +102,12 @@ export default function UsersPage() {
 
   /** 打开「归属」面板才取该用户当前的组织（抽屉未打开不发请求）。 */
   const curOrgsRes = useResource<{ orgId: string; primary: boolean }[]>(
-    ({ signal }) =>
-      api.get<{ orgId: string; primary: boolean }[]>(
-        `/admin/users/${encodeURIComponent(target?.userId ?? '')}/orgs`,
+    async ({ signal }) =>
+      (await http.get<{ orgId: string; primary: boolean }[]>(
+        `${usersPath}/${encodeURIComponent(target?.userId ?? '')}/orgs`,
         undefined,
         { signal },
-      ),
+      )) ?? [],
     { deps: [target?.userId, panel], enabled: panel === 'orgs' && !!target },
   );
 
@@ -148,7 +161,7 @@ export default function UsersPage() {
     try {
       const clientSalt = randomClientSalt();
       const credential = await deriveClientHash(np, clientSalt);
-      await api.post('/admin/users', {
+      await http.post(usersPath, {
         username: nu.trim(),
         credential,
         clientSalt,
@@ -156,7 +169,7 @@ export default function UsersPage() {
         employeeNo: ne.trim() || null,
         jobTitle: nj.trim() || null,
       });
-      toast.success(t('iam.users.msgCreated', { name: nu.trim() }));
+      toast.success(t('admin.users.msgCreated', { name: nu.trim() }));
       setNu('');
       setNp('');
       setNd('');
@@ -165,7 +178,7 @@ export default function UsersPage() {
       closePanel();
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errCreate'));
+      toast.error(e?.msg || t('admin.users.errCreate'));
     } finally {
       setBusy(false);
     }
@@ -174,11 +187,11 @@ export default function UsersPage() {
   async function onToggleStatus(r: AdminUserRow) {
     setToggling(r.userId);
     try {
-      await api.put(`/admin/users/${encodeURIComponent(r.userId)}/status`, { enabled: !r.enabled });
-      toast.success(`${r.username} ` + (r.enabled ? t('iam.users.msgDisabled') : t('iam.users.msgEnabled')));
+      await http.put(`${usersPath}/${encodeURIComponent(r.userId)}/status`, { enabled: !r.enabled });
+      toast.success(`${r.username} ` + (r.enabled ? t('admin.users.msgDisabled') : t('admin.users.msgEnabled')));
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errOp'));
+      toast.error(e?.msg || t('admin.users.errOp'));
     } finally {
       setToggling(null);
     }
@@ -186,13 +199,13 @@ export default function UsersPage() {
 
   async function onUnlock(r: AdminUserRow) {
     try {
-      const cleared = await api.post<boolean>(`/admin/users/${encodeURIComponent(r.userId)}/unlock`);
+      const cleared = await http.post<boolean>(`${usersPath}/${encodeURIComponent(r.userId)}/unlock`);
       toast.success(
-        cleared ? t('iam.users.msgUnlocked', { user: r.username }) : t('iam.users.msgNoLock', { user: r.username }),
+        cleared ? t('admin.users.msgUnlocked', { user: r.username }) : t('admin.users.msgNoLock', { user: r.username }),
       );
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errUnlock'));
+      toast.error(e?.msg || t('admin.users.errUnlock'));
     }
   }
 
@@ -202,13 +215,13 @@ export default function UsersPage() {
     try {
       const clientSalt = randomClientSalt();
       const credential = await deriveClientHash(rp, clientSalt);
-      await api.put(`/admin/users/${encodeURIComponent(target.userId)}/password`, { credential, clientSalt });
-      toast.success(t('iam.users.msgResetDone', { id: target.userId }));
+      await http.put(`${usersPath}/${encodeURIComponent(target.userId)}/password`, { credential, clientSalt });
+      toast.success(t('admin.users.msgResetDone', { id: target.userId }));
       setRp('');
       closePanel();
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errReset'));
+      toast.error(e?.msg || t('admin.users.errReset'));
     } finally {
       setBusy(false);
     }
@@ -218,17 +231,17 @@ export default function UsersPage() {
     if (!target) return;
     setBusy(true);
     try {
-      await api.put(`/admin/profiles/${encodeURIComponent(target.userId)}`, {
+      await http.put(`${profilesPath}/${encodeURIComponent(target.userId)}`, {
         displayName: edName.trim() || null,
         email: edEmail.trim() || null,
         mobile: edMobile.trim() || null,
         jobTitle: edJob.trim() || null,
       });
-      toast.success(t('iam.users.msgProfileSaved'));
+      toast.success(t('admin.users.msgProfileSaved'));
       closePanel();
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errSaveProfile'));
+      toast.error(e?.msg || t('admin.users.errSaveProfile'));
     } finally {
       setBusy(false);
     }
@@ -241,12 +254,12 @@ export default function UsersPage() {
       const list = Object.entries(orgSel)
         .filter(([, v]) => v)
         .map(([id]) => ({ orgId: id, primary: id === orgPrimary }));
-      await api.put(`/admin/users/${encodeURIComponent(target.userId)}/orgs`, { orgs: list });
-      toast.success(t('iam.users.msgOrgsSaved'));
+      await http.put(`${usersPath}/${encodeURIComponent(target.userId)}/orgs`, { orgs: list });
+      toast.success(t('admin.users.msgOrgsSaved'));
       closePanel();
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errSaveOrgs'));
+      toast.error(e?.msg || t('admin.users.errSaveOrgs'));
     } finally {
       setBusy(false);
     }
@@ -254,27 +267,27 @@ export default function UsersPage() {
 
   async function onDelete(r: AdminUserRow) {
     const ok = await confirm({
-      title: t('iam.common.delete'),
-      content: t('iam.users.confirmDelete', { name: r.username }),
+      title: t('admin.common.delete'),
+      content: t('admin.users.confirmDelete', { name: r.username }),
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     try {
-      await api.del(`/admin/users/${encodeURIComponent(r.userId)}`);
-      toast.success(t('iam.users.msgDeleted', { name: r.username }));
+      await http.del(`${usersPath}/${encodeURIComponent(r.userId)}`);
+      toast.success(t('admin.users.msgDeleted', { name: r.username }));
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.users.errDelete'));
+      toast.error(e?.msg || t('admin.users.errDelete'));
     }
   }
 
   function openProfile(r: AdminUserRow) {
     setTarget(r);
     setEdName(r.displayName ?? '');
-    setEdEmail('');
-    setEdMobile('');
+    setEdEmail(r.email ?? '');
+    setEdMobile(r.mobile ?? '');
     setEdJob(r.jobTitle ?? '');
     setPanel('profile');
   }
@@ -288,19 +301,19 @@ export default function UsersPage() {
   const locked = rows.filter((r) => r.locked).length;
   const adCount = rows.filter((r) => r.source === 'AD_SYNCED').length;
 
-  const columns = useMemo<Array<DataTableColumn<AdminUserRow>>>(
-    () => [
+  const columns = useMemo<Array<DataTableColumn<AdminUserRow>>>(() => {
+    const cols: Array<DataTableColumn<AdminUserRow>> = [
       {
         key: 'username',
-        titleKey: 'iam.users.th.user',
+        titleKey: 'admin.users.th.user',
         render: (r) => (
           <div className="user-cell">
             <span className="cim-mono">{r.username}</span>
             {r.displayName && <span className="dim">{r.displayName}</span>}
             {r.jobTitle && <span className="tag">{r.jobTitle}</span>}
-            {!r.hasCredential && (
+            {!readOnly && !r.hasCredential && (
               <CimTag size="small" tone="run">
-                {t('iam.users.tagProfileOnly')}
+                {t('admin.users.tagProfileOnly')}
               </CimTag>
             )}
           </div>
@@ -308,24 +321,40 @@ export default function UsersPage() {
       },
       {
         key: 'employeeNo',
-        titleKey: 'iam.users.th.empNo',
+        titleKey: 'admin.users.th.empNo',
         width: 100,
         mono: true,
         render: (r) => <span className="dim">{r.employeeNo ?? '—'}</span>,
       },
+      ...(readOnly
+        ? [
+            {
+              key: 'email',
+              titleKey: 'admin.users.th.email',
+              width: 200,
+              render: (r: AdminUserRow) => <span className="dim">{r.email ?? '—'}</span>,
+            } as DataTableColumn<AdminUserRow>,
+            {
+              key: 'mobile',
+              titleKey: 'admin.users.th.mobile',
+              width: 130,
+              render: (r: AdminUserRow) => <span className="dim">{r.mobile ?? '—'}</span>,
+            } as DataTableColumn<AdminUserRow>,
+          ]
+        : []),
       {
         key: 'source',
-        titleKey: 'iam.users.th.source',
+        titleKey: 'admin.users.th.source',
         width: 100,
         render: (r) => (
-          <CimTag size="small" tone={r.source === 'AD_SYNCED' ? 'run' : r.source === 'IAM_MANAGED' ? 'idle' : 'idle'}>
+          <CimTag size="small" tone={r.source === 'AD_SYNCED' ? 'run' : 'idle'}>
             {originLabel(r.source)}
           </CimTag>
         ),
       },
       {
         key: 'orgNames',
-        titleKey: 'iam.users.th.org',
+        titleKey: 'admin.users.th.org',
         render: (r) =>
           r.orgNames.length ? (
             <div className="tag-list">
@@ -337,94 +366,92 @@ export default function UsersPage() {
               {r.orgNames.length > 3 && <span className="dim">+{r.orgNames.length - 3}</span>}
             </div>
           ) : (
-            <span className="dim">{t('iam.users.noOrg')}</span>
+            <span className="dim">{t('admin.users.noOrg')}</span>
           ),
       },
       {
         key: 'status',
-        titleKey: 'iam.users.th.status',
+        titleKey: 'admin.users.th.status',
         width: 170,
         render: (r) => (
           <>
             <CimTag size="small" tone={r.enabled ? 'ok' : 'err'}>
-              {r.enabled ? t('iam.users.statusEnabled') : t('iam.users.statusDisabled')}
+              {r.enabled ? t('admin.users.statusEnabled') : t('admin.users.statusDisabled')}
             </CimTag>
             {r.locked && (
-              <span title={t('iam.lockouts.th.until') + ' ' + fmtDateTime(r.lockedUntil)} style={{ marginLeft: 6 }}>
+              <span title={t('admin.lockouts.th.until') + ' ' + fmtDateTime(r.lockedUntil)} style={{ marginLeft: 6 }}>
                 <CimTag size="small" tone="warn">
-                  {t('iam.users.tagLocked')}
+                  {t('admin.users.tagLocked')}
                 </CimTag>
               </span>
             )}
             {r.status === 'INACTIVE' && (
               <span style={{ marginLeft: 6 }}>
                 <CimTag size="small" tone="warn">
-                  {t('iam.users.tagProfileDisabled')}
+                  {t('admin.users.tagProfileDisabled')}
                 </CimTag>
               </span>
             )}
           </>
         ),
       },
-      {
+    ];
+    if (!readOnly) {
+      cols.push({
         key: 'apps',
-        titleKey: 'iam.users.th.admission',
+        titleKey: 'admin.users.th.admission',
         width: 80,
         align: 'right',
         render: (r) => r.apps?.length ?? 0,
-      },
-      {
+      });
+      cols.push({
         key: 'actions',
-        titleKey: 'iam.users.th.actions',
+        titleKey: 'admin.users.th.actions',
         width: 330,
         render: (r) => (
           <div className="cell-actions">
-            <Can perm={USER_UPDATE}>
+            {canUpdate && (
               <CimButton size="small" onClick={() => openProfile(r)}>
                 <IconEdit width={13} height={13} />
-                {t('iam.users.btnProfile')}
+                {t('admin.users.btnProfile')}
               </CimButton>
-            </Can>
-            <Can perm={USER_ORGS}>
+            )}
+            {canOrgs && (
               <CimButton size="small" onClick={() => openOrgs(r)}>
                 <IconTree width={13} height={13} />
-                {t('iam.users.btnOrgs')}
+                {t('admin.users.btnOrgs')}
               </CimButton>
-            </Can>
-            <Can perm={USER_STATUS}>
+            )}
+            {canStatus && (
               <CimButton
                 size="small"
                 disabled={toggling === r.userId}
                 onClick={() => void onToggleStatus(r)}
               >
                 {r.enabled ? <IconBan width={13} height={13} /> : <IconPower width={13} height={13} />}
-                {r.enabled ? t('iam.users.btnDisable') : t('iam.users.btnEnable')}
+                {r.enabled ? t('admin.users.btnDisable') : t('admin.users.btnEnable')}
               </CimButton>
-            </Can>
-            {r.hasCredential && (
-              <Can perm={USER_RESET_PWD}>
-                <CimButton
-                  size="small"
-                  onClick={() => {
-                    setTarget(r);
-                    setRp('');
-                    setPanel('reset');
-                  }}
-                >
-                  <IconKey width={13} height={13} />
-                  {t('iam.users.btnReset')}
-                </CimButton>
-              </Can>
             )}
-            {r.locked && (
-              <Can perm={USER_UNLOCK}>
-                <CimButton size="small" onClick={() => void onUnlock(r)}>
-                  <IconKey width={13} height={13} />
-                  {t('iam.users.btnUnlock')}
-                </CimButton>
-              </Can>
+            {r.hasCredential && canResetPwd && (
+              <CimButton
+                size="small"
+                onClick={() => {
+                  setTarget(r);
+                  setRp('');
+                  setPanel('reset');
+                }}
+              >
+                <IconKey width={13} height={13} />
+                {t('admin.users.btnReset')}
+              </CimButton>
             )}
-            <Can perm={USER_DELETE}>
+            {r.locked && canUnlock && (
+              <CimButton size="small" onClick={() => void onUnlock(r)}>
+                <IconKey width={13} height={13} />
+                {t('admin.users.btnUnlock')}
+              </CimButton>
+            )}
+            {canRemove && (
               <CimButton
                 danger
                 size="small"
@@ -433,26 +460,31 @@ export default function UsersPage() {
               >
                 <IconTrash width={13} height={13} />
               </CimButton>
-            </Can>
+            )}
           </div>
         ),
-      },
-    ],
+      });
+    }
+    return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, toggling],
-  );
+  }, [t, toggling, readOnly, canUpdate, canOrgs, canStatus, canResetPwd, canUnlock, canRemove]);
 
   return (
     <Page>
+      {readOnly && (
+        <div style={{ marginBottom: 10 }}>
+          <InlineAlert tone="info">{t('admin.users.readOnlyHint')}</InlineAlert>
+        </div>
+      )}
       <Panel
-        title={t('iam.users.title')}
+        title={t('admin.users.title')}
         actions={
           <>
-            <CimTag>{t('iam.users.count', { n: rows.length })}</CimTag>
-            <CimTag tone="ok">{t('iam.users.enabled', { n: enabled })}</CimTag>
-            {adCount > 0 && <CimTag tone="run">{t('iam.users.adSynced', { n: adCount })}</CimTag>}
-            {locked > 0 && <CimTag tone="err">{t('iam.users.locked', { n: locked })}</CimTag>}
-            <Can perm={USER_CREATE}>
+            <CimTag>{t('admin.users.count', { n: rows.length })}</CimTag>
+            {!readOnly && <CimTag tone="ok">{t('admin.users.enabled', { n: enabled })}</CimTag>}
+            {adCount > 0 && <CimTag tone="run">{t('admin.users.adSynced', { n: adCount })}</CimTag>}
+            {!readOnly && locked > 0 && <CimTag tone="err">{t('admin.users.locked', { n: locked })}</CimTag>}
+            {canCreate && (
               <CimButton
                 type="primary"
                 size="small"
@@ -462,9 +494,9 @@ export default function UsersPage() {
                 }}
               >
                 <IconPlus width={13} height={13} />
-                {t('iam.users.newAccount')}
+                {t('admin.users.newAccount')}
               </CimButton>
-            </Can>
+            )}
           </>
         }
       >
@@ -477,26 +509,26 @@ export default function UsersPage() {
           error={bundleRes.error?.message}
           onRetry={bundleRes.refresh}
           onRefresh={bundleRes.refresh}
-          settingsKey="iam.users"
+          settingsKey="admin.users"
           scrollX="max-content"
           search={{
             value: keyword,
             onChange: setKeyword,
-            placeholderKey: 'iam.users.searchPH',
+            placeholderKey: 'admin.users.searchPH',
             width: 180,
           }}
-          emptyTitleKey={rows.length ? 'iam.users.emptyMatch' : 'iam.users.emptyNone'}
-          emptyHintKey={rows.length ? 'iam.users.emptyHintMatch' : 'iam.users.emptyHintNone'}
+          emptyTitleKey={rows.length ? 'admin.users.emptyMatch' : 'admin.users.emptyNone'}
+          emptyHintKey={rows.length ? 'admin.users.emptyHintMatch' : 'admin.users.emptyHintNone'}
         />
       </Panel>
 
-      {panel === 'create' && (
-        <Panel title={t('iam.users.createTitle')} sub={t('iam.users.createSub')}>
+      {panel === 'create' && canCreate && (
+        <Panel title={t('admin.users.createTitle')} sub={t('admin.users.createSub')}>
           <div className="row">
-            <CimField label={t('iam.users.f.username')} htmlFor="nu">
+            <CimField label={t('admin.users.f.username')} htmlFor="nu">
               <CimInput id="nu" mono placeholder="operator01" value={nu} onChange={setNu} width={180} />
             </CimField>
-            <CimField label={t('iam.users.f.password')} htmlFor="np">
+            <CimField label={t('admin.users.f.password')} htmlFor="np">
               <CimInput
                 id="np"
                 password
@@ -506,30 +538,30 @@ export default function UsersPage() {
                 width={200}
               />
             </CimField>
-            <CimField label={t('iam.users.f.name')} htmlFor="nd">
-              <CimInput id="nd" placeholder={t('iam.users.phName')} value={nd} onChange={setNd} width={160} />
+            <CimField label={t('admin.users.f.name')} htmlFor="nd">
+              <CimInput id="nd" placeholder={t('admin.users.phName')} value={nd} onChange={setNd} width={160} />
             </CimField>
-            <CimField label={t('iam.users.f.empNo')} htmlFor="ne">
+            <CimField label={t('admin.users.f.empNo')} htmlFor="ne">
               <CimInput id="ne" mono placeholder="1001" value={ne} onChange={setNe} width={130} />
             </CimField>
-            <CimField label={t('iam.users.f.job')} htmlFor="nj">
-              <CimInput id="nj" placeholder={t('iam.users.phJob')} value={nj} onChange={setNj} width={160} />
+            <CimField label={t('admin.users.f.job')} htmlFor="nj">
+              <CimInput id="nj" placeholder={t('admin.users.phJob')} value={nj} onChange={setNj} width={160} />
             </CimField>
             <CimButton type="primary" htmlType="button" disabled={busy || !nu.trim() || !np} onClick={() => void onCreate()}>
-              {busy ? t('iam.users.creating') : t('iam.users.createSubmit')}
+              {busy ? t('admin.users.creating') : t('admin.users.createSubmit')}
             </CimButton>
             <CimButton htmlType="button" onClick={closePanel}>
-              {t('iam.users.cancel')}
+              {t('admin.users.cancel')}
             </CimButton>
           </div>
-          <p className="hint">{t('iam.users.createHint')}</p>
+          <p className="hint">{t('admin.users.createHint')}</p>
         </Panel>
       )}
 
-      {panel === 'reset' && target && (
-        <Panel title={t('iam.users.resetTitle', { id: target.userId })} sub={t('iam.users.resetSub')}>
+      {panel === 'reset' && target && canResetPwd && (
+        <Panel title={t('admin.users.resetTitle', { id: target.userId })} sub={t('admin.users.resetSub')}>
           <div className="row">
-            <CimField label={t('iam.users.resetNew')} htmlFor="rp">
+            <CimField label={t('admin.users.resetNew')} htmlFor="rp">
               <CimInput
                 id="rp"
                 password
@@ -541,22 +573,22 @@ export default function UsersPage() {
               />
             </CimField>
             <CimButton type="primary" htmlType="button" disabled={busy || !rp} onClick={() => void onReset()}>
-              {busy ? t('iam.users.submitting') : t('iam.users.resetSubmit')}
+              {busy ? t('admin.users.submitting') : t('admin.users.resetSubmit')}
             </CimButton>
             <CimButton htmlType="button" onClick={closePanel}>
-              {t('iam.users.cancel')}
+              {t('admin.users.cancel')}
             </CimButton>
           </div>
         </Panel>
       )}
 
-      {panel === 'profile' && target && (
+      {panel === 'profile' && target && canUpdate && (
         <Panel
-          title={t('iam.users.profileTitle', { id: target.userId })}
-          sub={target.source === 'AD_SYNCED' ? t('iam.users.profileSubAd') : t('iam.users.profileSubIam')}
+          title={t('admin.users.profileTitle', { id: target.userId })}
+          sub={target.source === 'AD_SYNCED' ? t('admin.users.profileSubAd') : t('admin.users.profileSubIam')}
         >
           <div className="row">
-            <CimField label={t('iam.users.f.name')} htmlFor="pdn">
+            <CimField label={t('admin.users.f.name')} htmlFor="pdn">
               <CimInput
                 id="pdn"
                 value={edName}
@@ -565,7 +597,7 @@ export default function UsersPage() {
                 width={160}
               />
             </CimField>
-            <CimField label={t('iam.users.f.email')} htmlFor="pem">
+            <CimField label={t('admin.users.f.email')} htmlFor="pem">
               <CimInput
                 id="pem"
                 value={edEmail}
@@ -575,7 +607,7 @@ export default function UsersPage() {
                 width={220}
               />
             </CimField>
-            <CimField label={t('iam.users.f.mobile')} htmlFor="pmb">
+            <CimField label={t('admin.users.f.mobile')} htmlFor="pmb">
               <CimInput
                 id="pmb"
                 value={edMobile}
@@ -584,30 +616,30 @@ export default function UsersPage() {
                 width={160}
               />
             </CimField>
-            <CimField label={t('iam.users.f.job')} htmlFor="pjt">
+            <CimField label={t('admin.users.f.job')} htmlFor="pjt">
               <CimInput
                 id="pjt"
                 value={edJob}
                 onChange={setEdJob}
-                placeholder={t('iam.users.phJob')}
+                placeholder={t('admin.users.phJob')}
                 width={160}
               />
             </CimField>
             <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSaveProfile()}>
-              {busy ? t('iam.users.saving') : t('iam.users.save')}
+              {busy ? t('admin.users.saving') : t('admin.users.save')}
             </CimButton>
             <CimButton htmlType="button" onClick={closePanel}>
-              {t('iam.users.cancel')}
+              {t('admin.users.cancel')}
             </CimButton>
           </div>
           <p className="hint">
-            {t('iam.users.profileHint', { no: target.employeeNo ?? '—', src: originLabel(target.source) })}
+            {t('admin.users.profileHint', { no: target.employeeNo ?? '—', src: originLabel(target.source) })}
           </p>
         </Panel>
       )}
 
-      {panel === 'orgs' && target && (
-        <Panel title={t('iam.users.orgsTitle', { id: target.userId })} sub={t('iam.users.orgsSub')}>
+      {panel === 'orgs' && target && canOrgs && (
+        <Panel title={t('admin.users.orgsTitle', { id: target.userId })} sub={t('admin.users.orgsSub')}>
           <div className="org-pick">
             {orgOptions.map((o) => (
               <CimCheckbox
@@ -622,40 +654,42 @@ export default function UsersPage() {
                 {o.label}
               </CimCheckbox>
             ))}
-            {!orgOptions.length && <span className="dim">{t('iam.users.orgsNone')}</span>}
+            {!orgOptions.length && <span className="dim">{t('admin.users.orgsNone')}</span>}
           </div>
           <div className="row" style={{ marginTop: 12 }}>
-            <CimField label={t('iam.users.primaryOrg')} htmlFor="prm">
+            <CimField label={t('admin.users.primaryOrg')} htmlFor="prm">
               <CimSelect
                 id="prm"
                 value={orgPrimary}
                 onChange={(v) => setOrgPrimary(typeof v === 'string' ? v : '')}
                 options={[
-                  { value: '', label: t('iam.users.primaryNone') },
+                  { value: '', label: t('admin.users.primaryNone') },
                   ...orgOptions.filter((o) => orgSel[o.id]).map((o) => ({ value: o.id, label: o.label })),
                 ]}
                 width={280}
               />
             </CimField>
             <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSaveOrgs()}>
-              {busy ? t('iam.users.saving') : t('iam.users.saveOrgs')}
+              {busy ? t('admin.users.saving') : t('admin.users.saveOrgs')}
             </CimButton>
             <CimButton htmlType="button" onClick={closePanel}>
-              {t('iam.users.cancel')}
+              {t('admin.users.cancel')}
             </CimButton>
           </div>
-          <p className="hint">{t('iam.users.orgsHint')}</p>
+          <p className="hint">{t('admin.users.orgsHint')}</p>
         </Panel>
       )}
 
-      <Panel title={t('iam.users.usageTitle')}>
-        <ul className="note-list">
-          <li>{t('iam.users.usageOnboard')}</li>
-          <li>{t('iam.users.usageTransfer')}</li>
-          <li>{t('iam.users.usageOffboard')}</li>
-          <li>{t('iam.users.usagePwd')}</li>
-        </ul>
-      </Panel>
+      {!readOnly && (
+        <Panel title={t('admin.users.usageTitle')}>
+          <ul className="note-list">
+            <li>{t('admin.users.usageOnboard')}</li>
+            <li>{t('admin.users.usageTransfer')}</li>
+            <li>{t('admin.users.usageOffboard')}</li>
+            <li>{t('admin.users.usagePwd')}</li>
+          </ul>
+        </Panel>
+      )}
     </Page>
   );
 }

@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestPropertySource(properties = {
+        "cim.iam.auth.bootstrap.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:iam-login-unit;DB_CLOSE_DELAY=-1;MODE=MySQL"
 })
 class LoginServiceTest {

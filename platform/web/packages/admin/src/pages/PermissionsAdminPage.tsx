@@ -1,71 +1,71 @@
+// 权限管理（共享）：权限点 CRUD（module:res:action）。
+//
+// 数据面复用平台 /sys/permissions（平台码 sys:permission:* 鉴权）；前端只填 code + name，
+// 平台 SysPermissionService 保存时 applyCode(code) 拆三段落库，保证三段与 code 永不漂移。
+//
+// 左列是与菜单树同构的权限点树（DIR → MENU 入口码 → BUTTON 动作码，共用 PermTree）；
+// 未挂页面的接口级码（平台 sys:* 闸门等）按 module 归组排后并打标。菜单树加载失败
+// （如无 sys:menu:list）时静默回退为纯 module 分组，不影响权限 CRUD 主功能。
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
-  Can,
+  CimButton,
+  CimField,
   CimInput,
   CimSelect,
+  CimSplitPane,
   EmptyState,
+  IconPlus,
+  IconTrash,
+  InlineAlert,
   Page,
   Panel,
   useConfirm,
   useToast,
-  CimButton,
-  InlineAlert,
-  CimField,
-  CimSplitPane,
 } from '@cim/ui';
-import * as api from '@/lib/api';
-import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '@/types';
-import PermTree from '@/components/PermTree';
-import { useHasAllPermissions } from '@/lib/usePermission';
-import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
-import { PERM_LIST, PERM_CREATE, PERM_UPDATE, PERM_DELETE, SYS } from '@/lib/permCodes';
-import { IconPlus, IconTrash } from '@/components/Icons';
+import { useAdminHasAll, useAdminHttp } from '../context';
+import PermTree from '../PermTree';
+import { PERM_PERMS, type AdminPermOverrides } from '../perms';
+import { buildPermPageMap, groupPermsByPage } from '../permPageMap';
+import type { MenuTreeNode, PageResultDto, SysPermissionDto } from '../types';
 
-/**
- * 权限管理（`/permissions`）：权限点 CRUD（`module:res:action`）。
- *
- * <p>数据面复用平台 `cim-system` 的 `/sys/permissions`（无 `/api/v1` 前缀，走 rootApi 实例）；
- * 平台码 `sys:permission:*` 是接口闸门，控制台码 `iam:perm:*` 是入口闸门（双闸门）。</p>
- *
- * <p><b>为什么不需要手填 module/res/action</b>：平台侧 `SysPermissionService` 在保存时统一调用
- * `applyCode(code)` 拆解三段并落库，保证三段与 `code` 永不漂移——这是「注解里的码」与
- * 「库里的码」能对上的前提。故前端只填 `code` + 名称。</p>
- *
- * <p><b>与菜单树同构的权限点树</b>：左列不再按「页面」平铺分组，而是直接渲染菜单树
- * 层级（DIR → MENU 入口码 → BUTTON 动作码，共用组件 `PermTree` 清单模式，行点击进入
- * 编辑）；未挂页面的接口级码（平台 `sys:*` 闸门等）按 module 归组排后并打标。菜单树
- * 加载失败（如无 `sys:menu:list`）时静默回退为纯 module 分组，不影响权限 CRUD 主功能。</p>
- */
-export default function PermissionsAdminPage() {
+export interface PermissionsAdminPageProps {
+  perms?: AdminPermOverrides;
+}
+
+/** 权限管理页（六页共享）。 */
+export default function PermissionsAdminPage({ perms }: PermissionsAdminPageProps) {
   const { t } = useTranslation();
+  const http = useAdminHttp();
   const toast = useToast();
   const confirm = useConfirm();
-  const canRead = useHasAllPermissions([PERM_LIST, SYS.PERM_LIST]);
-  const canRemove = useHasAllPermissions([PERM_DELETE, SYS.PERM_REMOVE]);
+  const p = { ...PERM_PERMS, ...perms };
+  const hasAll = useAdminHasAll();
+  const canRead = hasAll(p.read);
+  const canRemove = hasAll(p.remove);
+  const canSave = hasAll(p.save);
 
   const [keyword, setKeyword] = useState('');
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
 
-  const saveCodes = draft?.id ? [PERM_UPDATE, SYS.PERM_SAVE] : [PERM_CREATE, SYS.PERM_SAVE];
-
   const listRes = useResource<SysPermissionDto[]>(
     async ({ signal }) => {
-      const p = await api.rootGet<PageResultDto<SysPermissionDto>>(
+      const page = await http.get<PageResultDto<SysPermissionDto>>(
         '/sys/permissions/page',
         { page: 1, size: 500, sort: 'code,asc' },
         { signal },
       );
-      return p?.records ?? [];
+      return page?.records ?? [];
     },
     { enabled: canRead },
   );
 
   // 菜单树只用于「页面归属目录」：取不到（无 sys:menu:list）就回退 module 分组，故吞掉 error
   const treeRes = useResource<MenuTreeNode[]>(
-    ({ signal }) => api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal }),
+    async ({ signal }) =>
+      (await http.get<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal })) ?? [],
     { enabled: canRead },
   );
 
@@ -113,21 +113,21 @@ export default function PermissionsAdminPage() {
     if (!draft) return;
     const code = draft.code.trim();
     if (code.split(':').length !== 3) {
-      toast.error(t('iam.admin.perms.invalidCode'));
+      toast.error(t('admin.admin.perms.invalidCode'));
       return;
     }
     setBusy(true);
     try {
       const edits = { code, name: draft.name.trim() || null, status: draft.status };
       if (draft.id) {
-        await api.rootPut<SysPermissionDto>('/sys/permissions', { ...(draft.origin ?? {}), ...edits });
+        await http.put<SysPermissionDto>('/sys/permissions', { ...(draft.origin ?? {}), ...edits });
       } else {
-        await api.rootPost<SysPermissionDto>('/sys/permissions', edits);
+        await http.post<SysPermissionDto>('/sys/permissions', edits);
       }
-      toast.success(t('iam.common.saved'));
+      toast.success(t('admin.common.saved'));
       listRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.loadFailed'));
+      toast.error(e?.msg || t('admin.common.loadFailed'));
     } finally {
       setBusy(false);
     }
@@ -136,21 +136,21 @@ export default function PermissionsAdminPage() {
   async function onDelete() {
     if (!draft?.id) return;
     const ok = await confirm({
-      title: t('iam.common.delete'),
+      title: t('admin.common.delete'),
       content: draft.code,
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await api.rootDel<void>(`/sys/permissions/${encodeURIComponent(draft.id)}`);
-      toast.success(t('iam.common.deleted'));
+      await http.del<void>(`/sys/permissions/${encodeURIComponent(draft.id)}`);
+      toast.success(t('admin.common.deleted'));
       setDraft(null);
       listRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.loadFailed'));
+      toast.error(e?.msg || t('admin.common.loadFailed'));
     } finally {
       setBusy(false);
     }
@@ -160,7 +160,7 @@ export default function PermissionsAdminPage() {
     return (
       <Page>
         <Panel>
-          <InlineAlert tone="warn">{t('iam.common.noPlatformPerm')}</InlineAlert>
+          <InlineAlert tone="warn">{t('admin.common.noPlatformPerm')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -171,23 +171,23 @@ export default function PermissionsAdminPage() {
       <CimSplitPane>
         <Panel
           className="scroll-y"
-          title={t('iam.admin.perms.count')}
+          title={t('admin.admin.perms.count')}
           sub={`${filtered.length} / ${rows.length}`}
           flush
           actions={
             <>
-              <Can perm={[PERM_CREATE, SYS.PERM_SAVE]}>
+              {canSave && (
                 <CimButton
                   bare
                   className="icon-btn"
-                  title={t('iam.admin.perms.new')}
-                  onClick={() => setDraft({ id: '', code: 'iam:', name: '', status: 'ENABLED', origin: null })}
+                  title={t('admin.admin.perms.new')}
+                  onClick={() => setDraft({ id: '', code: 'xxx:', name: '', status: 'ENABLED', origin: null })}
                 >
                   <IconPlus width={14} height={14} />
                 </CimButton>
-              </Can>
+              )}
               <CimButton size="small" onClick={listRes.refresh} disabled={listRes.loading}>
-                {listRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
+                {listRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}
               </CimButton>
             </>
           }
@@ -198,16 +198,16 @@ export default function PermissionsAdminPage() {
               mono
               value={keyword}
               onChange={setKeyword}
-              placeholderKey="iam.common.search"
+              placeholderKey="admin.common.search"
               allowClear
             />
           </div>
 
           {listRes.error ? (
             <div style={{ padding: 14 }}>
-              <InlineAlert tone="err">{listRes.error.message || t('iam.common.loadFailed')}</InlineAlert>
+              <InlineAlert tone="err">{listRes.error.message || t('admin.common.loadFailed')}</InlineAlert>
               <CimButton type="primary" size="small" style={{ marginTop: 10 }} onClick={listRes.refresh}>
-                {t('iam.common.refresh')}
+                {t('admin.common.refresh')}
               </CimButton>
             </div>
           ) : filtered.length || moduleGroups.length ? (
@@ -216,8 +216,8 @@ export default function PermissionsAdminPage() {
               permIdByCode={permIdByCode}
               permById={permById}
               activePermId={draft?.id}
-              onPermClick={(p) =>
-                setDraft({ id: p.id, code: p.code, name: p.name ?? '', status: p.status, origin: p })
+              onPermClick={(perm) =>
+                setDraft({ id: perm.id, code: perm.code, name: perm.name ?? '', status: perm.status, origin: perm })
               }
               groups={moduleGroups.map((g) => ({
                 key: g.key,
@@ -228,20 +228,20 @@ export default function PermissionsAdminPage() {
               kw={keyword}
             />
           ) : (
-            <EmptyState titleKey="iam.common.none" />
+            <EmptyState titleKey="admin.common.none" />
           )}
         </Panel>
 
         <div>
           {draft ? (
             <Panel
-              title={draft.id ? t('iam.common.edit') : t('iam.admin.perms.new')}
-              sub={draft.id ?? t('iam.admin.perms.new')}
+              title={draft.id ? t('admin.common.edit') : t('admin.admin.perms.new')}
+              sub={draft.id ?? t('admin.admin.perms.new')}
               actions={
                 canRemove && draft.id ? (
                   <CimButton size="small" onClick={() => void onDelete()} disabled={busy}>
                     <IconTrash width={13} height={13} />
-                    {t('iam.common.delete')}
+                    {t('admin.common.delete')}
                   </CimButton>
                 ) : null
               }
@@ -250,7 +250,7 @@ export default function PermissionsAdminPage() {
                 <CimField
                   label={
                     <>
-                      {t('iam.field.code')} <span className="opt">{t('iam.common.required')}</span>
+                      {t('admin.field.code')} <span className="opt">{t('admin.common.required')}</span>
                     </>
                   }
                   htmlFor="p-code"
@@ -258,12 +258,12 @@ export default function PermissionsAdminPage() {
                   <CimInput
                     id="p-code"
                     mono
-                    placeholder="iam:user:create"
+                    placeholder="xxx:yyy:create"
                     value={draft.code}
                     onChange={(v) => setDraft({ ...draft, code: v })}
                   />
                 </CimField>
-                <CimField label={t('iam.field.name')} htmlFor="p-name">
+                <CimField label={t('admin.field.name')} htmlFor="p-name">
                   <CimInput
                     id="p-name"
                     value={draft.name}
@@ -273,7 +273,7 @@ export default function PermissionsAdminPage() {
                 <CimField
                   label={
                     <>
-                      {t('iam.common.enabled')} / {t('iam.common.disabled')}
+                      {t('admin.common.enabled')} / {t('admin.common.disabled')}
                     </>
                   }
                   htmlFor="p-status"
@@ -284,31 +284,31 @@ export default function PermissionsAdminPage() {
                       setDraft({ ...draft, status: (typeof v === 'string' ? v : 'ENABLED') as 'ENABLED' | 'DISABLED' })
                     }
                     options={[
-                      { value: 'ENABLED', labelKey: 'iam.common.enabled' },
-                      { value: 'DISABLED', labelKey: 'iam.common.disabled' },
+                      { value: 'ENABLED', labelKey: 'admin.common.enabled' },
+                      { value: 'DISABLED', labelKey: 'admin.common.disabled' },
                     ]}
                     allowClear={false}
                   />
                 </CimField>
               </div>
 
-              <p className="hint">{t('iam.admin.perms.codeHint')}</p>
-              <p className="hint">{t('iam.admin.perms.moduleOwner')}</p>
+              <p className="hint">{t('admin.admin.perms.codeHint')}</p>
+              <p className="hint">{t('admin.admin.perms.moduleOwner')}</p>
 
               <div className="sub-head" style={{ marginTop: 12 }}>
-                <Can perm={saveCodes}>
+                {canSave && (
                   <CimButton type="primary" htmlType="button" disabled={busy} onClick={() => void onSubmit()}>
-                    {busy ? t('iam.common.saving') : t('iam.common.save')}
+                    {busy ? t('admin.common.saving') : t('admin.common.save')}
                   </CimButton>
-                </Can>
+                )}
                 <CimButton size="small" htmlType="button" onClick={() => setDraft(null)}>
-                  {t('iam.common.close')}
+                  {t('admin.common.close')}
                 </CimButton>
               </div>
             </Panel>
           ) : (
-            <Panel title={t('iam.admin.perms.count')}>
-              <EmptyState titleKey="iam.admin.perms.new" />
+            <Panel title={t('admin.admin.perms.count')}>
+              <EmptyState titleKey="admin.admin.perms.new" />
             </Panel>
           )}
         </div>

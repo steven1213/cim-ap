@@ -36,7 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-@TestPropertySource(properties = "spring.datasource.url=jdbc:h2:mem:iam-it;DB_CLOSE_DELAY=-1;MODE=MySQL")
+@TestPropertySource(properties = {"cim.iam.auth.bootstrap.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:iam-it;DB_CLOSE_DELAY=-1;MODE=MySQL"})
 class IamApIntegrationTest {
 
     @Autowired

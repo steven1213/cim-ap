@@ -9,6 +9,7 @@
 //    auth=true」的部署在用户浏览器里继续走 dev 通道，直接绕过登录。
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { normalizeMenuTree, type CimMenuNode } from '@cim/shell';
 import * as api from '@/lib/api';
 import { sso } from '@/lib/sso';
 import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
@@ -23,11 +24,17 @@ interface AuthState {
   mode: AuthMode;
   /** 统一登录下的用户档案；dev 通道恒为 null（身份在 identityStore）。 */
   user: MeDto | null;
-  /** 启动探针：判定通道，并在已登录时带回档案。由 `main.tsx` 在挂载前 await。 */
+  /** 当前用户可见菜单树（已归一为 CimMenuNode；动态侧栏 + 菜单驱动路由唯一数据源）。 */
+  menus: CimMenuNode[];
+  /** 菜单是否已拉取（未拉取前消费方按空树处理）。 */
+  menusLoaded: boolean;
+  /** 启动探针：判定通道，并在已登录时带回档案 + 菜单。由 `main.tsx` 在挂载前 await。 */
   bootstrap: () => Promise<void>;
   setSession: (token: string, refreshToken: string) => void;
   /** 拉取档案并把身份写入 `identityStore`（供 `/sso` 回调后、BootGate 使用）。 */
   loadMe: () => Promise<void>;
+  /** 拉取菜单树（`/me/menus`，后端已按角色过滤；dev 通道为全量树）。 */
+  loadMenus: () => Promise<void>;
   logout: () => Promise<void>;
   clear: () => void;
 }
@@ -39,13 +46,19 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       mode: 'unknown',
       user: null,
+      menus: [],
+      menusLoaded: false,
 
       bootstrap: async () => {
         try {
           const me = await api.fetchMe();
           if (me && me.authEnabled === false) {
-            // dev 通道：身份继续由 identityStore 的持久化值 + 顶栏切换器表达
+            // dev 通道：身份继续由 identityStore 的持久化值 + 顶栏切换器表达；
+            // 菜单回全量树（后端 dev 分支），失败不阻塞进入（侧栏空、页面照常）
             set({ mode: 'dev', user: null });
+            await get().loadMenus().catch((err: unknown) => {
+              console.warn('[auth] dev 菜单拉取失败', err);
+            });
             return;
           }
           set({ mode: 'sso', user: me ?? null });
@@ -73,6 +86,11 @@ export const useAuthStore = create<AuthState>()(
         hydrateIdentity(me);
       },
 
+      loadMenus: async () => {
+        const raw = await api.fetchMenus();
+        set({ menus: normalizeMenuTree(raw ?? []), menusLoaded: true });
+      },
+
       logout: async () => {
         const { token, refreshToken, mode } = get();
         if (mode === 'sso') {
@@ -85,7 +103,7 @@ export const useAuthStore = create<AuthState>()(
         get().clear();
       },
 
-      clear: () => set({ token: null, refreshToken: null, user: null }),
+      clear: () => set({ token: null, refreshToken: null, user: null, menus: [], menusLoaded: false }),
     }),
     {
       name: 'approval-auth',

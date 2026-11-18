@@ -60,4 +60,17 @@ public class DirectoryController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant since) {
         return Result.ok(service.orgs(since));
     }
+
+    /** 全量档案（含归属组织；业务系统「人员管理」只读页数据面）。 */
+    @GetMapping("/profiles")
+    public Result<List<UserProfileDto>> profiles() {
+        return Result.ok(service.profiles());
+    }
+
+    /** 组织内人员 ID（{@code includeChildren} 缺省 true，含全部后代组织）。 */
+    @GetMapping("/orgs/{orgId}/users")
+    public Result<List<String>> orgMembers(@PathVariable String orgId,
+            @RequestParam(name = "includeChildren", defaultValue = "true") boolean includeChildren) {
+        return Result.ok(service.memberUserIds(orgId, includeChildren));
+    }
 }

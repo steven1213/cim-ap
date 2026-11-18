@@ -224,7 +224,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.REASON_UPDATE, 10));
 
         // —— 菜单管理（sys_menu 在线维护 + 角色授权联动；平台权限码，端点来自 cim-system）——
-        m.add(menu("menuAdmin", "grp.system", "/menus", "MenuPage",
+        m.add(menu("menuAdmin", "grp.system", "/menus", "MenusAdminPage",
                 "mds.nav.menus", "layers", MdsPermissions.SYS_MENU_LIST, 60));
         m.add(button("btn.menu.save", "menuAdmin", "mds.nav.menus.action.save",
                 MdsPermissions.SYS_MENU_SAVE, 10));
@@ -232,6 +232,39 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.SYS_MENU_REMOVE, 20));
         m.add(button("btn.menu.grant", "menuAdmin", "mds.nav.menus.action.grant",
                 MdsPermissions.SYS_ROLE_GRANT, 30));
+
+        // —— 系统配置组其余五页（六页共享组件 @cim/admin；菜单/权限/角色/多语言走平台端点，
+        //    组织/人员只读——主数据在 IAM，经本系统代理取目录 API）——
+        m.add(menu("permissionsAdmin", "grp.system", "/permissions", "PermissionsAdminPage",
+                "mds.nav.permissions", "shield", MdsPermissions.SYS_PERM_LIST, 61));
+        m.add(button("btn.permission.save", "permissionsAdmin", "mds.nav.permissions.action.save",
+                MdsPermissions.SYS_PERM_SAVE, 10));
+        m.add(button("btn.permission.delete", "permissionsAdmin", "mds.nav.permissions.action.delete",
+                MdsPermissions.SYS_PERM_REMOVE, 20));
+
+        m.add(menu("rolesAdmin", "grp.system", "/roles-admin", "RolesAdminPage",
+                "mds.nav.rolesAdmin", "users", MdsPermissions.SYS_ROLE_LIST, 62));
+        m.add(button("btn.role.save", "rolesAdmin", "mds.nav.rolesAdmin.action.save",
+                MdsPermissions.SYS_ROLE_SAVE, 10));
+        m.add(button("btn.role.delete", "rolesAdmin", "mds.nav.rolesAdmin.action.delete",
+                MdsPermissions.SYS_ROLE_REMOVE, 20));
+        m.add(button("btn.role.grant", "rolesAdmin", "mds.nav.rolesAdmin.action.grant",
+                MdsPermissions.SYS_ROLE_GRANT, 30));
+
+        m.add(menu("i18nAdmin", "grp.system", "/i18n", "I18nAdminPage",
+                "mds.nav.i18n", "check", MdsPermissions.SYS_I18N_LIST, 63));
+        m.add(button("btn.i18n.save", "i18nAdmin", "mds.nav.i18n.action.save",
+                MdsPermissions.SYS_I18N_SAVE, 10));
+        m.add(button("btn.i18n.delete", "i18nAdmin", "mds.nav.i18n.action.delete",
+                MdsPermissions.SYS_I18N_REMOVE, 20));
+        m.add(button("btn.i18n.locale", "i18nAdmin", "mds.nav.i18n.action.locale",
+                MdsPermissions.SYS_I18N_LOCALE, 30));
+
+        // 组织/人员：只读（无 BUTTON 节点），入口码 mds:org:view / mds:user:view
+        m.add(menu("orgs", "grp.system", "/orgs", "OrgPage",
+                "mds.nav.orgs", "tree", MdsPermissions.ORG_VIEW, 64));
+        m.add(menu("users", "grp.system", "/users", "UsersPage",
+                "mds.nav.users", "user", MdsPermissions.USER_VIEW, 65));
         return m;
     }
 
@@ -342,8 +375,18 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.SYS_MENU_SAVE, "菜单维护"));
         p.add(new PermDef(MdsPermissions.SYS_MENU_REMOVE, "菜单删除"));
         p.add(new PermDef(MdsPermissions.SYS_ROLE_LIST, "角色查看"));
+        p.add(new PermDef(MdsPermissions.SYS_ROLE_SAVE, "角色维护"));
+        p.add(new PermDef(MdsPermissions.SYS_ROLE_REMOVE, "角色删除"));
         p.add(new PermDef(MdsPermissions.SYS_ROLE_GRANT, "角色授权"));
+        p.add(new PermDef(MdsPermissions.SYS_PERM_LIST, "权限查看"));
+        p.add(new PermDef(MdsPermissions.SYS_PERM_SAVE, "权限维护"));
+        p.add(new PermDef(MdsPermissions.SYS_PERM_REMOVE, "权限删除"));
+        p.add(new PermDef(MdsPermissions.SYS_I18N_LIST, "译文查看"));
         p.add(new PermDef(MdsPermissions.SYS_I18N_SAVE, "译文维护"));
+        p.add(new PermDef(MdsPermissions.SYS_I18N_REMOVE, "译文删除"));
+        p.add(new PermDef(MdsPermissions.SYS_I18N_LOCALE, "语言目录维护"));
+        p.add(new PermDef(MdsPermissions.ORG_VIEW, "组织目录查看（只读，主数据在 IAM）"));
+        p.add(new PermDef(MdsPermissions.USER_VIEW, "人员目录查看（只读，主数据在 IAM）"));
         return p;
     }
 
@@ -435,7 +478,7 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.topology.action.stage.delete", "Stage·删除", "Stage · delete"));
         // —— 产品管理 ——
         t.add(new TextDef("mds.nav.group.product", "产品管理", "Products"));
-        t.add(new TextDef("mds.nav.group.system", "系统管理", "System"));
+        t.add(new TextDef("mds.nav.group.system", "系统配置", "System settings"));
         t.add(new TextDef("mds.nav.technology", "制程技术", "Technologies"));
         t.add(new TextDef("mds.nav.technology.action.create", "制程技术·新建", "Technology · create"));
         t.add(new TextDef("mds.nav.technology.action.update", "制程技术·编辑", "Technology · update"));
@@ -494,6 +537,19 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.menus.action.save", "菜单·维护", "Menu · save"));
         t.add(new TextDef("mds.nav.menus.action.delete", "菜单·删除", "Menu · delete"));
         t.add(new TextDef("mds.nav.menus.action.grant", "菜单·授权", "Menu · grant"));
+        t.add(new TextDef("mds.nav.permissions", "权限管理", "Permissions"));
+        t.add(new TextDef("mds.nav.permissions.action.save", "权限·维护", "Permission · save"));
+        t.add(new TextDef("mds.nav.permissions.action.delete", "权限·删除", "Permission · delete"));
+        t.add(new TextDef("mds.nav.rolesAdmin", "角色管理", "Roles"));
+        t.add(new TextDef("mds.nav.rolesAdmin.action.save", "角色·维护", "Role · save"));
+        t.add(new TextDef("mds.nav.rolesAdmin.action.delete", "角色·删除", "Role · delete"));
+        t.add(new TextDef("mds.nav.rolesAdmin.action.grant", "角色·授权", "Role · grant"));
+        t.add(new TextDef("mds.nav.i18n", "多语言", "Languages & i18n"));
+        t.add(new TextDef("mds.nav.i18n.action.save", "多语言·维护", "i18n · save"));
+        t.add(new TextDef("mds.nav.i18n.action.delete", "多语言·删除", "i18n · delete"));
+        t.add(new TextDef("mds.nav.i18n.action.locale", "多语言·语言目录", "i18n · locales"));
+        t.add(new TextDef("mds.nav.orgs", "组织管理", "Organization"));
+        t.add(new TextDef("mds.nav.users", "人员管理", "Users"));
         // —— 数据字典 ——
         t.add(new TextDef("mds.nav.dicts", "数据字典", "Data dictionaries"));
         t.add(new TextDef("mds.nav.dicts.action.save", "数据字典·维护", "Dictionary · save"));

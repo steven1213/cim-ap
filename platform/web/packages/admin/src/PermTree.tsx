@@ -1,29 +1,13 @@
+// 权限点树（权限管理 / 角色授权共用）——与菜单树同构的 DIR → MENU → BUTTON 三层树。
+//
+// 授权模式（角色管理）：页面行有「菜单可见 + 入口码」两个复选框，按钮码逐行复选；
+// 清单模式（权限管理）：行点击进入编辑，不渲染复选框。
+// 码在权限表无对应行（菜单树挂了码但未注册）→ 行灰显、复选框禁用并打「未注册」标。
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { MenuTreeNode, SysPermissionDto } from '@/types';
-import { IconChevron } from '@/components/Icons';
+import { CimButton, CimCheckbox, IconChevron } from '@cim/ui';
+import type { MenuTreeNode, SysPermissionDto } from './types';
 
-import { CimButton, CimCheckbox } from '@cim/ui';
-/**
- * 权限点树（权限管理 / 角色授权共用）——与菜单树**同构**的 DIR → MENU → BUTTON 三层树。
- *
- * <p>设计目标（用户反馈驱动）：授权/清单视图不能只平铺叶子码，必须完整呈现菜单树的
- * 层级——目录可折叠、页面行挂入口码、按钮码嵌在页面之下，用缩进引导线
- * （`.ptree-kids` 左边线）表达从属关系。</p>
- *
- * <p>行内为五列网格：折叠钮 / 复选框 / 名称 / 权限码 / 动作。码列固定弹性宽度，
- * 同一列垂直对齐；名称列吃掉剩余空间。两种模式：</p>
- * <ul>
- *   <li><b>授权模式</b>（角色管理）：传 `checkedPerms`/`onTogglePerm`——页面行有
- *   菜单可见 + 入口码两个复选框，按钮码逐行复选；`pageAction` 渲染页面级快捷键
- *   （「全选」）。超管时全部禁用（超管短路拥有全部码）。</li>
- *   <li><b>清单模式</b>（权限管理）：传 `permById`——行点击进入编辑，`activePermId`
- *   高亮当前编辑行；不渲染复选框。</li>
- * </ul>
- *
- * <p>码在权限表无对应行（菜单树挂了码但未注册）→ 行灰显、复选框禁用并打
- * 「未注册」标。检索过滤由调用方完成（传修剪后的 `nodes`）；`kw` 非空时树强制展开。</p>
- */
 /** 接口级/未挂页面分组（渲染在菜单树节点之后，同一棵树内）。 */
 export interface PermTreeGroup {
   key: string;
@@ -94,7 +78,7 @@ export default function PermTree({
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
   const expandAll = (kw ?? '').trim().length > 0;
   const grantMode = !permById;
-  const unregisteredTip = t('iam.admin.perms.unregistered');
+  const unregisteredTip = t('admin.admin.perms.unregistered');
 
   /** 子树统计（授权模式：已授/总数；清单模式只看总数）。 */
   function statsOf(n: MenuTreeNode): { on: number; total: number } {
@@ -173,7 +157,7 @@ export default function PermTree({
           <span />
         )}
         {!grantMode && perm?.status === 'DISABLED' ? (
-          <span className="tag err">{t('iam.common.disabled')}</span>
+          <span className="tag err">{t('admin.common.disabled')}</span>
         ) : (
           <span />
         )}
@@ -207,7 +191,7 @@ export default function PermTree({
           <span />
           <span className="ptree-name">
             {g.label}
-            {g.iface && <span className="tag">{t('iam.admin.perms.ifaceTag')}</span>}
+            {g.iface && <span className="tag">{t('admin.admin.perms.ifaceTag')}</span>}
           </span>
           <span className="ptree-count">
             {grantMode ? `${on} / ${g.perms.length}` : `${g.perms.length}`}
@@ -280,7 +264,7 @@ export default function PermTree({
               <input
                 type="checkbox"
                 className="cim-check"
-                title={t('iam.admin.roles.menuTip')}
+                title={t('admin.admin.roles.menuTip')}
                 checked={checkedMenus?.has(m.id) ?? false}
                 disabled={superMode}
                 onChange={() => onToggleMenu?.(m.id, !checkedMenus?.has(m.id))}
@@ -298,7 +282,7 @@ export default function PermTree({
               grantMode ? (
                 <CimCheckbox
                   className="ptree-entry"
-                  title={t('iam.admin.roles.entryTip')}
+                  title={t('admin.admin.roles.entryTip')}
                   checked={entryId !== undefined && (checkedPerms?.has(entryId) ?? false)}
                   disabled={superMode || entryId === undefined}
                   onChange={() => {

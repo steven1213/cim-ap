@@ -1,57 +1,67 @@
+// 多语言（共享）：语言目录与译文维护。
+//
+// 布局（主从式）：左列语言目录（点行即过滤右侧译文），右列译文表（module/keyword
+// 过滤 + 客户端分页）+ 缺失键 + 未译条目两个面板。与菜单/权限/角色三页同一
+// master-detail 心智模型。
+//
+// 数据面在宿主自己的 i18n 管理端点（IAM: /admin/i18n/**；业务系统: /{ap}/admin/i18n/**，
+// 各 ap 落自己的 I18nAdminController 委托平台 I18nService），经 basePath 注入——
+// 管理属 ap 内部权限（见 IamConsoleCatalog/identity-directory 既有决策），码走 sys:i18n:*。
+//
+// 保存后即时生效：写库即缓存失效，前端下次拉取即拿到新译文。「刷新译文」按钮
+// 经 reloadTranslations 重拉当前语言整包（宿主传自己的 changeLanguage force 包装）。
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebounced, useResource } from '@cim/data';
 import {
-  Can,
+  CimButton,
   CimModal,
   CimSelect,
+  CimSplitPane,
   CimTag,
   DataTable,
+  DataTableColumn,
+  FormField,
   FormGrid,
+  IconChevron,
+  IconEdit,
+  IconPlus,
+  IconRefresh,
+  IconSave,
+  IconTrash,
+  InlineAlert,
   Page,
   Panel,
   useConfirm,
   useToast,
-  type DataTableColumn,
-  type FormField,
-  CimButton,
-  InlineAlert,
-  CimSplitPane,
 } from '@cim/ui';
-import * as api from '@/lib/api';
-import { changeLanguage, currentLang } from '@/lib/i18n';
-import type { LocaleCoverageDto, SysI18nDto, SysLocaleDto } from '@/types';
-import { useHasPermission } from '@/lib/usePermission';
-import { I18N_LIST, I18N_CREATE, I18N_DELETE, I18N_LOCALE } from '@/lib/permCodes';
-import { IconChevron, IconEdit, IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
+import { useAdminHasAll, useAdminHttp } from '../context';
+import { I18N_PERMS, type AdminPermOverrides } from '../perms';
+import type { LocaleCoverageDto, SysI18nDto, SysLocaleDto } from '../types';
 
 /** 译文表客户端分页大小（服务端已按 locale/module/keyword 过滤，前端只做翻页）。 */
 const PAGE_SIZE = 50;
 
-/**
- * 多语言（`/i18n`）：语言目录与译文维护。
- *
- * <p><b>布局（主从式）</b>：左列语言目录（点行即过滤右侧译文），右列译文表
- * （module/keyword 过滤 + 客户端分页）+ 缺失键（默认收起，点开处理）。
- * 与菜单/权限/角色三页保持同一 master-detail 心智模型。</p>
- *
- * <p><b>数据面在 IAM 自己</b>（不像菜单/权限/角色那样复用平台端点）：管理端点
- * `GET/POST/DELETE /api/v1/admin/i18n/**` 由 `I18nAdminController` 提供，权限码是
- * 控制台自己的 `iam:i18n:*` —— 与平台 `sys:*` 无关，因此本页不需要双闸门。</p>
- *
- * <p><b>两级 scope</b>：`SYSTEM` 是程序内置种子（启动写入、不可删），`USER` 是业务/UI 文案。
- * 两者都按 `(localeCode, code)` upsert——在此覆盖 SYSTEM 行即可把内置文案改掉，
- * 且重启不会被种子冲回（种子口径是「已存在即跳过」）。</p>
- *
- * <p><b>保存后即时生效</b>：写库即 `cache.invalidate()`，前端下次拉取或刷新页面即拿到新译文。
- * 「刷新译文」按钮直接重拉当前语言的整包（`changeLanguage(lang, true)`）。</p>
- */
-export default function I18nAdminPage() {
-  const { t } = useTranslation();
+export interface I18nAdminPageProps {
+  perms?: AdminPermOverrides;
+  /** 管理端点前缀（缺省 /admin/i18n；业务系统传如 /mds/admin/i18n）。 */
+  basePath?: string;
+  /** 「刷新译文」动作（重拉当前语言整包）；不传则不渲染该按钮。 */
+  reloadTranslations?: () => void;
+}
+
+/** 多语言页（六页共享）。 */
+export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadTranslations }: I18nAdminPageProps) {
+  const { t, i18n } = useTranslation();
+  const http = useAdminHttp();
   const toast = useToast();
   const confirm = useConfirm();
-  const canRead = useHasPermission(I18N_LIST);
-  const canRemove = useHasPermission(I18N_DELETE);
+  const p = { ...I18N_PERMS, ...perms };
+  const hasAll = useAdminHasAll();
+  const canRead = hasAll(p.read);
+  const canRemove = hasAll(p.remove);
+  const canSave = hasAll(p.save);
+  const canLocale = hasAll(p.locale);
 
   const [localeDraft, setLocaleDraft] = useState<LocaleDraft | null>(null);
   const [msgDraft, setMsgDraft] = useState<MsgDraft | null>(null);
@@ -68,28 +78,28 @@ export default function I18nAdminPage() {
   const [busy, setBusy] = useState(false);
 
   const localesRes = useResource<SysLocaleDto[]>(
-    ({ signal }) => api.get<SysLocaleDto[]>('/admin/i18n/locales', undefined, { signal }),
+    async ({ signal }) => (await http.get<SysLocaleDto[]>(`${basePath}/locales`, undefined, { signal })) ?? [],
     { enabled: canRead },
   );
   const messagesRes = useResource<SysI18nDto[]>(
-    ({ signal }) =>
-      api.get<SysI18nDto[]>(
-        '/admin/i18n/messages',
+    async ({ signal }) =>
+      (await http.get<SysI18nDto[]>(
+        `${basePath}/messages`,
         {
           localeCode: filterLocale || undefined,
           module: filterModule || undefined,
           keyword: appliedKw || undefined,
         },
         { signal },
-      ),
+      )) ?? [],
     { deps: [filterLocale, filterModule, appliedKw], enabled: canRead, keepPreviousData: true },
   );
   const missingRes = useResource<Record<string, string>>(
-    ({ signal }) => api.get<Record<string, string>>('/admin/i18n/missing', undefined, { signal }),
+    async ({ signal }) => (await http.get<Record<string, string>>(`${basePath}/missing`, undefined, { signal })) ?? {},
     { enabled: canRead },
   );
   const coverageRes = useResource<LocaleCoverageDto[]>(
-    ({ signal }) => api.get<LocaleCoverageDto[]>('/admin/i18n/coverage', undefined, { signal }),
+    async ({ signal }) => (await http.get<LocaleCoverageDto[]>(`${basePath}/coverage`, undefined, { signal })) ?? [],
     { enabled: canRead },
   );
 
@@ -105,8 +115,8 @@ export default function I18nAdminPage() {
   );
 
   /**
-   * 「未译条目」面板跟踪的语言：优先左栏选中的那个；没选就挑**第一个真有缺口**的语言。
-   * 不挑 `[0]`——列表首项通常是默认语言，恒 100%，面板会永远空着，看起来像坏了。
+   * 「未译条目」面板跟踪的语言：优先左栏选中的那个；没选就挑第一个真有缺口的语言。
+   * 不挑 [0]——列表首项通常是默认语言，恒 100%，面板会永远空着，看起来像坏了。
    */
   const gapLocale = useMemo(() => {
     if (filterLocale) return coverage.find((c) => c.locale === filterLocale);
@@ -117,7 +127,7 @@ export default function I18nAdminPage() {
   useEffect(() => setPage(1), [filterLocale, filterModule, appliedKw]);
 
   /**
-   * 模块候选**只增不减**：直接按当前 `messages` 推导会让下拉在选中某模块后
+   * 模块候选只增不减：直接按当前 messages 推导会让下拉在选中某模块后
    * 只剩那一个选项（过滤后的结果里当然没有别的模块）。
    */
   const modulesRef = useRef<Set<string>>(new Set());
@@ -152,13 +162,13 @@ export default function I18nAdminPage() {
   async function onSaveLocale() {
     if (!localeDraft) return;
     if (!localeDraft.code.trim()) {
-      setLocaleErr({ code: t('iam.common.required') });
+      setLocaleErr({ code: t('admin.common.required') });
       return;
     }
     setLocaleErr({});
     setBusy(true);
     try {
-      await api.post<SysLocaleDto>('/admin/i18n/locales', {
+      await http.post<SysLocaleDto>(`${basePath}/locales`, {
         id: localeDraft.id || undefined,
         code: localeDraft.code.trim(),
         name: localeDraft.name.trim() || null,
@@ -166,11 +176,11 @@ export default function I18nAdminPage() {
         sortNo: Number(localeDraft.sortNo) || 0,
         status: localeDraft.status,
       });
-      toast.success(t('iam.common.saved'));
+      toast.success(t('admin.common.saved'));
       setLocaleDraft(null);
       reloadAll();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -178,21 +188,21 @@ export default function I18nAdminPage() {
 
   async function onDeleteLocale(l: SysLocaleDto) {
     const ok = await confirm({
-      title: t('iam.common.delete'),
-      content: `${t('iam.common.confirmDelete')}\n${l.code}`,
+      title: t('admin.common.delete'),
+      content: `${t('admin.common.confirmDelete')}\n${l.code}`,
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await api.del<void>(`/admin/i18n/locales/${encodeURIComponent(l.id)}`);
-      toast.success(t('iam.common.deleted'));
+      await http.del<void>(`${basePath}/locales/${encodeURIComponent(l.id)}`);
+      toast.success(t('admin.common.deleted'));
       if (filterLocale === l.code) setFilterLocale('');
       reloadAll();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -201,13 +211,13 @@ export default function I18nAdminPage() {
   async function onSaveMessage() {
     if (!msgDraft) return;
     if (!msgDraft.code.trim() || !msgDraft.localeCode.trim()) {
-      setMsgErr({ code: t('iam.common.required') });
+      setMsgErr({ code: t('admin.common.required') });
       return;
     }
     setMsgErr({});
     setBusy(true);
     try {
-      await api.post<SysI18nDto>('/admin/i18n/messages', {
+      await http.post<SysI18nDto>(`${basePath}/messages`, {
         id: msgDraft.id || undefined,
         localeCode: msgDraft.localeCode.trim(),
         code: msgDraft.code.trim(),
@@ -215,11 +225,11 @@ export default function I18nAdminPage() {
         module: msgDraft.module.trim() || undefined,
         scope: msgDraft.scope,
       });
-      toast.success(t('iam.common.saved'));
+      toast.success(t('admin.common.saved'));
       setMsgDraft(null);
       reloadAll();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -227,20 +237,20 @@ export default function I18nAdminPage() {
 
   async function onDeleteMessage(m: SysI18nDto) {
     const ok = await confirm({
-      title: t('iam.common.delete'),
-      content: `${t('iam.common.confirmDelete')}\n${m.localeCode} · ${m.code}`,
+      title: t('admin.common.delete'),
+      content: `${t('admin.common.confirmDelete')}\n${m.localeCode} · ${m.code}`,
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await api.del<void>(`/admin/i18n/messages/${encodeURIComponent(m.id)}`);
-      toast.success(t('iam.common.deleted'));
+      await http.del<void>(`${basePath}/messages/${encodeURIComponent(m.id)}`);
+      toast.success(t('admin.common.deleted'));
       reloadAll();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -249,11 +259,11 @@ export default function I18nAdminPage() {
   async function onClearMissing() {
     setBusy(true);
     try {
-      await api.del<void>('/admin/i18n/missing');
-      toast.success(t('iam.common.deleted'));
+      await http.del<void>(`${basePath}/missing`);
+      toast.success(t('admin.common.deleted'));
       missingRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -261,22 +271,22 @@ export default function I18nAdminPage() {
 
   const localeColumns = useMemo<Array<DataTableColumn<SysLocaleDto>>>(
     () => [
-      { key: 'code', titleKey: 'iam.field.locale', mono: true, width: 108 },
+      { key: 'code', titleKey: 'admin.field.locale', mono: true, width: 108 },
       {
         key: 'name',
-        titleKey: 'iam.field.name',
+        titleKey: 'admin.field.name',
         ellipsis: true,
         render: (l) => (
           <span className="cell-inline">
             <span className="dim">{l.name ?? '—'}</span>
             {l.isDefault && (
               <CimTag size="small" tone="run">
-                {t('iam.i18n.default')}
+                {t('admin.i18n.default')}
               </CimTag>
             )}
             {l.status === 'DISABLED' && (
               <CimTag size="small" tone="err">
-                {t('iam.common.disabled')}
+                {t('admin.common.disabled')}
               </CimTag>
             )}
           </span>
@@ -284,7 +294,7 @@ export default function I18nAdminPage() {
       },
       {
         key: 'coverage',
-        titleKey: 'iam.field.coverage',
+        titleKey: 'admin.field.coverage',
         width: 84,
         render: (l) => {
           const c = coverageByLocale.get(l.code);
@@ -301,15 +311,15 @@ export default function I18nAdminPage() {
       },
       {
         key: 'actions',
-        titleKey: 'iam.common.actions',
+        titleKey: 'admin.common.actions',
         width: 76,
         render: (l) => (
           <span className="cell-actions" onClick={(e) => e.stopPropagation()}>
-            <Can perm={I18N_LOCALE}>
+            {canLocale && (
               <CimButton
                 bare
                 className="icon-btn"
-                title={t('iam.common.edit')}
+                title={t('admin.common.edit')}
                 onClick={() =>
                   setLocaleDraft({
                     id: l.id,
@@ -323,52 +333,49 @@ export default function I18nAdminPage() {
               >
                 <IconEdit width={13} height={13} />
               </CimButton>
-            </Can>
-            {!l.isDefault && (
-              <Can perm={I18N_LOCALE}>
-                <CimButton
-                  bare
-                  className="icon-btn danger"
-                  title={t('iam.common.delete')}
-                  onClick={() => onDeleteLocale(l)}
-                >
-                  <IconTrash width={13} height={13} />
-                </CimButton>
-              </Can>
+            )}
+            {!l.isDefault && canLocale && (
+              <CimButton
+                bare
+                className="icon-btn danger"
+                title={t('admin.common.delete')}
+                onClick={() => onDeleteLocale(l)}
+              >
+                <IconTrash width={13} height={13} />
+              </CimButton>
             )}
           </span>
         ),
       },
     ],
-    // onDeleteLocale 依赖 filterLocale，透传 t 与 filterLocale 即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, filterLocale, coverageByLocale],
+    [t, canLocale, filterLocale, coverageByLocale],
   );
 
   const messageColumns = useMemo<Array<DataTableColumn<SysI18nDto>>>(
     () => [
-      { key: 'localeCode', titleKey: 'iam.field.locale', mono: true, width: 96 },
-      { key: 'code', titleKey: 'iam.field.code', mono: true, width: 240, ellipsis: true },
+      { key: 'localeCode', titleKey: 'admin.field.locale', mono: true, width: 96 },
+      { key: 'code', titleKey: 'admin.field.code', mono: true, width: 240, ellipsis: true },
       {
         key: 'content',
-        titleKey: 'iam.field.content',
+        titleKey: 'admin.field.content',
         ellipsis: true,
         render: (m) =>
           m.content ? m.content : (
             <CimTag size="small" tone="err">
-              {t('iam.common.none')}
+              {t('admin.common.none')}
             </CimTag>
           ),
       },
       {
         key: 'module',
-        titleKey: 'iam.field.module',
+        titleKey: 'admin.field.module',
         width: 96,
         render: (m) => <span className="cim-mono dim">{m.module ?? '—'}</span>,
       },
       {
         key: 'scope',
-        titleKey: 'iam.admin.i18n.scope',
+        titleKey: 'admin.admin.i18n.scope',
         width: 92,
         render: (m) => (
           <CimTag size="small" tone={m.scope === 'SYSTEM' ? 'run' : 'idle'}>
@@ -378,11 +385,11 @@ export default function I18nAdminPage() {
       },
       {
         key: 'actions',
-        titleKey: 'iam.common.actions',
+        titleKey: 'admin.common.actions',
         width: 108,
         render: (m) => (
           <span className="cell-actions">
-            <Can perm={I18N_CREATE}>
+            {canSave && (
               <CimButton
                 size="small"
                 onClick={() =>
@@ -396,20 +403,20 @@ export default function I18nAdminPage() {
                   })
                 }
               >
-                {t('iam.common.edit')}
+                {t('admin.common.edit')}
               </CimButton>
-            </Can>
-            <Can perm={I18N_DELETE}>
-              <CimButton bare className="icon-btn danger" title={t('iam.common.delete')} onClick={() => onDeleteMessage(m)}>
+            )}
+            {canRemove && (
+              <CimButton bare className="icon-btn danger" title={t('admin.common.delete')} onClick={() => onDeleteMessage(m)}>
                 <IconTrash width={13} height={13} />
               </CimButton>
-            </Can>
+            )}
           </span>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t],
+    [t, canSave, canRemove],
   );
 
   const localeFields = useMemo<Array<FormField<LocaleDraft>>>(
@@ -418,30 +425,30 @@ export default function I18nAdminPage() {
         ? [
             {
               key: 'code',
-              labelKey: 'iam.field.code',
+              labelKey: 'admin.field.code',
               kind: 'text',
               mono: true,
               placeholder: 'zh-TW',
               required: true,
               disabled: !!localeDraft.id,
-              hint: t('iam.admin.i18n.localeCodeHint'),
+              hint: t('admin.admin.i18n.localeCodeHint'),
             },
-            { key: 'name', labelKey: 'iam.field.name', kind: 'text', placeholder: '繁體中文' },
-            { key: 'sortNo', labelKey: 'iam.field.sortNo', kind: 'number', min: 0 },
+            { key: 'name', labelKey: 'admin.field.name', kind: 'text', placeholder: '繁體中文' },
+            { key: 'sortNo', labelKey: 'admin.field.sortNo', kind: 'number', min: 0 },
             {
               key: 'isDefault',
-              labelKey: 'iam.i18n.default',
+              labelKey: 'admin.i18n.default',
               kind: 'switch',
-              hint: t('iam.admin.i18n.defaultLocked'),
+              hint: t('admin.admin.i18n.defaultLocked'),
             },
             {
               key: 'status',
-              labelKey: 'iam.field.status',
+              labelKey: 'admin.field.status',
               kind: 'select',
               allowClear: false,
               options: [
-                { value: 'ENABLED', labelKey: 'iam.common.enabled' },
-                { value: 'DISABLED', labelKey: 'iam.common.disabled' },
+                { value: 'ENABLED', labelKey: 'admin.common.enabled' },
+                { value: 'DISABLED', labelKey: 'admin.common.disabled' },
               ],
             },
           ]
@@ -455,7 +462,7 @@ export default function I18nAdminPage() {
         ? [
             {
               key: 'localeCode',
-              labelKey: 'iam.field.locale',
+              labelKey: 'admin.field.locale',
               kind: 'select',
               allowClear: false,
               options: locales.map((l) => ({ value: l.code, label: l.code, hint: l.name ?? undefined })),
@@ -463,31 +470,31 @@ export default function I18nAdminPage() {
             },
             {
               key: 'code',
-              labelKey: 'iam.field.code',
+              labelKey: 'admin.field.code',
               kind: 'text',
               mono: true,
-              placeholder: 'iam.menu.menus',
+              placeholder: 'admin.menu.menus',
               required: true,
             },
-            { key: 'module', labelKey: 'iam.field.module', kind: 'text', mono: true },
+            { key: 'module', labelKey: 'admin.field.module', kind: 'text', mono: true },
             {
               key: 'scope',
-              labelKey: 'iam.admin.i18n.scope',
+              labelKey: 'admin.admin.i18n.scope',
               kind: 'select',
               allowClear: false,
               options: [
                 { value: 'USER', label: 'USER' },
                 { value: 'SYSTEM', label: 'SYSTEM' },
               ],
-              hint: t('iam.admin.i18n.systemScope'),
+              hint: t('admin.admin.i18n.systemScope'),
             },
             {
               key: 'content',
-              labelKey: 'iam.field.content',
+              labelKey: 'admin.field.content',
               kind: 'textarea',
               span: 2,
               rows: 3,
-              hint: t('iam.admin.i18n.reloadHint'),
+              hint: t('admin.admin.i18n.reloadHint'),
             },
           ]
         : [],
@@ -498,7 +505,7 @@ export default function I18nAdminPage() {
     return (
       <Page>
         <Panel>
-          <InlineAlert tone="warn">{t('iam.common.forbidden.desc')}</InlineAlert>
+          <InlineAlert tone="warn">{t('admin.common.forbidden.desc')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -509,15 +516,15 @@ export default function I18nAdminPage() {
       <CimSplitPane>
         <Panel
           className="scroll-y"
-          title={t('iam.admin.i18n.locales')}
+          title={t('admin.admin.i18n.locales')}
           flush
           actions={
             <>
-              <Can perm={I18N_LOCALE}>
+              {canLocale && (
                 <CimButton
                   bare
                   className="icon-btn"
-                  title={t('iam.admin.i18n.newLocale')}
+                  title={t('admin.admin.i18n.newLocale')}
                   onClick={() => {
                     setLocaleErr({});
                     setLocaleDraft({ id: '', code: '', name: '', isDefault: false, sortNo: 20, status: 'ENABLED' });
@@ -525,10 +532,10 @@ export default function I18nAdminPage() {
                 >
                   <IconPlus width={14} height={14} />
                 </CimButton>
-              </Can>
+              )}
               <CimButton size="small" onClick={localesRes.refresh} disabled={localesRes.loading}>
                 <IconRefresh width={13} height={13} />
-                {localesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
+                {localesRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}
               </CimButton>
             </>
           }
@@ -544,29 +551,29 @@ export default function I18nAdminPage() {
             onRetry={localesRes.refresh}
             onRowClick={(l) => setFilterLocale(filterLocale === l.code ? '' : l.code)}
             rowClassName={(l) => (filterLocale === l.code ? 'ant-table-row-selected' : '')}
-            emptyTitleKey="iam.common.none"
+            emptyTitleKey="admin.common.none"
           />
         </Panel>
 
         <div>
           <Panel
-            title={t('iam.admin.i18n.messages')}
+            title={t('admin.admin.i18n.messages')}
             sub={
-              pages > 1 ? t('iam.common.pagerInfo', { page: safePage, pages, total: messages.length }) : undefined
+              pages > 1 ? t('admin.common.pagerInfo', { page: safePage, pages, total: messages.length }) : undefined
             }
             flush
             actions={
               <>
-                <Can perm={I18N_CREATE}>
+                {canSave && (
                   <CimButton
                     bare
                     className="icon-btn"
-                    title={t('iam.admin.i18n.newMessage')}
+                    title={t('admin.admin.i18n.newMessage')}
                     onClick={() => {
                       setMsgErr({});
                       setMsgDraft({
                         id: '',
-                        localeCode: filterLocale || currentLang(),
+                        localeCode: filterLocale || i18n.language,
                         code: '',
                         content: '',
                         module: filterModule,
@@ -576,15 +583,15 @@ export default function I18nAdminPage() {
                   >
                     <IconPlus width={14} height={14} />
                   </CimButton>
-                </Can>
-                {currentLang() && (
+                )}
+                {reloadTranslations && (
                   <CimButton
                     size="small"
-                    title={t('iam.admin.i18n.reloadHint')}
-                    onClick={() => changeLanguage(currentLang(), true)}
+                    title={t('admin.admin.i18n.reloadHint')}
+                    onClick={reloadTranslations}
                   >
                     <IconSave width={13} height={13} />
-                    {t('iam.common.refresh')}
+                    {t('admin.common.refresh')}
                   </CimButton>
                 )}
               </>
@@ -602,7 +609,7 @@ export default function I18nAdminPage() {
               search={{
                 value: keyword,
                 onChange: setKeyword,
-                placeholderKey: 'iam.admin.i18n.keyword',
+                placeholderKey: 'admin.admin.i18n.keyword',
                 width: 220,
               }}
               actions={
@@ -611,7 +618,7 @@ export default function I18nAdminPage() {
                     <CimButton
                       size="small"
                       htmlType="button"
-                      title={t('iam.admin.i18n.clickToFilter')}
+                      title={t('admin.admin.i18n.clickToFilter')}
                       onClick={() => setFilterLocale('')}
                     >
                       {filterLocale} ✕
@@ -623,7 +630,7 @@ export default function I18nAdminPage() {
                     allowClear
                     value={filterModule || null}
                     onChange={(v) => setFilterModule((v as string) ?? '')}
-                    placeholder={t('iam.admin.i18n.filterModule')}
+                    placeholder={t('admin.admin.i18n.filterModule')}
                     options={modules.map((m) => ({ value: m, label: m }))}
                   />
                 </>
@@ -634,34 +641,34 @@ export default function I18nAdminPage() {
                       page: safePage,
                       size: PAGE_SIZE,
                       total: messages.length,
-                      onChange: (p) => setPage(p),
+                      onChange: (pg) => setPage(pg),
                       sizeOptions: [PAGE_SIZE],
                     }
                   : undefined
               }
-              emptyTitleKey="iam.common.none"
+              emptyTitleKey="admin.common.none"
             />
           </Panel>
 
           <Panel
-            title={t('iam.i18n.missing')}
-            sub={missOpen ? t('iam.admin.i18n.missingHint') : undefined}
+            title={t('admin.i18n.missing')}
+            sub={missOpen ? t('admin.admin.i18n.missingHint') : undefined}
             actions={
               <>
                 <CimTag tone={missingKeys.length ? 'warn' : 'ok'}>
-                  {t('iam.admin.i18n.missingCount', { n: missingKeys.length })}
+                  {t('admin.admin.i18n.missingCount', { n: missingKeys.length })}
                 </CimTag>
                 {canRemove && missOpen && missingKeys.length > 0 && (
                   <CimButton size="small" onClick={onClearMissing} disabled={busy}>
                     <IconTrash width={13} height={13} />
-                    {t('iam.admin.i18n.clearMissing')}
+                    {t('admin.admin.i18n.clearMissing')}
                   </CimButton>
                 )}
                 <CimButton
                   bare
                   className="icon-btn"
                   htmlType="button"
-                  title={missOpen ? t('iam.common.collapseAll') : t('iam.common.expandAll')}
+                  title={missOpen ? t('admin.common.collapseAll') : t('admin.common.expandAll')}
                   aria-expanded={missOpen}
                   onClick={() => setMissOpen((v) => !v)}
                 >
@@ -678,60 +685,61 @@ export default function I18nAdminPage() {
                   {missingKeys.map((k) => (
                     <CimTag key={k} tone="warn" className="cim-mono">
                       <span title={missing[k]}>{k}</span>
-                      <CimButton
-                        bare
-                        className="chip-x"
-                        title={t('iam.common.add')}
-                        onClick={() => {
-                          setMsgErr({});
-                          setMsgDraft({
-                            id: '',
-                            localeCode: filterLocale || currentLang(),
-                            code: k,
-                            content: '',
-                            module: '',
-                            scope: 'USER',
-                          });
-                        }}
-                      >
-                        +
-                      </CimButton>
+                      {canSave && (
+                        <CimButton
+                          bare
+                          className="chip-x"
+                          title={t('admin.common.add')}
+                          onClick={() => {
+                            setMsgErr({});
+                            setMsgDraft({
+                              id: '',
+                              localeCode: filterLocale || i18n.language,
+                              code: k,
+                              content: '',
+                              module: '',
+                              scope: 'USER',
+                            });
+                          }}
+                        >
+                          +
+                        </CimButton>
+                      )}
                     </CimTag>
                   ))}
                 </div>
               ) : (
                 <div className="cim-empty">
-                  <div className="cim-empty-title">{t('iam.common.none')}</div>
+                  <div className="cim-empty-title">{t('admin.common.none')}</div>
                 </div>
               )
             ) : null}
           </Panel>
 
           {/*
-            未译条目 ≠ 缺失译文：
-            - 缺失译文 = 四级兜底全未命中（连中文都没有），前端会上报，量很小；
-            - 未译条目 = 本语言没值、被默认语言兜底填满。**服务端合并后键是命中的**，
-              英文界面显示中文，前端不会上报任何东西。只有按原始值比才看得见。
+            未译条目 ≠ 缺失译文：缺失译文 = 四级兜底全未命中（连中文都没有）；
+            未译条目 = 本语言没值、被默认语言兜底填满（英文界面显示中文）。
+            只有按原始值比才看得见。
           */}
           <Panel
-            title={t('iam.i18n.untranslated')}
+            title={t('admin.i18n.untranslated')}
             sub={
               gapLocale
-                ? t('iam.admin.i18n.untranslatedHint', { locale: gapLocale.name ?? gapLocale.locale })
+                ? t('admin.admin.i18n.untranslatedHint', { locale: gapLocale.name ?? gapLocale.locale })
                 : undefined
             }
             actions={
               <>
                 {gapLocale && (
                   <CimTag tone={gapLocale.missing.length ? 'warn' : 'ok'}>
-                    {t('iam.admin.i18n.untranslatedCount', {
+                    {t('admin.admin.i18n.untranslatedCount', {
                       n: gapLocale.missing.length + (gapLocale.truncated ? '+' : ''),
                     })}
                   </CimTag>
                 )}
                 <CimButton size="small" onClick={coverageRes.refresh} disabled={coverageRes.loading}>
                   <IconRefresh width={13} height={13} />
-                  {coverageRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
+                  {coverageRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}
                 </CimButton>
               </>
             }
@@ -742,11 +750,11 @@ export default function I18nAdminPage() {
                   {gapLocale.missing.map((k) => (
                     <CimTag key={k} tone="warn" className="cim-mono">
                       <span title={k}>{k}</span>
-                      <Can perm={I18N_CREATE}>
+                      {canSave && (
                         <CimButton
                           bare
                           className="chip-x"
-                          title={t('iam.common.add')}
+                          title={t('admin.common.add')}
                           onClick={() => {
                             setMsgErr({});
                             setMsgDraft({
@@ -761,16 +769,16 @@ export default function I18nAdminPage() {
                         >
                           +
                         </CimButton>
-                      </Can>
+                      )}
                     </CimTag>
                   ))}
                 </div>
-                {gapLocale.truncated && <p className="dim">{t('iam.admin.i18n.untranslatedTruncated')}</p>}
+                {gapLocale.truncated && <p className="dim">{t('admin.admin.i18n.untranslatedTruncated')}</p>}
               </>
             ) : (
               <div className="cim-empty">
-                <div className="cim-empty-title">{t('iam.common.none')}</div>
-                <div className="cim-empty-hint">{t('iam.admin.i18n.noUntranslated')}</div>
+                <div className="cim-empty-title">{t('admin.common.none')}</div>
+                <div className="cim-empty-hint">{t('admin.admin.i18n.noUntranslated')}</div>
               </div>
             )}
           </Panel>
@@ -780,10 +788,10 @@ export default function I18nAdminPage() {
       <CimModal
         open={!!localeDraft}
         onClose={() => setLocaleDraft(null)}
-        title={localeDraft?.id ? t('iam.common.edit') : t('iam.admin.i18n.newLocale')}
+        title={localeDraft?.id ? t('admin.common.edit') : t('admin.admin.i18n.newLocale')}
         onOk={onSaveLocale}
-        okKey="iam.common.save"
-        cancelKey="iam.common.cancel"
+        okKey="admin.common.save"
+        cancelKey="admin.common.cancel"
         okLoading={busy}
       >
         {localeDraft && (
@@ -801,10 +809,10 @@ export default function I18nAdminPage() {
       <CimModal
         open={!!msgDraft}
         onClose={() => setMsgDraft(null)}
-        title={msgDraft?.id ? t('iam.common.edit') : t('iam.admin.i18n.newMessage')}
+        title={msgDraft?.id ? t('admin.common.edit') : t('admin.admin.i18n.newMessage')}
         onOk={onSaveMessage}
-        okKey="iam.common.save"
-        cancelKey="iam.common.cancel"
+        okKey="admin.common.save"
+        cancelKey="admin.common.cancel"
         okLoading={busy}
         width={640}
       >
@@ -823,7 +831,7 @@ export default function I18nAdminPage() {
   );
 }
 
-// ------------------------------------------------------------------ 辅助
+// ---------------------------------------------------------------- 辅助
 
 interface LocaleDraft {
   id: string;

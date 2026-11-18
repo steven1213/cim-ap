@@ -1,36 +1,48 @@
+// 组织架构（共享，六页系统配置之一）。
+//
+// 主数据在 IAM（org_node 自引用树）。IAM 宿主传 readOnly=false + 缺省端点（/admin/orgs、
+// /admin/users）即得全 CRUD；业务系统宿主传 readOnly=true + 目录代理前缀
+// （如 /mds/admin/directory/orgs），页面隐藏全部增删改控件，仅保留树浏览、
+// 节点详情与成员名册展示——与 IAM 页面同一套组件与视觉，样式天然统一。
+//
+// 权限：动作 UI 以 useAdminHasAll 判权显隐（不使用 @cim/ui 的 Can——那依赖宿主
+// 权限上下文组件；本包自持 AdminProvider 注入的 hasAll，宿主耦合更小）。
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
-  Can,
+  CimButton,
   CimInput,
   CimSelect,
   CimTag,
   CimTree,
   EmptyState,
+  IconEdit,
+  IconPlus,
+  IconTrash,
+  InlineAlert,
   Page,
   Panel,
+  CimField,
+  CimSplitPane,
   useConfirm,
   useToast,
   type CimTreeNode,
-  CimButton,
-  InlineAlert,
-  CimField,
-  CimSplitPane,
 } from '@cim/ui';
-import * as api from '@/lib/api';
-import type { AdminUserRow, OrgNode, OrgNodeType } from '@/types';
-import { fmtRelative, orgTypeLabel, originLabel } from '@/lib/format';
-import { ORG_CREATE, ORG_DELETE, ORG_MEMBER, ORG_MOVE, ORG_UPDATE } from '@/lib/permCodes';
-import { IconEdit, IconPlus, IconTrash } from '@/components/Icons';
+import { useAdminHasAll, useAdminHttp } from '../context';
+import { IAM_CREATE_PERMS, ORG_PERMS, type AdminPermOverrides } from '../perms';
+import type { AdminUserRow, OrgNode, OrgNodeType } from '../types';
+import { fmtRelative, orgTypeLabel, originLabel } from '../format';
 
-/**
- * 组织架构（制造组织树）。
- *
- * <p>厂区 → 车间 → 产线 → 工序 → 班组由 IAM 自建；AD 同步来的行政部门为只读。
- * 组织是「按组织批量授权」与数据权限的上游——先把树建对，再挂人与授权。
- * 各写操作按 `iam:org:*` 权限显隐。</p>
- */
+export interface OrgPageProps {
+  /** 只读模式（业务系统）：隐藏全部增删改控件，数据走目录代理。 */
+  readOnly?: boolean;
+  perms?: AdminPermOverrides;
+  /** 组织端点前缀（缺省 /admin/orgs；只读宿主传如 /mds/admin/directory/orgs）。 */
+  orgPath?: string;
+  /** 人员端点前缀（缺省 /admin/users；只读宿主传如 /mds/admin/directory/users）。 */
+  usersPath?: string;
+}
 
 interface Bundle {
   orgs: OrgNode[];
@@ -44,10 +56,19 @@ interface OrgTreeNode extends OrgNode {
 
 const CREATE_TYPES: OrgNodeType[] = ['AREA', 'WORKSHOP', 'LINE', 'PROCESS', 'TEAM'];
 
-export default function OrgPage() {
+/** 组织页（六页共享）。 */
+export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/orgs', usersPath = '/admin/users' }: OrgPageProps) {
   const { t } = useTranslation();
+  const http = useAdminHttp();
+  const hasAll = useAdminHasAll();
   const toast = useToast();
   const confirm = useConfirm();
+  const p = { ...ORG_PERMS, ...IAM_CREATE_PERMS, ...perms };
+  const canCreate = !readOnly && hasAll(p.orgCreate ?? ['iam:org:create']);
+  const canUpdate = !readOnly && hasAll(p.save ?? []);
+  const canMove = !readOnly && hasAll(p.move ?? []);
+  const canRemove = !readOnly && hasAll(p.remove ?? []);
+  const canMember = !readOnly && hasAll(p.member ?? []);
 
   const [expanded, setExpanded] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -72,21 +93,28 @@ export default function OrgPage() {
 
   const bundleRes = useResource<Bundle>(async ({ signal }) => {
     const [orgs, users] = await Promise.all([
-      api.get<OrgNode[]>('/admin/orgs', undefined, { signal }),
-      api.get<AdminUserRow[]>('/admin/users', undefined, { signal }),
+      http.get<OrgNode[]>(orgPath, undefined, { signal }),
+      http.get<AdminUserRow[]>(usersPath, undefined, { signal }),
     ]);
-    return { orgs, users };
+    return { orgs: orgs ?? [], users: users ?? [] };
   });
 
   const nodes = bundleRes.data?.orgs ?? [];
   const users = bundleRes.data?.users ?? [];
 
   const membersRes = useResource<string[]>(
-    ({ signal }) =>
-      api.get<string[]>(`/admin/orgs/${encodeURIComponent(selected ?? '')}/users`, undefined, { signal }),
+    async ({ signal }) =>
+      (await http.get<string[]>(`${orgPath}/${encodeURIComponent(selected ?? '')}/users`, undefined, { signal })) ?? [],
     { deps: [selected], enabled: !!selected },
   );
   const members = selected ? membersRes.data ?? [] : [];
+
+  /** 成员 ID → 展示名（只读模式下名册更可读；IAM 全量用户表里也直接映射）。 */
+  const memberName = useMemo(() => {
+    const m = new Map<string, string>();
+    users.forEach((u) => m.set(u.userId, u.displayName || u.username));
+    return m;
+  }, [users]);
 
   /** 首屏展开全部：只在第一批数据到达时做一次，之后用户的折叠状态不再被覆盖。 */
   const seeded = useRef(false);
@@ -97,7 +125,7 @@ export default function OrgPage() {
   }, [nodes]);
 
   const selectedNode = nodes.find((n) => n.id === selected) ?? null;
-  const managed = selectedNode?.source === 'IAM_MANAGED';
+  const managed = !readOnly && selectedNode?.source === 'IAM_MANAGED';
 
   /** 选中节点变化 → 把它的当前值灌进右侧表单（用户在这之后改的是草稿，不回写树）。 */
   useEffect(() => {
@@ -138,7 +166,7 @@ export default function OrgPage() {
           )}
           {n.status === 'DISABLED' && (
             <CimTag size="small" tone="err">
-              {t('iam.orgs.statusDisabled')}
+              {t('admin.orgs.statusDisabled')}
             </CimTag>
           )}
         </span>
@@ -163,20 +191,20 @@ export default function OrgPage() {
   async function onCreate() {
     setBusy(true);
     try {
-      await api.post('/admin/orgs', {
+      await http.post(orgPath, {
         parentId: parentId || null,
         code: code.trim(),
         name: name.trim(),
         nodeType,
         sortNo: Number(sortNo) || 0,
       });
-      toast.success(t('iam.orgs.msgCreated', { name: name.trim() }));
+      toast.success(t('admin.orgs.msgCreated', { name: name.trim() }));
       setCode('');
       setName('');
       setShowCreate(false);
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errCreate'));
+      toast.error(e?.msg || t('admin.orgs.errCreate'));
     } finally {
       setBusy(false);
     }
@@ -186,15 +214,15 @@ export default function OrgPage() {
     if (!selected) return;
     setBusy(true);
     try {
-      await api.put(`/admin/orgs/${encodeURIComponent(selected)}`, {
+      await http.put(`${orgPath}/${encodeURIComponent(selected)}`, {
         name: editName.trim(),
         sortNo: Number(editSort) || 0,
         status: editStatus,
       });
-      toast.success(t('iam.orgs.msgSaved'));
+      toast.success(t('admin.orgs.msgSaved'));
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errSave'));
+      toast.error(e?.msg || t('admin.orgs.errSave'));
     } finally {
       setBusy(false);
     }
@@ -203,31 +231,31 @@ export default function OrgPage() {
   async function onMove() {
     if (!selected) return;
     try {
-      await api.put(`/admin/orgs/${encodeURIComponent(selected)}/move`, { newParentId: moveTo || null });
-      toast.success(t('iam.orgs.msgMoved'));
+      await http.put(`${orgPath}/${encodeURIComponent(selected)}/move`, { newParentId: moveTo || null });
+      toast.success(t('admin.orgs.msgMoved'));
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errMove'));
+      toast.error(e?.msg || t('admin.orgs.errMove'));
     }
   }
 
   async function onDelete() {
     if (!selectedNode) return;
     const ok = await confirm({
-      title: t('iam.orgs.delete'),
-      content: t('iam.orgs.confirmDelete', { name: selectedNode.name }),
+      title: t('admin.orgs.delete'),
+      content: t('admin.orgs.confirmDelete', { name: selectedNode.name }),
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     try {
-      await api.del(`/admin/orgs/${encodeURIComponent(selectedNode.id)}`);
-      toast.success(t('iam.orgs.msgDeleted'));
+      await http.del(`${orgPath}/${encodeURIComponent(selectedNode.id)}`);
+      toast.success(t('admin.orgs.msgDeleted'));
       setSelected(null);
       bundleRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errDelete'));
+      toast.error(e?.msg || t('admin.orgs.errDelete'));
     }
   }
 
@@ -235,64 +263,69 @@ export default function OrgPage() {
     if (!selected || !addUser.trim()) return;
     const uid = addUser.trim();
     try {
-      const cur = await api.get<{ orgId: string; primary: boolean }[]>(
-        `/admin/users/${encodeURIComponent(uid)}/orgs`,
-      );
+      const cur = (await http.get<{ orgId: string; primary: boolean }[]>(
+        `${usersPath}/${encodeURIComponent(uid)}/orgs`,
+      )) ?? [];
       if (cur.some((o) => o.orgId === selected)) {
-        toast.info(t('iam.orgs.msgMemberAdded', { uid }));
+        toast.info(t('admin.orgs.msgMemberAdded', { uid }));
         return;
       }
       const next = [
         ...cur.map((o) => ({ orgId: o.orgId, primary: o.primary })),
         { orgId: selected, primary: cur.length === 0 },
       ];
-      await api.put(`/admin/users/${encodeURIComponent(uid)}/orgs`, { orgs: next });
-      toast.success(t('iam.orgs.msgMemberMoved', { uid }));
+      await http.put(`${usersPath}/${encodeURIComponent(uid)}/orgs`, { orgs: next });
+      toast.success(t('admin.orgs.msgMemberMoved', { uid }));
       setAddUser('');
       membersRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errMember'));
+      toast.error(e?.msg || t('admin.orgs.errMember'));
     }
   }
 
   async function onRemoveMember(uid: string) {
     if (!selected) return;
     try {
-      const cur = await api.get<{ orgId: string; primary: boolean }[]>(
-        `/admin/users/${encodeURIComponent(uid)}/orgs`,
-      );
+      const cur = (await http.get<{ orgId: string; primary: boolean }[]>(
+        `${usersPath}/${encodeURIComponent(uid)}/orgs`,
+      )) ?? [];
       const next = cur.filter((o) => o.orgId !== selected).map((o) => ({ orgId: o.orgId, primary: o.primary }));
-      await api.put(`/admin/users/${encodeURIComponent(uid)}/orgs`, { orgs: next });
-      toast.success(t('iam.orgs.msgMemberRemoved', { uid }));
+      await http.put(`${usersPath}/${encodeURIComponent(uid)}/orgs`, { orgs: next });
+      toast.success(t('admin.orgs.msgMemberRemoved', { uid }));
       membersRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.orgs.errRemove'));
+      toast.error(e?.msg || t('admin.orgs.errRemove'));
     }
   }
 
   return (
     <Page>
+      {readOnly && (
+        <div style={{ marginBottom: 10 }}>
+          <InlineAlert tone="info">{t('admin.orgs.readOnlyHint')}</InlineAlert>
+        </div>
+      )}
       <CimSplitPane>
         <Panel
           className="scroll-y"
-          title={t('iam.orgs.title')}
+          title={t('admin.orgs.title')}
           actions={
             <>
-              <CimTag>{t('iam.orgs.count', { n: nodes.length })}</CimTag>
-              <Can perm={ORG_CREATE}>
+              <CimTag>{t('admin.orgs.count', { n: nodes.length })}</CimTag>
+              {canCreate && (
                 <CimButton type="primary" size="small" onClick={() => setShowCreate((v) => !v)}>
                   <IconPlus width={13} height={13} />
-                  {t('iam.orgs.newNode')}
+                  {t('admin.orgs.newNode')}
                 </CimButton>
-              </Can>
+              )}
             </>
           }
         >
           {bundleRes.error ? (
             <div style={{ padding: 14 }}>
-              <InlineAlert tone="err">{bundleRes.error.message || t('iam.orgs.errLoad')}</InlineAlert>
+              <InlineAlert tone="err">{bundleRes.error.message || t('admin.orgs.errLoad')}</InlineAlert>
               <CimButton type="primary" size="small" style={{ marginTop: 10 }} onClick={bundleRes.refresh}>
-                {t('iam.common.refresh')}
+                {t('admin.common.refresh')}
               </CimButton>
             </div>
           ) : treeNodes.length ? (
@@ -308,54 +341,54 @@ export default function OrgPage() {
             </div>
           ) : (
             <div style={{ padding: 14 }}>
-              <EmptyState titleKey="iam.orgs.emptyTitle" hintKey="iam.orgs.emptyHint" />
+              <EmptyState titleKey="admin.orgs.emptyTitle" hintKey="admin.orgs.emptyHint" />
             </div>
           )}
         </Panel>
 
         <Panel
-          title={selectedNode ? t('iam.orgs.nodeTitle', { name: selectedNode.name }) : t('iam.orgs.nodeDetail')}
+          title={selectedNode ? t('admin.orgs.nodeTitle', { name: selectedNode.name }) : t('admin.orgs.nodeDetail')}
           sub={
             selectedNode
-              ? t('iam.orgs.nodeSub', {
+              ? t('admin.orgs.nodeSub', {
                   src: originLabel(selectedNode.source),
-                  ro: managed ? t('iam.orgs.nodeReadOnly') : '',
+                  ro: managed ? t('admin.orgs.nodeReadOnly') : '',
                 })
-              : t('iam.orgs.selectNode')
+              : t('admin.orgs.selectNode')
           }
         >
           {!selectedNode ? (
-            <EmptyState titleKey="iam.orgs.nodeNotSelected" hintKey="iam.orgs.selectHint" />
+            <EmptyState titleKey="admin.orgs.nodeNotSelected" hintKey="admin.orgs.selectHint" />
           ) : (
             <>
               <dl className="kv">
-                <dt>{t('iam.orgs.dt.code')}</dt>
+                <dt>{t('admin.orgs.dt.code')}</dt>
                 <dd className="mono">{selectedNode.code}</dd>
-                <dt>{t('iam.orgs.dt.type')}</dt>
+                <dt>{t('admin.orgs.dt.type')}</dt>
                 <dd>{orgTypeLabel(selectedNode.nodeType)}</dd>
-                <dt>{t('iam.orgs.dt.source')}</dt>
+                <dt>{t('admin.orgs.dt.source')}</dt>
                 <dd>{originLabel(selectedNode.source)}</dd>
-                <dt>{t('iam.orgs.dt.status')}</dt>
+                <dt>{t('admin.orgs.dt.status')}</dt>
                 <dd>
                   <CimTag size="small" tone={selectedNode.status === 'ENABLED' ? 'ok' : 'err'}>
                     {selectedNode.status === 'ENABLED'
-                      ? t('iam.orgs.statusEnabled')
-                      : t('iam.orgs.statusDisabled')}
+                      ? t('admin.orgs.statusEnabled')
+                      : t('admin.orgs.statusDisabled')}
                   </CimTag>
                 </dd>
-                <dt>{t('iam.orgs.dt.path')}</dt>
+                <dt>{t('admin.orgs.dt.path')}</dt>
                 <dd className="mono dim">{selectedNode.path}</dd>
-                <dt>{t('iam.orgs.dt.updated')}</dt>
+                <dt>{t('admin.orgs.dt.updated')}</dt>
                 <dd>{fmtRelative(selectedNode.updatedAt)}</dd>
               </dl>
 
-              {managed ? (
+              {managed && (
                 <>
                   <div className="row" style={{ marginTop: 14 }}>
-                    <CimField label={t('iam.orgs.f.name')} htmlFor="on">
+                    <CimField label={t('admin.orgs.f.name')} htmlFor="on">
                       <CimInput id="on" value={editName} onChange={setEditName} width={180} />
                     </CimField>
-                    <CimField label={t('iam.orgs.f.sort')} htmlFor="os">
+                    <CimField label={t('admin.orgs.f.sort')} htmlFor="os">
                       <CimInput
                         id="os"
                         mono
@@ -364,7 +397,7 @@ export default function OrgPage() {
                         width={100}
                       />
                     </CimField>
-                    <CimField label={t('iam.orgs.f.status')} htmlFor="ost">
+                    <CimField label={t('admin.orgs.f.status')} htmlFor="ost">
                       <CimSelect
                         id="ost"
                         value={editStatus}
@@ -372,73 +405,77 @@ export default function OrgPage() {
                           setEditStatus((typeof v === 'string' ? v : 'ENABLED') as 'ENABLED' | 'DISABLED')
                         }
                         options={[
-                          { value: 'ENABLED', label: t('iam.orgs.optEnabled') },
-                          { value: 'DISABLED', label: t('iam.orgs.optDisabled') },
+                          { value: 'ENABLED', label: t('admin.orgs.optEnabled') },
+                          { value: 'DISABLED', label: t('admin.orgs.optDisabled') },
                         ]}
                         allowClear={false}
                         width={140}
                       />
                     </CimField>
-                    <Can perm={ORG_UPDATE}>
+                    {canUpdate && (
                       <CimButton type="primary" size="small" htmlType="button" disabled={busy} onClick={() => void onUpdate()}>
                         <IconEdit width={13} height={13} />
-                        {t('iam.orgs.save')}
+                        {t('admin.orgs.save')}
                       </CimButton>
-                    </Can>
+                    )}
                   </div>
 
-                  <div className="row" style={{ marginTop: 12 }}>
-                    <CimField label={t('iam.orgs.moveTo')} htmlFor="mv">
-                      <CimSelect
-                        id="mv"
-                        value={moveTo}
-                        onChange={(v) => setMoveTo(typeof v === 'string' ? v : '')}
-                        options={[
-                          { value: '', label: t('iam.orgs.noParent') },
-                          ...flatOptions
-                            .filter((o) => o.id !== selectedNode.id)
-                            .map((o) => ({ value: o.id, label: o.label })),
-                        ]}
-                        allowClear={false}
-                        width={300}
-                      />
-                    </CimField>
-                    <Can perm={ORG_MOVE}>
-                      <CimButton size="small" htmlType="button" onClick={() => void onMove()}>
-                        {t('iam.orgs.move')}
-                      </CimButton>
-                    </Can>
-                    <Can perm={ORG_DELETE}>
-                      <CimButton danger size="small" htmlType="button" onClick={() => void onDelete()}>
-                        <IconTrash width={13} height={13} />
-                        {t('iam.orgs.delete')}
-                      </CimButton>
-                    </Can>
-                  </div>
+                  {(canMove || canRemove) && (
+                    <div className="row" style={{ marginTop: 12 }}>
+                      {canMove && (
+                        <>
+                          <CimField label={t('admin.orgs.moveTo')} htmlFor="mv">
+                            <CimSelect
+                              id="mv"
+                              value={moveTo}
+                              onChange={(v) => setMoveTo(typeof v === 'string' ? v : '')}
+                              options={[
+                                { value: '', label: t('admin.orgs.noParent') },
+                                ...flatOptions
+                                  .filter((o) => o.id !== selectedNode.id)
+                                  .map((o) => ({ value: o.id, label: o.label })),
+                              ]}
+                              allowClear={false}
+                              width={300}
+                            />
+                          </CimField>
+                          <CimButton size="small" htmlType="button" onClick={() => void onMove()}>
+                            {t('admin.orgs.move')}
+                          </CimButton>
+                        </>
+                      )}
+                      {canRemove && (
+                        <CimButton danger size="small" htmlType="button" onClick={() => void onDelete()}>
+                          <IconTrash width={13} height={13} />
+                          {t('admin.orgs.delete')}
+                        </CimButton>
+                      )}
+                    </div>
+                  )}
                 </>
-              ) : (
+              )}
+              {!readOnly && !managed && (
                 <p className="hint" style={{ marginTop: 12 }}>
-                  {t('iam.orgs.adReadOnly')}
+                  {t('admin.orgs.adReadOnly')}
                 </p>
               )}
 
               <div className="sub-block">
                 <div className="sub-head">
-                  <b>{t('iam.orgs.membersTitle')}</b>
-                  <CimTag>{t('iam.orgs.membersCount', { n: members.length })}</CimTag>
+                  <b>{t('admin.orgs.membersTitle')}</b>
+                  <CimTag>{t('admin.orgs.membersCount', { n: members.length })}</CimTag>
                 </div>
-                <div className="row">
-                  <CimField>
-                    <CimSelect
-                      value={addUser}
-                      onChange={(v) => setAddUser(typeof v === 'string' ? v : '')}
-                      // 原实现用 datalist：Safari 不支持、且只能按 user id 前缀匹配；换成可选可搜的下拉
-                      options={users.map((u) => ({ value: u.userId, label: u.displayName || u.username, hint: u.username }))}
-                      placeholderKey="iam.orgs.memberPH"
-                      width={260}
-                    />
-                  </CimField>
-                  <Can perm={ORG_MEMBER}>
+                {canMember && (
+                  <div className="row">
+                    <CimField>
+                      <CimSelect
+                        value={addUser}
+                        onChange={(v) => setAddUser(typeof v === 'string' ? v : '')}
+                        options={users.map((u) => ({ value: u.userId, label: u.displayName || u.username, hint: u.username }))}
+                        placeholderKey="admin.orgs.memberPH"
+                        width={260}
+                      />
+                    </CimField>
                     <CimButton
                       type="primary"
                       size="small"
@@ -447,53 +484,53 @@ export default function OrgPage() {
                       disabled={!addUser.trim()}
                     >
                       <IconPlus width={13} height={13} />
-                      {t('iam.orgs.addMember')}
+                      {t('admin.orgs.addMember')}
                     </CimButton>
-                  </Can>
-                </div>
+                  </div>
+                )}
                 <div className="tag-list" style={{ marginTop: 10 }}>
                   {members.map((m) => (
                     <span key={m} className="role-chip">
-                      <span className="mono">{m}</span>
-                      <Can perm={ORG_MEMBER}>
+                      <span className="mono" title={m}>{memberName.get(m) ?? m}</span>
+                      {canMember && (
                         <CimButton
                           bare
                           className="chip-x"
                           htmlType="button"
                           onClick={() => void onRemoveMember(m)}
-                          aria-label={t('iam.orgs.removeMember')}
+                          aria-label={t('admin.orgs.removeMember')}
                         >
                           ×
                         </CimButton>
-                      </Can>
+                      )}
                     </span>
                   ))}
-                  {!members.length && <span className="dim">{t('iam.orgs.noMembers')}</span>}
+                  {!members.length && <span className="dim">{t('admin.orgs.noMembers')}</span>}
                 </div>
-                <p className="hint">{t('iam.orgs.memberHint')}</p>
+                {!readOnly && <p className="hint">{t('admin.orgs.memberHint')}</p>}
               </div>
             </>
           )}
         </Panel>
       </CimSplitPane>
 
-      {showCreate && (
-        <Panel title={t('iam.orgs.newTitle')} sub={t('iam.orgs.newSub')}>
+      {showCreate && canCreate && (
+        <Panel title={t('admin.orgs.newTitle')} sub={t('admin.orgs.newSub')}>
           <div className="row">
-            <CimField label={t('iam.orgs.f.parent')} htmlFor="pp">
+            <CimField label={t('admin.orgs.f.parent')} htmlFor="pp">
               <CimSelect
                 id="pp"
                 value={parentId}
                 onChange={(v) => setParentId(typeof v === 'string' ? v : '')}
                 options={[
-                  { value: '', label: t('iam.orgs.noParent') },
+                  { value: '', label: t('admin.orgs.noParent') },
                   ...flatOptions.map((o) => ({ value: o.id, label: o.label })),
                 ]}
                 allowClear={false}
                 width={260}
               />
             </CimField>
-            <CimField label={t('iam.orgs.f.code')} htmlFor="cc">
+            <CimField label={t('admin.orgs.f.code')} htmlFor="cc">
               <CimInput
                 id="cc"
                 mono
@@ -503,10 +540,10 @@ export default function OrgPage() {
                 width={170}
               />
             </CimField>
-            <CimField label={t('iam.orgs.f.name')} htmlFor="nn">
-              <CimInput id="nn" placeholder={t('iam.orgs.namePH')} value={name} onChange={setName} width={160} />
+            <CimField label={t('admin.orgs.f.name')} htmlFor="nn">
+              <CimInput id="nn" placeholder={t('admin.orgs.namePH')} value={name} onChange={setName} width={160} />
             </CimField>
-            <CimField label={t('iam.orgs.f.type')} htmlFor="nt">
+            <CimField label={t('admin.orgs.f.type')} htmlFor="nt">
               <CimSelect
                 id="nt"
                 value={nodeType}
@@ -516,7 +553,7 @@ export default function OrgPage() {
                 width={130}
               />
             </CimField>
-            <CimField label={t('iam.orgs.f.sort')} htmlFor="sn">
+            <CimField label={t('admin.orgs.f.sort')} htmlFor="sn">
               <CimInput
                 id="sn"
                 mono
@@ -525,18 +562,16 @@ export default function OrgPage() {
                 width={90}
               />
             </CimField>
-            <Can perm={ORG_CREATE}>
-              <CimButton
-                type="primary"
-                htmlType="button"
-                disabled={busy || !code.trim() || !name.trim()}
-                onClick={() => void onCreate()}
-              >
-                {busy ? t('iam.orgs.creating') : t('iam.orgs.create')}
-              </CimButton>
-            </Can>
+            <CimButton
+              type="primary"
+              htmlType="button"
+              disabled={busy || !code.trim() || !name.trim()}
+              onClick={() => void onCreate()}
+            >
+              {busy ? t('admin.orgs.creating') : t('admin.orgs.create')}
+            </CimButton>
           </div>
-          <p className="hint">{t('iam.orgs.hint')}</p>
+          <p className="hint">{t('admin.orgs.hint')}</p>
         </Panel>
       )}
     </Page>

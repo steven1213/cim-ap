@@ -148,6 +148,17 @@ public class SysRbacService {
         return MenuTrees.build(resolveMenus(userId), includeButtons);
     }
 
+    /**
+     * <b>全量</b>菜单树（不做角色过滤；dev/演示态无登录身份时用）。
+     *
+     * <p>仅限「auth 关闭的演示通道」：该通道没有 principal，按角色过滤无从谈起，
+     * 回全量树让演示环境侧栏与路由完整可用。认证态一律走 {@link #menuTree}。</p>
+     */
+    @Transactional(readOnly = true)
+    public List<MenuNode> fullMenuTree(boolean includeButtons) {
+        return MenuTrees.build(menuRepository.findByOrderBySortNoAsc(), includeButtons);
+    }
+
     /** 用户已授予的<b>全部</b>角色 ID（含停用角色，供授权界面回显；解析权限走 {@link #enabledRolesOf}）。 */
     @Transactional(readOnly = true)
     public List<String> roleIdsOf(String userId) {

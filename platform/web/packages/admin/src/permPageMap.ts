@@ -1,16 +1,9 @@
-import type { MenuTreeNode, SysMenuDto, SysPermissionDto } from '@/types';
-
-/**
- * 「权限点 → 所属页面」映射（权威源 = 菜单树）。
- *
- * <p>菜单树里 {@link SysMenuDto}-`MENU` 节点的 `permCode` 是该页面的**入口码**，
- * 其下 `BUTTON` 节点的 `permCode` 是页面内动作码——两者共同构成「这个权限码
- * 用在哪个页面」的权威关联。按页面分组比按 `module`（code 首段）分组更贴近
- * 管理员的心智模型：「给某个页面授权」而不是「给某个 module 授权」。</p>
- *
- * <p>未挂到任何菜单节点的码（平台 `sys:*` 接口闸门、兜底码等）归入
- * `module` 组——它们本来就是接口级权限，按 code 首段分组是最诚实的呈现。</p>
- */
+// 「权限点 → 所属页面」映射（权威源 = 菜单树）。
+//
+// 菜单树里 MENU 节点的 permCode 是该页面的入口码，其下 BUTTON 节点的 permCode
+// 是页面内动作码——两者共同构成「这个权限码用在哪个页面」的权威关联。
+// 未挂到任何菜单节点的码（平台 sys:* 接口闸门等）归入 module 组。
+import type { MenuTreeNode, SysMenuDto, SysPermissionDto } from './types';
 
 /** 一个权限码的页面归属：所在页面 + 页面所在目录（可为 null，顶级菜单无目录）。 */
 export interface PermPageRef {
@@ -30,8 +23,7 @@ export interface PermGroup {
 /**
  * 遍历菜单树，构建 `permCode → { page, group }`。
  *
- * <p>DFS 过程中维护「当前目录 / 当前页面」；同一码出现多次时**先到先得**
- * （菜单树不允许同码重复挂载，此兜底只为容错）。</p>
+ * <p>DFS 过程中维护「当前目录 / 当前页面」；同一码出现多次时<b>先到先得</b>。</p>
  */
 export function buildPermPageMap(tree: MenuTreeNode[]): Map<string, PermPageRef> {
   const map = new Map<string, PermPageRef>();
@@ -59,8 +51,7 @@ export function buildPermPageMap(tree: MenuTreeNode[]): Map<string, PermPageRef>
 /**
  * 把权限点按「所属页面」分组；未挂页面的按 `module` 归组排在后面。
  *
- * <p>page 组顺序 = 菜单树出现顺序（与导航一致，管理员按页面找码零学习成本）；
- * module 组按字母序。组内权限按 code 排序。</p>
+ * <p>page 组顺序 = 菜单树出现顺序（与导航一致）；module 组按字母序。组内权限按 code 排序。</p>
  */
 export function groupPermsByPage(
   perms: SysPermissionDto[],

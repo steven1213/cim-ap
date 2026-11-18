@@ -57,24 +57,39 @@ class RmsConsoleMenuSeedTest {
         List<SysMenu> menus = menuRepository.findByOrderBySortNoAsc();
         Set<String> codes = menus.stream().map(SysMenu::getI18nCode).collect(Collectors.toSet());
 
-        // 8 个导航菜单 + 3 个分组目录，全部以 rms.nav.* 命名
+        // IA 对齐后的树：概览 + 四组（日常操作/治理与合规/基础数据/系统配置）+ 七模块 + 系统配置六页
         assertThat(codes).contains(
                 "rms.nav.dashboard",
-                "rms.nav.recipes", "rms.nav.deviceTypes", "rms.nav.deviceAreas", "rms.nav.devices",
-                "rms.nav.signoff", "rms.nav.compare", "rms.nav.audit",
-                "rms.nav.group.recipe", "rms.nav.group.device", "rms.nav.group.advanced");
+                "rms.nav.group.daily", "rms.nav.group.governance", "rms.nav.group.master", "rms.nav.group.settings",
+                "rms.nav.module.recipe", "rms.nav.module.deviceOps",
+                "rms.nav.module.release", "rms.nav.module.observe",
+                "rms.nav.module.deviceModel", "rms.nav.module.spec", "rms.nav.module.auth",
+                "rms.nav.recipes", "rms.nav.deviceRecipes", "rms.nav.devices", "rms.nav.signoff", "rms.nav.compare",
+                "rms.nav.qualifications", "rms.nav.golden", "rms.nav.bypasses",
+                "rms.nav.audit", "rms.nav.integration", "rms.nav.experiments",
+                "rms.nav.deviceTypes", "rms.nav.deviceAreas",
+                "rms.nav.specs", "rms.nav.specTemplates", "rms.nav.bodyTemplates",
+                "rms.nav.deviceAuth", "rms.nav.ecsv");
 
-        // 分组为 DIR 目录节点
-        assertThat(byI18n(menus, "rms.nav.group.recipe").getType()).isEqualTo(MenuType.DIR);
-        // 配方库为 MENU，且绑定 rms:recipe:view
+        // 四个分组为 DIR 目录节点
+        assertThat(byI18n(menus, "rms.nav.group.daily").getType()).isEqualTo(MenuType.DIR);
+        assertThat(byI18n(menus, "rms.nav.group.settings").getType()).isEqualTo(MenuType.DIR);
+
+        // 配方库为 MENU，绑定 rms:recipe:view
         SysMenu recipes = byI18n(menus, "rms.nav.recipes");
         assertThat(recipes.getType()).isEqualTo(MenuType.MENU);
         assertThat(recipes.getPermCode()).isEqualTo("rms:recipe:view");
         assertThat(recipes.getPath()).isEqualTo("/recipes");
 
-        // 父子挂载：配方库挂在「配方管理」目录下（父 ID 由运行期 IdGenerator 生成，测试据此校验关系）
-        SysMenu groupRecipe = byI18n(menus, "rms.nav.group.recipe");
-        assertThat(recipes.getParentId()).isEqualTo(groupRecipe.getId());
+        // 父子挂载：配方库 → 「配方管理」模块 DIR → 「日常操作」分组（父 ID 由运行期 IdGenerator 生成）
+        SysMenu modRecipe = byI18n(menus, "rms.nav.module.recipe");
+        assertThat(recipes.getParentId()).isEqualTo(modRecipe.getId());
+        assertThat(modRecipe.getParentId()).isEqualTo(byI18n(menus, "rms.nav.group.daily").getId());
+
+        // 系统配置组下有菜单管理页（/menus，共享组件 MenusAdminPage）
+        SysMenu menuAdmin = byI18n(menus, "rms.nav.menus");
+        assertThat(menuAdmin.getType()).isEqualTo(MenuType.MENU);
+        assertThat(menuAdmin.getPath()).isEqualTo("/menus");
 
         // 概览为顶级（无父）
         assertThat(byI18n(menus, "rms.nav.dashboard").getParentId()).isNull();
@@ -90,19 +105,21 @@ class RmsConsoleMenuSeedTest {
         assertThat(i18nRepository.findByLocaleCodeAndModule("zh-CN", "rms")).isNotEmpty();
         assertThat(i18nRepository.findByLocaleCodeAndModule("en-US", "rms")).isNotEmpty();
 
-        // 抽样校验中文/英文键值（菜单名）
+        // 抽样校验中文/英文键值（分组名 / 菜单名）
         assertThat(content("zh-CN", "rms.nav.dashboard")).isEqualTo("概览");
         assertThat(content("zh-CN", "rms.nav.recipes")).isEqualTo("配方库");
-        assertThat(content("zh-CN", "rms.nav.group.device")).isEqualTo("设备管理");
+        assertThat(content("zh-CN", "rms.nav.group.daily")).isEqualTo("日常操作");
+        assertThat(content("zh-CN", "rms.nav.group.settings")).isEqualTo("系统配置");
         assertThat(content("en-US", "rms.nav.dashboard")).isEqualTo("Overview");
         assertThat(content("en-US", "rms.nav.recipes")).isEqualTo("Recipes");
+        assertThat(content("en-US", "rms.nav.group.daily")).isEqualTo("Daily Ops");
     }
 
     @Test
     void adminRole_hasMenuVisibilityGrants() {
         SysRole admin = roleRepository.findFirstByCodeOrderByCreateTimeAsc(RmsConsoleCatalog.ROLE_ADMIN)
                 .orElseThrow();
-        // 超管须拥有全部导航菜单可见性（含全量 11 个节点）
+        // 超管须拥有全部导航菜单可见性（对齐 catalog：概览 + 四组七模块 + 系统配置六页）
         assertThat(roleMenuRepository.findByRoleId(admin.getId())).hasSize(RmsConsoleCatalog.menus().size());
     }
 

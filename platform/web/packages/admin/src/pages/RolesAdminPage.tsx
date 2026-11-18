@@ -1,65 +1,58 @@
+// 角色管理（共享）：角色 CRUD + 授权。
+//
+// 授权交互为单棵菜单树（一次保存），存储仍是两张独立授权表：sys_role_perm（接口权限）
+// 与 sys_role_menu（侧栏可见）。树上勾选菜单＝写菜单表，勾选入口码/按钮码＝写权限表。
+// 「能调用接口」与「看得见菜单」解耦语义完整保留（可只勾其一）。
+//
+// 授权目录与角色列表分开取：只读角色可能没有 sys:permission:list / sys:menu:list，
+// 此时角色列表照常可用、只有授权区降级提示——避免一个 403 把整页拖垮。
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
-  Can,
+  CimButton,
   CimInput,
-  CimTag,
+  CimSplitPane,
   CimTabs,
+  CimTag,
   DataTable,
+  DataTableColumn,
   EmptyState,
+  FormField,
   FormGrid,
+  IconPlus,
+  IconRefresh,
+  IconSave,
+  IconTrash,
+  InlineAlert,
   Page,
   Panel,
+  TabItem,
   useConfirm,
   useToast,
-  type DataTableColumn,
-  type FormField,
-  type TabItem,
-  CimButton,
-  InlineAlert,
-  CimSplitPane,
 } from '@cim/ui';
-import * as api from '@/lib/api';
-import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '@/types';
-import PermTree from '@/components/PermTree';
-import { useHasAllPermissions } from '@/lib/usePermission';
-import { buildPermPageMap, groupPermsByPage } from '@/lib/permPageMap';
-import {
-  ROLE_ADMIN_LIST,
-  ROLE_ADMIN_CREATE,
-  ROLE_ADMIN_UPDATE,
-  ROLE_ADMIN_DELETE,
-  ROLE_ADMIN_GRANT,
-  SYS,
-} from '@/lib/permCodes';
-import { IconPlus, IconRefresh, IconSave, IconTrash } from '@/components/Icons';
+import { useAdminHasAll, useAdminHttp } from '../context';
+import PermTree from '../PermTree';
+import { ROLE_PERMS, type AdminPermOverrides } from '../perms';
+import { buildPermPageMap, groupPermsByPage } from '../permPageMap';
+import type { MenuTreeNode, PageResultDto, SysMenuDto, SysPermissionDto, SysRoleDto } from '../types';
 
-/**
- * 角色管理（`/roles-admin`）：角色 CRUD + 授权。
- *
- * <p><b>授权交互为单棵菜单树（一次保存），存储仍是两张独立授权表</b>：
- * `sys_role_perm`（接口权限）与 `sys_role_menu`（侧栏可见）。树上勾选菜单＝写菜单表，
- * 勾选入口码/按钮码＝写权限表，一个「保存授权」顺序写两张表。平台刻意让
- * 「能调用接口」与「看得见菜单」解耦（README §21.1）——解耦语义完整保留：
- * 可以只勾菜单不勾码（路由可达、接口 403），反之亦然；只是不再要求管理员分两批操作。</p>
- *
- * <p><b>树结构</b>（与菜单树同构，渲染交给共用组件 `PermTree`）：DIR 可折叠；
- * MENU 行＝菜单可见 checkbox + 入口码 checkbox + 「全选」快捷（菜单+入口+全部按钮）；
- * 其下嵌套该页按钮码。未挂页面的接口级码（平台 `sys:*` 闸门等）按 module 分组排在
- * 树后，与权限管理页同口径。</p>
- *
- * <p>数据面在平台 `/sys/**`，需同时具备控制台码与平台码（双闸门，见 `lib/permCodes.ts` 的 `SYS`）。</p>
- *
- * <p><b>授权目录与角色列表分开取</b>：只读角色可能没有 `sys:permission:list` / `sys:menu:list`，
- * 此时角色列表照常可用、只有授权区降级提示——避免一个 403 把整页拖垮。</p>
- */
-export default function RolesAdminPage() {
+export interface RolesAdminPageProps {
+  perms?: AdminPermOverrides;
+}
+
+/** 角色管理页（六页共享）。 */
+export default function RolesAdminPage({ perms }: RolesAdminPageProps) {
   const { t } = useTranslation();
+  const http = useAdminHttp();
   const toast = useToast();
   const confirm = useConfirm();
-  const canRead = useHasAllPermissions([ROLE_ADMIN_LIST, SYS.ROLE_LIST]);
-  const canRemove = useHasAllPermissions([ROLE_ADMIN_DELETE, SYS.ROLE_REMOVE]);
+  const p = { ...ROLE_PERMS, ...perms };
+  const hasAll = useAdminHasAll();
+  const canRead = hasAll(p.read);
+  const canRemove = hasAll(p.remove);
+  const canSave = hasAll(p.save);
+  const canGrant = hasAll(p.grant);
 
   const [selected, setSelected] = useState<SysRoleDto | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -75,12 +68,12 @@ export default function RolesAdminPage() {
   const selectedId = selected?.id ?? '';
 
   const rolesRes = useResource<PageResultDto<SysRoleDto>>(
-    ({ signal }) =>
-      api.rootGet<PageResultDto<SysRoleDto>>(
+    async ({ signal }) =>
+      (await http.get<PageResultDto<SysRoleDto>>(
         '/sys/roles/page',
         { page: 1, size: 500, sort: 'sortNo,asc' },
         { signal },
-      ),
+      )) ?? { records: [], total: 0, page: 0, size: 0 },
     { enabled: canRead },
   );
   const roles = useMemo(() => rolesRes.data?.records ?? [], [rolesRes.data]);
@@ -89,12 +82,12 @@ export default function RolesAdminPage() {
   const catalogRes = useResource<Catalog>(
     async ({ signal }) => {
       const [permPage, tree] = await Promise.all([
-        api.rootGet<PageResultDto<SysPermissionDto>>(
+        http.get<PageResultDto<SysPermissionDto>>(
           '/sys/permissions/page',
           { page: 1, size: 500, sort: 'code,asc' },
           { signal },
         ),
-        api.rootGet<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal }),
+        http.get<MenuTreeNode[]>('/sys/menus/tree', { includeButtons: true }, { signal }),
       ]);
       const nodes = tree ?? [];
       return { perms: permPage?.records ?? [], tree: nodes, flat: flatten(nodes) };
@@ -110,8 +103,8 @@ export default function RolesAdminPage() {
   const grantsRes = useResource<{ perms: string[]; menus: string[] }>(
     async ({ signal }) => {
       const [perms, menus] = await Promise.all([
-        api.rootGet<string[]>(`/sys/roles/${encodeURIComponent(selectedId)}/permissions`, undefined, { signal }),
-        api.rootGet<string[]>(`/sys/roles/${encodeURIComponent(selectedId)}/menus`, undefined, { signal }),
+        http.get<string[]>(`/sys/roles/${encodeURIComponent(selectedId)}/permissions`, undefined, { signal }),
+        http.get<string[]>(`/sys/roles/${encodeURIComponent(selectedId)}/menus`, undefined, { signal }),
       ]);
       return { perms: perms ?? [], menus: menus ?? [] };
     },
@@ -163,7 +156,7 @@ export default function RolesAdminPage() {
   async function onSave() {
     if (!draft) return;
     const errs: typeof fieldErr = {};
-    if (!draft.code.trim()) errs.code = t('iam.common.required');
+    if (!draft.code.trim()) errs.code = t('admin.common.required');
     setFieldErr(errs);
     if (Object.keys(errs).length) return;
 
@@ -177,13 +170,13 @@ export default function RolesAdminPage() {
         status: draft.status,
       };
       const saved = draft.id
-        ? await api.rootPut<SysRoleDto>('/sys/roles', { ...(selected ?? {}), ...edits })
-        : await api.rootPost<SysRoleDto>('/sys/roles', edits);
-      toast.success(t('iam.common.saved'));
+        ? await http.put<SysRoleDto>('/sys/roles', { ...(selected ?? {}), ...edits })
+        : await http.post<SysRoleDto>('/sys/roles', edits);
+      toast.success(t('admin.common.saved'));
       rolesRes.refresh();
       if (saved) selectRole(saved);
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -192,23 +185,23 @@ export default function RolesAdminPage() {
   async function onDelete() {
     if (!draft?.id) return;
     const ok = await confirm({
-      title: t('iam.common.delete'),
-      content: `${t('iam.common.confirmDelete')}\n${draft.code}`,
+      title: t('admin.common.delete'),
+      content: `${t('admin.common.confirmDelete')}\n${draft.code}`,
       danger: true,
-      okKey: 'iam.common.delete',
-      cancelKey: 'iam.common.cancel',
+      okKey: 'admin.common.delete',
+      cancelKey: 'admin.common.cancel',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await api.rootDel<void>(`/sys/roles/${encodeURIComponent(draft.id)}`);
-      toast.success(t('iam.common.deleted'));
+      await http.del<void>(`/sys/roles/${encodeURIComponent(draft.id)}`);
+      toast.success(t('admin.common.deleted'));
       closeDraft();
       setGrantedPerms(new Set());
       setGrantedMenus(new Set());
       rolesRes.refresh();
     } catch (e: any) {
-      toast.error(e?.msg || t('iam.common.saveFailed'));
+      toast.error(e?.msg || t('admin.common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -225,28 +218,28 @@ export default function RolesAdminPage() {
     setBusy(true);
     const failed: string[] = [];
     try {
-      await api.rootPut<void>(
+      await http.put<void>(
         `/sys/roles/${encodeURIComponent(selected.id)}/permissions`,
         Array.from(grantedPerms),
       );
     } catch {
-      failed.push(t('iam.admin.roles.tabPermGrant'));
+      failed.push(t('admin.admin.roles.tabPermGrant'));
     }
     try {
-      await api.rootPut<void>(`/sys/roles/${encodeURIComponent(selected.id)}/menus`, Array.from(grantedMenus));
+      await http.put<void>(`/sys/roles/${encodeURIComponent(selected.id)}/menus`, Array.from(grantedMenus));
     } catch {
-      failed.push(t('iam.admin.roles.tabMenuGrant'));
+      failed.push(t('admin.admin.roles.tabMenuGrant'));
     }
     setBusy(false);
-    if (failed.length) toast.error(`${t('iam.common.saveFailed')}：${failed.join(' / ')}`);
-    else toast.success(t('iam.common.saved'));
+    if (failed.length) toast.error(`${t('admin.common.saveFailed')}：${failed.join(' / ')}`);
+    else toast.success(t('admin.common.saved'));
   }
 
   /** 权限码按「所属页面」分组（菜单树关联）；接口级码按 module 排后；支持本地检索。 */
   const permGroups = useMemo(() => {
     const kw = permKw.trim().toLowerCase();
     const visible = kw
-      ? allPerms.filter((p) => p.code.toLowerCase().includes(kw) || (p.name ?? '').toLowerCase().includes(kw))
+      ? allPerms.filter((perm) => perm.code.toLowerCase().includes(kw) || (perm.name ?? '').toLowerCase().includes(kw))
       : allPerms;
     return groupPermsByPage(visible, buildPermPageMap(menuTree));
   }, [allPerms, menuTree, permKw]);
@@ -254,10 +247,10 @@ export default function RolesAdminPage() {
   /** 组级全选/清空：组内已全选则清空，否则全选。 */
   function toggleGroup(g: { perms: SysPermissionDto[] }) {
     const next = new Set(grantedPerms);
-    const allOn = g.perms.length > 0 && g.perms.every((p) => next.has(p.id));
-    for (const p of g.perms) {
-      if (allOn) next.delete(p.id);
-      else next.add(p.id);
+    const allOn = g.perms.length > 0 && g.perms.every((perm) => next.has(perm.id));
+    for (const perm of g.perms) {
+      if (allOn) next.delete(perm.id);
+      else next.add(perm.id);
     }
     setGrantedPerms(next);
   }
@@ -265,7 +258,7 @@ export default function RolesAdminPage() {
   /** 授权树用：permCode → 权限行 ID（授权接口按权限 ID 读写；树上只有码）。 */
   const permIdByCode = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of allPerms) m.set(p.code, p.id);
+    for (const perm of allPerms) m.set(perm.code, perm.id);
     return m;
   }, [allPerms]);
 
@@ -317,24 +310,24 @@ export default function RolesAdminPage() {
     () => [
       {
         key: 'name',
-        titleKey: 'iam.field.name',
+        titleKey: 'admin.field.name',
         render: (r) => (
           <span className="cell-inline">
             <span className="tree-name">{r.name ?? r.code}</span>
             {r.isSuper && (
               <CimTag size="small" tone="run">
-                {t('iam.admin.roles.super')}
+                {t('admin.admin.roles.super')}
               </CimTag>
             )}
             {r.status === 'DISABLED' && (
               <CimTag size="small" tone="err">
-                {t('iam.common.disabled')}
+                {t('admin.common.disabled')}
               </CimTag>
             )}
           </span>
         ),
       },
-      { key: 'code', titleKey: 'iam.field.code', mono: true, width: 140, ellipsis: true },
+      { key: 'code', titleKey: 'admin.field.code', mono: true, width: 140, ellipsis: true },
     ],
     [t],
   );
@@ -345,38 +338,38 @@ export default function RolesAdminPage() {
     return [
       {
         key: 'code',
-        labelKey: 'iam.field.code',
+        labelKey: 'admin.field.code',
         kind: 'text',
         mono: true,
-        placeholder: 'IAM_AUDITOR',
+        placeholder: 'AUDITOR',
         required: true,
         disabled: !!draft.id,
       },
-      { key: 'name', labelKey: 'iam.field.name', kind: 'text', placeholderKey: 'iam.field.name' },
-      { key: 'sortNo', labelKey: 'iam.field.sortNo', kind: 'number', min: 0 },
+      { key: 'name', labelKey: 'admin.field.name', kind: 'text', placeholderKey: 'admin.field.name' },
+      { key: 'sortNo', labelKey: 'admin.field.sortNo', kind: 'number', min: 0 },
       {
         key: 'isSuper',
-        labelKey: 'iam.admin.roles.super',
+        labelKey: 'admin.admin.roles.super',
         kind: 'switch',
-        hint: draft.isSuper ? t('iam.admin.roles.superHint') : undefined,
+        hint: draft.isSuper ? t('admin.admin.roles.superHint') : undefined,
       },
       {
         key: 'status',
-        labelKey: 'iam.field.status',
+        labelKey: 'admin.field.status',
         kind: 'select',
         allowClear: false,
         options: [
-          { value: 'ENABLED', labelKey: 'iam.common.enabled' },
-          { value: 'DISABLED', labelKey: 'iam.common.disabled' },
+          { value: 'ENABLED', labelKey: 'admin.common.enabled' },
+          { value: 'DISABLED', labelKey: 'admin.common.disabled' },
         ],
       },
     ];
   }, [draft, t]);
 
   /**
-   * 授权树（共用组件 {@link PermTree}）：DIR 折叠 → MENU 行（菜单可见 + 入口码 + 页面全选）
-   * → 按钮码嵌套其下。按钮码以菜单树 BUTTON 节点的 `permCode` 为准，经 {@link permIdByCode}
-   * 换算成权限 ID 写入 `sys_role_perm`；码未在权限表注册时行灰显（显示码但勾不了）。
+   * 授权树（共用组件 PermTree）：DIR 折叠 → MENU 行（菜单可见 + 入口码 + 页面全选）
+   * → 按钮码嵌套其下。按钮码以菜单树 BUTTON 节点的 permCode 为准，经 permIdByCode
+   * 换算成权限 ID 写入 sys_role_perm；码未在权限表注册时行灰显（显示码但勾不了）。
    */
   const grantTree = (
     <PermTree
@@ -404,12 +397,12 @@ export default function RolesAdminPage() {
           style={{ padding: '1px 8px' }}
           onClick={() => toggleMenuPage(node)}
         >
-          {t('iam.common.selectAll')}
+          {t('admin.common.selectAll')}
         </CimButton>
       )}
       groups={ifaceGroups.map((g) => ({ key: g.key, label: g.label, iface: true, perms: g.perms }))}
       groupAction={(g) => {
-        const allOn = g.perms.length > 0 && g.perms.every((p) => grantedPerms.has(p.id));
+        const allOn = g.perms.length > 0 && g.perms.every((perm) => grantedPerms.has(perm.id));
         return (
           <CimButton
             size="small"
@@ -417,7 +410,7 @@ export default function RolesAdminPage() {
             style={{ padding: '1px 8px' }}
             onClick={() => toggleGroup(g)}
           >
-            {allOn ? t('iam.common.clearAll') : t('iam.common.selectAll')}
+            {allOn ? t('admin.common.clearAll') : t('admin.common.selectAll')}
           </CimButton>
         );
       }}
@@ -429,7 +422,7 @@ export default function RolesAdminPage() {
     return (
       <Page>
         <Panel>
-          <InlineAlert tone="warn">{t('iam.common.noPlatformPerm')}</InlineAlert>
+          <InlineAlert tone="warn">{t('admin.common.noPlatformPerm')}</InlineAlert>
         </Panel>
       </Page>
     );
@@ -439,16 +432,16 @@ export default function RolesAdminPage() {
     ? [
         {
           key: 'basic',
-          labelKey: 'iam.admin.roles.tabBasic',
+          labelKey: 'admin.admin.roles.tabBasic',
           children: (
             <Panel
-              title={draft.id ? t('iam.common.edit') : t('iam.admin.roles.new')}
+              title={draft.id ? t('admin.common.edit') : t('admin.admin.roles.new')}
               sub={draft.id ? draft.code : undefined}
               actions={
                 canRemove && draft.id ? (
                   <CimButton size="small" onClick={onDelete} disabled={busy}>
                     <IconTrash width={13} height={13} />
-                    {t('iam.common.delete')}
+                    {t('admin.common.delete')}
                   </CimButton>
                 ) : undefined
               }
@@ -462,13 +455,13 @@ export default function RolesAdminPage() {
                 disabled={busy}
               />
               <div className="sub-head" style={{ marginTop: 12 }}>
-                <Can perm={draft.id ? [ROLE_ADMIN_UPDATE, SYS.ROLE_SAVE] : [ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
+                {canSave && (
                   <CimButton type="primary" htmlType="button" onClick={onSave} disabled={busy}>
-                    {busy ? t('iam.common.saving') : t('iam.common.save')}
+                    {busy ? t('admin.common.saving') : t('admin.common.save')}
                   </CimButton>
-                </Can>
+                )}
                 <CimButton size="small" htmlType="button" onClick={closeDraft}>
-                  {t('iam.common.close')}
+                  {t('admin.common.close')}
                 </CimButton>
               </div>
             </Panel>
@@ -480,46 +473,46 @@ export default function RolesAdminPage() {
   if (draft?.id) {
     tabItems.push({
       key: 'grant',
-      labelKey: 'iam.admin.roles.tabGrant',
+      labelKey: 'admin.admin.roles.tabGrant',
       badge: grantedPerms.size,
       children: (
         <Panel
-          title={t('iam.admin.roles.tabGrant')}
+          title={t('admin.admin.roles.tabGrant')}
           sub={`${grantedPerms.size} / ${allPerms.length} · ${grantedMenus.size} / ${allMenus.length}`}
           actions={
-            <Can perm={[ROLE_ADMIN_GRANT, SYS.ROLE_GRANT]}>
+            canGrant ? (
               <CimButton size="small" onClick={saveGrant} disabled={busy}>
                 <IconSave width={13} height={13} />
-                {t('iam.admin.roles.grantSave')}
+                {t('admin.admin.roles.grantSave')}
               </CimButton>
-            </Can>
+            ) : undefined
           }
         >
-          <p className="hint">{t('iam.admin.roles.grantNote')}</p>
+          <p className="hint">{t('admin.admin.roles.grantNote')}</p>
           {(catalogErr || grantsRes.error) && (
             <InlineAlert tone="warn">{catalogErr || grantsRes.error?.message}</InlineAlert>
           )}
           {!draft.isSuper && (
             <div className="sub-head">
-              <span className="hint">{t('iam.admin.roles.groupByPage')}</span>
+              <span className="hint">{t('admin.admin.roles.groupByPage')}</span>
               <span className="row" style={{ flexWrap: 'nowrap' }}>
                 <CimInput
                   id="role-perm-kw"
                   mono
                   width={200}
-                  placeholder={t('iam.common.search')}
+                  placeholder={t('admin.common.search')}
                   value={permKw}
                   onChange={setPermKw}
                 />
                 <CimButton
                   size="small"
                   htmlType="button"
-                  onClick={() => setGrantedPerms(new Set(allPerms.map((p) => p.id)))}
+                  onClick={() => setGrantedPerms(new Set(allPerms.map((perm) => perm.id)))}
                 >
-                  {t('iam.common.selectAll')}
+                  {t('admin.common.selectAll')}
                 </CimButton>
                 <CimButton size="small" htmlType="button" onClick={() => setGrantedPerms(new Set())}>
-                  {t('iam.common.clearAll')}
+                  {t('admin.common.clearAll')}
                 </CimButton>
               </span>
             </div>
@@ -527,7 +520,7 @@ export default function RolesAdminPage() {
           {menuTree.length ? (
             <div style={{ paddingTop: 4 }}>{grantTree}</div>
           ) : (
-            <EmptyState titleKey="iam.common.none" hint={catalogErr || undefined} />
+            <EmptyState titleKey="admin.common.none" hint={catalogErr || undefined} />
           )}
         </Panel>
       ),
@@ -539,19 +532,19 @@ export default function RolesAdminPage() {
       <CimSplitPane>
         <Panel
           className="scroll-y"
-          title={t('iam.admin.roles.list')}
+          title={t('admin.admin.roles.list')}
           sub={`${roles.length}`}
           flush
           actions={
             <>
-              <Can perm={[ROLE_ADMIN_CREATE, SYS.ROLE_SAVE]}>
-                <CimButton bare className="icon-btn" title={t('iam.admin.roles.new')} onClick={startCreate}>
+              {canSave && (
+                <CimButton bare className="icon-btn" title={t('admin.admin.roles.new')} onClick={startCreate}>
                   <IconPlus width={14} height={14} />
                 </CimButton>
-              </Can>
+              )}
               <CimButton size="small" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
                 <IconRefresh width={13} height={13} />
-                {rolesRes.loading ? t('iam.common.loading') : t('iam.common.refresh')}
+                {rolesRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}
               </CimButton>
             </>
           }
@@ -567,8 +560,8 @@ export default function RolesAdminPage() {
             onRetry={rolesRes.refresh}
             onRowClick={selectRole}
             rowClassName={(r) => (r.id === selected?.id ? 'ant-table-row-selected' : '')}
-            emptyTitleKey="iam.admin.roles.empty"
-            emptyHintKey="iam.admin.roles.emptyHint"
+            emptyTitleKey="admin.admin.roles.empty"
+            emptyHintKey="admin.admin.roles.emptyHint"
           />
         </Panel>
 
@@ -576,8 +569,8 @@ export default function RolesAdminPage() {
           {draft ? (
             <CimTabs items={tabItems} activeKey={tab} onChange={setTab} />
           ) : (
-            <Panel title={t('iam.admin.roles.selectRole')}>
-              <EmptyState titleKey="iam.admin.roles.selectRole" hintKey="iam.common.noPlatformPerm" />
+            <Panel title={t('admin.admin.roles.selectRole')}>
+              <EmptyState titleKey="admin.admin.roles.selectRole" hintKey="admin.common.noPlatformPerm" />
             </Panel>
           )}
         </div>
@@ -586,7 +579,7 @@ export default function RolesAdminPage() {
   );
 }
 
-// ------------------------------------------------------------------ 辅助
+// ---------------------------------------------------------------- 辅助
 
 interface Draft {
   id: string;

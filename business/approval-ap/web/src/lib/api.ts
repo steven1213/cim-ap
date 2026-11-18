@@ -12,27 +12,8 @@
 import { createHttpClient, type RequestOptions } from '@cim/data';
 import { useAuthStore } from '@/store/authStore';
 import { useIdentityStore, SHARED_DOMAIN } from '@/store/identityStore';
-import type {
-  AddSignRequest,
-  AuditView,
-  CallbackRegistrationRequest,
-  CallbackRegistrationView,
-  CompleteTaskRequest,
-  DefinitionXmlView,
-  FormSchemaField,
-  OutboxView,
-  ProcessDefinitionView,
-  ProcessDetailView,
-  ProcessInstanceView,
-  ReassignRequest,
-  ReturnRequest,
-  ReturnTargetsView,
-  StartProcessRequest,
-  StatsView,
-  TaskView,
-  AttachmentView,
-  MeDto,
-} from '@/types';
+import type { RawMenuNode } from '@cim/shell';
+import type { AddSignRequest, AttachmentView, AuditView, CallbackRegistrationRequest, CallbackRegistrationView, CompleteTaskRequest, DefinitionXmlView, FormSchemaField, MeDto, OutboxView, ProcessDefinitionView, ProcessDetailView, ProcessInstanceView, ReassignRequest, ReturnRequest, ReturnTargetsView, StartProcessRequest, StatsView, TaskView } from '@/types';
 
 export type { ApiError, RequestOptions } from '@cim/data';
 
@@ -40,7 +21,7 @@ export type { ApiError, RequestOptions } from '@cim/data';
  * ⚠️ 与 `store/authStore.ts` 是**循环 import**（它要 `http` 发 `/me` 与登出）。
  * 能成立是因为 `getToken` / `onUnauthorized` 都是闭包，只在发请求时才求值。
  */
-const http = createHttpClient({
+export const httpClient = createHttpClient({
   // 与另外三端不同：approval 的资源前缀是 `/api/v1/approval`，页面里只写 `/definitions` 这类资源段
   baseURL: '/api/v1/approval',
   getToken: () => useAuthStore.getState().token,
@@ -76,7 +57,7 @@ function currentIdentity(): { userId: string; tenantId: string; roles: string[] 
  * @returns 后端档案；401（认证已开启但未登录 / 令牌失效）返回 null
  */
 export function fetchMe(): Promise<MeDto | null> {
-  return http.fetchMe<MeDto>('/api/v1/approval/me');
+  return httpClient.fetchMe<MeDto>('/api/v1/approval/me');
 }
 
 /** 拉取当前用户档案（已登录；走带拦截器的实例，401 会清态跳登录）。 */
@@ -84,12 +65,21 @@ export function getMe(opts?: RequestOptions): Promise<MeDto | null> {
   return apiGet<MeDto | null>('/me', undefined, opts);
 }
 
+/**
+ * 当前用户可见菜单树（DIR/MENU，不含 BUTTON；`sys_role_menu` 过滤后，动态侧栏 +
+ * 菜单驱动路由唯一数据源）。后端 `MenuNode{menu, children}` 信封树，由 authStore
+ * 经 `normalizeMenuTree`（@cim/shell）归一为 `CimMenuNode`。
+ */
+export function fetchMenus(): Promise<RawMenuNode[]> {
+  return apiGet<RawMenuNode[]>('/me/menus');
+}
+
 async function apiGet<T>(url: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<T> {
-  return http.get<T>(url, params, opts);
+  return httpClient.get<T>(url, params, opts);
 }
 
 async function apiPost<T>(url: string, body?: unknown, params?: Record<string, unknown>): Promise<T> {
-  return http.post<T>(url, body, params ? { params } : undefined);
+  return httpClient.post<T>(url, body, params ? { params } : undefined);
 }
 
 // ---------- 流程定义 / 发起 ----------
@@ -108,14 +98,14 @@ export function startProcess(req: StartProcessRequest): Promise<{ processInstanc
 
 /** 撤回：发起人终止运行中实例。 */
 export function withdrawInstance(processInstanceId: string, actor?: string): Promise<void> {
-  return http.post(`/processes/instances/${encodeURIComponent(processInstanceId)}/withdraw`, null, {
+  return httpClient.post(`/processes/instances/${encodeURIComponent(processInstanceId)}/withdraw`, null, {
     params: { actor: actor ?? currentIdentity().userId },
   });
 }
 
 /** 催办：向当前待办人推送实时催办通知。 */
 export function urgeInstance(processInstanceId: string, actor?: string): Promise<void> {
-  return http.post(`/processes/instances/${encodeURIComponent(processInstanceId)}/urge`, null, {
+  return httpClient.post(`/processes/instances/${encodeURIComponent(processInstanceId)}/urge`, null, {
     params: { actor: actor ?? currentIdentity().userId },
   });
 }
@@ -282,14 +272,14 @@ export async function uploadAttachment(
   if (opts?.processInstanceId) form.append('processInstanceId', opts.processInstanceId);
   form.append('tenantId', opts?.tenantId ?? currentIdentity().tenantId);
   form.append('uploader', opts?.uploader ?? currentIdentity().userId);
-  const r = await http.post<AttachmentView>('/attachments/upload', form, {
+  const r = await httpClient.post<AttachmentView>('/attachments/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return r;
 }
 
 export function deleteAttachment(id: string, actor?: string): Promise<void> {
-  return http.del<void>(`/attachments/${encodeURIComponent(id)}`, {
+  return httpClient.del<void>(`/attachments/${encodeURIComponent(id)}`, {
     actor: actor ?? currentIdentity().userId,
   });
 }

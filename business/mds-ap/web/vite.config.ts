@@ -30,6 +30,7 @@ export default defineConfig({
       '@cim/data': path.resolve(__dirname, '../../../platform/web/packages/data/src'),
       '@cim/shell': path.resolve(__dirname, '../../../platform/web/packages/shell/src'),
       '@cim/i18n': path.resolve(__dirname, '../../../platform/web/packages/i18n/src'),
+      '@cim/admin': path.resolve(__dirname, '../../../platform/web/packages/admin/src'),
       // @cim/ui 是源码直引，其内部的 `import 'antd'` 会从共享包所在目录向上查找，
       // 落不到业务的 node_modules，故显式指向真实安装位置。
       // 这样 antd 内部 `import 'react'` 也能解析到同一份 React，不会出现两份实例。

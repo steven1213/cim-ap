@@ -278,3 +278,7 @@ export interface MeDto {
   permissions: string[];
   authEnabled: boolean;
 }
+
+// ---------------------------------------------------------------- 动态菜单（/me/menus）
+
+/** 菜单节点（sys_menu 行；对齐 @cim/shell CimMenuNode 字面子集）。 */

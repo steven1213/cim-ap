@@ -92,6 +92,26 @@ public final class RmsPermissions {
     public static final String INTEGRATION_VIEW = "rms:integration:view";
     public static final String INTEGRATION_OPERATE = "rms:integration:operate";
 
+    // ---------------- 平台管理域（系统配置组；端点来自 cim-system / 本 ap i18n 管理控制器，码值与 PermissionCodes 对齐） ----------------
+    public static final String SYS_MENU_LIST = com.cim.system.support.PermissionCodes.MENU_LIST;
+    public static final String SYS_MENU_SAVE = com.cim.system.support.PermissionCodes.MENU_SAVE;
+    public static final String SYS_MENU_REMOVE = com.cim.system.support.PermissionCodes.MENU_REMOVE;
+    public static final String SYS_ROLE_LIST = com.cim.system.support.PermissionCodes.ROLE_LIST;
+    public static final String SYS_ROLE_SAVE = com.cim.system.support.PermissionCodes.ROLE_SAVE;
+    public static final String SYS_ROLE_REMOVE = com.cim.system.support.PermissionCodes.ROLE_REMOVE;
+    public static final String SYS_ROLE_GRANT = com.cim.system.support.PermissionCodes.ROLE_GRANT;
+    public static final String SYS_PERM_LIST = com.cim.system.support.PermissionCodes.PERMISSION_LIST;
+    public static final String SYS_PERM_SAVE = com.cim.system.support.PermissionCodes.PERMISSION_SAVE;
+    public static final String SYS_PERM_REMOVE = com.cim.system.support.PermissionCodes.PERMISSION_REMOVE;
+    public static final String SYS_I18N_LIST = com.cim.system.support.PermissionCodes.I18N_LIST;
+    public static final String SYS_I18N_SAVE = com.cim.system.support.PermissionCodes.I18N_SAVE;
+    public static final String SYS_I18N_REMOVE = com.cim.system.support.PermissionCodes.I18N_REMOVE;
+    public static final String SYS_I18N_LOCALE = com.cim.system.support.PermissionCodes.I18N_LOCALE;
+
+    // ---------------- 目录只读（组织/人员；主数据在 IAM，本系统只读——经代理取目录 API） ----------------
+    public static final String ORG_VIEW = "rms:org:view";
+    public static final String USER_VIEW = "rms:user:view";
+
     /** 全量权限（超管 / RMS 管理员短路展开）。 */
     public static Set<String> full() {
         Set<String> s = new LinkedHashSet<>();
@@ -113,6 +133,11 @@ public final class RmsPermissions {
         s.add(BODY_TEMPLATE_VIEW); s.add(BODY_TEMPLATE_MANAGE);
         s.add(EXPERIMENT_VIEW); s.add(EXPERIMENT_MANAGE);
         s.add(REPORT_VIEW); s.add(INTEGRATION_VIEW); s.add(INTEGRATION_OPERATE);
+        s.add(SYS_MENU_LIST); s.add(SYS_MENU_SAVE); s.add(SYS_MENU_REMOVE);
+        s.add(SYS_ROLE_LIST); s.add(SYS_ROLE_SAVE); s.add(SYS_ROLE_REMOVE); s.add(SYS_ROLE_GRANT);
+        s.add(SYS_PERM_LIST); s.add(SYS_PERM_SAVE); s.add(SYS_PERM_REMOVE);
+        s.add(SYS_I18N_LIST); s.add(SYS_I18N_SAVE); s.add(SYS_I18N_REMOVE); s.add(SYS_I18N_LOCALE);
+        s.add(ORG_VIEW); s.add(USER_VIEW);
         return s;
     }
 
@@ -131,6 +156,7 @@ public final class RmsPermissions {
         s.add(BODY_TEMPLATE_VIEW);
         s.add(EXPERIMENT_VIEW);
         s.add(REPORT_VIEW); s.add(INTEGRATION_VIEW);
+        s.add(ORG_VIEW); s.add(USER_VIEW);
         return s;
     }
 }

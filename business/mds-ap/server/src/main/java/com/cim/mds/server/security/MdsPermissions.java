@@ -114,8 +114,20 @@ public final class MdsPermissions {
     public static final String SYS_MENU_SAVE = PermissionCodes.MENU_SAVE;
     public static final String SYS_MENU_REMOVE = PermissionCodes.MENU_REMOVE;
     public static final String SYS_ROLE_LIST = PermissionCodes.ROLE_LIST;
+    public static final String SYS_ROLE_SAVE = PermissionCodes.ROLE_SAVE;
+    public static final String SYS_ROLE_REMOVE = PermissionCodes.ROLE_REMOVE;
     public static final String SYS_ROLE_GRANT = PermissionCodes.ROLE_GRANT;
-    public static final String SYS_I18N_SAVE = "sys:i18n:save";
+    public static final String SYS_PERM_LIST = PermissionCodes.PERMISSION_LIST;
+    public static final String SYS_PERM_SAVE = PermissionCodes.PERMISSION_SAVE;
+    public static final String SYS_PERM_REMOVE = PermissionCodes.PERMISSION_REMOVE;
+    public static final String SYS_I18N_LIST = PermissionCodes.I18N_LIST;
+    public static final String SYS_I18N_SAVE = PermissionCodes.I18N_SAVE;
+    public static final String SYS_I18N_REMOVE = PermissionCodes.I18N_REMOVE;
+    public static final String SYS_I18N_LOCALE = PermissionCodes.I18N_LOCALE;
+
+    // ---------------- 目录只读（组织/人员；主数据在 IAM，本系统只读——经代理取目录 API） ----------------
+    public static final String ORG_VIEW = "mds:org:view";
+    public static final String USER_VIEW = "mds:user:view";
 
     /** 全部权限码（供种子与测试断言，顺序稳定）。 */
     public static Set<String> all() {
@@ -184,8 +196,18 @@ public final class MdsPermissions {
         codes.add(SYS_MENU_SAVE);
         codes.add(SYS_MENU_REMOVE);
         codes.add(SYS_ROLE_LIST);
+        codes.add(SYS_ROLE_SAVE);
+        codes.add(SYS_ROLE_REMOVE);
         codes.add(SYS_ROLE_GRANT);
+        codes.add(SYS_PERM_LIST);
+        codes.add(SYS_PERM_SAVE);
+        codes.add(SYS_PERM_REMOVE);
+        codes.add(SYS_I18N_LIST);
         codes.add(SYS_I18N_SAVE);
+        codes.add(SYS_I18N_REMOVE);
+        codes.add(SYS_I18N_LOCALE);
+        codes.add(ORG_VIEW);
+        codes.add(USER_VIEW);
         return codes;
     }
 }

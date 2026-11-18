@@ -18,6 +18,7 @@ import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,6 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:iam-directory;DB_CLOSE_DELAY=-1;MODE=MySQL",
         "cim.iam.auth.bootstrap.admin-username=admin",
+        "cim.iam.auth.bootstrap.enabled=false",
         "cim.iam.auth.bootstrap.admin-password=Admin@123456",
         "cim.iam.directory.api.key=test-directory-key"
 })
@@ -79,6 +81,17 @@ class IdentityDirectoryTest {
     private TokenVersionService tokenVersionService;
     @Autowired
     private IamAuthProperties authProps;
+
+    @BeforeEach
+    void ensureAdmin() {
+        // bootstrap 引导已关（cim.iam.auth.bootstrap.enabled=false）：管理员由测试自建，
+        // 口令与原 bootstrap 配置一致（Admin@123456）。幂等：已存在则跳过。
+        if (credentialService.findByUsername("admin").isEmpty()) {
+            String salt = "salt-admin";
+            String clientHash = PasswordDerivation.derive("Admin@123456", salt, rounds());
+            credentialService.registerLocalUser("admin", clientHash, salt);
+        }
+    }
 
     @Test
     void orgGrantExpandsToMemberThroughAncestorChain() {

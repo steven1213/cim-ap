@@ -28,6 +28,8 @@
       "@cim/shell/*": ["../../../platform/web/packages/shell/src/*"],
       "@cim/i18n": ["../../../platform/web/packages/i18n/src/index.ts"],
       "@cim/i18n/*": ["../../../platform/web/packages/i18n/src/*"],
+      "@cim/admin": ["../../../platform/web/packages/admin/src/index.ts"],
+      "@cim/admin/*": ["../../../platform/web/packages/admin/src/*"],
       "antd": ["node_modules/antd"],
       "antd/*": ["node_modules/antd/*"],
       "dayjs": ["node_modules/dayjs"],

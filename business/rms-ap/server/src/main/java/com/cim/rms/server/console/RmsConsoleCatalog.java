@@ -41,53 +41,102 @@ public final class RmsConsoleCatalog {
                           String i18nCode, String icon, String permCode, int sortNo) {
     }
 
-    /** RMS 控制台菜单树（父先于子；顺序即种子写入顺序）。 */
+    /** RMS 控制台菜单树（父先于子；顺序即种子写入顺序）。IA 与前端 navConfig 对齐：概览 + 三组七模块 + 系统配置。 */
     public static List<MenuDef> menus() {
         List<MenuDef> m = new ArrayList<>();
-        // —— 概览（不绑权限：登录后的落脚页）——
+        // —— 概览（不绑权限：登录后的落脚页；不套分组）——
         m.add(menu("overview", null, "/", "DashboardPage", "rms.nav.dashboard", "gauge", null, 10));
-        // —— 配方管理 ——
-        m.add(dir("grp.recipe", "rms.nav.group.recipe", 20));
-        m.add(menu("recipes", "grp.recipe", "/recipes", "RecipeLibraryPage", "rms.nav.recipes",
+
+        // —— 日常操作（高频：占日常操作 80%）——
+        m.add(dir("grp.daily", "rms.nav.group.daily", 20));
+        m.add(dir("mod.recipe", "grp.daily", "rms.nav.module.recipe", 10));
+        m.add(menu("recipes", "mod.recipe", "/recipes", "RecipeLibraryPage", "rms.nav.recipes",
                 "sliders", RmsPermissions.RECIPE_VIEW, 10));
-        m.add(menu("specs", "grp.recipe", "/specs", "SpecPage", "rms.nav.specs",
-                "checklist", RmsPermissions.SPEC_VIEW, 20));
-        m.add(menu("spec-templates", "grp.recipe", "/spec-templates", "SpecTemplatePage", "rms.nav.specTemplates",
-                "copy", RmsPermissions.SPEC_VIEW, 30));
-        m.add(menu("body-templates", "grp.recipe", "/body-templates", "BodyTemplatePage", "rms.nav.bodyTemplates",
-                "file", RmsPermissions.BODY_TEMPLATE_VIEW, 40));
-        // —— 设备管理 ——
-        m.add(dir("grp.device", "rms.nav.group.device", 30));
-        m.add(menu("device-types", "grp.device", "/device-types", "DeviceTypePage", "rms.nav.deviceTypes",
+        m.add(menu("deviceRecipes", "mod.recipe", "/device-recipes", "DeviceRecipePage", "rms.nav.deviceRecipes",
+                "tree", RmsPermissions.RECIPE_VIEW, 20));
+        m.add(dir("mod.deviceOps", "grp.daily", "rms.nav.module.deviceOps", 20));
+        m.add(menu("devices", "mod.deviceOps", "/devices", "DevicePage", "rms.nav.devices",
+                "monitor", RmsPermissions.DEVICE_VIEW, 10));
+        m.add(menu("signoff", "mod.deviceOps", "/signoff", "SignoffPage", "rms.nav.signoff",
+                "shield", RmsPermissions.SIGNOFF_VIEW, 20));
+        m.add(menu("compare", "mod.deviceOps", "/compare", "ComparePage", "rms.nav.compare",
+                "refresh", RmsPermissions.COMPARE_VIEW, 30));
+
+        // —— 治理与合规（次高频：审批域配置与安全管控）——
+        m.add(dir("grp.governance", "rms.nav.group.governance", 30));
+        m.add(dir("mod.release", "grp.governance", "rms.nav.module.release", 10));
+        m.add(menu("qualifications", "mod.release", "/qualifications", "QualificationPage", "rms.nav.qualifications",
+                "link", RmsPermissions.QUALIFICATION_VIEW, 10));
+        m.add(menu("golden", "mod.release", "/golden", "GoldenPage", "rms.nav.golden",
+                "star", RmsPermissions.GOLDEN_VIEW, 20));
+        m.add(menu("bypasses", "mod.release", "/bypasses", "BypassPage", "rms.nav.bypasses",
+                "shield", RmsPermissions.BYPASS_VIEW, 30));
+        m.add(dir("mod.observe", "grp.governance", "rms.nav.module.observe", 20));
+        m.add(menu("audit", "mod.observe", "/audit", "AuditLogPage", "rms.nav.audit",
+                "inbox", RmsPermissions.AUDIT_VIEW, 10));
+        m.add(menu("integration", "mod.observe", "/integration", "IntegrationPage", "rms.nav.integration",
+                "link", RmsPermissions.INTEGRATION_VIEW, 20));
+        m.add(menu("experiments", "mod.observe", "/experiments", "ExperimentPage", "rms.nav.experiments",
+                "flask", RmsPermissions.EXPERIMENT_VIEW, 30));
+
+        // —— 基础数据（低频维护：建好之后很少动）——
+        m.add(dir("grp.master", "rms.nav.group.master", 40));
+        m.add(dir("mod.deviceModel", "grp.master", "rms.nav.module.deviceModel", 10));
+        m.add(menu("deviceTypes", "mod.deviceModel", "/device-types", "DeviceTypePage", "rms.nav.deviceTypes",
                 "apps", RmsPermissions.DEVICE_TYPE_VIEW, 10));
-        m.add(menu("device-areas", "grp.device", "/device-areas", "DeviceAreaPage", "rms.nav.deviceAreas",
+        m.add(menu("deviceAreas", "mod.deviceModel", "/device-areas", "DeviceAreaPage", "rms.nav.deviceAreas",
                 "tree", RmsPermissions.DEVICE_AREA_VIEW, 20));
-        m.add(menu("devices", "grp.device", "/devices", "DevicePage", "rms.nav.devices",
-                "monitor", RmsPermissions.DEVICE_VIEW, 30));
-        m.add(menu("ecsv", "grp.device", "/ecsv", "EcSvPage", "rms.nav.ecsv",
-                "activity", RmsPermissions.ECSV_VIEW, 40));
-        // —— 管控（Bypass / 资格矩阵 / Golden / 设备授权）——
-        m.add(dir("grp.governance", "rms.nav.group.governance", 35));
-        m.add(menu("bypasses", "grp.governance", "/bypasses", "BypassPage", "rms.nav.bypasses",
-                "shield-off", RmsPermissions.BYPASS_VIEW, 10));
-        m.add(menu("qualifications", "grp.governance", "/qualifications", "QualificationPage", "rms.nav.qualifications",
-                "badge", RmsPermissions.QUALIFICATION_VIEW, 20));
-        m.add(menu("golden", "grp.governance", "/golden", "GoldenPage", "rms.nav.golden",
-                "star", RmsPermissions.GOLDEN_VIEW, 30));
-        m.add(menu("device-auth", "grp.governance", "/device-auth", "DeviceAuthPage", "rms.nav.deviceAuth",
-                "key", RmsPermissions.DEVICE_AUTH_VIEW, 40));
-        m.add(menu("experiments", "grp.governance", "/experiments", "ExperimentPage", "rms.nav.experiments",
-                "flask", RmsPermissions.EXPERIMENT_VIEW, 50));
-        // —— 高级（签核 / 比对 / 审计 / 集成）——
-        m.add(dir("grp.advanced", "rms.nav.group.advanced", 40));
-        m.add(menu("signoff", "grp.advanced", "/signoff", "SignoffPage", "rms.nav.signoff",
-                "shield", RmsPermissions.SIGNOFF_VIEW, 10));
-        m.add(menu("compare", "grp.advanced", "/compare", "ComparePage", "rms.nav.compare",
-                "refresh", RmsPermissions.COMPARE_VIEW, 20));
-        m.add(menu("audit", "grp.advanced", "/audit", "AuditLogPage", "rms.nav.audit",
-                "inbox", RmsPermissions.AUDIT_VIEW, 30));
-        m.add(menu("integration", "grp.advanced", "/integration", "IntegrationPage", "rms.nav.integration",
-                "plug", RmsPermissions.INTEGRATION_VIEW, 40));
+        m.add(dir("mod.spec", "grp.master", "rms.nav.module.spec", 20));
+        m.add(menu("specs", "mod.spec", "/specs", "SpecPage", "rms.nav.specs",
+                "list", RmsPermissions.SPEC_VIEW, 10));
+        m.add(menu("specTemplates", "mod.spec", "/spec-templates", "SpecTemplatePage", "rms.nav.specTemplates",
+                "sliders", RmsPermissions.SPEC_VIEW, 20));
+        m.add(menu("bodyTemplates", "mod.spec", "/body-templates", "BodyTemplatePage", "rms.nav.bodyTemplates",
+                "file", RmsPermissions.BODY_TEMPLATE_VIEW, 30));
+        m.add(dir("mod.auth", "grp.master", "rms.nav.module.auth", 30));
+        m.add(menu("deviceAuth", "mod.auth", "/device-auth", "DeviceAuthPage", "rms.nav.deviceAuth",
+                "key", RmsPermissions.DEVICE_AUTH_VIEW, 10));
+        m.add(menu("ecsv", "mod.auth", "/ecsv", "EcSvPage", "rms.nav.ecsv",
+                "alert", RmsPermissions.ECSV_VIEW, 20));
+
+        // —— 系统配置（六页共享组件 @cim/admin；菜单/权限/角色/多语言走平台端点，
+        //    组织/人员只读——主数据在 IAM，经本系统代理取目录 API）——
+        m.add(dir("grp.settings", "rms.nav.group.settings", 50));
+        m.add(menu("menuAdmin", "grp.settings", "/menus", "MenusAdminPage",
+                "rms.nav.menus", "layers", RmsPermissions.SYS_MENU_LIST, 10));
+        m.add(button("btn.menu.save", "menuAdmin", "rms.nav.menus.action.save",
+                RmsPermissions.SYS_MENU_SAVE, 10));
+        m.add(button("btn.menu.delete", "menuAdmin", "rms.nav.menus.action.delete",
+                RmsPermissions.SYS_MENU_REMOVE, 20));
+        m.add(button("btn.menu.grant", "menuAdmin", "rms.nav.menus.action.grant",
+                RmsPermissions.SYS_ROLE_GRANT, 30));
+        m.add(menu("permissionsAdmin", "grp.settings", "/permissions", "PermissionsAdminPage",
+                "rms.nav.permissions", "shield", RmsPermissions.SYS_PERM_LIST, 20));
+        m.add(button("btn.permission.save", "permissionsAdmin", "rms.nav.permissions.action.save",
+                RmsPermissions.SYS_PERM_SAVE, 10));
+        m.add(button("btn.permission.delete", "permissionsAdmin", "rms.nav.permissions.action.delete",
+                RmsPermissions.SYS_PERM_REMOVE, 20));
+        m.add(menu("rolesAdmin", "grp.settings", "/roles-admin", "RolesAdminPage",
+                "rms.nav.rolesAdmin", "users", RmsPermissions.SYS_ROLE_LIST, 30));
+        m.add(button("btn.role.save", "rolesAdmin", "rms.nav.rolesAdmin.action.save",
+                RmsPermissions.SYS_ROLE_SAVE, 10));
+        m.add(button("btn.role.delete", "rolesAdmin", "rms.nav.rolesAdmin.action.delete",
+                RmsPermissions.SYS_ROLE_REMOVE, 20));
+        m.add(button("btn.role.grant", "rolesAdmin", "rms.nav.rolesAdmin.action.grant",
+                RmsPermissions.SYS_ROLE_GRANT, 30));
+        m.add(menu("i18nAdmin", "grp.settings", "/i18n", "I18nAdminPage",
+                "rms.nav.i18n", "check", RmsPermissions.SYS_I18N_LIST, 40));
+        m.add(button("btn.i18n.save", "i18nAdmin", "rms.nav.i18n.action.save",
+                RmsPermissions.SYS_I18N_SAVE, 10));
+        m.add(button("btn.i18n.delete", "i18nAdmin", "rms.nav.i18n.action.delete",
+                RmsPermissions.SYS_I18N_REMOVE, 20));
+        m.add(button("btn.i18n.locale", "i18nAdmin", "rms.nav.i18n.action.locale",
+                RmsPermissions.SYS_I18N_LOCALE, 30));
+        // 组织/人员：只读（无 BUTTON 节点），入口码 rms:org:view / rms:user:view
+        m.add(menu("orgs", "grp.settings", "/orgs", "OrgPage",
+                "rms.nav.orgs", "tree", RmsPermissions.ORG_VIEW, 50));
+        m.add(menu("users", "grp.settings", "/users", "UsersPage",
+                "rms.nav.users", "user", RmsPermissions.USER_VIEW, 60));
         return m;
     }
 
@@ -98,6 +147,16 @@ public final class RmsConsoleCatalog {
 
     private static MenuDef dir(String key, String i18nCode, int sortNo) {
         return new MenuDef(key, null, MenuType.DIR, null, null, i18nCode, null, null, sortNo);
+    }
+
+    /** 二级模块目录（分组 → 模块 → 页面，三级结构与前端 navConfig 一致）。 */
+    private static MenuDef dir(String key, String parentKey, String i18nCode, int sortNo) {
+        return new MenuDef(key, parentKey, MenuType.DIR, null, null, i18nCode, null, null, sortNo);
+    }
+
+    /** 按钮节点：单菜单承载动作，i18n 码显式传入（sys_menu.i18n_code 全库唯一）。 */
+    private static MenuDef button(String key, String parentKey, String i18nCode, String permCode, int sortNo) {
+        return new MenuDef(key, parentKey, MenuType.BUTTON, null, null, i18nCode, null, permCode, sortNo);
     }
 
     // ================================================================ 权限
@@ -167,6 +226,23 @@ public final class RmsConsoleCatalog {
         p.add(new PermDef(RmsPermissions.REPORT_VIEW, "报表查看"));
         p.add(new PermDef(RmsPermissions.INTEGRATION_VIEW, "集成监控查看"));
         p.add(new PermDef(RmsPermissions.INTEGRATION_OPERATE, "集成操作（解除 Hold 等）"));
+        // 系统配置（平台域：菜单/权限/角色/多语言 + 只读目录）
+        p.add(new PermDef(RmsPermissions.SYS_MENU_LIST, "菜单查看"));
+        p.add(new PermDef(RmsPermissions.SYS_MENU_SAVE, "菜单维护"));
+        p.add(new PermDef(RmsPermissions.SYS_MENU_REMOVE, "菜单删除"));
+        p.add(new PermDef(RmsPermissions.SYS_ROLE_LIST, "角色查看"));
+        p.add(new PermDef(RmsPermissions.SYS_ROLE_SAVE, "角色维护"));
+        p.add(new PermDef(RmsPermissions.SYS_ROLE_REMOVE, "角色删除"));
+        p.add(new PermDef(RmsPermissions.SYS_ROLE_GRANT, "角色授权"));
+        p.add(new PermDef(RmsPermissions.SYS_PERM_LIST, "权限查看"));
+        p.add(new PermDef(RmsPermissions.SYS_PERM_SAVE, "权限维护"));
+        p.add(new PermDef(RmsPermissions.SYS_PERM_REMOVE, "权限删除"));
+        p.add(new PermDef(RmsPermissions.SYS_I18N_LIST, "译文查看"));
+        p.add(new PermDef(RmsPermissions.SYS_I18N_SAVE, "译文维护"));
+        p.add(new PermDef(RmsPermissions.SYS_I18N_REMOVE, "译文删除"));
+        p.add(new PermDef(RmsPermissions.SYS_I18N_LOCALE, "语言目录维护"));
+        p.add(new PermDef(RmsPermissions.ORG_VIEW, "组织目录查看（只读，主数据在 IAM）"));
+        p.add(new PermDef(RmsPermissions.USER_VIEW, "人员目录查看（只读，主数据在 IAM）"));
         return p;
     }
 
@@ -245,29 +321,55 @@ public final class RmsConsoleCatalog {
     /** RMS 控制台文案（菜单名 / 分组名 / 外壳文案）。 */
     public static List<TextDef> texts() {
         List<TextDef> t = new ArrayList<>();
-        // —— 菜单与分组 ——
+        // —— 菜单与分组（IA 与前端 navConfig 三组七模块对齐）——
         t.add(new TextDef("rms.nav.dashboard", "概览", "Overview"));
-        t.add(new TextDef("rms.nav.group.recipe", "配方管理", "Recipe"));
+        t.add(new TextDef("rms.nav.group.daily", "日常操作", "Daily Ops"));
+        t.add(new TextDef("rms.nav.module.recipe", "配方管理", "Recipes"));
         t.add(new TextDef("rms.nav.recipes", "配方库", "Recipes"));
+        t.add(new TextDef("rms.nav.deviceRecipes", "设备配方", "Device Recipes"));
+        t.add(new TextDef("rms.nav.module.deviceOps", "设备与签核", "Equipment & Sign-off"));
+        t.add(new TextDef("rms.nav.devices", "设备台账", "Devices"));
+        t.add(new TextDef("rms.nav.signoff", "签核流", "Sign-off"));
+        t.add(new TextDef("rms.nav.compare", "在线比对", "Compare"));
+        t.add(new TextDef("rms.nav.group.governance", "治理与合规", "Governance"));
+        t.add(new TextDef("rms.nav.module.release", "放行与管控", "Release Control"));
+        t.add(new TextDef("rms.nav.qualifications", "资格矩阵", "Qualification"));
+        t.add(new TextDef("rms.nav.golden", "Golden 机差", "Golden"));
+        t.add(new TextDef("rms.nav.bypasses", "Bypass 豁免", "Bypass"));
+        t.add(new TextDef("rms.nav.module.observe", "审计与集成", "Audit & Integration"));
+        t.add(new TextDef("rms.nav.audit", "审计日志", "Audit Log"));
+        t.add(new TextDef("rms.nav.integration", "集成监控", "Integration"));
+        t.add(new TextDef("rms.nav.experiments", "实验通道", "Experiments"));
+        t.add(new TextDef("rms.nav.group.master", "基础数据", "Master Data"));
+        t.add(new TextDef("rms.nav.module.deviceModel", "设备模型", "Equipment Model"));
+        t.add(new TextDef("rms.nav.deviceTypes", "设备类型", "Device Types"));
+        t.add(new TextDef("rms.nav.deviceAreas", "设备区域", "Device Areas"));
+        t.add(new TextDef("rms.nav.module.spec", "规格与模板", "Specs & Templates"));
         t.add(new TextDef("rms.nav.specs", "参数规格", "Param Specs"));
         t.add(new TextDef("rms.nav.specTemplates", "规格模板", "Spec Templates"));
         t.add(new TextDef("rms.nav.bodyTemplates", "Body 模板", "Body Templates"));
-        t.add(new TextDef("rms.nav.experiments", "实验通道", "Experiments"));
-        t.add(new TextDef("rms.nav.group.device", "设备管理", "Devices"));
-        t.add(new TextDef("rms.nav.deviceTypes", "设备类型", "Device Types"));
-        t.add(new TextDef("rms.nav.deviceAreas", "设备区域", "Device Areas"));
-        t.add(new TextDef("rms.nav.devices", "设备台账", "Devices"));
-        t.add(new TextDef("rms.nav.ecsv", "EC/SV 规格", "EC/SV Specs"));
-        t.add(new TextDef("rms.nav.group.governance", "管控中心", "Governance"));
-        t.add(new TextDef("rms.nav.bypasses", "Bypass 豁免", "BypassPage"));
-        t.add(new TextDef("rms.nav.qualifications", "资格矩阵", "QualificationPage"));
-        t.add(new TextDef("rms.nav.golden", "Golden 机差", "GoldenPage"));
+        t.add(new TextDef("rms.nav.module.auth", "授权与例外", "Authorization"));
         t.add(new TextDef("rms.nav.deviceAuth", "设备授权", "Device Auth"));
-        t.add(new TextDef("rms.nav.group.advanced", "高级", "Advanced"));
-        t.add(new TextDef("rms.nav.signoff", "签核流", "Sign-off"));
-        t.add(new TextDef("rms.nav.compare", "在线比对", "ComparePage"));
-        t.add(new TextDef("rms.nav.audit", "审计日志", "Audit Log"));
-        t.add(new TextDef("rms.nav.integration", "集成监控", "IntegrationPage"));
+        t.add(new TextDef("rms.nav.ecsv", "EC/SV 规格", "EC/SV Specs"));
+        // —— 系统配置组（六页共享组件 @cim/admin）——
+        t.add(new TextDef("rms.nav.group.settings", "系统配置", "System settings"));
+        t.add(new TextDef("rms.nav.menus", "菜单管理", "Menus"));
+        t.add(new TextDef("rms.nav.menus.action.save", "菜单·维护", "Menu · save"));
+        t.add(new TextDef("rms.nav.menus.action.delete", "菜单·删除", "Menu · delete"));
+        t.add(new TextDef("rms.nav.menus.action.grant", "菜单·授权", "Menu · grant"));
+        t.add(new TextDef("rms.nav.permissions", "权限管理", "Permissions"));
+        t.add(new TextDef("rms.nav.permissions.action.save", "权限·维护", "Permission · save"));
+        t.add(new TextDef("rms.nav.permissions.action.delete", "权限·删除", "Permission · delete"));
+        t.add(new TextDef("rms.nav.rolesAdmin", "角色管理", "Roles"));
+        t.add(new TextDef("rms.nav.rolesAdmin.action.save", "角色·维护", "Role · save"));
+        t.add(new TextDef("rms.nav.rolesAdmin.action.delete", "角色·删除", "Role · delete"));
+        t.add(new TextDef("rms.nav.rolesAdmin.action.grant", "角色·授权", "Role · grant"));
+        t.add(new TextDef("rms.nav.i18n", "多语言", "Languages & i18n"));
+        t.add(new TextDef("rms.nav.i18n.action.save", "多语言·维护", "i18n · save"));
+        t.add(new TextDef("rms.nav.i18n.action.delete", "多语言·删除", "i18n · delete"));
+        t.add(new TextDef("rms.nav.i18n.action.locale", "多语言·语言目录", "i18n · locales"));
+        t.add(new TextDef("rms.nav.orgs", "组织管理", "Organization"));
+        t.add(new TextDef("rms.nav.users", "人员管理", "Users"));
         // —— 签核 / 比对 / 审计 页面（与前端内置包 rms.signoff.* / rms.compare.* / rms.audit.* 对齐）——
         t.add(new TextDef("rms.signoff.title", "签核流", "Sign-off"));
         t.add(new TextDef("rms.signoff.pending", "待审批", "Pending"));

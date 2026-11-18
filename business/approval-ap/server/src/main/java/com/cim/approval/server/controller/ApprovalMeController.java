@@ -2,6 +2,9 @@ package com.cim.approval.server.controller;
 
 import com.cim.auth.principal.CimUserPrincipal;
 import com.cim.spring.support.web.Result;
+import com.cim.system.menu.MenuNode;
+import com.cim.system.rbac.LocalUserResolver;
+import com.cim.system.rbac.SysRbacService;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -35,6 +38,14 @@ public class ApprovalMeController {
     @Value("${cim.auth.enabled:false}")
     private boolean authEnabled;
 
+    private final LocalUserResolver userResolver;
+    private final SysRbacService rbacService;
+
+    public ApprovalMeController(LocalUserResolver userResolver, SysRbacService rbacService) {
+        this.userResolver = userResolver;
+        this.rbacService = rbacService;
+    }
+
     /** GET /api/v1/approval/me —— 当前用户档案 + 认证开关。 */
     @GetMapping("/me")
     public Result<MeDto> me() {
@@ -50,6 +61,23 @@ public class ApprovalMeController {
                 p.roles() == null ? List.of() : List.copyOf(p.roles()),
                 p.authoritiesSet() == null ? Set.of() : Set.copyOf(p.authoritiesSet()),
                 authEnabled));
+    }
+
+    /**
+     * GET /api/v1/approval/me/menus —— 当前用户可见菜单树（含 DIR/MENU，不含 BUTTON）。
+     *
+     * <p>按 {@code sys_role_menu} 过滤；dev 态（auth 关闭）无 principal，回<b>全量</b>树
+     * （演示通道没有身份，按角色过滤无从谈起；认证态一律按角色过滤）。</p>
+     */
+    @GetMapping("/me/menus")
+    public Result<List<MenuNode>> myMenus() {
+        CimUserPrincipal p = principal();
+        if (p == null) {
+            return Result.ok(rbacService.fullMenuTree(false));
+        }
+        return userResolver.resolve(p.userId(), p.username())
+                .map(user -> Result.ok(rbacService.menuTree(user.getId(), false)))
+                .orElseGet(() -> Result.ok(List.of()));
     }
 
     private CimUserPrincipal principal() {

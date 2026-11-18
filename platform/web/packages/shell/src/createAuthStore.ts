@@ -48,6 +48,54 @@ export interface CimMenuNode {
   children: CimMenuNode[];
 }
 
+/** 后端 `MenuNode{menu, children}` 的信封形状（只取前端关心的字段）。 */
+export interface RawMenuNode {
+  menu?: {
+    id?: string;
+    parentId?: string | null;
+    type?: 'DIR' | 'MENU' | 'BUTTON';
+    path?: string | null;
+    component?: string | null;
+    i18nCode?: string;
+    icon?: string | null;
+    permCode?: string | null;
+    sortNo?: number;
+    visible?: boolean;
+    status?: 'ENABLED' | 'DISABLED';
+  } | null;
+  children?: RawMenuNode[] | null;
+}
+
+/**
+ * 后端菜单信封树 → 前端 {@link CimMenuNode} 树。
+ *
+ * <p>自建 authStore 的应用（如 approval 的双通道 store）拉到菜单后也走同一归一，
+ * 保证 `createMenuRoutes` / 外壳侧栏消费的数据形态全平台一致。</p>
+ */
+export function normalizeMenuTree(nodes: RawMenuNode[] | null | undefined): CimMenuNode[] {
+  if (!nodes) return [];
+  const out: CimMenuNode[] = [];
+  for (const n of nodes) {
+    const m = n.menu;
+    if (!m?.id) continue;
+    out.push({
+      id: m.id,
+      parentId: m.parentId ?? null,
+      type: m.type ?? 'MENU',
+      path: m.path ?? null,
+      component: m.component ?? null,
+      i18nCode: m.i18nCode ?? '',
+      icon: m.icon ?? null,
+      permCode: m.permCode ?? null,
+      sortNo: m.sortNo ?? 0,
+      visible: m.visible !== false,
+      status: m.status ?? 'ENABLED',
+      children: normalizeMenuTree(n.children),
+    });
+  }
+  return out;
+}
+
 export interface AuthState<TMe> {
   token: string | null;
   refreshToken: string | null;
@@ -138,48 +186,6 @@ export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
   const { name, client, mePath, meOnPlatform, permissionsPath, permissionsOnPlatform, menusPath, menusOnPlatform, logout } =
     options;
 
-  /** 后端 `MenuNode{menu, children}` 的信封形状（只取前端关心的字段）。 */
-  interface RawMenuNode {
-    menu?: {
-      id?: string;
-      parentId?: string | null;
-      type?: 'DIR' | 'MENU' | 'BUTTON';
-      path?: string | null;
-      component?: string | null;
-      i18nCode?: string;
-      icon?: string | null;
-      permCode?: string | null;
-      sortNo?: number;
-      visible?: boolean;
-      status?: 'ENABLED' | 'DISABLED';
-    } | null;
-    children?: RawMenuNode[] | null;
-  }
-
-  function flatten(nodes: RawMenuNode[] | null | undefined): CimMenuNode[] {
-    if (!nodes) return [];
-    const out: CimMenuNode[] = [];
-    for (const n of nodes) {
-      const m = n.menu;
-      if (!m?.id) continue;
-      out.push({
-        id: m.id,
-        parentId: m.parentId ?? null,
-        type: m.type ?? 'MENU',
-        path: m.path ?? null,
-        component: m.component ?? null,
-        i18nCode: m.i18nCode ?? '',
-        icon: m.icon ?? null,
-        permCode: m.permCode ?? null,
-        sortNo: m.sortNo ?? 0,
-        visible: m.visible !== false,
-        status: m.status ?? 'ENABLED',
-        children: flatten(n.children),
-      });
-    }
-    return out;
-  }
-
   return create<AuthState<TMe>>()(
     persist(
       (set, get) => ({
@@ -211,7 +217,7 @@ export function createAuthStore<TMe>(options: CreateAuthStoreOptions) {
           const raw = menusOnPlatform
             ? await client.rootGet<RawMenuNode[]>(menusPath)
             : await client.get<RawMenuNode[]>(menusPath);
-          set({ menus: flatten(raw ?? []), menusLoaded: true });
+          set({ menus: normalizeMenuTree(raw ?? []), menusLoaded: true });
         },
 
         logout: async () => {

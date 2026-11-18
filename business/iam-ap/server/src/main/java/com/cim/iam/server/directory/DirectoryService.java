@@ -6,6 +6,7 @@ import com.cim.iam.server.directory.DirectoryDtos.UserProfileDto;
 import com.cim.iam.server.directory.DirectoryDtos.WatermarkDto;
 import com.cim.iam.server.org.OrgNode;
 import com.cim.iam.server.org.OrgNodeRepository;
+import com.cim.iam.server.org.OrgNodeService;
 import com.cim.iam.server.org.UserOrg;
 import com.cim.iam.server.profile.ProfileService;
 import com.cim.iam.server.profile.UserProfile;
@@ -35,6 +36,7 @@ public class DirectoryService {
 
     private final ProfileService profileService;
     private final OrgNodeRepository orgNodeRepository;
+    private final OrgNodeService orgNodeService;
     private final DirectoryWatermarkService watermarkService;
 
     public WatermarkDto watermark() {
@@ -49,6 +51,16 @@ public class DirectoryService {
 
     public List<UserProfileDto> users(List<String> userIds) {
         return profileService.findAllByIds(userIds).stream().map(this::toDto).toList();
+    }
+
+    /** 全量档案（含归属组织摘要；业务系统「人员管理」只读页数据面）。 */
+    public List<UserProfileDto> profiles() {
+        return profileService.listAll().stream().map(this::toDto).toList();
+    }
+
+    /** 组织内人员 ID（{@code includeChildren} 时含全部后代组织，语义与 {@code /admin/orgs/{id}/users} 一致）。 */
+    public List<String> memberUserIds(String orgId, boolean includeChildren) {
+        return orgNodeService.userIdsInOrg(orgId, includeChildren);
     }
 
     /** 组织节点（{@code since} 非空时仅返回其后变更的节点，供业务侧增量合并）。 */

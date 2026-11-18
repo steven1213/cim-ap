@@ -2,6 +2,9 @@ package com.cim.rms.server.security;
 
 import com.cim.auth.principal.CimUserPrincipal;
 import com.cim.spring.support.web.Result;
+import com.cim.system.menu.MenuNode;
+import com.cim.system.rbac.LocalUserResolver;
+import com.cim.system.rbac.SysRbacService;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +28,14 @@ import java.util.Set;
 @RequestMapping("/api/v1/rms")
 public class MeController {
 
+    private final LocalUserResolver userResolver;
+    private final SysRbacService rbacService;
+
+    public MeController(LocalUserResolver userResolver, SysRbacService rbacService) {
+        this.userResolver = userResolver;
+        this.rbacService = rbacService;
+    }
+
     private CimUserPrincipal principal() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof CimUserPrincipal p)) {
@@ -45,6 +56,23 @@ public class MeController {
                 p.roles() == null ? List.of() : List.copyOf(p.roles()),
                 p.authoritiesSet() == null ? List.of() : List.copyOf(p.authoritiesSet()));
         return Result.ok(dto);
+    }
+
+    /**
+     * GET /api/v1/rms/me/menus —— 当前用户可见菜单树（含 DIR/MENU，<b>不含 BUTTON</b>）。
+     *
+     * <p>按 {@code sys_role_menu} 过滤（后端裁剪）；BUTTON 节点是授权粒度，侧栏与路由都不消费。
+     * 未在本 ap 建档时返回空树（前端回退：无菜单=无侧栏项，不会报错）。</p>
+     */
+    @GetMapping("/me/menus")
+    public Result<List<MenuNode>> myMenus() {
+        CimUserPrincipal p = principal();
+        if (p == null) {
+            return Result.ok(List.of());
+        }
+        return userResolver.resolve(p.userId(), p.username())
+                .map(user -> Result.ok(rbacService.menuTree(user.getId(), false)))
+                .orElseGet(() -> Result.ok(List.of()));
     }
 
     /** GET /api/v1/rms/permissions —— 本 ap 权限码集（前端门禁用）。 */

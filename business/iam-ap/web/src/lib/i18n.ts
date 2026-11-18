@@ -10,6 +10,7 @@
 // 这正是 `@cim/i18n` 用 `remote` 选项而不是写死来源的原因。
 import { createI18n } from '@cim/i18n';
 import type { LocaleInfo } from '@cim/i18n';
+import { adminEnUS, adminZhCN } from '@cim/admin';
 import { rootGet, rootPost, setAcceptLanguage } from '@/lib/api';
 import type { I18nBundle, SysLocaleDto } from '@/types';
 
@@ -25,8 +26,9 @@ export const FALLBACK_LOCALES: LocaleInfo[] = [
 const cim = createI18n({
   app: 'iam',
   defaultLng: DEFAULT_LANG,
-  // 本应用没有内置译文包（文案全在后端），故 builtin 留空——
-  // 四级兜底的第三级在此退化为空集，第四级 humanize 顶上。
+  // 六页系统配置（@cim/admin）的文案随包内置：页面键在 admin.* 命名空间下，
+  // 后端库里只有 iam.* 业务键——此包作为兜底并入，远端同键可覆盖。
+  builtin: { 'zh-CN': adminZhCN, 'en-US': adminEnUS },
   locales: FALLBACK_LOCALES,
   onLanguageChange: setAcceptLanguage,
   dev: import.meta.env.DEV,

@@ -14,8 +14,8 @@ export const useAuthStore = createAuthStore<MeDto>({
   client: httpClient,
   mePath: '/rms/me',
   permissionsPath: '/rms/permissions',
-  // ⚠️ 动态菜单暂不启用：RmsConsoleCatalog（平面 4 组）与前端 navConfig（3 组 7 模块）
-  //    的信息架构未对齐，硬切会整体变形。对齐后加 `menusPath: '/sys/me/menus'` 即可
-  //    （Layout/App 按 MDS 同构模式切换，能力已在 @cim/shell 就绪）。
+  // 动态菜单树（后端按角色过滤）：侧栏与路由的唯一数据源（navConfig 已退场；
+  // IA 已在 RmsConsoleCatalog 对齐——概览 + 三组七模块 + 系统配置六页）
+  menusPath: '/rms/me/menus',
   logout: ({ token, refreshToken }) => sso.idpLogout(token, refreshToken),
 });

@@ -39,7 +39,9 @@ const cim = createI18n({
 });
 
 export const currentLang = (): string => cim.currentLang();
-export const changeLanguage = (lang: string): Promise<void> => cim.changeLanguage(lang);
+/** force=true：无视缓存版本号强制重拉整包（译文维护保存后刷新界面用）。 */
+export const changeLanguage = (lang: string, force = false): Promise<void> =>
+  cim.changeLanguage(lang, force ? { force } : undefined);
 export const bootstrapI18n = (): Promise<string> => cim.bootstrap();
 export const loadLocales = () => cim.loadLocales();
 

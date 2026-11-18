@@ -7,6 +7,7 @@
 //   2. 本应用没有 `setAcceptLanguage`（api 层不带语言头），故不接 onLanguageChange。
 import axios from 'axios';
 import { createI18n } from '@cim/i18n';
+import { adminZhCN, adminEnUS } from '@cim/admin';
 import { zhCN, enUS } from '@/lib/i18n/messages';
 
 export const DEFAULT_LANG = 'zh-CN';
@@ -14,7 +15,11 @@ export const DEFAULT_LANG = 'zh-CN';
 const cim = createI18n({
   app: 'approval',
   defaultLng: DEFAULT_LANG,
-  builtin: { 'zh-CN': zhCN, 'en-US': enUS },
+  // 内置包 = 本应用文案 + 系统配置六页共享文案（@cim/admin 优先，远端 sys_i18n 可逐键覆盖）
+  builtin: {
+    'zh-CN': { ...zhCN, ...adminZhCN },
+    'en-US': { ...enUS, ...adminEnUS },
+  },
   locales: [
     { code: 'zh-CN', name: '简体中文' },
     { code: 'en-US', name: 'English' },
@@ -35,7 +40,8 @@ const cim = createI18n({
 });
 
 export const currentLang = (): string => cim.currentLang();
-export const changeLanguage = (lang: string): Promise<void> => cim.changeLanguage(lang);
+export const changeLanguage = (lang: string, opts?: { force?: boolean }): Promise<void> =>
+  cim.changeLanguage(lang, opts);
 export const bootstrapI18n = (): Promise<string> => cim.bootstrap();
 export const loadLocales = () => cim.loadLocales();
 

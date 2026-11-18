@@ -17,8 +17,9 @@ import NotFoundPage from './NotFoundPage';
 /** `component` 标识 → 页面组件。键与 `IamConsoleCatalog` 里 `MenuDef.component` 一一对应。 */
 export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType>> = {
   Overview: lazy(() => import('./DashboardPage')),
-  Orgs: lazy(() => import('./OrgPage')),
-  Users: lazy(() => import('./UsersPage')),
+  // 六页系统配置：实现在共享包 @cim/admin，./AdminPages 只做宿主适配器注入
+  Orgs: lazy(async () => ({ default: (await import('./AdminPages')).Orgs })),
+  Users: lazy(async () => ({ default: (await import('./AdminPages')).Users })),
   Lockouts: lazy(() => import('./LockoutsPage')),
   Apps: lazy(() => import('./AppMgmtPage')),
   Admissions: lazy(() => import('./AdmissionsPage')),
@@ -28,10 +29,10 @@ export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType>> =
   Audit: lazy(() => import('./AuditPage')),
   Settings: lazy(() => import('./SettingsPage')),
   Profile: lazy(() => import('./ProfilePage')),
-  MenusAdmin: lazy(() => import('./MenusAdminPage')),
-  PermissionsAdmin: lazy(() => import('./PermissionsAdminPage')),
-  RolesAdmin: lazy(() => import('./RolesAdminPage')),
-  I18nAdmin: lazy(() => import('./I18nAdminPage')),
+  MenusAdmin: lazy(async () => ({ default: (await import('./AdminPages')).MenusAdmin })),
+  PermissionsAdmin: lazy(async () => ({ default: (await import('./AdminPages')).PermissionsAdmin })),
+  RolesAdmin: lazy(async () => ({ default: (await import('./AdminPages')).RolesAdmin })),
+  I18nAdmin: lazy(async () => ({ default: (await import('./AdminPages')).I18nAdmin })),
 };
 
 /** 解析页面组件；标识缺失/未知时回退（缺失路径的提示页）。 */

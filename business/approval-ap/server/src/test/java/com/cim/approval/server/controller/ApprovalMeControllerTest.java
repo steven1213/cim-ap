@@ -2,10 +2,13 @@ package com.cim.approval.server.controller;
 
 import com.cim.auth.principal.CimUserPrincipal;
 import com.cim.auth.token.TokenClaims;
+import com.cim.system.rbac.LocalUserResolver;
+import com.cim.system.rbac.SysRbacService;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -25,11 +28,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ApprovalMeControllerTest {
 
-    private final ApprovalMeController controller = new ApprovalMeController();
+    private final LocalUserResolver userResolver = Mockito.mock(LocalUserResolver.class);
+    private final SysRbacService rbacService = Mockito.mock(SysRbacService.class);
+    private final ApprovalMeController controller = new ApprovalMeController(userResolver, rbacService);
 
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
+        Mockito.reset(userResolver, rbacService);
     }
 
     @Test
@@ -62,6 +68,31 @@ class ApprovalMeControllerTest {
         assertThat(dto.permissions()).isEmpty();
         // 前端据此保留身份切换器、继续用 userId/tenantId 查询参数
         assertThat(dto.authEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("认证态菜单：按 sys_role_menu 过滤（menuTree，不含 BUTTON）")
+    void ssoMenusFilteredByRole() {
+        authenticateAs(new CimUserPrincipal(
+                claims("u-1001", "张三", "t1", Set.of("manager"), Set.of()),
+                Set.of()));
+        com.cim.system.user.SysUser user = Mockito.mock(com.cim.system.user.SysUser.class);
+        Mockito.when(user.getId()).thenReturn("local-1");
+        Mockito.when(userResolver.resolve("u-1001", "张三")).thenReturn(java.util.Optional.of(user));
+        Mockito.when(rbacService.menuTree("local-1", false)).thenReturn(List.of());
+
+        assertThat(controller.myMenus().data()).isEmpty();
+        Mockito.verify(rbacService).menuTree("local-1", false);
+    }
+
+    @Test
+    @DisplayName("dev 态菜单：无 principal 时回全量树（演示通道不做角色过滤）")
+    void devMenusReturnFullTree() {
+        Mockito.when(rbacService.fullMenuTree(false)).thenReturn(List.of());
+
+        assertThat(controller.myMenus().data()).isEmpty();
+        Mockito.verify(rbacService).fullMenuTree(false);
+        Mockito.verifyNoInteractions(userResolver);
     }
 
     private static void authenticateAs(CimUserPrincipal principal) {

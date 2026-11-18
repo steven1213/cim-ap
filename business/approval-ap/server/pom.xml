@@ -57,6 +57,26 @@
             <artifactId>cim-cache-starter</artifactId>
             <version>${cim.version}</version>
         </dependency>
+        <!--
+            平台 i18n starter（sys_locale / sys_i18n 表 + I18nService + 公开运行时端点）；
+            多语言管理端点由本 ap 自落（ApprovalI18nAdminController，管理属 ap 内部权限）。
+        -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-i18n-starter</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
+        <!--
+            域模块 cim-system（sys_menu 父子树 + sys_permission + RBAC + 平台迁移 V1000），
+            不另造表；其 DbLocalAuthorityLoader 顶替 cim-auth-starter 的默认
+            ClaimLocalAuthorityLoader，使本 ap 权限源为「本 ap 库内 RBAC」。
+            对齐 mds-ap / rms-ap 的同款依赖。
+        -->
+        <dependency>
+            <groupId>com.cim</groupId>
+            <artifactId>cim-system</artifactId>
+            <version>${cim.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.cim</groupId>
             <artifactId>cim-notify-starter</artifactId>
