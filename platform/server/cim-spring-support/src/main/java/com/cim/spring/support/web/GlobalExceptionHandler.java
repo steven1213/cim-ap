@@ -43,7 +43,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BizException.class)
     public ResponseEntity<Result<Void>> handleBiz(BizException ex) {
         BizCode code = ex.getBizCode();
-        String msg = messageResolver.resolve(code.getI18nKey(), ex.getArgs(), code.getDefaultMessage());
+        // 键优先级：业务级 i18nKey（BizException.of 创建）> code 级 bizCode.i18nKey
+        String key = ex.getI18nKey() != null ? ex.getI18nKey() : code.getI18nKey();
+        String msg = messageResolver.resolve(key, ex.getArgs(), code.getDefaultMessage());
         // 业务异常属预期分支，记 warn 且不打栈
         log.warn("[BizException] code={} msg={} traceId={}", code.getCode(), msg, TraceContext.currentTraceId());
         return ResponseEntity.status(code.getHttpStatus()).body(Result.fail(code, msg));

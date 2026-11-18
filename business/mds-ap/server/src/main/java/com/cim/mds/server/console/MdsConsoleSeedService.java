@@ -260,7 +260,10 @@ public class MdsConsoleSeedService {
 
     private int seedTranslationsZh() {
         ensureLocale("zh-CN", "简体中文", true, 0);
-        return i18nService.seedMessages("zh-CN", MdsConsoleCatalog.zhMap(), I18nScope.USER, BUNDLE);
+        int n = i18nService.seedMessages("zh-CN", MdsConsoleCatalog.zhMap(), I18nScope.USER, BUNDLE);
+        // 业务错误文案（BizException.of 的 mds.biz.* 键，scope=SYSTEM——与 BizCode 平台键同级）
+        n += i18nService.seedMessages("zh-CN", MdsBizMessages.ZH, I18nScope.SYSTEM, BUNDLE);
+        return n;
     }
 
     private int seedTranslationsEn() {
@@ -268,7 +271,9 @@ public class MdsConsoleSeedService {
             return 0;
         }
         ensureLocale("en-US", "English", false, 10);
-        return i18nService.seedMessages("en-US", MdsConsoleCatalog.enMap(), I18nScope.USER, BUNDLE);
+        int n = i18nService.seedMessages("en-US", MdsConsoleCatalog.enMap(), I18nScope.USER, BUNDLE);
+        n += i18nService.seedMessages("en-US", MdsBizMessages.EN, I18nScope.SYSTEM, BUNDLE);
+        return n;
     }
 
     private void ensureLocale(String code, String name, boolean asDefault, int sortNo) {

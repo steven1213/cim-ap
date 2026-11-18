@@ -113,7 +113,7 @@ public class OperationAdminService {
         checkInspectOnly(opType, req.inspectPlan(), req.samplingRate());
         checkBatch(req.batchMode(), req.batchSize());
         if (operationRepository.findByOpCodeAndDeletedFalse(req.opCode().trim()).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "工序编码已存在: " + req.opCode().trim());
+            throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.operation.opCodeDuplicate", req.opCode().trim());
         }
         CimOperation entity = new CimOperation();
         entity.setOpCode(req.opCode().trim());
@@ -189,12 +189,12 @@ public class OperationAdminService {
         CimOperation op = requireOperation(id);
         if (!CimOperation.STATUS_UNFROZEN.equals(op.getStatus())
                 && !CimOperation.STATUS_DISABLED.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结/已禁用版本可删除（当前 " + op.getStatus() + "）");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyDraftOrDisabledDeletable", op.getStatus());
         }
         if (isReferenced(op.getOpCode())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "工序 " + op.getOpCode() + " 已被流程步骤引用，禁止删除");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.referencedNoDelete", op.getOpCode());
         }
         operationRepository.delete(op);
     }
@@ -206,8 +206,8 @@ public class OperationAdminService {
     public OpView freeze(String id) {
         CimOperation op = requireOperation(id);
         if (!CimOperation.STATUS_UNFROZEN.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结版本可冻结，当前状态: " + op.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyUnfrozenFreezable", op.getStatus());
         }
         op.setStatus(CimOperation.STATUS_FROZEN);
         return toView(operationRepository.save(op));
@@ -218,8 +218,8 @@ public class OperationAdminService {
     public OpView unfreeze(String id) {
         CimOperation op = requireOperation(id);
         if (!CimOperation.STATUS_FROZEN.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅已冻结版本可解冻，当前状态: " + op.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyFrozenUnfreezable", op.getStatus());
         }
         op.setStatus(CimOperation.STATUS_UNFROZEN);
         return toView(operationRepository.save(op));
@@ -230,8 +230,8 @@ public class OperationAdminService {
     public OpView activate(String id) {
         CimOperation op = requireOperation(id);
         if (!CimOperation.STATUS_FROZEN.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅已冻结版本可激活，当前状态: " + op.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyFrozenActivatable", op.getStatus());
         }
         String family = op.getOpFamilyCode() == null ? op.getOpCode() : op.getOpFamilyCode();
         operationRepository.findByOpFamilyCodeAndDeletedFalseAndStatus(family, CimOperation.STATUS_ACTIVE)
@@ -250,12 +250,12 @@ public class OperationAdminService {
         CimOperation op = requireOperation(id);
         if (!CimOperation.STATUS_FROZEN.equals(op.getStatus())
                 && !CimOperation.STATUS_ACTIVE.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅冻结/生效版本可禁用，当前状态: " + op.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyFrozenOrActiveDisablable", op.getStatus());
         }
         if (isReferenced(op.getOpCode())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "工序 " + op.getOpCode() + " 已被流程步骤引用，禁止禁用（请先改流程引用）");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.referencedNoDisable", op.getOpCode());
         }
         op.setStatus(CimOperation.STATUS_DISABLED);
         return toView(operationRepository.save(op));
@@ -271,7 +271,7 @@ public class OperationAdminService {
         requireText(newOpCode, "newOpCode");
         String code = newOpCode.trim();
         if (operationRepository.findByOpCodeAndDeletedFalse(code).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "工序编码已存在: " + code);
+            throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.operation.opCodeDuplicate", code);
         }
         String family = source.getOpFamilyCode() == null ? source.getOpCode() : source.getOpFamilyCode();
         CimOperation entity = new CimOperation();
@@ -314,8 +314,8 @@ public class OperationAdminService {
 
     private String requireOpType(String opType) {
         if (opType == null || !VALID_OP_TYPES.contains(opType)) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "opType 非法: " + opType + "（PROCESS/INSPECT/REWORK）");
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.operation.opTypeInvalid", String.valueOf(opType));
         }
         return opType;
     }
@@ -325,7 +325,7 @@ public class OperationAdminService {
             return null;
         }
         if (technologyRepository.findByTechCodeAndDeletedFalse(techCode).isEmpty()) {
-            throw new BizException(BizCode.DATA_NOT_FOUND, "工艺技术不存在: " + techCode);
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.techNotFound", techCode);
         }
         return techCode;
     }
@@ -335,7 +335,7 @@ public class OperationAdminService {
             return null;
         }
         if (equipmentTypeRepository.findByTypeCodeAndDeletedFalse(equipType).isEmpty()) {
-            throw new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + equipType);
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.equipTypeNotFound", equipType);
         }
         return equipType;
     }
@@ -346,20 +346,20 @@ public class OperationAdminService {
             return null;
         }
         if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).isEmpty()) {
-            throw new BizException(BizCode.DATA_NOT_FOUND, "设备能力不存在: " + capabilityCode);
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.capabilityNotFound", capabilityCode);
         }
         return capabilityCode;
     }
 
     private void checkQtime(Integer min, Integer max) {
         if (min != null && min <= 0) {
-            throw new BizException(BizCode.PARAM_INVALID, "qtimeMin 必须为正整数: " + min);
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.qtimeMinPositive", min);
         }
         if (max != null && max <= 0) {
-            throw new BizException(BizCode.PARAM_INVALID, "qtimeMax 必须为正整数: " + max);
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.qtimeMaxPositive", max);
         }
         if (min != null && max != null && min > max) {
-            throw new BizException(BizCode.PARAM_INVALID, "qtimeMin 不能大于 qtimeMax");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.qtimeRange");
         }
     }
 
@@ -367,31 +367,30 @@ public class OperationAdminService {
     private void checkInspectOnly(String opType, String inspectPlan, BigDecimal samplingRate) {
         if (!CimOperation.TYPE_INSPECT.equals(opType)) {
             if (inspectPlan != null) {
-                throw new BizException(BizCode.PARAM_INVALID, "仅 INSPECT 工序可设置检验计划");
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.inspectPlanOnly");
             }
             if (samplingRate != null) {
-                throw new BizException(BizCode.PARAM_INVALID, "仅 INSPECT 工序可设置抽样率");
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.samplingRateOnly");
             }
         } else if (samplingRate != null
                 && (samplingRate.compareTo(BigDecimal.ZERO) <= 0 || samplingRate.compareTo(HUNDRED) > 0)) {
-            throw new BizException(BizCode.PARAM_INVALID, "samplingRate 必须在 (0, 100] 内: " + samplingRate);
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.samplingRateRange", samplingRate);
         }
     }
 
     private void checkBatch(String batchMode, Integer batchSize) {
         if (batchMode != null && !VALID_BATCH_MODES.contains(batchMode)) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "batchMode 非法: " + batchMode + "（SERIAL/PARALLEL/BATCH）");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.batchModeInvalid", batchMode);
         }
         if (batchSize != null && batchSize <= 0) {
-            throw new BizException(BizCode.PARAM_INVALID, "batchSize 必须为正整数: " + batchSize);
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.batchSizePositive", batchSize);
         }
     }
 
     private void requireDraft(CimOperation op) {
         if (!CimOperation.STATUS_UNFROZEN.equals(op.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结版本可编辑（当前 " + op.getStatus() + "）；冻结/生效版本请复制新版本修改");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.operation.onlyUnfrozenEditable", op.getStatus());
         }
     }
 
@@ -404,12 +403,12 @@ public class OperationAdminService {
     private CimOperation requireOperation(String id) {
         return operationRepository.findById(id)
                 .filter(o -> !Boolean.TRUE.equals(o.getDeleted()))
-                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "工序不存在: " + id));
+                .orElseThrow(() -> BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.notFound", id));
     }
 
     private void requireText(String value, String field) {
         if (!StringUtils.hasText(value)) {
-            throw new BizException(BizCode.PARAM_INVALID, field + " 不能为空");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.common.fieldRequired", field);
         }
     }
 

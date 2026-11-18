@@ -172,7 +172,7 @@ public class FlowAdminService {
         String code = namingRuleService.apply(NamingRuleAdminService.OBJ_FLOW,
                 blankToNull(req.flowCode()), ctx);
         if (flowRepository.findByFlowCodeAndDeletedFalse(code).isPresent()) {
-            throw new BizException(BizCode.DATA_DUPLICATE, "流程编码已存在: " + code);
+            throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.flow.flowCodeDuplicate", code);
         }
         CimFlow entity = new CimFlow();
         entity.setFlowCode(code);
@@ -207,9 +207,8 @@ public class FlowAdminService {
         CimFlow flow = requireFlow(id);
         if (!CimFlow.STATUS_UNFROZEN.equals(flow.getStatus())
                 && !CimFlow.STATUS_DISABLED.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结/已禁用版本可删除（当前 " + flow.getStatus()
-                            + "）；生效/冻结版本请先禁用");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyDraftOrDisabledDeletable", flow.getStatus());
         }
         edgeRepository.findByFlowIdAndDeletedFalse(id).forEach(edgeRepository::delete);
         stepRepository.findByFlowIdAndDeletedFalseOrderByStepNoAsc(id).forEach(stepRepository::delete);
@@ -234,7 +233,7 @@ public class FlowAdminService {
         List<CanvasNode> nodes = doc.nodes();
         List<CanvasEdge> edges = doc.edges();
         if (nodes.isEmpty()) {
-            throw new BizException(BizCode.PARAM_INVALID, "画布至少需要一个节点");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.canvasEmpty");
         }
 
         // ---- 节点校验：类型白名单 / id 与 stepCode 唯一 / 引用真实 / qtime / SUBFLOW / 批处理 / bin
@@ -243,14 +242,14 @@ public class FlowAdminService {
         for (int i = 0; i < nodes.size(); i++) {
             CanvasNode n = nodes.get(i);
             if (!VALID_STEP_TYPES.contains(n.stepType())) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "第 " + (i + 1) + " 个节点 stepType 非法: " + n.stepType());
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.nodeStepTypeInvalid", i + 1, n.stepType());
             }
             if (!nodeIds.add(n.id())) {
-                throw new BizException(BizCode.DATA_DUPLICATE, "节点 id 重复: " + n.id());
+                throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.flow.nodeIdDuplicate", n.id());
             }
             if (!stepCodes.add(n.stepCode())) {
-                throw new BizException(BizCode.DATA_DUPLICATE, "步骤编码重复: " + n.stepCode());
+                throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.flow.stepCodeDuplicate", n.stepCode());
             }
             // 工序引用守门（V20）：仅业务工序三类可引用；须存在且 ACTIVE；
             // 带出标准值由前端在「选工序」时回填（后端只存引用，不静默合并覆盖值）
@@ -258,59 +257,57 @@ public class FlowAdminService {
                 if (!CimFlowStep.TYPE_PROCESS.equals(n.stepType())
                         && !CimFlowStep.TYPE_INSPECT.equals(n.stepType())
                         && !CimFlowStep.TYPE_REWORK.equals(n.stepType())) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "仅 PROCESS/INSPECT/REWORK 步骤可引用工序库: " + n.stepCode());
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.opRefStepTypeInvalid", n.stepCode());
                 }
                 CimOperation op = operationRepository
                         .findByOpCodeAndDeletedFalse(n.operationCode().trim())
-                        .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND,
-                                "引用的工序不存在: " + n.operationCode().trim()));
+                        .orElseThrow(() -> BizException.of(BizCode.DATA_NOT_FOUND,
+                                "mds.biz.flow.opRefNotFound", n.operationCode().trim()));
                 if (!CimOperation.STATUS_ACTIVE.equals(op.getStatus())) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "引用的工序不是生效版本: " + n.operationCode().trim()
-                                    + "（当前 " + op.getStatus() + "）");
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.opRefNotActive", n.operationCode().trim(), op.getStatus());
                 }
                 if (CimFlowStep.TYPE_INSPECT.equals(n.stepType())
                         && !CimOperation.TYPE_INSPECT.equals(op.getOpType())) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "INSPECT 步骤只能引用检验类工序: " + n.operationCode().trim());
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.inspectRefMustBeInspect", n.operationCode().trim());
                 }
             }
             if (n.equipType() != null
                     && equipmentTypeRepository.findByTypeCodeAndDeletedFalse(n.equipType()).isEmpty()) {
-                throw new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + n.equipType());
+                throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.flow.equipTypeNotFound", n.equipType());
             }
             // V21：能力需求非空才校验存在（AMAT 口径——经设备能力关联匹配可加工设备）
             if (n.capabilityCode() != null
                     && capabilityRepository.findByCapabilityCodeAndDeletedFalse(n.capabilityCode()).isEmpty()) {
-                throw new BizException(BizCode.DATA_NOT_FOUND,
-                        "设备能力不存在: " + n.capabilityCode() + "（步骤 " + n.stepCode() + "）");
+                throw BizException.of(BizCode.DATA_NOT_FOUND,
+                        "mds.biz.flow.capabilityNotFound", n.capabilityCode(), n.stepCode());
             }
             checkQtime(n.qtimeMin(), n.qtimeMax(), n.stepCode());
             // SUBFLOW：flowRef 必填且引用真实（发布状态在发布守门再查）
             if (CimFlowStep.TYPE_SUBFLOW.equals(n.stepType())) {
                 if (n.flowRef() == null || n.flowRef().isBlank()) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "子流程节点 " + n.stepCode() + " 未指定引用流程（flowRef）");
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.subflowRefRequired", n.stepCode());
                 }
                 if (flowRepository.findByFlowCodeAndDeletedFalse(n.flowRef()).isEmpty()) {
-                    throw new BizException(BizCode.DATA_NOT_FOUND, "引用的流程不存在: " + n.flowRef());
+                    throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.flow.flowRefNotFound", n.flowRef());
                 }
             } else if (n.flowRef() != null && !n.flowRef().isBlank()) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "仅 SUBFLOW 节点可设置 flowRef: " + n.stepCode());
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.flowRefOnlySubflow", n.stepCode());
             }
             // 批处理模式白名单 + 装载量
             if (n.batchMode() != null && !VALID_BATCH_MODES.contains(n.batchMode())) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "步骤 " + n.stepCode() + " 的 batchMode 非法: " + n.batchMode()
-                                + "（SERIAL/PARALLEL/BATCH）");
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.batchModeInvalid", n.stepCode(), n.batchMode());
             }
             if (n.batchSize() != null) {
                 Integer bs = parseNullableInt(n.batchSize(), "batchSize", n.stepCode());
                 if (bs != null && bs <= 0) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "步骤 " + n.stepCode() + " 的 batchSize 必须为正整数: " + bs);
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.batchSizePositive", n.stepCode(), bs);
                 }
             }
             // bin 词表语法：binType 白名单 + 节点内 code 唯一
@@ -320,32 +317,31 @@ public class FlowAdminService {
                     continue;
                 }
                 if (!CimFlowBin.TYPE_PASS.equals(b.binType()) && !CimFlowBin.TYPE_FAIL.equals(b.binType())) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "步骤 " + n.stepCode() + " 的 bin " + b.binCode() + " 类型非法: "
-                                    + b.binType() + "（PASS/FAIL）");
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.binTypeInvalid", n.stepCode(), b.binCode(), b.binType());
                 }
                 if (!binCodes.add(b.binCode())) {
-                    throw new BizException(BizCode.DATA_DUPLICATE,
-                            "步骤 " + n.stepCode() + " 的 bin 编码重复: " + b.binCode());
+                    throw BizException.of(BizCode.DATA_DUPLICATE,
+                            "mds.biz.flow.binCodeDuplicate", n.stepCode(), b.binCode());
                 }
             }
             // 检验配置（V14）：仅 INSPECT 可设检验计划/抽样率；抽样率 0-100
             if (!CimFlowStep.TYPE_INSPECT.equals(n.stepType())) {
                 if (n.inspectPlan() != null) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "仅 INSPECT 节点可设置检验计划: " + n.stepCode());
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.inspectPlanOnly", n.stepCode());
                 }
                 if (n.samplingRate() != null) {
-                    throw new BizException(BizCode.PARAM_INVALID,
-                            "仅 INSPECT 节点可设置抽样率: " + n.stepCode());
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.samplingRateOnly", n.stepCode());
                 }
             } else {
                 if (n.samplingRate() != null) {
                     BigDecimal rate = parseNullableDecimal(n.samplingRate(), "samplingRate", n.stepCode());
                     if (rate != null
                             && (rate.compareTo(BigDecimal.ZERO) <= 0 || rate.compareTo(HUNDRED) > 0)) {
-                        throw new BizException(BizCode.PARAM_INVALID,
-                                "步骤 " + n.stepCode() + " 的 samplingRate 必须在 (0, 100] 内: " + rate);
+                        throw BizException.of(BizCode.PARAM_INVALID,
+                                "mds.biz.flow.samplingRateRange", n.stepCode(), rate);
                     }
                 }
             }
@@ -355,25 +351,25 @@ public class FlowAdminService {
         for (int i = 0; i < doc.qtimes().size(); i++) {
             CanvasQtime q = doc.qtimes().get(i);
             if (!nodeIds.contains(q.from()) || !nodeIds.contains(q.to())) {
-                throw new BizException(BizCode.DATA_NOT_FOUND,
-                        "第 " + (i + 1) + " 条跨站 Q-time 引用了不存在的节点");
+                throw BizException.of(BizCode.DATA_NOT_FOUND,
+                        "mds.biz.flow.qtimeNodeNotFound", i + 1);
             }
             if (q.from().equals(q.to())) {
-                throw new BizException(BizCode.PARAM_INVALID, "跨站 Q-time 不允许 from 与 to 相同");
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.qtimeSelfSite");
             }
             Integer maxMinutes = parseNullableInt(q.maxMinutes(), "maxMinutes", nodeCode(nodes, q.from()));
             if (maxMinutes == null || maxMinutes <= 0) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "第 " + (i + 1) + " 条跨站 Q-time 的 maxMinutes 必须为正整数: " + q.maxMinutes());
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.qtimeMaxPositive", i + 1, q.maxMinutes());
             }
             if (!VALID_QTIME_ACTIONS.contains(q.action())) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "第 " + (i + 1) + " 条跨站 Q-time 的 action 非法: " + q.action() + "（HOLD/SCRAP）");
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.qtimeActionInvalid", i + 1, q.action());
             }
             if (!qtimePairs.add(q.from() + "->" + q.to())) {
-                throw new BizException(BizCode.DATA_DUPLICATE,
-                        "跨站 Q-time 重复（相同起止站）: "
-                                + nodeCode(nodes, q.from()) + " → " + nodeCode(nodes, q.to()));
+                throw BizException.of(BizCode.DATA_DUPLICATE,
+                        "mds.biz.flow.qtimeDuplicate",
+                        nodeCode(nodes, q.from()), nodeCode(nodes, q.to()));
             }
         }
         // ---- 边校验：端点存在 / 非自环 / 语义合法（DECISION 出边必须 PASS/FAIL）+ 条件命中 bin 词表
@@ -384,15 +380,15 @@ public class FlowAdminService {
         for (int i = 0; i < edges.size(); i++) {
             CanvasEdge e = edges.get(i);
             if (e.from().equals(e.to())) {
-                throw new BizException(BizCode.PARAM_INVALID, "第 " + (i + 1) + " 条边不允许自环");
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.edgeSelfLoop", i + 1);
             }
             if (!nodeIds.contains(e.from()) || !nodeIds.contains(e.to())) {
-                throw new BizException(BizCode.DATA_NOT_FOUND,
-                        "第 " + (i + 1) + " 条边端点引用了不存在的节点");
+                throw BizException.of(BizCode.DATA_NOT_FOUND,
+                        "mds.biz.flow.edgeNodeNotFound", i + 1);
             }
             if (!VALID_EDGE_TYPES.contains(e.edgeType())) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "第 " + (i + 1) + " 条边 edgeType 非法: " + e.edgeType());
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.edgeTypeInvalid", i + 1, e.edgeType());
             }
             CanvasNode fromNode = nodes.stream().filter(n -> n.id().equals(e.from()))
                     .findFirst().orElseThrow();
@@ -413,20 +409,23 @@ public class FlowAdminService {
                         : CimFlowEdge.TYPE_MAIN.equals(e.edgeType()) || CimFlowEdge.TYPE_REWORK.equals(e.edgeType());
             }
             if (!ok) {
-                throw new BizException(BizCode.PARAM_INVALID, structural
-                        ? "SPLIT/MERGE 节点的出入边语义只能是 MAIN: " + e.edgeType()
-                        : (CimFlowStep.TYPE_DECISION.equals(fromNode.stepType())
-                                ? "DECISION 节点出边只能是 PASS/FAIL"
-                                : "非 DECISION 节点出边只能是 MAIN/REWORK: " + e.edgeType()));
+                if (structural) {
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.structuralEdgeMainOnly", i + 1, e.edgeType());
+                }
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        CimFlowStep.TYPE_DECISION.equals(fromNode.stepType())
+                                ? "mds.biz.flow.decisionEdgePassFail" : "mds.biz.flow.plainEdgeMainRework",
+                        i + 1, e.edgeType());
             }
             // bin 词表已定义的 DECISION 节点：出边 condition 必须命中词表（防手写条件漂移）
             Set<String> nodeBins = binsByNode.get(e.from());
             if (CimFlowStep.TYPE_DECISION.equals(fromNode.stepType())
                     && nodeBins != null && !nodeBins.isEmpty()
                     && (e.condition() == null || !nodeBins.contains(e.condition()))) {
-                throw new BizException(BizCode.PARAM_INVALID,
-                        "步骤 " + fromNode.stepCode() + " 的出边条件 " + e.condition()
-                                + " 不在其 bin 词表内（可用: " + String.join("/", nodeBins) + "）");
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.conditionNotInBins",
+                        fromNode.stepCode(), String.valueOf(e.condition()), String.join("/", nodeBins));
             }
         }
 
@@ -517,13 +516,13 @@ public class FlowAdminService {
     public FlowView freeze(String id) {
         CimFlow flow = requireFlow(id);
         if (!CimFlow.STATUS_UNFROZEN.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结版本可冻结，当前状态: " + flow.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyUnfrozenFreezable", flow.getStatus());
         }
         ValidationResult result = validateGraph(id);
         if (!result.valid()) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "流程校验未通过，不能冻结: " + String.join("；", result.problems()));
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.flow.validateFailFreeze", String.join("；", result.problems()));
         }
         flow.setStatus(CimFlow.STATUS_FROZEN);
         return toView(flowRepository.save(flow), countSteps(id));
@@ -534,8 +533,8 @@ public class FlowAdminService {
     public FlowView unfreeze(String id) {
         CimFlow flow = requireFlow(id);
         if (!CimFlow.STATUS_FROZEN.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅已冻结版本可解冻，当前状态: " + flow.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyFrozenUnfreezable", flow.getStatus());
         }
         flow.setStatus(CimFlow.STATUS_UNFROZEN);
         return toView(flowRepository.save(flow), countSteps(id));
@@ -550,13 +549,13 @@ public class FlowAdminService {
     public FlowView activate(String id) {
         CimFlow flow = requireFlow(id);
         if (!CimFlow.STATUS_FROZEN.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅已冻结版本可激活，当前状态: " + flow.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyFrozenActivatable", flow.getStatus());
         }
         ValidationResult result = validateGraph(id);
         if (!result.valid()) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "流程校验未通过，不能激活: " + String.join("；", result.problems()));
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.flow.validateFailActivate", String.join("；", result.problems()));
         }
         String family = flow.getFamilyCode() == null ? flow.getFlowCode() : flow.getFamilyCode();
         flowRepository.findByFamilyCodeAndDeletedFalseAndStatus(family, CimFlow.STATUS_ACTIVE)
@@ -575,8 +574,8 @@ public class FlowAdminService {
         CimFlow flow = requireFlow(id);
         if (!CimFlow.STATUS_FROZEN.equals(flow.getStatus())
                 && !CimFlow.STATUS_ACTIVE.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅冻结/生效版本可禁用，当前状态: " + flow.getStatus());
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyFrozenOrActiveDisablable", flow.getStatus());
         }
         flow.setStatus(CimFlow.STATUS_DISABLED);
         return toView(flowRepository.save(flow), countSteps(id));
@@ -948,7 +947,7 @@ public class FlowAdminService {
     private CimFlow requireFlow(String id) {
         return flowRepository.findById(id)
                 .filter(f -> !Boolean.TRUE.equals(f.getDeleted()))
-                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "流程不存在: " + id));
+                .orElseThrow(() -> BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.flow.notFound", id));
     }
 
     /** 族内下一个版本号（max+1）。 */
@@ -964,9 +963,8 @@ public class FlowAdminService {
 
     private static void requireDraft(CimFlow flow) {
         if (!CimFlow.STATUS_UNFROZEN.equals(flow.getStatus())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "仅未冻结（UNFROZEN）版本可修改（当前 " + flow.getStatus()
-                            + "）；冻结/生效版本的修改请先复制为新版本");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.onlyUnfrozenEditable", flow.getStatus());
         }
     }
 
@@ -974,7 +972,7 @@ public class FlowAdminService {
     private String requireTech(String techCode) {
         String code = blankToNull(techCode);
         if (code != null && technologyRepository.findByTechCodeAndDeletedFalse(code).isEmpty()) {
-            throw new BizException(BizCode.DATA_NOT_FOUND, "制程技术不存在: " + code);
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.flow.techNotFound", code);
         }
         return code;
     }
@@ -987,8 +985,8 @@ public class FlowAdminService {
         try {
             return Integer.valueOf(v.trim());
         } catch (NumberFormatException e) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "步骤 " + stepCode + " 的 " + field + " 不是整数: " + v);
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.flow.notInteger", stepCode, field, v);
         }
     }
 
@@ -1000,8 +998,8 @@ public class FlowAdminService {
         try {
             return new BigDecimal(v.trim());
         } catch (NumberFormatException e) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "步骤 " + stepCode + " 的 " + field + " 不是数字: " + v);
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.flow.notDecimal", stepCode, field, v);
         }
     }
 
@@ -1015,8 +1013,8 @@ public class FlowAdminService {
         Integer mn = parseNullableInt(min, "qtimeMin", stepCode);
         Integer mx = parseNullableInt(max, "qtimeMax", stepCode);
         if (mn != null && mx != null && mn > mx) {
-            throw new BizException(BizCode.PARAM_INVALID,
-                    "步骤 " + stepCode + " 的 qtimeMin（" + mn + "）不能大于 qtimeMax（" + mx + "）");
+            throw BizException.of(BizCode.PARAM_INVALID,
+                    "mds.biz.flow.qtimeMinMax", stepCode, mn, mx);
         }
     }
 
@@ -1024,7 +1022,7 @@ public class FlowAdminService {
     private String requireFlowKind(String kind) {
         String k = blankToNull(kind) == null ? CimFlow.KIND_MAIN : blankToNull(kind);
         if (!VALID_FLOW_KINDS.contains(k)) {
-            throw new BizException(BizCode.PARAM_INVALID, "flowKind 非法: " + k + "（MAIN/SUB）");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.flowKindInvalid", k);
         }
         return k;
     }
@@ -1059,7 +1057,7 @@ public class FlowAdminService {
 
     private static void requireText(String v, String field) {
         if (v == null || v.isBlank()) {
-            throw new BizException(BizCode.PARAM_INVALID, field + " 不能为空");
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.common.fieldRequired", field);
         }
     }
 
