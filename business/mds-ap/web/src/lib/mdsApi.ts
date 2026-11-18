@@ -57,6 +57,7 @@ import type {
   ShiftUserOption,
   ShiftLogView,
   ShiftLogPayload,
+  ControlSwitchView,
 } from '@/types';
 
 const BASE = '/mds';
@@ -862,4 +863,22 @@ export function saveShiftLog(payload: ShiftLogPayload): Promise<ShiftLogView> {
 /** 接班签收（乐观锁；签收后锁定只读）。 */
 export function ackShiftLog(id: string, version: number): Promise<ShiftLogView> {
   return http.post<ShiftLogView>(`${BASE}/shift-logs/${id}/ack?version=${version}`, {});
+}
+
+// ============================================================ 卡控开关（V18）
+
+/** 卡控开关清单（domainCode 过滤可选；页面按排班域拉取）。 */
+export function listControlSwitches(
+  domainCode?: string,
+  signal?: AbortSignal,
+): Promise<ControlSwitchView[]> {
+  return http.get<ControlSwitchView[]>(`${BASE}/control-switches`, { domainCode }, { signal });
+}
+
+/** 卡控开关启停（幂等；与现值相同后端直接返回）。 */
+export function setControlSwitch(code: string, enabled: boolean): Promise<ControlSwitchView> {
+  return http.put<ControlSwitchView>(
+    `${BASE}/control-switches/${code}?enabled=${enabled}`,
+    {},
+  );
 }

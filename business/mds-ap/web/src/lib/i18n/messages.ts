@@ -652,6 +652,12 @@ export const zhCN: Record<string, string> = {
   'mds.shiftLog.ackConfirm': '确认签收 {{date}} {{shift}} 的交接记录？签收后记录锁定只读。',
   'mds.shiftLog.ackOk': '签收',
   'mds.shiftLog.acked2': '已签收',
+
+  // ---------------- 卡控开关（V18，嵌在班次与班制页头部） ----------------
+  'mds.shift.control.title': 'MES 卡控',
+  'mds.shift.control.hint': '开关控制 MES 侧卡控是否生效：开 = 执行卡控判定，关 = 仅记录不拦截',
+  'mds.shift.control.shift.on_duty_check': '当班校验',
+  'mds.shift.control.shift.handover_freeze': '交接冻结',
   'mds.reason.type.createNew': '新建类型',
   'mds.reason.type.createTitle': '新建原因码类型',
   'mds.reason.type.editTitle': '编辑原因码类型',
@@ -1351,6 +1357,12 @@ export const enUS: Record<string, string> = {
   'mds.shiftLog.ackConfirm': 'Acknowledge the {{date}} {{shift}} handover log? It will be locked after acknowledgement.',
   'mds.shiftLog.ackOk': 'Ack',
   'mds.shiftLog.acked2': 'Acknowledged',
+
+  // ---------------- Control switches (V18, in ShiftDefsPage header) ----------------
+  'mds.shift.control.title': 'MES controls',
+  'mds.shift.control.hint': 'Switches decide whether MES enforcement is active: on = enforced, off = log only',
+  'mds.shift.control.shift.on_duty_check': 'On-duty check',
+  'mds.shift.control.shift.handover_freeze': 'Handover freeze',
   'mds.reason.type.createNew': 'New type',
   'mds.reason.type.createTitle': 'New reason code type',
   'mds.reason.type.editTitle': 'Edit reason code type',

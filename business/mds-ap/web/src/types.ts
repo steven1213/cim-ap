@@ -909,3 +909,13 @@ export interface ShiftLogPayload {
   pendingItems?: string | null;
   remarks?: string | null;
 }
+
+/** 卡控开关行（V18）——一行一个卡控点，MES 消费方按 TTL 缓存拉取决定卡控是否生效。 */
+export interface ControlSwitchView {
+  id: string;
+  controlCode: string;
+  domainCode: string;
+  name: string;
+  enabled: boolean;
+  description?: string | null;
+}

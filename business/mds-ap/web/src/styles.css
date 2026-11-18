@@ -887,6 +887,30 @@ table.naming-seg-table th {
   align-items: start;
 }
 
+/* 卡控开关条（V18）：页面头部就地启停，不单独建页（动线不割裂） */
+.shift-control-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--cim-border, #d9d9d9);
+  border-radius: 8px;
+  background: var(--cim-bg-secondary, #fafafa);
+}
+
+.shift-control-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.shift-control-hint {
+  font-size: 12px;
+  margin-left: 8px;
+}
+
 /* 班次名称前的日历色点 */
 .shift-color-dot {
   display: inline-block;

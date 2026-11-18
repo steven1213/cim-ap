@@ -189,6 +189,9 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.SHIFT_UPDATE, 20));
         m.add(button("btn.shiftDef.delete", "shiftDefs", "mds.nav.shiftDefs.action.delete",
                 MdsPermissions.SHIFT_DELETE, 30));
+        // V18 卡控开关启停（ShiftDefsPage 就地切换 chips；无独立管理页）
+        m.add(button("btn.shiftDef.control", "shiftDefs", "mds.nav.shiftDefs.action.control",
+                MdsPermissions.SHIFT_UPDATE, 40));
         m.add(menu("schedule", "grp.shift", "/schedule", "SchedulePage",
                 "mds.nav.schedule", "calendar", MdsPermissions.SHIFT_VIEW, 20));
         m.add(button("btn.schedule.save", "schedule", "mds.nav.schedule.action.save",
@@ -512,6 +515,7 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.shiftDefs.action.create", "班次·新建", "Shift · create"));
         t.add(new TextDef("mds.nav.shiftDefs.action.save", "班次·维护", "Shift · save"));
         t.add(new TextDef("mds.nav.shiftDefs.action.delete", "班次·删除", "Shift · delete"));
+        t.add(new TextDef("mds.nav.shiftDefs.action.control", "班次·卡控", "Shift · control"));
         t.add(new TextDef("mds.nav.schedule", "排班安排", "Schedule"));
         t.add(new TextDef("mds.nav.schedule.action.save", "排班·维护", "Schedule · save"));
         t.add(new TextDef("mds.nav.shiftLogs", "交接班记录", "Shift logs"));

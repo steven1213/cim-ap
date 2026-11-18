@@ -4,6 +4,7 @@ import { useResource } from '@cim/data';
 import {
   Can,
   CimButton,
+  CimCheckTag,
   CimModal,
   DataTable,
   FormGrid,
@@ -16,14 +17,19 @@ import {
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
-import type { ShiftPatternView, ShiftView } from '@/types';
+import { useHasPermission } from '@/lib/usePermission';
+import type { ControlSwitchView, ShiftPatternView, ShiftView } from '@/types';
 
 /**
- * 班次与班制（ShiftDefsPage，V17）——排班域的定义类主数据维护。
+ * 班次与班制（ShiftDefsPage，V17/V18）——排班域的定义类主数据维护。
  *
  * <p>左栏班次（一天内的值守时间段，晚班演示跨天口径），右栏班制（周期轮转序列，
  * 是排班页「按班制生成」的模板）。守门规则：code 建后不可改；被引用的班次禁删
  * （2004 只能停用）；班制 detail 项数必须等于周期天数且引用启用班次。</p>
+ *
+ * <p>V18 卡控开关：页面头部就地切换（无独立管理页，动线不割裂）——开关数据源是
+ * `cim_control_switch`（mshift 域），MES 等消费方按 TTL 缓存拉取；开 = 消费方执行
+ * 卡控判定，关 = 卡控逻辑常驻但直接放行。启停权限沿用 {@code mds:shift:update}。</p>
  */
 
 const NO_SHIFTS: ShiftView[] = [];
@@ -51,7 +57,7 @@ export const SHIFT_COLORS: Record<string, string> = {
 };
 
 export default function ShiftDefsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -59,6 +65,28 @@ export default function ShiftDefsPage() {
   const patternsRes = useResource(({ signal }) => api.listShiftPatterns(signal));
   const shifts = shiftsRes.data ?? NO_SHIFTS;
   const patterns = patternsRes.data ?? NO_PATTERNS;
+
+  // ── 卡控开关（V18）——就地启停；标签文案优先 i18n（en），缺翻译回退库名 ──
+  const canControl = useHasPermission(MDS_PERMS.shift.update);
+  const switchesRes = useResource(({ signal }) => api.listControlSwitches('mshift', signal));
+  const switches = switchesRes.data ?? [];
+  const [toggling, setToggling] = useState<string | null>(null);
+  const controlLabelOf = (sw: ControlSwitchView) => {
+    const key = `mds.shift.control.${sw.controlCode}`;
+    return i18n.exists(key) ? t(key) : sw.name;
+  };
+  const doToggleSwitch = async (sw: ControlSwitchView, next: boolean) => {
+    setToggling(sw.controlCode);
+    try {
+      await api.setControlSwitch(sw.controlCode, next);
+      toast.success(t('mds.common.saved'));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setToggling(null);
+      switchesRes.refresh();
+    }
+  };
 
   // ── 班次弹窗 ──
   const [shiftForm, setShiftForm] = useState<
@@ -214,6 +242,22 @@ export default function ShiftDefsPage() {
 
   return (
     <Page>
+      <div className="shift-control-bar">
+        <span className="shift-control-title">{t('mds.shift.control.title')}</span>
+        {switches.map((sw) => (
+          <CimCheckTag
+            key={sw.controlCode}
+            checked={sw.enabled}
+            disabled={!canControl || toggling === sw.controlCode}
+            onChange={(next) => void doToggleSwitch(sw, next)}
+          >
+            {controlLabelOf(sw)}
+          </CimCheckTag>
+        ))}
+        {switchesRes.loading ? <span className="dim">{t('mds.common.loading')}</span> : null}
+        <span className="dim shift-control-hint">{t('mds.shift.control.hint')}</span>
+      </div>
+
       <div className="shift-defs-layout">
         <Panel
           title={t('mds.shiftDef.panelTitle')}
