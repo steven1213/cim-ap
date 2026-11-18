@@ -374,3 +374,33 @@ export function IconSave(p: IconProps) {
   );
 }
 
+/** 时钟（班次/时间类） */
+export function IconClock(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 7.2V12l3.4 2" />
+    </svg>
+  );
+}
+
+/** 日历（排班/计划类） */
+export function IconCalendar(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="1.6" />
+      <path d="M4 10h16M8.4 3.2v4M15.6 3.2v4" />
+    </svg>
+  );
+}
+
+/** 文档（记录/日志类） */
+export function IconFile(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M14 3.5v4h4M9 12h6M9 15.5h6" />
+    </svg>
+  );
+}
+

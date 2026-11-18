@@ -150,4 +150,7 @@ export {
   IconEdit,
   IconSync,
   IconSave,
+  IconClock,
+  IconCalendar,
+  IconFile,
 } from './icons';

@@ -7,7 +7,10 @@ import type { ComponentType, SVGProps } from 'react';
 import {
   IconAlert,
   IconApps,
+  IconCalendar,
   IconCheckCircle,
+  IconClock,
+  IconFile,
   IconGauge,
   IconInbox,
   IconKey,
@@ -50,6 +53,9 @@ const REGISTRY: Record<string, IconComponent> = {
   user: IconUser,
   'org-grant': IconOrgGrant,
   alert: IconAlert,
+  clock: IconClock,
+  calendar: IconCalendar,
+  file: IconFile,
 };
 
 /** 解析图标标识；未知返回回退图标。 */
