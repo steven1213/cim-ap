@@ -106,6 +106,18 @@ export const MDS_PERMS = {
     update: 'mds:reason:update',
     delete: 'mds:reason:delete',
   },
+  // 班组排班（V17）：班次/班制/排班三块共用一组码（维护人是同一批管理员）
+  shift: {
+    view: 'mds:shift:view',
+    create: 'mds:shift:create',
+    update: 'mds:shift:update',
+    delete: 'mds:shift:delete',
+  },
+  // 交接班记录：值班人员全员可写，与排班管理员分开
+  shiftlog: {
+    view: 'mds:shiftlog:view',
+    save: 'mds:shiftlog:save',
+  },
 } as const;
 
 /** 平台管理码（端点在 cim-system，与后端 PermissionCodes 对齐——菜单维护页双闸门之一）。 */

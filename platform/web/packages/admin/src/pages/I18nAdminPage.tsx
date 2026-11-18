@@ -317,8 +317,8 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
           <span className="cell-actions" onClick={(e) => e.stopPropagation()}>
             {canLocale && (
               <CimButton
-                bare
-                className="icon-btn"
+                size="small"
+                iconOnly
                 title={t('admin.common.edit')}
                 onClick={() =>
                   setLocaleDraft({
@@ -330,19 +330,18 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
                     status: l.status,
                   })
                 }
-              >
-                <IconEdit width={13} height={13} />
-              </CimButton>
+              icon={<IconEdit width={13} height={13} />}
+              />
             )}
             {!l.isDefault && canLocale && (
               <CimButton
-                bare
-                className="icon-btn danger"
+                size="small"
+                iconOnly
+                danger
                 title={t('admin.common.delete')}
                 onClick={() => onDeleteLocale(l)}
-              >
-                <IconTrash width={13} height={13} />
-              </CimButton>
+              icon={<IconTrash width={13} height={13} />}
+              />
             )}
           </span>
         ),
@@ -407,9 +406,7 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
               </CimButton>
             )}
             {canRemove && (
-              <CimButton bare className="icon-btn danger" title={t('admin.common.delete')} onClick={() => onDeleteMessage(m)}>
-                <IconTrash width={13} height={13} />
-              </CimButton>
+              <CimButton size="small" iconOnly danger title={t('admin.common.delete')} onClick={() => onDeleteMessage(m)} icon={<IconTrash width={13} height={13} />} />
             )}
           </span>
         ),
@@ -522,16 +519,15 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
             <>
               {canLocale && (
                 <CimButton
-                  bare
-                  className="icon-btn"
+                  size="small"
+                  iconOnly
                   title={t('admin.admin.i18n.newLocale')}
                   onClick={() => {
                     setLocaleErr({});
                     setLocaleDraft({ id: '', code: '', name: '', isDefault: false, sortNo: 20, status: 'ENABLED' });
                   }}
-                >
-                  <IconPlus width={14} height={14} />
-                </CimButton>
+                icon={<IconPlus width={14} height={14} />}
+                />
               )}
               <CimButton size="small" onClick={localesRes.refresh} disabled={localesRes.loading}>
                 <IconRefresh width={13} height={13} />
@@ -566,8 +562,8 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
               <>
                 {canSave && (
                   <CimButton
-                    bare
-                    className="icon-btn"
+                    size="small"
+                    iconOnly
                     title={t('admin.admin.i18n.newMessage')}
                     onClick={() => {
                       setMsgErr({});
@@ -580,9 +576,8 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
                         scope: 'USER',
                       });
                     }}
-                  >
-                    <IconPlus width={14} height={14} />
-                  </CimButton>
+                  icon={<IconPlus width={14} height={14} />}
+                  />
                 )}
                 {reloadTranslations && (
                   <CimButton
@@ -665,17 +660,18 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
                   </CimButton>
                 )}
                 <CimButton
-                  bare
-                  className="icon-btn"
+                  size="small"
+                  iconOnly
                   htmlType="button"
                   title={missOpen ? t('admin.common.collapseAll') : t('admin.common.expandAll')}
                   aria-expanded={missOpen}
                   onClick={() => setMissOpen((v) => !v)}
-                >
-                  <span className={'tree-toggle' + (missOpen ? ' open' : '')} style={{ width: 14, height: 14 }}>
-                    <IconChevron width={12} height={12} />
-                  </span>
-                </CimButton>
+                  icon={
+                    <span className={'tree-toggle' + (missOpen ? ' open' : '')} style={{ width: 14, height: 14 }}>
+                      <IconChevron width={12} height={12} />
+                    </span>
+                  }
+                />
               </>
             }
           >

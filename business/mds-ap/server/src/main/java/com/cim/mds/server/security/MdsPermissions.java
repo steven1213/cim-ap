@@ -125,6 +125,16 @@ public final class MdsPermissions {
     public static final String SYS_I18N_REMOVE = PermissionCodes.I18N_REMOVE;
     public static final String SYS_I18N_LOCALE = PermissionCodes.I18N_LOCALE;
 
+    // ---------------- 班组排班（Shift，日常操作域：班次/班制/排班三块共用一组码） ----------------
+    public static final String SHIFT_VIEW = "mds:shift:view";
+    public static final String SHIFT_CREATE = "mds:shift:create";
+    public static final String SHIFT_UPDATE = "mds:shift:update";
+    public static final String SHIFT_DELETE = "mds:shift:delete";
+
+    // ---------------- 交接班记录（ShiftLog：值班人员全员可写，与排班管理员分开） ----------------
+    public static final String SHIFTLOG_VIEW = "mds:shiftlog:view";
+    public static final String SHIFTLOG_SAVE = "mds:shiftlog:save";
+
     // ---------------- 目录只读（组织/人员；主数据在 IAM，本系统只读——经代理取目录 API） ----------------
     public static final String ORG_VIEW = "mds:org:view";
     public static final String USER_VIEW = "mds:user:view";
@@ -192,6 +202,12 @@ public final class MdsPermissions {
         codes.add(REASON_CREATE);
         codes.add(REASON_UPDATE);
         codes.add(REASON_DELETE);
+        codes.add(SHIFT_VIEW);
+        codes.add(SHIFT_CREATE);
+        codes.add(SHIFT_UPDATE);
+        codes.add(SHIFT_DELETE);
+        codes.add(SHIFTLOG_VIEW);
+        codes.add(SHIFTLOG_SAVE);
         codes.add(SYS_MENU_LIST);
         codes.add(SYS_MENU_SAVE);
         codes.add(SYS_MENU_REMOVE);

@@ -779,6 +779,11 @@ button:disabled {
   padding: 6px 7px;
 }
 
+/* small 尺寸下的图标按钮：垂直内边距与 .btn-sm 一致，保证与并排文字按钮同高。 */
+.btn-sm.btn-icon-only {
+  padding: 4px;
+}
+
 /* 忙碌态：.btn 体系原本用 disabled 表达，antd 用户习惯 loading 转圈，保留后者。
    spinner 用 currentColor，因此三种层级下都自动配色。 */
 .btn[data-loading='true'] {

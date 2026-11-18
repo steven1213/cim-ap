@@ -46,6 +46,17 @@ import type {
   NamingRulePayload,
   NamingRulePreviewReq,
   NamingRulePreviewRes,
+  ShiftView,
+  ShiftPayload,
+  ShiftPatternView,
+  ShiftPatternPayload,
+  ShiftAssignmentView,
+  ShiftCellPayload,
+  ShiftGeneratePayload,
+  ShiftCopyPayload,
+  ShiftUserOption,
+  ShiftLogView,
+  ShiftLogPayload,
 } from '@/types';
 
 const BASE = '/mds';
@@ -759,4 +770,96 @@ export function listWipReasonEvents(
 /** 创建事件（快照五件套同事务落库）。 */
 export function createWipReasonEvent(payload: WipReasonEventPayload): Promise<WipReasonEventView> {
   return http.post<WipReasonEventView>(`${BASE}/wip-reason-events`, payload);
+}
+
+// ============================================================ 班组排班（V17）
+
+/** 班次全量（sort_no 升序）。 */
+export function listShifts(signal?: AbortSignal): Promise<ShiftView[]> {
+  return http.get<ShiftView[]>(`${BASE}/shifts`, undefined, { signal });
+}
+
+/** 启用班次（排班下拉口径）。 */
+export function listEnabledShifts(signal?: AbortSignal): Promise<ShiftView[]> {
+  return http.get<ShiftView[]>(`${BASE}/shifts/enabled`, undefined, { signal });
+}
+
+export function createShift(payload: ShiftPayload): Promise<ShiftView> {
+  return http.post<ShiftView>(`${BASE}/shifts`, payload);
+}
+
+export function updateShift(id: string, payload: ShiftPayload): Promise<ShiftView> {
+  return http.put<ShiftView>(`${BASE}/shifts/${id}`, payload);
+}
+
+/** 删除班次（被引用返回 2004，只能停用）。 */
+export function deleteShift(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/shifts/${id}`);
+}
+
+/** 班制全量。 */
+export function listShiftPatterns(signal?: AbortSignal): Promise<ShiftPatternView[]> {
+  return http.get<ShiftPatternView[]>(`${BASE}/shift-patterns`, undefined, { signal });
+}
+
+/** 启用班制（铺排入口下拉）。 */
+export function listEnabledShiftPatterns(signal?: AbortSignal): Promise<ShiftPatternView[]> {
+  return http.get<ShiftPatternView[]>(`${BASE}/shift-patterns/enabled`, undefined, { signal });
+}
+
+export function createShiftPattern(payload: ShiftPatternPayload): Promise<ShiftPatternView> {
+  return http.post<ShiftPatternView>(`${BASE}/shift-patterns`, payload);
+}
+
+export function updateShiftPattern(id: string, payload: ShiftPatternPayload): Promise<ShiftPatternView> {
+  return http.put<ShiftPatternView>(`${BASE}/shift-patterns/${id}`, payload);
+}
+
+export function deleteShiftPattern(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/shift-patterns/${id}`);
+}
+
+/** 周区间排班（from = 周一）。 */
+export function listWeekAssignments(from: string, signal?: AbortSignal): Promise<ShiftAssignmentView[]> {
+  return http.get<ShiftAssignmentView[]>(`${BASE}/shift-assignments`, { from }, { signal });
+}
+
+/** 单格保存（shiftCode 空 = 清空；返回 null 表示已清空）。 */
+export function saveShiftCell(payload: ShiftCellPayload): Promise<ShiftAssignmentView | null> {
+  return http.put<ShiftAssignmentView | null>(`${BASE}/shift-assignments`, payload);
+}
+
+/** 班制铺排（一步落库；返回写入行数）。 */
+export function generateFromPattern(payload: ShiftGeneratePayload): Promise<number> {
+  return http.post<number>(`${BASE}/shift-assignments/generate`, payload);
+}
+
+/** 复制上周。 */
+export function copyLastWeek(payload: ShiftCopyPayload): Promise<number> {
+  return http.post<number>(`${BASE}/shift-assignments/copy`, payload);
+}
+
+/** 选人下拉（IAM 目录启用档案）。 */
+export function listShiftUsers(signal?: AbortSignal): Promise<ShiftUserOption[]> {
+  return http.get<ShiftUserOption[]>(`${BASE}/shift-users`, undefined, { signal });
+}
+
+/** 交接记录清单（shiftCode 过滤可选）。 */
+export function listShiftLogs(shiftCode?: string, signal?: AbortSignal): Promise<ShiftLogView[]> {
+  return http.get<ShiftLogView[]>(`${BASE}/shift-logs`, { shiftCode }, { signal });
+}
+
+/** 交接记录详情。 */
+export function getShiftLog(id: string, signal?: AbortSignal): Promise<ShiftLogView> {
+  return http.get<ShiftLogView>(`${BASE}/shift-logs/${id}`, undefined, { signal });
+}
+
+/** 交班提交 / 修改（仅未签收可改）。 */
+export function saveShiftLog(payload: ShiftLogPayload): Promise<ShiftLogView> {
+  return http.post<ShiftLogView>(`${BASE}/shift-logs`, payload);
+}
+
+/** 接班签收（乐观锁；签收后锁定只读）。 */
+export function ackShiftLog(id: string, version: number): Promise<ShiftLogView> {
+  return http.post<ShiftLogView>(`${BASE}/shift-logs/${id}/ack?version=${version}`, {});
 }

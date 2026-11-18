@@ -461,13 +461,12 @@ export default function MenusAdminPage({ perms, icons, namePerm = ['sys:i18n:sav
               </CimButton>
               {canSave && (
                 <CimButton
-                  bare
-                  className="icon-btn"
+                  size="small"
+                  iconOnly
                   title={t('admin.admin.menus.newRoot')}
                   onClick={() => startCreate(null)}
-                >
-                  <IconPlus width={14} height={14} />
-                </CimButton>
+                  icon={<IconPlus width={14} height={14} />}
+                />
               )}
               {canGrant && (
                 <CimButton size="small" onClick={() => setGrantOpen(true)}>

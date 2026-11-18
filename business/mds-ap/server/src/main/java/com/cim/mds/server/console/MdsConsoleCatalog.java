@@ -179,6 +179,27 @@ public final class MdsConsoleCatalog {
 
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
+        // shift ops group (V17)
+        m.add(dir("grp.shift", "mds.nav.group.shift", 37));
+        m.add(menu("shiftDefs", "grp.shift", "/shift-defs", "ShiftDefsPage",
+                "mds.nav.shiftDefs", "clock", MdsPermissions.SHIFT_VIEW, 10));
+        m.add(button("btn.shiftDef.create", "shiftDefs", "mds.nav.shiftDefs.action.create",
+                MdsPermissions.SHIFT_CREATE, 10));
+        m.add(button("btn.shiftDef.save", "shiftDefs", "mds.nav.shiftDefs.action.save",
+                MdsPermissions.SHIFT_UPDATE, 20));
+        m.add(button("btn.shiftDef.delete", "shiftDefs", "mds.nav.shiftDefs.action.delete",
+                MdsPermissions.SHIFT_DELETE, 30));
+        m.add(menu("schedule", "grp.shift", "/schedule", "SchedulePage",
+                "mds.nav.schedule", "calendar", MdsPermissions.SHIFT_VIEW, 20));
+        m.add(button("btn.schedule.save", "schedule", "mds.nav.schedule.action.save",
+                MdsPermissions.SHIFT_UPDATE, 10));
+        m.add(menu("shiftLogs", "grp.shift", "/shift-logs", "ShiftLogsPage",
+                "mds.nav.shiftLogs", "file", MdsPermissions.SHIFTLOG_VIEW, 30));
+        m.add(button("btn.shiftLog.save", "shiftLogs", "mds.nav.shiftLogs.action.save",
+                MdsPermissions.SHIFTLOG_SAVE, 10));
+        m.add(button("btn.shiftLog.ack", "shiftLogs", "mds.nav.shiftLogs.action.ack",
+                MdsPermissions.SHIFTLOG_SAVE, 20));
+
         m.add(dir("grp.system", "mds.nav.group.system", 40));
         m.add(menu("dicts", "grp.system", "/dicts", "DictPage",
                 "mds.nav.dicts", "list", PermissionCodes.DICT_LIST, 10));
@@ -385,6 +406,13 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.SYS_I18N_SAVE, "译文维护"));
         p.add(new PermDef(MdsPermissions.SYS_I18N_REMOVE, "译文删除"));
         p.add(new PermDef(MdsPermissions.SYS_I18N_LOCALE, "语言目录维护"));
+        // 班组排班（V17）
+        p.add(new PermDef(MdsPermissions.SHIFT_VIEW, "班次/班制/排班查看"));
+        p.add(new PermDef(MdsPermissions.SHIFT_CREATE, "班次/班制新建"));
+        p.add(new PermDef(MdsPermissions.SHIFT_UPDATE, "排班维护/班制铺排"));
+        p.add(new PermDef(MdsPermissions.SHIFT_DELETE, "班次/班制删除"));
+        p.add(new PermDef(MdsPermissions.SHIFTLOG_VIEW, "交接班记录查看"));
+        p.add(new PermDef(MdsPermissions.SHIFTLOG_SAVE, "交接班记录提交/签收"));
         p.add(new PermDef(MdsPermissions.ORG_VIEW, "组织目录查看（只读，主数据在 IAM）"));
         p.add(new PermDef(MdsPermissions.USER_VIEW, "人员目录查看（只读，主数据在 IAM）"));
         return p;
@@ -479,6 +507,16 @@ public final class MdsConsoleCatalog {
         // —— 产品管理 ——
         t.add(new TextDef("mds.nav.group.product", "产品管理", "Products"));
         t.add(new TextDef("mds.nav.group.system", "系统配置", "System settings"));
+        t.add(new TextDef("mds.nav.group.shift", "班组排班", "Shift Ops"));
+        t.add(new TextDef("mds.nav.shiftDefs", "班次与班制", "Shifts & patterns"));
+        t.add(new TextDef("mds.nav.shiftDefs.action.create", "班次·新建", "Shift · create"));
+        t.add(new TextDef("mds.nav.shiftDefs.action.save", "班次·维护", "Shift · save"));
+        t.add(new TextDef("mds.nav.shiftDefs.action.delete", "班次·删除", "Shift · delete"));
+        t.add(new TextDef("mds.nav.schedule", "排班安排", "Schedule"));
+        t.add(new TextDef("mds.nav.schedule.action.save", "排班·维护", "Schedule · save"));
+        t.add(new TextDef("mds.nav.shiftLogs", "交接班记录", "Shift logs"));
+        t.add(new TextDef("mds.nav.shiftLogs.action.save", "交接班·提交", "Shift log · save"));
+        t.add(new TextDef("mds.nav.shiftLogs.action.ack", "交接班·签收", "Shift log · ack"));
         t.add(new TextDef("mds.nav.technology", "制程技术", "Technologies"));
         t.add(new TextDef("mds.nav.technology.action.create", "制程技术·新建", "Technology · create"));
         t.add(new TextDef("mds.nav.technology.action.update", "制程技术·编辑", "Technology · update"));

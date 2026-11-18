@@ -538,9 +538,7 @@ export default function RolesAdminPage({ perms }: RolesAdminPageProps) {
           actions={
             <>
               {canSave && (
-                <CimButton bare className="icon-btn" title={t('admin.admin.roles.new')} onClick={startCreate}>
-                  <IconPlus width={14} height={14} />
-                </CimButton>
+                <CimButton size="small" iconOnly title={t('admin.admin.roles.new')} onClick={startCreate} icon={<IconPlus width={14} height={14} />} />
               )}
               <CimButton size="small" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
                 <IconRefresh width={13} height={13} />

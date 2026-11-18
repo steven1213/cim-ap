@@ -785,3 +785,127 @@ export interface WipReasonEventPayload {
   occurredAt?: string | null;
   operator?: string | null;
 }
+
+// ============================================================ 班组排班（V17）
+
+/** 班次定义行。 */
+export interface ShiftView {
+  id: string;
+  shiftCode: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  crossDay: boolean;
+  color?: string | null;
+  enabled: boolean;
+  sortNo: number;
+  description?: string | null;
+}
+
+/** 班次保存请求（shiftCode 建后不可改）。 */
+export interface ShiftPayload {
+  shiftCode: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  crossDay: boolean;
+  color?: string | null;
+  enabled: boolean;
+  sortNo: number;
+  description?: string | null;
+}
+
+/** 班制定义行（detail 已拆数组，第 N 天 → 班次 code）。 */
+export interface ShiftPatternView {
+  id: string;
+  patternCode: string;
+  patternName: string;
+  cycleDays: number;
+  detail: string[];
+  enabled: boolean;
+  sortNo: number;
+  description?: string | null;
+}
+
+/** 班制保存请求。 */
+export interface ShiftPatternPayload {
+  patternCode: string;
+  patternName: string;
+  cycleDays: number;
+  detail: string[];
+  enabled: boolean;
+  sortNo: number;
+  description?: string | null;
+}
+
+/** 排班格（周视图单元格）。 */
+export interface ShiftAssignmentView {
+  id: string;
+  workDate: string;
+  userId: string;
+  username: string;
+  shiftCode: string;
+  source: string;
+  version: number;
+}
+
+/** 单格保存请求（shiftCode 空 = 清空该格）。 */
+export interface ShiftCellPayload {
+  workDate: string;
+  userId: string;
+  username?: string;
+  shiftCode?: string | null;
+}
+
+/** 班制铺排请求（一步落库）。 */
+export interface ShiftGeneratePayload {
+  patternCode: string;
+  startDate: string;
+  userIds: string[];
+  usernames?: Record<string, string>;
+}
+
+/** 复制上周请求（两端均为周一）。 */
+export interface ShiftCopyPayload {
+  fromWeekStart: string;
+  toWeekStart: string;
+}
+
+/** 选人下拉行（IAM 目录摘要）。 */
+export interface ShiftUserOption {
+  userId: string;
+  username: string;
+  enabled: boolean;
+}
+
+/** 交接班记录行。 */
+export interface ShiftLogView {
+  id: string;
+  workDate: string;
+  shiftCode: string;
+  shiftName: string;
+  handoverUser: string;
+  handoverName?: string | null;
+  receiverUser?: string | null;
+  receiverName?: string | null;
+  equipmentIssue?: string | null;
+  pendingItems?: string | null;
+  remarks?: string | null;
+  acked: boolean;
+  ackBy?: string | null;
+  ackName?: string | null;
+  ackAt?: string | null;
+  version: number;
+}
+
+/** 交接记录保存请求（workDate 空 = 按当前时刻推算归属）。 */
+export interface ShiftLogPayload {
+  id?: string | null;
+  workDate?: string | null;
+  shiftCode: string;
+  receiverUser?: string | null;
+  receiverName?: string | null;
+  equipmentIssue?: string | null;
+  pendingItems?: string | null;
+  remarks?: string | null;
+}

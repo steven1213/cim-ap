@@ -178,13 +178,12 @@ export default function PermissionsAdminPage({ perms }: PermissionsAdminPageProp
             <>
               {canSave && (
                 <CimButton
-                  bare
-                  className="icon-btn"
+                  size="small"
+                  iconOnly
                   title={t('admin.admin.perms.new')}
                   onClick={() => setDraft({ id: '', code: 'xxx:', name: '', status: 'ENABLED', origin: null })}
-                >
-                  <IconPlus width={14} height={14} />
-                </CimButton>
+                icon={<IconPlus width={14} height={14} />}
+                />
               )}
               <CimButton size="small" onClick={listRes.refresh} disabled={listRes.loading}>
                 {listRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}

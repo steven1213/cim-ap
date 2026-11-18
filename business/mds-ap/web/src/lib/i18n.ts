@@ -7,6 +7,7 @@
 //      在库内维护的文案随远端包生效，内置包退为离线兜底；
 //   2. 切语言时顺手改 `Accept-Language`（本包不认识 axios，也不该认识）。
 import { createI18n } from '@cim/i18n';
+import { adminEnUS, adminZhCN } from '@cim/admin';
 import { httpClient, setAcceptLanguage } from '@/lib/api';
 import { zhCN, enUS } from '@/lib/i18n/messages';
 
@@ -15,7 +16,8 @@ export const DEFAULT_LANG = 'zh-CN';
 const cim = createI18n({
   app: 'mds',
   defaultLng: DEFAULT_LANG,
-  builtin: { 'zh-CN': zhCN, 'en-US': enUS },
+  // 内置包 = 本应用文案 + 系统配置六页共享文案（@cim/admin；远端 sys_i18n 可逐键覆盖）
+  builtin: { 'zh-CN': { ...adminZhCN, ...zhCN }, 'en-US': { ...adminEnUS, ...enUS } },
   locales: [
     { code: 'zh-CN', name: '简体中文' },
     { code: 'en-US', name: 'English' },
