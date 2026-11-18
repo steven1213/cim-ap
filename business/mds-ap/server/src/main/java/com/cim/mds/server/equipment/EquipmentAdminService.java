@@ -22,6 +22,7 @@ import com.cim.system.dict.SysDictService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 设备（Equipment）管理——实例主数据 CRUD + 能力关联维护。
@@ -84,6 +85,30 @@ public class EquipmentAdminService {
     }
 
     // ------------------------------------------------------------------ 写
+
+    /**
+     * 能力 → 可加工设备解析（V21，AMAT 口径）：经 cim_equipment_capability 反查
+     * 挂有该能力码的设备清单（Equipment 级，2026-11-18 定稿）。
+     * 路线画布/派工侧用 Step.capabilityCode 调用本端点得到「可用于加工的设备」。
+     */
+    @Transactional(readOnly = true)
+    public List<EquipmentView> byCapability(String capabilityCode) {
+        if (!StringUtils.hasText(capabilityCode)) {
+            throw new BizException(BizCode.PARAM_INVALID, "capabilityCode 必填");
+        }
+        if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).isEmpty()) {
+            throw new BizException(BizCode.DATA_NOT_FOUND, "设备能力不存在: " + capabilityCode);
+        }
+        Map<String, CimEquipmentType> types = typeRepository.findAll().stream()
+                .filter(t -> !Boolean.TRUE.equals(t.getDeleted()))
+                .collect(Collectors.toMap(CimEquipmentType::getTypeCode, Function.identity()));
+        return eqpCapRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).stream()
+                .map(rel -> equipmentRepository.findById(rel.getEquipmentId())
+                        .filter(e -> !Boolean.TRUE.equals(e.getDeleted())))
+                .flatMap(java.util.Optional::stream)
+                .map(e -> toView(e, types.get(e.getTypeCode())))
+                .toList();
+    }
 
     @Transactional
     public EquipmentView create(EquipmentReq req) {

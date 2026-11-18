@@ -43,6 +43,14 @@ public class EquipmentController {
         return Result.ok(service.list(keyword, typeCode, processOnly, amhsOnly));
     }
 
+    /** 能力 → 可加工设备解析（V21，AMAT 口径）：Step.capabilityCode 反查挂该能力的设备清单。 */
+    @PreAuthorize("hasAuthority('mds:equipment:view')")
+    @GetMapping("/equipments/by-capability")
+    public Result<List<EquipmentAdminService.EquipmentView>> byCapability(
+            @RequestParam String capabilityCode) {
+        return Result.ok(service.byCapability(capabilityCode));
+    }
+
     @PreAuthorize("hasAuthority('mds:equipment:create')")
     @PostMapping("/equipments")
     public Result<EquipmentAdminService.EquipmentView> create(

@@ -93,6 +93,17 @@ public class CimOperation extends BaseDefData {
     @Column(name = "equip_type", length = 64)
     private String equipType;
 
+    /** 默认能力需求编码（逻辑引用 cim_capability，可空；非空才校验存在）。
+     *  AMAT 口径：Step 挂 Capability，经设备能力关联（cim_equipment_capability）
+     *  匹配可加工设备；本列为工序默认能力，路线内 Step 可覆写。 */
+    @Column(name = "capability_code", length = 64)
+    private String capabilityCode;
+
+    /** 默认 EDC Plan 引用码（工程数据采集计划；可空字符串引用，MDS 不做主数据——
+     *  采数规则属 MES/EDA 域，本列只留引用缝；路线内 Step 可覆写）。 */
+    @Column(name = "edc_plan_code", length = 64)
+    private String edcPlanCode;
+
     /** 默认 Q-time 队留下限（分钟，可空）。 */
     @Column(name = "qtime_min")
     private Integer qtimeMin;

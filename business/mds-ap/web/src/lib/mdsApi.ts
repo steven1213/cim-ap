@@ -338,6 +338,14 @@ export function listEquipmentCapabilities(id: string, signal?: AbortSignal): Pro
   });
 }
 
+/** 能力 → 可加工设备解析（V21，AMAT 口径）：Step.capabilityCode 反查挂该能力的设备。 */
+export function listEquipmentsByCapability(
+  capabilityCode: string,
+  signal?: AbortSignal,
+): Promise<Equipment[]> {
+  return http.get<Equipment[]>(`${BASE}/equipments/by-capability`, { capabilityCode }, { signal });
+}
+
 /** 全量替换设备能力关联（勾选提交）。 */
 export function setEquipmentCapabilities(id: string, capabilityCodes: string[]): Promise<string[]> {
   return http.put<string[]>(

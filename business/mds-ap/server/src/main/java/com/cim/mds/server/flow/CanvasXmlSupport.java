@@ -22,7 +22,8 @@ import com.cim.spring.support.web.BizCode;
  *     <node id="n1" stepCode="STP010" stepName="光刻显影" stepType="PROCESS"
  *           operationCode="OP-LITHO-DEV" recipeRef="" equipType="LITHO" qtimeMin="" qtimeMax="" reworkLimit=""
  *           flowRef="" batchMode="BATCH" batchSize="12" holdPoint="true" holdReason=""
- *           inspectPlan="EDC-01" samplingRate="25" x="120" y="80">
+ *           inspectPlan="EDC-01" samplingRate="25"
+ *           capabilityCode="CAP-LITHO-01" edcPlanCode="" x="120" y="80">
  *       <bin code="GOOD" name="良品" type="PASS"/>
  *     </node>
  *   </nodes>
@@ -54,7 +55,8 @@ public final class CanvasXmlSupport {
                              String qtimeMax, String reworkLimit, String x, String y,
                              String flowRef, String batchMode, String batchSize,
                              boolean holdPoint, String holdReason,
-                             String inspectPlan, String samplingRate) {
+                             String inspectPlan, String samplingRate,
+                             String capabilityCode, String edcPlanCode) {
     }
 
     /** 解析出的画布边（XML 原顺序）。 */
@@ -111,7 +113,8 @@ public final class CanvasXmlSupport {
                     opt(el, "qtimeMax"), opt(el, "reworkLimit"), opt(el, "x"), opt(el, "y"),
                     opt(el, "flowRef"), opt(el, "batchMode"), opt(el, "batchSize"),
                     Boolean.parseBoolean(el.getAttribute("holdPoint")), opt(el, "holdReason"),
-                    opt(el, "inspectPlan"), opt(el, "samplingRate")));
+                    opt(el, "inspectPlan"), opt(el, "samplingRate"),
+                    opt(el, "capabilityCode"), opt(el, "edcPlanCode")));
             // DECISION 节点的 <bin> 子元素（词表；V13）
             NodeList binEls = el.getElementsByTagName("bin");
             for (int j = 0; j < binEls.getLength(); j++) {

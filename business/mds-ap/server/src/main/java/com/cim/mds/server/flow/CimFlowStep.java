@@ -87,6 +87,16 @@ public class CimFlowStep extends BaseDefData {
     @Column(name = "equip_type", length = 64)
     private String equipType;
 
+    /** 能力需求编码（V21，AMAT 口径；逻辑引用 cim_capability，可空 = 继承所引工序
+     *  的默认能力）。经设备能力关联（cim_equipment_capability，Equipment 级）匹配
+     *  可加工设备；非空才校验存在。 */
+    @Column(name = "capability_code", length = 64)
+    private String capabilityCode;
+
+    /** EDC Plan 引用码（V21；可空 = 继承所引工序默认值；MDS 不做主数据，采数规则属 MES/EDA 域）。 */
+    @Column(name = "edc_plan_code", length = 64)
+    private String edcPlanCode;
+
     /** Q-time 队留下限（分钟，可空）。 */
     @Column(name = "qtime_min")
     private Integer qtimeMin;

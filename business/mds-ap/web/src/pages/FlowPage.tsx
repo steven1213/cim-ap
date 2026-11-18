@@ -102,6 +102,10 @@ interface StepNodeData extends Record<string, unknown> {
   operationCode?: string;
   recipeRef?: string;
   equipType?: string;
+  /** 能力需求覆写（V21，AMAT 口径；可空 = 继承工序默认能力）。 */
+  capabilityCode?: string;
+  /** EDC Plan 引用码覆写（V21；可空 = 继承工序默认值）。 */
+  edcPlanCode?: string;
   qtimeMin?: string;
   qtimeMax?: string;
   reworkLimit?: string;
@@ -167,6 +171,7 @@ function serializeCanvasXml(graph: Graph, qtimes: QtimeDef[]): string {
       + ` flowRef="${esc(d.flowRef)}" batchMode="${esc(d.batchMode)}" batchSize="${esc(d.batchSize)}"`
       + ` holdPoint="${d.holdPoint ? 'true' : 'false'}" holdReason="${esc(d.holdReason)}"`
       + ` inspectPlan="${esc(d.inspectPlan)}" samplingRate="${esc(d.samplingRate)}"`
+      + ` capabilityCode="${esc(d.capabilityCode)}" edcPlanCode="${esc(d.edcPlanCode)}"`
       + ` x="${Math.round(pos.x)}" y="${Math.round(pos.y)}"`;
     const bins = d.bins ?? [];
     if (bins.length) {
@@ -240,6 +245,8 @@ function parseCanvasXml(xml: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
         holdReason: get('holdReason'),
         inspectPlan: get('inspectPlan'),
         samplingRate: get('samplingRate'),
+        capabilityCode: get('capabilityCode'),
+        edcPlanCode: get('edcPlanCode'),
         bins: bins.length ? bins : undefined,
       },
     });
@@ -363,6 +370,7 @@ function nodeAttrs(d: StepNodeData, t: (k: string) => string): KeyValue {
   if (d.operationCode) tipParts.push(`OP: ${d.operationCode}`);
   if (d.recipeRef) tipParts.push(`Recipe: ${d.recipeRef}`);
   if (d.equipType) tipParts.push(`Equip: ${d.equipType}`);
+  if (d.capabilityCode) tipParts.push(`Cap: ${d.capabilityCode}`);
   if (d.inspectPlan) {
     tipParts.push(`EDC: ${d.inspectPlan}${d.samplingRate ? ` (${d.samplingRate}%)` : ''}`);
   }
@@ -1315,6 +1323,8 @@ function NodeFormModal({
     operationCode: d.operationCode ?? '',
     recipeRef: d.recipeRef ?? '',
     equipType: d.equipType ?? '',
+    capabilityCode: d.capabilityCode ?? '',
+    edcPlanCode: d.edcPlanCode ?? '',
     batchMode: d.batchMode ?? '',
     batchSize: d.batchSize ?? '',
     qtimeMin: d.qtimeMin ?? '',
@@ -1330,6 +1340,26 @@ function NodeFormModal({
   const [publishedFlows, setPublishedFlows] = useState<FormOption[]>([]);
   // 工序库下拉（V20）：仅 ACTIVE 工序；INSPECT 节点只列检验类工序
   const [activeOps, setActiveOps] = useState<OperationView[]>([]);
+  // 能力字典下拉 + 可加工设备预览（V21，AMAT 口径）
+  const [capabilities, setCapabilities] = useState<FormOption[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .listCapabilities()
+      .then((list) => {
+        if (alive)
+          setCapabilities(
+            list.map((c) => ({ value: c.capabilityCode, label: `${c.capabilityCode} · ${c.capabilityName}` })),
+          );
+      })
+      .catch(() => {
+        if (alive) setCapabilities([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -1392,6 +1422,23 @@ function NodeFormModal({
       },
       { kind: 'text' as const, key: 'recipeRef' as const, labelKey: 'mds.flow.field.recipeRef', mono: true },
       { kind: 'text' as const, key: 'equipType' as const, labelKey: 'mds.flow.field.equipType', mono: true },
+      // ---- 能力需求 / EDC Plan（V21，AMAT 口径；可空 = 继承工序默认）
+      {
+        kind: 'select' as const,
+        key: 'capabilityCode' as const,
+        labelKey: 'mds.flow.field.capabilityCode',
+        options: capabilities,
+        showSearch: true,
+        allowClear: true,
+        hidden: structural || isDecision || isSubflow,
+      },
+      {
+        kind: 'text' as const,
+        key: 'edcPlanCode' as const,
+        labelKey: 'mds.flow.field.edcPlanCode',
+        mono: true,
+        hidden: structural || isDecision || isSubflow,
+      },
       {
         kind: 'select' as const,
         key: 'batchMode' as const,
@@ -1428,13 +1475,35 @@ function NodeFormModal({
         hidden: !isSubflow,
       },
     ],
-    [structural, isSubflow, isInspect, publishedFlows, activeOps],
+    [structural, isSubflow, isInspect, publishedFlows, activeOps, capabilities],
   );
 
   /** bin 行更新。 */
   const patchBin = (idx: number, patch: Partial<BinDef>) => {
     setBins((bs) => bs.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
   };
+
+  // 可加工设备预览（V21）：按能力码反查挂该能力的设备（AMAT 口径——能力匹配找设备）
+  const [capableEqps, setCapableEqps] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (structural || isDecision || isSubflow || !form.capabilityCode) {
+      setCapableEqps(null);
+      return;
+    }
+    let alive = true;
+    setCapableEqps(null);
+    void api
+      .listEquipmentsByCapability(form.capabilityCode)
+      .then((list) => {
+        if (alive) setCapableEqps(list.map((e) => e.equipmentCode));
+      })
+      .catch(() => {
+        if (alive) setCapableEqps([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [form.capabilityCode, structural, isDecision, isSubflow]);
 
   function submit() {
     const code = form.stepCode.trim();
@@ -1479,6 +1548,8 @@ function NodeFormModal({
       operationCode: structural || isDecision || isSubflow ? undefined : form.operationCode || undefined,
       recipeRef: form.recipeRef.trim() || undefined,
       equipType: form.equipType.trim() || undefined,
+      capabilityCode: structural || isDecision || isSubflow ? undefined : form.capabilityCode || undefined,
+      edcPlanCode: structural || isDecision || isSubflow ? undefined : form.edcPlanCode.trim() || undefined,
       batchMode: (form.batchMode || undefined) as StepNodeData['batchMode'],
       batchSize: form.batchSize === '' ? undefined : String(form.batchSize),
       qtimeMin: form.qtimeMin === '' ? undefined : String(form.qtimeMin),
@@ -1515,6 +1586,8 @@ function NodeFormModal({
               if (op) {
                 if (!p.recipeRef && op.recipeRef) next.recipeRef = op.recipeRef;
                 if (!p.equipType && op.equipType) next.equipType = op.equipType;
+                if (!p.capabilityCode && op.capabilityCode) next.capabilityCode = op.capabilityCode;
+                if (!p.edcPlanCode && op.edcPlanCode) next.edcPlanCode = op.edcPlanCode;
                 if (p.qtimeMin === '' && op.qtimeMin != null) next.qtimeMin = String(op.qtimeMin);
                 if (p.qtimeMax === '' && op.qtimeMax != null) next.qtimeMax = String(op.qtimeMax);
                 if (p.reworkLimit === '' && op.reworkLimit != null) next.reworkLimit = String(op.reworkLimit);
@@ -1533,6 +1606,14 @@ function NodeFormModal({
         }
         columns={2}
       />
+      {capableEqps !== null && (
+        <p className="flow-cap-eqp dim">
+          {t('mds.flow.capableEquipments', {
+            count: capableEqps.length,
+            codes: capableEqps.slice(0, 6).join(', ') || '—',
+          })}
+        </p>
+      )}
       {isDecision && (
         <>
           <FieldGroup labelKey="mds.flow.bin.group" />

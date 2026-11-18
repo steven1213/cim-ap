@@ -1122,3 +1122,8 @@ table.naming-seg-table th {
   font-size: 12.5px;
   margin: 0 0 8px;
 }
+.flow-cap-eqp {
+  font-size: 12px;
+  margin: 4px 0 0;
+  word-break: break-all;
+}

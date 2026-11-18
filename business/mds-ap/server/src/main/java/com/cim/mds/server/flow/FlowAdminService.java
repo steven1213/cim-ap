@@ -86,6 +86,7 @@ public class FlowAdminService {
     private final CimFlowQtimeRepository qtimeRepository;
     private final CimTechnologyRepository technologyRepository;
     private final CimEquipmentTypeRepository equipmentTypeRepository;
+    private final com.cim.mds.server.equipment.CimCapabilityRepository capabilityRepository;
     private final CimOperationRepository operationRepository;
     private final NamingRuleAdminService namingRuleService;
 
@@ -98,13 +99,15 @@ public class FlowAdminService {
                            String familyCode, Integer versionNo) {
     }
 
-    /** 解析产物节点视图（stepNo = XML 原顺序； nodeId = 边引用锚点；operationCode = 引用工序库，V20）。 */
+    /** 解析产物节点视图（stepNo = XML 原顺序； nodeId = 边引用锚点；operationCode = 引用工序库，V20；
+     *  capabilityCode/edcPlanCode = 能力需求/EDC Plan 覆写（V21，可空 = 继承工序默认）。 */
     public record StepView(String id, String nodeId, String stepCode, String stepName,
                            String stepType, String operationCode, Integer stepNo, String recipeRef, String equipType,
                            Integer qtimeMin, Integer qtimeMax, Integer reworkLimit,
                            String flowRef, String batchMode, Integer batchSize,
                            Boolean holdPoint, String holdReason,
-                           String inspectPlan, BigDecimal samplingRate) {
+                           String inspectPlan, BigDecimal samplingRate,
+                           String capabilityCode, String edcPlanCode) {
     }
 
     /** 解析产物边视图（from/to = XML 节点 id）。 */
@@ -277,6 +280,12 @@ public class FlowAdminService {
                     && equipmentTypeRepository.findByTypeCodeAndDeletedFalse(n.equipType()).isEmpty()) {
                 throw new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + n.equipType());
             }
+            // V21：能力需求非空才校验存在（AMAT 口径——经设备能力关联匹配可加工设备）
+            if (n.capabilityCode() != null
+                    && capabilityRepository.findByCapabilityCodeAndDeletedFalse(n.capabilityCode()).isEmpty()) {
+                throw new BizException(BizCode.DATA_NOT_FOUND,
+                        "设备能力不存在: " + n.capabilityCode() + "（步骤 " + n.stepCode() + "）");
+            }
             checkQtime(n.qtimeMin(), n.qtimeMax(), n.stepCode());
             // SUBFLOW：flowRef 必填且引用真实（发布状态在发布守门再查）
             if (CimFlowStep.TYPE_SUBFLOW.equals(n.stepType())) {
@@ -446,6 +455,8 @@ public class FlowAdminService {
                     ? null : n.operationCode().trim());
             entity.setRecipeRef(n.recipeRef());
             entity.setEquipType(n.equipType());
+            entity.setCapabilityCode(n.capabilityCode());
+            entity.setEdcPlanCode(n.edcPlanCode());
             entity.setQtimeMin(parseNullableInt(n.qtimeMin(), "qtimeMin", n.stepCode()));
             entity.setQtimeMax(parseNullableInt(n.qtimeMax(), "qtimeMax", n.stepCode()));
             entity.setReworkLimit(parseNullableInt(n.reworkLimit(), "reworkLimit", n.stepCode()));
@@ -607,6 +618,8 @@ public class FlowAdminService {
             clone.setOperationCode(s.getOperationCode());
             clone.setRecipeRef(s.getRecipeRef());
             clone.setEquipType(s.getEquipType());
+            clone.setCapabilityCode(s.getCapabilityCode());
+            clone.setEdcPlanCode(s.getEdcPlanCode());
             clone.setQtimeMin(s.getQtimeMin());
             clone.setQtimeMax(s.getQtimeMax());
             clone.setReworkLimit(s.getReworkLimit());
@@ -1030,7 +1043,8 @@ public class FlowAdminService {
                 s.getQtimeMin(), s.getQtimeMax(), s.getReworkLimit(),
                 s.getFlowRef(), s.getBatchMode(), s.getBatchSize(),
                 s.getHoldPoint(), s.getHoldReason(),
-                s.getInspectPlan(), s.getSamplingRate());
+                s.getInspectPlan(), s.getSamplingRate(),
+                s.getCapabilityCode(), s.getEdcPlanCode());
     }
 
     private static QtimeView toQtimeView(CimFlowQtime q) {

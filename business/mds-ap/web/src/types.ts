@@ -554,6 +554,10 @@ export interface OperationView {
   versionNo?: number | null;
   recipeRef?: string | null;
   equipType?: string | null;
+  /** 默认能力需求（AMAT 口径：经设备能力关联匹配可加工设备；可空=通用）。 */
+  capabilityCode?: string | null;
+  /** 默认 EDC Plan 引用码（采数规则属 MES/EDA 域，MDS 仅存引用）。 */
+  edcPlanCode?: string | null;
   qtimeMin?: number | null;
   qtimeMax?: number | null;
   reworkLimit?: number | null;
@@ -583,6 +587,8 @@ export interface OperationPayload {
   techCode?: string | null;
   recipeRef?: string | null;
   equipType?: string | null;
+  capabilityCode?: string | null;
+  edcPlanCode?: string | null;
   qtimeMin?: number | null;
   qtimeMax?: number | null;
   reworkLimit?: number | null;
@@ -632,6 +638,10 @@ export interface FlowStepView {
   stepNo: number;
   recipeRef?: string | null;
   equipType?: string | null;
+  /** 能力需求覆写（V21；可空 = 继承所引工序默认能力）。 */
+  capabilityCode?: string | null;
+  /** EDC Plan 引用码覆写（V21；可空 = 继承所引工序默认值）。 */
+  edcPlanCode?: string | null;
   qtimeMin?: number | null;
   qtimeMax?: number | null;
   reworkLimit?: number | null;

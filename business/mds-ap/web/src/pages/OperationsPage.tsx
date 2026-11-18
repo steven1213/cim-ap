@@ -118,6 +118,7 @@ export default function OperationsPage() {
       { key: 'techCode', titleKey: 'mds.operation.field.techCode', width: 110, mono: true },
       { key: 'recipeRef', titleKey: 'mds.operation.field.recipeRef', width: 130, mono: true },
       { key: 'equipType', titleKey: 'mds.operation.field.equipType', width: 110, mono: true },
+      { key: 'capabilityCode', titleKey: 'mds.operation.field.capabilityCode', width: 110, mono: true },
       {
         key: 'referenced',
         titleKey: 'mds.operation.field.referenced',
@@ -258,6 +259,7 @@ function OpFormModal(props: {
   const [err, setErr] = useState('');
   const techsRes = useResource(({ signal }) => api.listTechnologies(undefined, signal));
   const equipTypesRes = useResource(({ signal }) => api.listEquipmentTypes(undefined, signal));
+  const capsRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
   const [form, setForm] = useState({
     opCode: editing?.opCode ?? '',
     opName: editing?.opName ?? '',
@@ -265,6 +267,8 @@ function OpFormModal(props: {
     techCode: editing?.techCode ?? '',
     recipeRef: editing?.recipeRef ?? '',
     equipType: editing?.equipType ?? '',
+    capabilityCode: editing?.capabilityCode ?? '',
+    edcPlanCode: editing?.edcPlanCode ?? '',
     qtimeMin: editing?.qtimeMin != null ? String(editing.qtimeMin) : '',
     qtimeMax: editing?.qtimeMax != null ? String(editing.qtimeMax) : '',
     reworkLimit: editing?.reworkLimit != null ? String(editing.reworkLimit) : '',
@@ -295,6 +299,8 @@ function OpFormModal(props: {
         techCode: form.techCode || null,
         recipeRef: form.recipeRef || null,
         equipType: form.equipType || null,
+        capabilityCode: form.capabilityCode || null,
+        edcPlanCode: form.edcPlanCode || null,
         qtimeMin: numOrNull(form.qtimeMin),
         qtimeMax: numOrNull(form.qtimeMax),
         reworkLimit: numOrNull(form.reworkLimit),
@@ -362,6 +368,17 @@ function OpFormModal(props: {
             allowClear: true,
             options: (equipTypesRes.data ?? []).map((eq) => ({ value: eq.typeCode, label: eq.typeName ?? eq.typeCode })),
           },
+          {
+            kind: 'select',
+            key: 'capabilityCode',
+            labelKey: 'mds.operation.field.capabilityCode',
+            allowClear: true,
+            options: (capsRes.data ?? []).map((cap) => ({
+              value: cap.capabilityCode,
+              label: cap.capabilityName ?? cap.capabilityCode,
+            })),
+          },
+          { kind: 'text', key: 'edcPlanCode', labelKey: 'mds.operation.field.edcPlanCode', mono: true },
           { kind: 'number', key: 'qtimeMin', labelKey: 'mds.operation.field.qtimeMin' },
           { kind: 'number', key: 'qtimeMax', labelKey: 'mds.operation.field.qtimeMax' },
           { kind: 'number', key: 'reworkLimit', labelKey: 'mds.operation.field.reworkLimit' },

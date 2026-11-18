@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
+import com.cim.mds.server.equipment.CimCapabilityRepository;
 import com.cim.mds.server.equipment.CimEquipmentTypeRepository;
 import com.cim.mds.server.site.CimTechnologyRepository;
 import com.cim.spring.support.web.BizCode;
@@ -46,13 +47,14 @@ public class OperationAdminService {
     private final CimFlowStepRepository stepRepository;
     private final CimTechnologyRepository technologyRepository;
     private final CimEquipmentTypeRepository equipmentTypeRepository;
+    private final CimCapabilityRepository capabilityRepository;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
     /** 工序视图（referenced = 是否被路线步骤引用，前端禁删/禁禁用按钮用）。 */
     public record OpView(String id, String opCode, String opName, String opType,
                          String techCode, String status, String opFamilyCode, Integer versionNo,
-                         String recipeRef, String equipType,
+                         String recipeRef, String equipType, String capabilityCode, String edcPlanCode,
                          Integer qtimeMin, Integer qtimeMax, Integer reworkLimit,
                          Boolean holdPoint, String holdReason,
                          String batchMode, Integer batchSize,
@@ -64,7 +66,7 @@ public class OperationAdminService {
 
     /** 工序新建/更新请求。opCode 仅新建生效（建后不可改）。 */
     public record OpReq(String opCode, String opName, String opType, String techCode,
-                        String recipeRef, String equipType,
+                        String recipeRef, String equipType, String capabilityCode, String edcPlanCode,
                         Integer qtimeMin, Integer qtimeMax, Integer reworkLimit,
                         Boolean holdPoint, String holdReason,
                         String batchMode, Integer batchSize,
@@ -106,6 +108,7 @@ public class OperationAdminService {
         String opType = requireOpType(req.opType());
         String techCode = requireTech(req.techCode());
         String equipType = requireEquipType(req.equipType());
+        String capabilityCode = requireCapability(req.capabilityCode());
         checkQtime(req.qtimeMin(), req.qtimeMax());
         checkInspectOnly(opType, req.inspectPlan(), req.samplingRate());
         checkBatch(req.batchMode(), req.batchSize());
@@ -118,6 +121,8 @@ public class OperationAdminService {
         entity.setOpType(opType);
         entity.setTechCode(techCode);
         entity.setEquipType(equipType);
+        entity.setCapabilityCode(capabilityCode);
+        entity.setEdcPlanCode(req.edcPlanCode());
         entity.setRecipeRef(req.recipeRef());
         entity.setQtimeMin(req.qtimeMin());
         entity.setQtimeMax(req.qtimeMax());
@@ -149,12 +154,15 @@ public class OperationAdminService {
         requireText(req.opName(), "opName");
         String techCode = requireTech(req.techCode());
         String equipType = requireEquipType(req.equipType());
+        String capabilityCode = requireCapability(req.capabilityCode());
         checkQtime(req.qtimeMin(), req.qtimeMax());
         checkInspectOnly(entity.getOpType(), req.inspectPlan(), req.samplingRate());
         checkBatch(req.batchMode(), req.batchSize());
         entity.setOpName(req.opName().trim());
         entity.setTechCode(techCode);
         entity.setEquipType(equipType);
+        entity.setCapabilityCode(capabilityCode);
+        entity.setEdcPlanCode(req.edcPlanCode());
         entity.setRecipeRef(req.recipeRef());
         entity.setQtimeMin(req.qtimeMin());
         entity.setQtimeMax(req.qtimeMax());
@@ -276,6 +284,8 @@ public class OperationAdminService {
         entity.setVersionNo(nextVersionNo(family));
         entity.setRecipeRef(source.getRecipeRef());
         entity.setEquipType(source.getEquipType());
+        entity.setCapabilityCode(source.getCapabilityCode());
+        entity.setEdcPlanCode(source.getEdcPlanCode());
         entity.setQtimeMin(source.getQtimeMin());
         entity.setQtimeMax(source.getQtimeMax());
         entity.setReworkLimit(source.getReworkLimit());
@@ -328,6 +338,17 @@ public class OperationAdminService {
             throw new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + equipType);
         }
         return equipType;
+    }
+
+    /** 能力需求校验（非空才校验；逻辑引用 cim_capability——AMAT 口径 Step 挂 Capability 匹配可加工设备）。 */
+    private String requireCapability(String capabilityCode) {
+        if (!StringUtils.hasText(capabilityCode)) {
+            return null;
+        }
+        if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).isEmpty()) {
+            throw new BizException(BizCode.DATA_NOT_FOUND, "设备能力不存在: " + capabilityCode);
+        }
+        return capabilityCode;
     }
 
     private void checkQtime(Integer min, Integer max) {
@@ -399,7 +420,7 @@ public class OperationAdminService {
     private OpView toView(CimOperation o) {
         return new OpView(o.getId(), o.getOpCode(), o.getOpName(), o.getOpType(),
                 o.getTechCode(), o.getStatus(), o.getOpFamilyCode(), o.getVersionNo(),
-                o.getRecipeRef(), o.getEquipType(),
+                o.getRecipeRef(), o.getEquipType(), o.getCapabilityCode(), o.getEdcPlanCode(),
                 o.getQtimeMin(), o.getQtimeMax(), o.getReworkLimit(),
                 o.getHoldPoint(), o.getHoldReason(),
                 o.getBatchMode(), o.getBatchSize(),
