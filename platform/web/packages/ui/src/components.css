@@ -72,6 +72,14 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* 工具栏动作组之间的分隔线（按家族分组：新增/复制 | 导入/导出 | 批量…） */
+.cim-toolbar-divider {
+  width: 0.5px;
+  height: 16px;
+  background: var(--line);
+  margin: 0 4px;
+  flex: 0 0 auto;
+}
 
 /* ---------- 表单字段 ---------- */
 .cim-field {

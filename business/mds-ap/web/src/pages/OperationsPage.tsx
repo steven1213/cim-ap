@@ -1,32 +1,88 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
   Can,
   CimButton,
-  CimModal,
   DataTable,
+  EmptyState,
   FormGrid,
   Page,
   Panel,
   useConfirm,
   useToast,
   type DataTableColumn,
+  type FormField,
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import type { OperationView } from '@/types';
 
 /**
- * 工序库（OperationsPage，V20）——P-T-R-O 四层建模的 O 层管理页。
+ * 工序库（OperationsPage，V20 / 动线改版）——P-T-R-O 四层建模的 O 层管理页。
  *
- * <p>Operation = 独立主数据（工序），跨路线复用；Step = 路线内工序实例（流程画布里
- * 引用本库 + 局部覆盖）。生命周期与制造流程同款四态：UNFROZEN（草稿，可编辑）→
- * FROZEN（冻结待激活）→ ACTIVE（生效，同族唯一，只有 ACTIVE 可被路线引用）→
- * DISABLED（禁用）；改冻结/生效版本 = 复制同族新版本。被路线步骤引用的工序
- * 禁删禁禁用（后端 2004 守门，前端 referenced 列提示）。12 寸预留字段
- * （光罩/测试程序/Inhibit/监测片/腔体）建列不启用，表单不暴露。</p>
+ * <p>布局为「左列表 + 右详情」主从结构，按用户操作动线组织：</p>
+ * <ul>
+ *   <li>高频动线（搜索 → 点选 → 就地编辑 → 保存 → 生命周期动作）全程零弹窗；
+ *       编辑在右侧详情面板内完成，不丢视线焦点。</li>
+ *   <li>中频动作（新增/批量删除）在列表工具栏；复制新版为内联输入条（不弹窗）。</li>
+ *   <li>对象级生命周期按钮贴详情头，且按状态动态出现（UNFROZEN→编辑/冻结/删除；
+ *       FROZEN→解冻/发布/禁用/复制新版；ACTIVE→禁用/复制新版；DISABLED→删除），
+ *       只出现当前合法的动作。</li>
+ *   <li>批量删除经列表勾选（仅 UNFROZEN/DISABLED 可勾），逐条删除并汇报成败。</li>
+ * </ul>
+ *
+ * <p>Operation = 独立主数据，生命周期四态：UNFROZEN → FROZEN → ACTIVE（生效，同族
+ * 唯一，只有 ACTIVE 可被路线引用）→ DISABLED；改冻结/生效版本 = 复制同族新版本。
+ * 被路线步骤引用的工序禁删禁禁用（后端 2004 守门）。12 寸预留字段表单不暴露。</p>
  */
+
+type DetailMode = 'view' | 'edit' | 'create' | 'copy';
+
+interface OpFormState {
+  opCode: string;
+  opName: string;
+  opType: OperationView['opType'];
+  techCode: string;
+  recipeRef: string;
+  equipType: string;
+  capabilityCode: string;
+  edcPlanCode: string;
+  qtimeMin: string;
+  qtimeMax: string;
+  reworkLimit: string;
+  holdPoint: boolean;
+  holdReason: string;
+  batchMode: string;
+  batchSize: string;
+  inspectPlan: string;
+  samplingRate: string;
+  remark: string;
+}
+
+function formFrom(row: OperationView | null): OpFormState {
+  return {
+    opCode: row?.opCode ?? '',
+    opName: row?.opName ?? '',
+    opType: (row?.opType ?? 'PROCESS') as OperationView['opType'],
+    techCode: row?.techCode ?? '',
+    recipeRef: row?.recipeRef ?? '',
+    equipType: row?.equipType ?? '',
+    capabilityCode: row?.capabilityCode ?? '',
+    edcPlanCode: row?.edcPlanCode ?? '',
+    qtimeMin: row?.qtimeMin != null ? String(row.qtimeMin) : '',
+    qtimeMax: row?.qtimeMax != null ? String(row.qtimeMax) : '',
+    reworkLimit: row?.reworkLimit != null ? String(row.reworkLimit) : '',
+    holdPoint: Boolean(row?.holdPoint),
+    holdReason: row?.holdReason ?? '',
+    batchMode: row?.batchMode ?? '',
+    batchSize: row?.batchSize != null ? String(row.batchSize) : '',
+    inspectPlan: row?.inspectPlan ?? '',
+    samplingRate: row?.samplingRate != null ? String(row.samplingRate) : '',
+    remark: row?.remark ?? '',
+  };
+}
+
 export default function OperationsPage() {
   const { t } = useTranslation();
   const toast = useToast();
@@ -38,10 +94,133 @@ export default function OperationsPage() {
   });
   const ops = opsRes.data ?? [];
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<OperationView | null>(null);
-  const [copying, setCopying] = useState<OperationView | null>(null);
+  // 左列表：选中 + 勾选（批量删除）
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
 
+  // 右详情：view | edit | create | copy 四态
+  const [mode, setMode] = useState<DetailMode>('view');
+  const [form, setForm] = useState<OpFormState>(() => formFrom(null));
+  const initialRef = useRef('');
+  const [copyCode, setCopyCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  // 下拉数据源（详情表单用；页面级加载一次）
+  const techsRes = useResource(({ signal }) => api.listTechnologies(undefined, signal));
+  const equipTypesRes = useResource(({ signal }) => api.listEquipmentTypes(undefined, signal));
+  const capsRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
+
+  const selected = useMemo(() => ops.find((r) => r.id === selectedId) ?? null, [ops, selectedId]);
+  const dirty = mode === 'edit' || mode === 'create' ? JSON.stringify(form) !== initialRef.current : false;
+
+  const set = (patch: Partial<OpFormState>) => setForm((f) => ({ ...f, ...patch }));
+  const numOrNull = (v: string) => (v.trim() === '' ? null : Number(v));
+
+  // ---- 模式切换 ----
+  const enterCreate = () => {
+    setForm(formFrom(null));
+    initialRef.current = JSON.stringify(form);
+    setErr('');
+    setMode('create');
+  };
+  const enterEdit = (row: OperationView) => {
+    setForm(formFrom(row));
+    initialRef.current = JSON.stringify(form);
+    setErr('');
+    setMode('edit');
+  };
+  const enterCopy = () => {
+    setCopyCode('');
+    setErr('');
+    setMode('copy');
+  };
+  const backToView = () => {
+    setErr('');
+    setMode('view');
+  };
+
+  const onRowClick = async (row: OperationView) => {
+    if (row.id === selectedId && mode === 'view') return;
+    if (dirty) {
+      const ok = await confirm({
+        titleKey: 'mds.operation.discardTitle',
+        contentKey: 'mds.operation.discardText',
+        okKey: 'mds.common.ok',
+      });
+      if (!ok) return;
+    }
+    setSelectedId(row.id);
+    setMode('view');
+    setErr('');
+  };
+
+  // ---- 保存 ----
+  const save = async () => {
+    setErr('');
+    if (!form.opName.trim()) {
+      setErr(t('mds.operation.errNameRequired'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = {
+        opCode: form.opCode.trim() || null,
+        opName: form.opName.trim(),
+        opType: form.opType,
+        techCode: form.techCode || null,
+        recipeRef: form.recipeRef || null,
+        equipType: form.equipType || null,
+        capabilityCode: form.capabilityCode || null,
+        edcPlanCode: form.edcPlanCode || null,
+        qtimeMin: numOrNull(form.qtimeMin),
+        qtimeMax: numOrNull(form.qtimeMax),
+        reworkLimit: numOrNull(form.reworkLimit),
+        holdPoint: form.holdPoint,
+        holdReason: form.holdReason || null,
+        batchMode: form.batchMode || null,
+        batchSize: numOrNull(form.batchSize),
+        inspectPlan: form.inspectPlan || null,
+        samplingRate: numOrNull(form.samplingRate),
+        remark: form.remark || null,
+      };
+      const ret =
+        mode === 'create'
+          ? await api.createOperation(payload)
+          : await api.updateOperation(selected!.id, payload);
+      toast.success(t('mds.common.saved'));
+      opsRes.refresh();
+      setSelectedId(ret.id);
+      backToView();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitCopy = async () => {
+    if (!selected) return;
+    if (!copyCode.trim()) {
+      setErr(t('mds.operation.errCodeRequired'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const ret = await api.copyOperation(selected.id, copyCode.trim());
+      toast.success(t('mds.common.saved'));
+      opsRes.refresh();
+      setSelectedId(ret.id);
+      setCopyCode('');
+      backToView();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- 生命周期 / 删除 ----
   const doAction = async (row: OperationView, action: 'freeze' | 'unfreeze' | 'activate' | 'disable') => {
     const ok = await confirm({
       titleKey: `mds.operation.${action}Confirm`,
@@ -71,397 +250,330 @@ export default function OperationsPage() {
     if (!ok) return;
     try {
       await api.deleteOperation(row.id);
-      toast.success(t('mds.common.saved'));
+      toast.success(t('mds.common.deleted'));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
       return;
     }
+    if (row.id === selectedId) setSelectedId(null);
+    setCheckedKeys((ks) => ks.filter((k) => k !== row.id));
     opsRes.refresh();
   };
 
+  const doBatchDelete = async () => {
+    if (!checkedKeys.length) return;
+    const ok = await confirm({
+      titleKey: 'mds.operation.batchDeleteConfirm',
+      content: t('mds.operation.batchDeleteConfirmText', { n: checkedKeys.length }),
+      okKey: 'mds.common.delete',
+      danger: true,
+    });
+    if (!ok) return;
+    let okCount = 0;
+    let failCount = 0;
+    for (const id of checkedKeys) {
+      try {
+        await api.deleteOperation(id);
+        okCount += 1;
+      } catch {
+        failCount += 1;
+      }
+    }
+    if (failCount === 0) toast.success(t('mds.common.deleted'));
+    else toast.error(t('mds.operation.batchResult', { ok: okCount, fail: failCount }));
+    if (selectedId && checkedKeys.includes(selectedId)) setSelectedId(null);
+    setCheckedKeys([]);
+    opsRes.refresh();
+  };
+
+  // ---- 左列表列（瘦身：全字段在右侧详情） ----
   const columns = useMemo<Array<DataTableColumn<OperationView>>>(
     () => [
-      {
-        key: 'opCode',
-        titleKey: 'mds.operation.field.opCode',
-        width: 150,
-        mono: true,
-        render: (r) => (
-          <span>
-            {r.opCode}
-            <span className="flow-name-sub"> V{r.versionNo ?? 1}</span>
-          </span>
-        ),
-      },
-      {
-        key: 'opName',
-        titleKey: 'mds.operation.field.opName',
-        width: 180,
-        render: (r) => <span className="flow-name-main">{r.opName}</span>,
-      },
-      {
-        key: 'opType',
-        titleKey: 'mds.operation.field.opType',
-        width: 90,
-        render: (r) => t(`mds.operation.type.${r.opType}`),
-      },
-      {
-        key: 'status',
-        titleKey: 'mds.operation.field.status',
-        width: 88,
-        render: (r) => (
-          <span className={`flow-status flow-status-${r.status.toLowerCase()}`}>
-            {t(`mds.operation.status.${r.status}`)}
-          </span>
-        ),
-      },
-      { key: 'techCode', titleKey: 'mds.operation.field.techCode', width: 110, mono: true },
-      { key: 'recipeRef', titleKey: 'mds.operation.field.recipeRef', width: 130, mono: true },
-      { key: 'equipType', titleKey: 'mds.operation.field.equipType', width: 110, mono: true },
-      { key: 'capabilityCode', titleKey: 'mds.operation.field.capabilityCode', width: 110, mono: true },
-      {
-        key: 'referenced',
-        titleKey: 'mds.operation.field.referenced',
-        width: 90,
-        render: (r) =>
-          r.referenced ? <span className="op-ref-yes">{t('mds.operation.referencedYes')}</span> : <span className="dim">—</span>,
-      },
-      {
-        key: 'actions',
-        titleKey: 'mds.common.actions',
-        width: 260,
-        render: (r) => (
-          <span className="cell-actions">
-            {r.status === 'UNFROZEN' && (
-              <Can perm={MDS_PERMS.operation.update}>
-                <CimButton size="small" onClick={() => void doAction(r, 'freeze')}>
-                  {t('mds.operation.freeze')}
-                </CimButton>
-              </Can>
-            )}
-            {r.status === 'FROZEN' && (
-              <Can perm={MDS_PERMS.operation.update}>
-                <CimButton size="small" onClick={() => void doAction(r, 'activate')}>
-                  {t('mds.operation.activate')}
-                </CimButton>
-                <CimButton size="small" onClick={() => void doAction(r, 'unfreeze')}>
-                  {t('mds.operation.unfreeze')}
-                </CimButton>
-              </Can>
-            )}
-            {(r.status === 'FROZEN' || r.status === 'ACTIVE') && (
-              <Can perm={MDS_PERMS.operation.update}>
-                <CimButton size="small" onClick={() => void doAction(r, 'disable')}>
-                  {t('mds.operation.disable')}
-                </CimButton>
-              </Can>
-            )}
-            {(r.status === 'FROZEN' || r.status === 'ACTIVE') && (
-              <Can perm={MDS_PERMS.operation.create}>
-                <CimButton size="small" onClick={() => setCopying(r)}>
-                  {t('mds.operation.copy')}
-                </CimButton>
-              </Can>
-            )}
-            {r.status === 'UNFROZEN' && (
-              <Can perm={MDS_PERMS.operation.update}>
-                <CimButton size="small" onClick={() => setEditing(r)}>
-                  {t('mds.common.edit')}
-                </CimButton>
-              </Can>
-            )}
-            {(r.status === 'UNFROZEN' || r.status === 'DISABLED') && (
-              <Can perm={MDS_PERMS.operation.delete}>
-                <CimButton size="small" danger onClick={() => void doDelete(r)}>
-                  {t('mds.common.delete')}
-                </CimButton>
-              </Can>
-            )}
-          </span>
-        ),
-      },
-    ],
+    {
+      key: 'opCode',
+      titleKey: 'mds.operation.field.opCode',
+      width: 160,
+      mono: true,
+      render: (r) => (
+        <span>
+          {r.opCode}
+          <span className="flow-name-sub"> V{r.versionNo ?? 1}</span>
+        </span>
+      ),
+    },
+    { key: 'opName', titleKey: 'mds.operation.field.opName', width: 150, ellipsis: true, render: (r) => <span className="flow-name-main">{r.opName}</span> },
+    {
+      key: 'opType',
+      titleKey: 'mds.operation.field.opType',
+      width: 80,
+      render: (r) => t(`mds.operation.type.${r.opType}`),
+    },
+    {
+      key: 'status',
+      titleKey: 'mds.operation.field.status',
+      width: 84,
+      render: (r) => (
+        <span className={`flow-status flow-status-${r.status.toLowerCase()}`}>
+          {t(`mds.operation.status.${r.status}`)}
+        </span>
+      ),
+    },
+    { key: 'capabilityCode', titleKey: 'mds.operation.field.capabilityCode', width: 110, mono: true },
+    {
+      key: 'referenced',
+      titleKey: 'mds.operation.field.referenced',
+      width: 80,
+      render: (r) =>
+        r.referenced ? <span className="op-ref-yes">{t('mds.operation.referencedYes')}</span> : <span className="dim">—</span>,
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t],
-  );
+  ], [t]);
+
+  const checkedDeletable = checkedKeys.length > 0;
+
+  // ---- 详情头动作（对象级，按状态动态出现） ----
+  const headerActions = mode === 'view' && selected ? (
+    <>
+      {selected.status === 'UNFROZEN' && (
+        <Can perm={MDS_PERMS.operation.update}>
+          <CimButton type="primary" size="small" onClick={() => enterEdit(selected)}>
+            {t('mds.common.edit')}
+          </CimButton>
+        </Can>
+      )}
+      {selected.status === 'UNFROZEN' && (
+        <Can perm={MDS_PERMS.operation.update}>
+          <CimButton size="small" onClick={() => void doAction(selected, 'freeze')}>
+            {t('mds.operation.freeze')}
+          </CimButton>
+        </Can>
+      )}
+      {selected.status === 'FROZEN' && (
+        <Can perm={MDS_PERMS.operation.update}>
+          <CimButton size="small" onClick={() => void doAction(selected, 'unfreeze')}>
+            {t('mds.operation.unfreeze')}
+          </CimButton>
+        </Can>
+      )}
+      {selected.status === 'FROZEN' && (
+        <Can perm={MDS_PERMS.operation.update}>
+          <CimButton type="primary" size="small" onClick={() => void doAction(selected, 'activate')}>
+            {t('mds.operation.activate')}
+          </CimButton>
+        </Can>
+      )}
+      {(selected.status === 'FROZEN' || selected.status === 'ACTIVE') && (
+        <Can perm={MDS_PERMS.operation.update}>
+          <CimButton size="small" danger onClick={() => void doAction(selected, 'disable')}>
+            {t('mds.operation.disable')}
+          </CimButton>
+        </Can>
+      )}
+      {(selected.status === 'FROZEN' || selected.status === 'ACTIVE') && (
+        <Can perm={MDS_PERMS.operation.create}>
+          <CimButton size="small" onClick={enterCopy}>
+            {t('mds.operation.copyNew')}
+          </CimButton>
+        </Can>
+      )}
+      {(selected.status === 'UNFROZEN' || selected.status === 'DISABLED') && (
+        <Can perm={MDS_PERMS.operation.delete}>
+          <CimButton size="small" danger onClick={() => void doDelete(selected)}>
+            {t('mds.common.delete')}
+          </CimButton>
+        </Can>
+      )}
+    </>
+  ) : null;
+
+  const fields = useMemo<Array<FormField<OpFormState>>>(
+    () => {
+    const locked = mode === 'edit';
+    return [
+      { kind: 'text', key: 'opCode', labelKey: 'mds.operation.field.opCode', mono: true, disabled: mode !== 'create', required: mode === 'create' },
+      { kind: 'text', key: 'opName', labelKey: 'mds.operation.field.opName', required: true },
+      {
+        kind: 'select',
+        key: 'opType',
+        labelKey: 'mds.operation.field.opType',
+        disabled: locked,
+        options: [
+          { value: 'PROCESS', label: t('mds.operation.type.PROCESS') },
+          { value: 'INSPECT', label: t('mds.operation.type.INSPECT') },
+          { value: 'REWORK', label: t('mds.operation.type.REWORK') },
+        ],
+      },
+      {
+        kind: 'select',
+        key: 'techCode',
+        labelKey: 'mds.operation.field.techCode',
+        allowClear: true,
+        options: (techsRes.data ?? []).map((tech) => ({ value: tech.techCode, label: tech.techName ?? tech.techCode })),
+      },
+      { kind: 'text', key: 'recipeRef', labelKey: 'mds.operation.field.recipeRef', mono: true },
+      {
+        kind: 'select',
+        key: 'equipType',
+        labelKey: 'mds.operation.field.equipType',
+        allowClear: true,
+        options: (equipTypesRes.data ?? []).map((eq) => ({ value: eq.typeCode, label: eq.typeName ?? eq.typeCode })),
+      },
+      {
+        kind: 'select',
+        key: 'capabilityCode',
+        labelKey: 'mds.operation.field.capabilityCode',
+        allowClear: true,
+        options: (capsRes.data ?? []).map((cap) => ({
+          value: cap.capabilityCode,
+          label: cap.capabilityName ?? cap.capabilityCode,
+        })),
+      },
+      { kind: 'text', key: 'edcPlanCode', labelKey: 'mds.operation.field.edcPlanCode', mono: true },
+      { kind: 'number', key: 'qtimeMin', labelKey: 'mds.operation.field.qtimeMin' },
+      { kind: 'number', key: 'qtimeMax', labelKey: 'mds.operation.field.qtimeMax' },
+      { kind: 'number', key: 'reworkLimit', labelKey: 'mds.operation.field.reworkLimit' },
+      { kind: 'switch', key: 'holdPoint', labelKey: 'mds.operation.field.holdPoint' },
+      ...(form.holdPoint ? [{ kind: 'text' as const, key: 'holdReason' as const, labelKey: 'mds.operation.field.holdReason' }] : []),
+      {
+        kind: 'select',
+        key: 'batchMode',
+        labelKey: 'mds.operation.field.batchMode',
+        allowClear: true,
+        options: [
+          { value: 'SERIAL', label: t('mds.operation.batch.SERIAL') },
+          { value: 'PARALLEL', label: t('mds.operation.batch.PARALLEL') },
+          { value: 'BATCH', label: t('mds.operation.batch.BATCH') },
+        ],
+      },
+      { kind: 'number', key: 'batchSize', labelKey: 'mds.operation.field.batchSize' },
+      ...(form.opType === 'INSPECT'
+        ? [
+            { kind: 'text' as const, key: 'inspectPlan' as const, labelKey: 'mds.operation.field.inspectPlan', mono: true },
+            { kind: 'number' as const, key: 'samplingRate' as const, labelKey: 'mds.operation.field.samplingRate' },
+          ]
+        : []),
+      { kind: 'textarea', key: 'remark', labelKey: 'mds.operation.field.remark' },
+    ];
+  }, [t, mode, form.holdPoint, form.opType, techsRes.data, equipTypesRes.data, capsRes.data]);
 
   return (
     <Page>
-      <Panel
-        titleKey="mds.operation.listTitle"
-        actions={
-          <>
-            <input
-              className="op-search"
-              placeholder={t('mds.operation.searchPlaceholder')}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
+      <div className="op-layout">
+        <DataTable<OperationView>
+          titleKey="mds.operation.listTitle"
+          columns={columns}
+          rows={ops}
+          rowKey={(r) => r.id}
+          loading={opsRes.loading}
+          error={opsRes.error?.message ?? null}
+          onRetry={opsRes.refresh}
+          search={{ value: keyword, onChange: setKeyword, placeholderKey: 'mds.operation.searchPlaceholder' }}
+          headActions={
             <Can perm={MDS_PERMS.operation.create}>
-              <CimButton
-                type="primary"
-                size="small"
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
+              <CimButton type="primary" size="small" onClick={enterCreate}>
                 {t('mds.common.create')}
               </CimButton>
             </Can>
-          </>
-        }
-      >
-        <DataTable
-          rows={ops}
-          columns={columns}
-          rowKey={(r) => r.id}
-          loading={opsRes.loading}
+          }
+          actions={
+            <Can perm={MDS_PERMS.operation.delete}>
+              <CimButton
+                size="small"
+                danger
+                disabled={!checkedDeletable}
+                onClick={() => void doBatchDelete()}
+              >
+                {t('mds.operation.batchDelete')}
+                {checkedDeletable ? ` (${checkedKeys.length})` : ''}
+              </CimButton>
+            </Can>
+          }
+          onRefresh={opsRes.refresh}
+          selectedKeys={checkedKeys}
+          onSelectionChange={setCheckedKeys}
+          selectable={(r) => r.status === 'UNFROZEN' || r.status === 'DISABLED'}
+          onRowClick={(r) => void onRowClick(r)}
+          rowClassName={(r) => (r.id === selectedId ? 'row-selected' : '')}
+          emptyTitleKey="mds.operation.empty"
         />
-      </Panel>
 
-      {formOpen && (
-        <OpFormModal
-          key={editing?.id ?? 'new'}
-          editing={editing}
-          onClose={() => setFormOpen(false)}
-          onDone={() => {
-            setFormOpen(false);
-            opsRes.refresh();
-          }}
-        />
-      )}
+        <Panel className="op-detail">
+          {!selected && mode !== 'create' ? (
+            <EmptyState titleKey="mds.operation.selectHint" />
+          ) : (
+            <div className="op-detail-body">
+              <div className="op-detail-head">
+                {mode === 'create' ? (
+                  <h3 className="op-detail-title">{t('mds.operation.createTitle')}</h3>
+                ) : (
+                  <>
+                    <h3 className="op-detail-title">
+                      {selected!.opCode}
+                      <span className="flow-name-sub"> V{selected!.versionNo ?? 1}</span>
+                    </h3>
+                    <span className={`flow-status flow-status-${selected!.status.toLowerCase()}`}>
+                      {t(`mds.operation.status.${selected!.status}`)}
+                    </span>
+                    {selected!.referenced && (
+                      <span className="op-ref-yes">{t('mds.operation.referencedYes')}</span>
+                    )}
+                  </>
+                )}
+                {mode === 'edit' && <span className="op-editing-badge">{t('mds.operation.editing')}</span>}
+                <div className="op-detail-actions">
+                  {mode === 'view' && headerActions}
+                  {(mode === 'edit' || mode === 'create') && (
+                    <>
+                      <CimButton type="primary" size="small" disabled={busy} onClick={() => void save()}>
+                        {t('mds.common.save')}
+                      </CimButton>
+                      <CimButton size="small" onClick={backToView}>
+                        {t('mds.common.cancel')}
+                      </CimButton>
+                    </>
+                  )}
+                  {mode === 'copy' && (
+                    <>
+                      <CimButton type="primary" size="small" disabled={busy} onClick={() => void submitCopy()}>
+                        {t('mds.common.ok')}
+                      </CimButton>
+                      <CimButton size="small" onClick={backToView}>
+                        {t('mds.common.cancel')}
+                      </CimButton>
+                    </>
+                  )}
+                </div>
+              </div>
 
-      {copying && (
-        <CopyModal
-          source={copying}
-          onClose={() => setCopying(null)}
-          onDone={() => {
-            setCopying(null);
-            opsRes.refresh();
-          }}
-        />
-      )}
+              {mode === 'copy' && selected && (
+                <div className="op-copy-bar">
+                  <span className="dim">{t('mds.operation.copyFrom', { code: selected.opCode, version: selected.versionNo ?? 1 })}</span>
+                  <input
+                    className="op-search"
+                    placeholder={t('mds.operation.field.newOpCode')}
+                    value={copyCode}
+                    onChange={(e) => setCopyCode(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {err && <p className="op-error">{err}</p>}
+
+              {mode === 'copy' ? (
+                <p className="dim">{t('mds.operation.copyHint')}</p>
+              ) : (
+                <FormGrid
+                  fields={fields}
+                  value={form}
+                  disabled={mode === 'view'}
+                  onChange={(patch: Record<string, unknown>) => set(patch as Partial<OpFormState>)}
+                  columns={2}
+                />
+              )}
+            </div>
+          )}
+        </Panel>
+      </div>
     </Page>
-  );
-}
-
-/** 工序新建/编辑弹窗（编辑态 opCode/opType 锁定；12 寸预留字段不进表单）。 */
-function OpFormModal(props: {
-  editing: OperationView | null;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const { t } = useTranslation();
-  const toast = useToast();
-  const editing = props.editing;
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const techsRes = useResource(({ signal }) => api.listTechnologies(undefined, signal));
-  const equipTypesRes = useResource(({ signal }) => api.listEquipmentTypes(undefined, signal));
-  const capsRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
-  const [form, setForm] = useState({
-    opCode: editing?.opCode ?? '',
-    opName: editing?.opName ?? '',
-    opType: (editing?.opType ?? 'PROCESS') as OperationView['opType'],
-    techCode: editing?.techCode ?? '',
-    recipeRef: editing?.recipeRef ?? '',
-    equipType: editing?.equipType ?? '',
-    capabilityCode: editing?.capabilityCode ?? '',
-    edcPlanCode: editing?.edcPlanCode ?? '',
-    qtimeMin: editing?.qtimeMin != null ? String(editing.qtimeMin) : '',
-    qtimeMax: editing?.qtimeMax != null ? String(editing.qtimeMax) : '',
-    reworkLimit: editing?.reworkLimit != null ? String(editing.reworkLimit) : '',
-    holdPoint: Boolean(editing?.holdPoint),
-    holdReason: editing?.holdReason ?? '',
-    batchMode: editing?.batchMode ?? '',
-    batchSize: editing?.batchSize != null ? String(editing.batchSize) : '',
-    inspectPlan: editing?.inspectPlan ?? '',
-    samplingRate: editing?.samplingRate != null ? String(editing.samplingRate) : '',
-    remark: editing?.remark ?? '',
-  });
-
-  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
-  const numOrNull = (v: string) => (v.trim() === '' ? null : Number(v));
-
-  const submit = async () => {
-    setErr('');
-    if (!form.opName.trim()) {
-      setErr(t('mds.operation.errNameRequired'));
-      return;
-    }
-    setBusy(true);
-    try {
-      const payload = {
-        opCode: form.opCode.trim() || null,
-        opName: form.opName.trim(),
-        opType: form.opType,
-        techCode: form.techCode || null,
-        recipeRef: form.recipeRef || null,
-        equipType: form.equipType || null,
-        capabilityCode: form.capabilityCode || null,
-        edcPlanCode: form.edcPlanCode || null,
-        qtimeMin: numOrNull(form.qtimeMin),
-        qtimeMax: numOrNull(form.qtimeMax),
-        reworkLimit: numOrNull(form.reworkLimit),
-        holdPoint: form.holdPoint,
-        holdReason: form.holdReason || null,
-        batchMode: form.batchMode || null,
-        batchSize: numOrNull(form.batchSize),
-        inspectPlan: form.inspectPlan || null,
-        samplingRate: numOrNull(form.samplingRate),
-        remark: form.remark || null,
-      };
-      if (editing) await api.updateOperation(editing.id, payload);
-      else await api.createOperation(payload);
-      toast.success(t('mds.common.saved'));
-      props.onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <CimModal
-      open
-      titleKey={editing ? 'mds.operation.editTitle' : 'mds.operation.createTitle'}
-      onClose={props.onClose}
-      footer={
-        <>
-          <CimButton onClick={props.onClose}>{t('mds.common.cancel')}</CimButton>
-          <CimButton type="primary" disabled={busy} onClick={() => void submit()}>
-            {t('mds.common.ok')}
-          </CimButton>
-        </>
-      }
-    >
-      {err && <p className="op-error">{err}</p>}
-      <FormGrid
-        fields={[
-          { kind: 'text', key: 'opCode', labelKey: 'mds.operation.field.opCode', mono: true, disabled: Boolean(editing), required: !editing },
-          { kind: 'text', key: 'opName', labelKey: 'mds.operation.field.opName', required: true },
-          {
-            kind: 'select',
-            key: 'opType',
-            labelKey: 'mds.operation.field.opType',
-            disabled: Boolean(editing),
-            options: [
-              { value: 'PROCESS', label: t('mds.operation.type.PROCESS') },
-              { value: 'INSPECT', label: t('mds.operation.type.INSPECT') },
-              { value: 'REWORK', label: t('mds.operation.type.REWORK') },
-            ],
-          },
-          {
-            kind: 'select',
-            key: 'techCode',
-            labelKey: 'mds.operation.field.techCode',
-            allowClear: true,
-            options: (techsRes.data ?? []).map((tech) => ({ value: tech.techCode, label: tech.techName ?? tech.techCode })),
-          },
-          { kind: 'text', key: 'recipeRef', labelKey: 'mds.operation.field.recipeRef', mono: true },
-          {
-            kind: 'select',
-            key: 'equipType',
-            labelKey: 'mds.operation.field.equipType',
-            allowClear: true,
-            options: (equipTypesRes.data ?? []).map((eq) => ({ value: eq.typeCode, label: eq.typeName ?? eq.typeCode })),
-          },
-          {
-            kind: 'select',
-            key: 'capabilityCode',
-            labelKey: 'mds.operation.field.capabilityCode',
-            allowClear: true,
-            options: (capsRes.data ?? []).map((cap) => ({
-              value: cap.capabilityCode,
-              label: cap.capabilityName ?? cap.capabilityCode,
-            })),
-          },
-          { kind: 'text', key: 'edcPlanCode', labelKey: 'mds.operation.field.edcPlanCode', mono: true },
-          { kind: 'number', key: 'qtimeMin', labelKey: 'mds.operation.field.qtimeMin' },
-          { kind: 'number', key: 'qtimeMax', labelKey: 'mds.operation.field.qtimeMax' },
-          { kind: 'number', key: 'reworkLimit', labelKey: 'mds.operation.field.reworkLimit' },
-          { kind: 'switch', key: 'holdPoint', labelKey: 'mds.operation.field.holdPoint' },
-          ...(form.holdPoint ? [{ kind: 'text' as const, key: 'holdReason' as const, labelKey: 'mds.operation.field.holdReason' }] : []),
-          {
-            kind: 'select',
-            key: 'batchMode',
-            labelKey: 'mds.operation.field.batchMode',
-            allowClear: true,
-            options: [
-              { value: 'SERIAL', label: t('mds.operation.batch.SERIAL') },
-              { value: 'PARALLEL', label: t('mds.operation.batch.PARALLEL') },
-              { value: 'BATCH', label: t('mds.operation.batch.BATCH') },
-            ],
-          },
-          { kind: 'number', key: 'batchSize', labelKey: 'mds.operation.field.batchSize' },
-          ...(form.opType === 'INSPECT'
-            ? [
-                { kind: 'text' as const, key: 'inspectPlan' as const, labelKey: 'mds.operation.field.inspectPlan', mono: true },
-                { kind: 'number' as const, key: 'samplingRate' as const, labelKey: 'mds.operation.field.samplingRate' },
-              ]
-            : []),
-          { kind: 'textarea', key: 'remark', labelKey: 'mds.operation.field.remark' },
-        ]}
-        value={form}
-        onChange={(patch: Record<string, unknown>) => set(patch as Partial<typeof form>)}
-        columns={2}
-      />
-    </CimModal>
-  );
-}
-
-/** 复制为同族新版本弹窗（opCode 手填必填）。 */
-function CopyModal(props: { source: OperationView; onClose: () => void; onDone: () => void }) {
-  const { t } = useTranslation();
-  const toast = useToast();
-  const [newOpCode, setNewOpCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-
-  const submit = async () => {
-    setErr('');
-    if (!newOpCode.trim()) {
-      setErr(t('mds.operation.errCodeRequired'));
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.copyOperation(props.source.id, newOpCode.trim());
-      toast.success(t('mds.common.saved'));
-      props.onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <CimModal
-      open
-      titleKey="mds.operation.copyTitle"
-      onClose={props.onClose}
-      footer={
-        <>
-          <CimButton onClick={props.onClose}>{t('mds.common.cancel')}</CimButton>
-          <CimButton type="primary" disabled={busy} onClick={() => void submit()}>
-            {t('mds.common.ok')}
-          </CimButton>
-        </>
-      }
-    >
-      {err && <p className="op-error">{err}</p>}
-      <p className="dim">
-        {t('mds.operation.copyFrom', { code: props.source.opCode, version: props.source.versionNo ?? 1 })}
-      </p>
-      <FormGrid
-        fields={[{ kind: 'text', key: 'newOpCode', labelKey: 'mds.operation.field.newOpCode', mono: true, required: true }]}
-        value={{ newOpCode }}
-        onChange={(patch: Record<string, unknown>) => setNewOpCode(String(patch.newOpCode ?? ''))}
-        columns={1}
-      />
-    </CimModal>
   );
 }

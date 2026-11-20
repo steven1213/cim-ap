@@ -1127,3 +1127,51 @@ table.naming-seg-table th {
   margin: 4px 0 0;
   word-break: break-all;
 }
+
+/* ---------- 工序库主从布局（动线改版：左列表 + 右详情就地编辑） ---------- */
+.op-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.op-detail-body {
+  padding: 4px 2px;
+}
+.op-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.op-detail-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.op-detail-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.op-editing-badge {
+  font-size: 12px;
+  color: var(--cim-status-ok, #16a34a);
+  border: 0.5px solid var(--cim-status-ok, #16a34a);
+  border-radius: 9px;
+  padding: 0 8px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.op-copy-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.op-copy-bar .op-search {
+  width: 220px;
+}
