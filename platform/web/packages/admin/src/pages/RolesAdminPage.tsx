@@ -20,7 +20,6 @@ import {
   EmptyState,
   FormField,
   FormGrid,
-  IconPlus,
   IconRefresh,
   IconSave,
   IconTrash,
@@ -538,7 +537,9 @@ export default function RolesAdminPage({ perms }: RolesAdminPageProps) {
           actions={
             <>
               {canSave && (
-                <CimButton size="small" iconOnly title={t('admin.admin.roles.new')} onClick={startCreate} icon={<IconPlus width={14} height={14} />} />
+                <CimButton type="primary" size="small" onClick={startCreate}>
+                  {t('admin.common.create')}
+                </CimButton>
               )}
               <CimButton size="small" onClick={rolesRes.refresh} disabled={rolesRes.loading}>
                 <IconRefresh width={13} height={13} />

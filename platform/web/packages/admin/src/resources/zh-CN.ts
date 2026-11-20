@@ -25,6 +25,7 @@ const zhCN: Record<string, string> = {
   'admin.i18n.default': '默认语言',
   'admin.common.actions': '操作',
   'admin.common.add': '新增',
+  'admin.common.create': '新建',
   'admin.common.edit': '编辑',
   'admin.common.delete': '删除',
   'admin.common.save': '保存',

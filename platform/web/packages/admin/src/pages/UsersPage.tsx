@@ -26,7 +26,7 @@ import { IAM_CREATE_PERMS, USER_PERMS, type AdminPermOverrides } from '../perms'
 import type { AdminUserRow, OrgNode } from '../types';
 import { deriveClientHash, randomClientSalt } from '../crypto';
 import { fmtDateTime, orgTypeLabel, originLabel } from '../format';
-import { IconBan, IconEdit, IconKey, IconPlus, IconPower, IconTree, IconTrash } from '@cim/ui';
+import { IconBan, IconEdit, IconKey, IconPower, IconTree, IconTrash } from '@cim/ui';
 
 type PanelMode = null | 'create' | 'reset' | 'profile' | 'orgs';
 
@@ -493,8 +493,7 @@ export default function UsersPage({ readOnly = false, perms, usersPath = '/admin
                   setTarget(null);
                 }}
               >
-                <IconPlus width={13} height={13} />
-                {t('admin.users.newAccount')}
+                {t('admin.common.create')}
               </CimButton>
             )}
           </>
@@ -518,7 +517,14 @@ export default function UsersPage({ readOnly = false, perms, usersPath = '/admin
             width: 180,
           }}
           emptyTitleKey={rows.length ? 'admin.users.emptyMatch' : 'admin.users.emptyNone'}
-          emptyHintKey={rows.length ? 'admin.users.emptyHintMatch' : 'admin.users.emptyHintNone'}
+          // 只读视图没有「新建」入口，不能提示用户去点不存在的按钮
+          emptyHintKey={
+            rows.length
+              ? 'admin.users.emptyHintMatch'
+              : canCreate
+                ? 'admin.users.emptyHintNone'
+                : undefined
+          }
         />
       </Panel>
 

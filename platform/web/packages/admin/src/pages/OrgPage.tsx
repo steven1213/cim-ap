@@ -314,8 +314,7 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
               <CimTag>{t('admin.orgs.count', { n: nodes.length })}</CimTag>
               {canCreate && (
                 <CimButton type="primary" size="small" onClick={() => setShowCreate((v) => !v)}>
-                  <IconPlus width={13} height={13} />
-                  {t('admin.orgs.newNode')}
+                  {t('admin.common.create')}
                 </CimButton>
               )}
             </>

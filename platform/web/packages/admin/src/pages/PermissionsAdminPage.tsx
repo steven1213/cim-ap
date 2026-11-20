@@ -16,7 +16,6 @@ import {
   CimSelect,
   CimSplitPane,
   EmptyState,
-  IconPlus,
   IconTrash,
   InlineAlert,
   Page,
@@ -178,12 +177,12 @@ export default function PermissionsAdminPage({ perms }: PermissionsAdminPageProp
             <>
               {canSave && (
                 <CimButton
+                  type="primary"
                   size="small"
-                  iconOnly
-                  title={t('admin.admin.perms.new')}
                   onClick={() => setDraft({ id: '', code: 'xxx:', name: '', status: 'ENABLED', origin: null })}
-                icon={<IconPlus width={14} height={14} />}
-                />
+                >
+                  {t('admin.common.create')}
+                </CimButton>
               )}
               <CimButton size="small" onClick={listRes.refresh} disabled={listRes.loading}>
                 {listRes.loading ? t('admin.common.loading') : t('admin.common.refresh')}

@@ -25,7 +25,6 @@ import {
   FormGrid,
   IconChevron,
   IconEdit,
-  IconPlus,
   IconRefresh,
   IconSave,
   IconTrash,
@@ -518,16 +517,12 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
           actions={
             <>
               {canLocale && (
-                <CimButton
-                  size="small"
-                  iconOnly
-                  title={t('admin.admin.i18n.newLocale')}
-                  onClick={() => {
-                    setLocaleErr({});
-                    setLocaleDraft({ id: '', code: '', name: '', isDefault: false, sortNo: 20, status: 'ENABLED' });
-                  }}
-                icon={<IconPlus width={14} height={14} />}
-                />
+                <CimButton type="primary" size="small" onClick={() => {
+                  setLocaleErr({});
+                  setLocaleDraft({ id: '', code: '', name: '', isDefault: false, sortNo: 20, status: 'ENABLED' });
+                }}>
+                  {t('admin.common.create')}
+                </CimButton>
               )}
               <CimButton size="small" onClick={localesRes.refresh} disabled={localesRes.loading}>
                 <IconRefresh width={13} height={13} />
@@ -561,23 +556,19 @@ export default function I18nAdminPage({ perms, basePath = '/admin/i18n', reloadT
             actions={
               <>
                 {canSave && (
-                  <CimButton
-                    size="small"
-                    iconOnly
-                    title={t('admin.admin.i18n.newMessage')}
-                    onClick={() => {
-                      setMsgErr({});
-                      setMsgDraft({
-                        id: '',
-                        localeCode: filterLocale || i18n.language,
-                        code: '',
-                        content: '',
-                        module: filterModule,
-                        scope: 'USER',
-                      });
-                    }}
-                  icon={<IconPlus width={14} height={14} />}
-                  />
+                  <CimButton type="primary" size="small" onClick={() => {
+                    setMsgErr({});
+                    setMsgDraft({
+                      id: '',
+                      localeCode: filterLocale || i18n.language,
+                      code: '',
+                      content: '',
+                      module: filterModule,
+                      scope: 'USER',
+                    });
+                  }}>
+                    {t('admin.common.create')}
+                  </CimButton>
                 )}
                 {reloadTranslations && (
                   <CimButton

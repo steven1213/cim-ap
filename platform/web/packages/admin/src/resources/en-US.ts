@@ -24,6 +24,7 @@ const enUS: Record<string, string> = {
   'admin.i18n.default': 'Default locale',
   'admin.common.actions': 'Actions',
   'admin.common.add': 'Add',
+  'admin.common.create': 'Create',
   'admin.common.edit': 'Edit',
   'admin.common.delete': 'Delete',
   'admin.common.save': 'Save',

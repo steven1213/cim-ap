@@ -460,13 +460,9 @@ export default function MenusAdminPage({ perms, icons, namePerm = ['sys:i18n:sav
                 {allExpanded ? t('admin.common.collapseAll') : t('admin.common.expandAll')}
               </CimButton>
               {canSave && (
-                <CimButton
-                  size="small"
-                  iconOnly
-                  title={t('admin.admin.menus.newRoot')}
-                  onClick={() => startCreate(null)}
-                  icon={<IconPlus width={14} height={14} />}
-                />
+                <CimButton type="primary" size="small" onClick={() => startCreate(null)}>
+                  {t('admin.common.create')}
+                </CimButton>
               )}
               {canGrant && (
                 <CimButton size="small" onClick={() => setGrantOpen(true)}>
