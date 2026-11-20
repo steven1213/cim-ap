@@ -166,6 +166,54 @@ export default function NamingRulePage() {
     rulesRes.refresh();
   };
 
+  // ---------------------------------------------------------------- 段配置就地维护
+  // 段列表是规则的一部分：面板内新增/编辑/删除/调序立即全量提交（updateNamingRule），
+  // 后端 validateSegments 守门通过才算成功——与「编辑规则」弹窗走同一端点、同一校验。
+  const [segEdit, setSegEdit] = useState<{ index: number | null; seg: NamingSegment } | null>(null);
+
+  const saveSegments = async (next: NamingSegment[]) => {
+    if (!active) return;
+    if (next.length === 0) {
+      toast.error(t('mds.namingRule.segmentsEmpty'));
+      return;
+    }
+    try {
+      await api.updateNamingRule(active.id, {
+        ruleName: active.ruleName,
+        segments: next,
+        enabled: active.enabled,
+        remark: active.remark,
+      });
+      toast.success(t('mds.common.updated'));
+      setSegEdit(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    rulesRes.refresh();
+  };
+
+  const doSegMove = async (index: number, delta: -1 | 1) => {
+    if (!active) return;
+    const next = [...active.segments];
+    const target = index + delta;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    await saveSegments(next);
+  };
+
+  const doSegDelete = async (index: number) => {
+    if (!active) return;
+    const ok = await confirm({
+      title: t('mds.common.delete'),
+      content: t('mds.namingRule.segDeleteConfirm', { n: index + 1 }),
+      danger: true,
+      okKey: 'mds.common.delete',
+    });
+    if (!ok) return;
+    await saveSegments(active.segments.filter((_, i) => i !== index));
+  };
+
   const columns = useMemo<Array<DataTableColumn<NamingRule>>>(
     () => [
       { key: 'ruleName', titleKey: 'mds.namingRule.field.name', width: 180 },
@@ -200,6 +248,7 @@ export default function NamingRulePage() {
     <Page>
       <div className="state-model-layout">
         <DataTable<NamingRule>
+          titleKey="mds.namingRule.listTitle"
           columns={columns}
           rows={rows}
           rowKey={(r) => r.id}
@@ -272,12 +321,23 @@ export default function NamingRulePage() {
               />
             </Panel>
 
-            {/* 块二：段配置明细（编辑在弹窗内） */}
+            {/* 块二：段配置明细（就地新增/编辑/调序/删除，保存即全量提交） */}
             <Panel
               titleKey="mds.namingRule.segmentsTitle"
               sub={t('mds.namingRule.segmentsMeta', {
                 vars: activeSpec ? activeSpec.vars.map((v) => `{${v}}`).join(' ') : '—',
               })}
+              actions={
+                <Can perm={MDS_PERMS.namingRule.update}>
+                  <CimButton
+                    type="primary"
+                    size="small"
+                    onClick={() => setSegEdit({ index: null, seg: defaultSegment('LITERAL') })}
+                  >
+                    {t('mds.namingRule.segAdd')}
+                  </CimButton>
+                </Can>
+              }
             >
               {active.segments.length > 0 ? (
                 <table className="naming-seg-table">
@@ -287,6 +347,7 @@ export default function NamingRulePage() {
                       <th>{t('mds.namingRule.seg.type')}</th>
                       <th>{t('mds.namingRule.seg.config')}</th>
                       <th>{t('mds.namingRule.seg.length')}</th>
+                      <th className="naming-seg-op-col">{t('mds.common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -296,6 +357,25 @@ export default function NamingRulePage() {
                         <td className="mono">{seg.type}</td>
                         <td className="mono">{segmentSummary(seg, t)}</td>
                         <td className="mono">{seg.length ?? '—'}</td>
+                        <td>
+                          <Can perm={MDS_PERMS.namingRule.update}>
+                            <div className="naming-seg-ops">
+                              <button type="button" className="cim-btn" disabled={i === 0}
+                                      title={t('mds.namingRule.seg.up')}
+                                      onClick={() => void doSegMove(i, -1)}>↑</button>
+                              <button type="button" className="cim-btn" disabled={i === active.segments.length - 1}
+                                      title={t('mds.namingRule.seg.down')}
+                                      onClick={() => void doSegMove(i, 1)}>↓</button>
+                              <button type="button" className="cim-btn"
+                                      onClick={() => setSegEdit({ index: i, seg: { ...seg } })}>
+                                {t('mds.common.edit')}
+                              </button>
+                              <button type="button" className="cim-btn" onClick={() => void doSegDelete(i)}>
+                                {t('mds.common.delete')}
+                              </button>
+                            </div>
+                          </Can>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -322,6 +402,21 @@ export default function NamingRulePage() {
             setFormState(null);
             toast.success(t(wasCreate ? 'mds.common.created' : 'mds.common.updated'));
             rulesRes.refresh();
+          }}
+        />
+      )}
+
+      {segEdit && active && (
+        <SegmentModal
+          index={segEdit.index}
+          initial={segEdit.seg}
+          spec={activeSpec}
+          onClose={() => setSegEdit(null)}
+          onDone={(seg) => {
+            const next = [...active.segments];
+            if (segEdit.index === null) next.push(seg);
+            else next[segEdit.index] = seg;
+            void saveSegments(next);
           }}
         />
       )}
@@ -442,6 +537,167 @@ const RULE_TITLE = {
   editKey: 'mds.namingRule.editTitle',
   createKey: 'mds.namingRule.createTitle',
 } as const;
+
+/**
+ * 单段编辑器（类型下拉 + 随类型变化的参数面）。
+ * 规则弹窗的段卡片与段配置面板的编辑弹窗共用——同一段配置只有一份渲染逻辑。
+ */
+function SegmentFields({
+  seg,
+  spec,
+  onChange,
+}: {
+  seg: NamingSegment;
+  spec: NamingRuleObjectSpec | null;
+  onChange: (patch: Partial<NamingSegment>) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label>
+        <span>{t('mds.namingRule.seg.type')}</span>
+        <select
+          className="cim-select"
+          value={seg.type}
+          onChange={(e) => onChange(defaultSegment(e.target.value as NamingSegment['type']))}
+        >
+          {SEGMENT_TYPES.map((tp) => (
+            <option key={tp} value={tp}>{t(`mds.namingRule.type.${tp}`)}</option>
+          ))}
+        </select>
+      </label>
+      {seg.type === 'LITERAL' && (
+        <label>
+          <span>{t('mds.namingRule.seg.text')}</span>
+          <input className="cim-input mono" value={seg.text ?? ''} onChange={(e) => onChange({ text: e.target.value, length: e.target.value.length })} />
+        </label>
+      )}
+      {seg.type === 'VAR' && (
+        <label>
+          <span>{t('mds.namingRule.seg.var')}</span>
+          <select className="cim-select" value={seg.var ?? ''}
+                  onChange={(e) => onChange({ var: e.target.value })}>
+            <option value="">—</option>
+            {(spec?.vars ?? []).map((v) => <option key={v} value={v}>{`{${v}}`}</option>)}
+          </select>
+        </label>
+      )}
+      {seg.type === 'ENUM' && (
+        <>
+          <label>
+            <span>{t('mds.namingRule.seg.var')}</span>
+            <select className="cim-select" value={seg.var ?? ''}
+                    onChange={(e) => onChange({ var: e.target.value })}>
+              <option value="">—</option>
+              {(spec?.vars ?? []).map((v) => <option key={v} value={v}>{`{${v}}`}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>{t('mds.namingRule.seg.dictKey')}</span>
+            <input className="cim-input mono" value={seg.dictKey ?? ''} placeholder="equip_kind"
+                   onChange={(e) => onChange({ dictKey: e.target.value, values: undefined })} />
+          </label>
+          <label>
+            <span>{t('mds.namingRule.seg.values')}</span>
+            <input className="cim-input mono" value={(seg.values ?? []).join('|')}
+                   placeholder="A|B|C"
+                   onChange={(e) => onChange({
+                     values: e.target.value ? e.target.value.split('|') : undefined,
+                     dictKey: '',
+                   })} />
+          </label>
+          <label>
+            <span>{t('mds.namingRule.seg.length')}</span>
+            <input className="cim-input" type="number" min={1} max={32} value={seg.length ?? ''}
+                   onChange={(e) => onChange({ length: e.target.value ? Number(e.target.value) : undefined })} />
+          </label>
+        </>
+      )}
+      {seg.type === 'DATE' && (
+        <label>
+          <span>{t('mds.namingRule.seg.pattern')}</span>
+          <input className="cim-input mono" value={seg.pattern ?? ''} placeholder="yyyyMMdd"
+                 onChange={(e) => onChange({ pattern: e.target.value })} />
+        </label>
+      )}
+      {seg.type === 'SEQ' && (
+        <>
+          <label>
+            <span>{t('mds.namingRule.seg.length')}</span>
+            <input className="cim-input" type="number" min={1} max={9} value={seg.length ?? 3}
+                   onChange={(e) => onChange({ length: Number(e.target.value) })} />
+          </label>
+          <label>
+            <span>{t('mds.namingRule.field.seqStart')}</span>
+            <input className="cim-input" type="number" min={0} value={seg.start ?? 1}
+                   onChange={(e) => onChange({ start: Number(e.target.value) })} />
+          </label>
+          <label>
+            <span>{t('mds.namingRule.field.seqScope')}</span>
+            <select className="cim-select" value={seg.scope ?? 'GLOBAL'}
+                    onChange={(e) => onChange({ scope: e.target.value })}>
+              {SEQ_SCOPES.map((s) => (
+                <option key={s} value={s}>{t(`mds.namingRule.scope.${s}`)}</option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * 单段编辑弹窗（段配置面板的「新增段/编辑」入口）：
+ * 只编辑一段，确定后由调用方把段写回全量段列表并立即保存——后端 validateSegments 守门。
+ */
+function SegmentModal({
+  index,
+  initial,
+  spec,
+  onClose,
+  onDone,
+}: {
+  /** null=新增（追加到末尾）；否则=编辑第 index 段（0 起）。 */
+  index: number | null;
+  initial: NamingSegment;
+  spec: NamingRuleObjectSpec | null;
+  onClose: () => void;
+  onDone: (seg: NamingSegment) => void;
+}) {
+  const { t } = useTranslation();
+  const [seg, setSeg] = useState<NamingSegment>({ ...initial });
+  const [err, setErr] = useState('');
+
+  const submit = () => {
+    if (seg.type === 'LITERAL' && !(seg.text ?? '').trim()) {
+      setErr(t('mds.common.required'));
+      return;
+    }
+    onDone(seg);
+  };
+
+  return (
+    <CimModal
+      open
+      onClose={onClose}
+      title={t(index === null ? 'mds.namingRule.segCreateTitle' : 'mds.namingRule.segEditTitle', { n: (index ?? 0) + 1 })}
+      onOk={submit}
+      okKey="mds.common.save"
+      cancelKey="mds.common.cancel"
+      width={520}
+    >
+      <div className="naming-seg-body naming-seg-modal-body">
+        <SegmentFields
+          seg={seg}
+          spec={spec}
+          onChange={(patch) => setSeg((prev) => ({ ...prev, ...patch }))}
+        />
+      </div>
+      {err ? <p className="cim-field-error form-err">{err}</p> : null}
+    </CimModal>
+  );
+}
 
 /**
  * 规则新建/编辑弹窗：基础信息走 FormGrid；段列表为动态嵌套结构（每段参数面随类型变化），
@@ -584,15 +840,6 @@ function RuleFormModal({
           <div key={i} className="naming-seg-card">
             <div className="naming-seg-head">
               <span className="mono">{i + 1}</span>
-              <select
-                className="cim-select"
-                value={seg.type}
-                onChange={(e) => patchSegment(i, defaultSegment(e.target.value as NamingSegment['type']))}
-              >
-                {SEGMENT_TYPES.map((tp) => (
-                  <option key={tp} value={tp}>{t(`mds.namingRule.type.${tp}`)}</option>
-                ))}
-              </select>
               <div className="naming-seg-ops">
                 <button type="button" className="cim-btn" disabled={i === 0}
                         onClick={() => moveSegment(i, -1)}>{t('mds.namingRule.seg.up')}</button>
@@ -604,83 +851,11 @@ function RuleFormModal({
               </div>
             </div>
             <div className="naming-seg-body">
-              {seg.type === 'LITERAL' && (
-                <label>
-                  <span>{t('mds.namingRule.seg.text')}</span>
-                  <input className="cim-input mono" value={seg.text ?? ''} onChange={(e) => patchSegment(i, { text: e.target.value, length: e.target.value.length })} />
-                </label>
-              )}
-              {seg.type === 'VAR' && (
-                <label>
-                  <span>{t('mds.namingRule.seg.var')}</span>
-                  <select className="cim-select" value={seg.var ?? ''}
-                          onChange={(e) => patchSegment(i, { var: e.target.value })}>
-                    <option value="">—</option>
-                    {(spec?.vars ?? []).map((v) => <option key={v} value={v}>{`{${v}}`}</option>)}
-                  </select>
-                </label>
-              )}
-              {seg.type === 'ENUM' && (
-                <>
-                  <label>
-                    <span>{t('mds.namingRule.seg.var')}</span>
-                    <select className="cim-select" value={seg.var ?? ''}
-                            onChange={(e) => patchSegment(i, { var: e.target.value })}>
-                      <option value="">—</option>
-                      {(spec?.vars ?? []).map((v) => <option key={v} value={v}>{`{${v}}`}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    <span>{t('mds.namingRule.seg.dictKey')}</span>
-                    <input className="cim-input mono" value={seg.dictKey ?? ''} placeholder="equip_kind"
-                           onChange={(e) => patchSegment(i, { dictKey: e.target.value, values: undefined })} />
-                  </label>
-                  <label>
-                    <span>{t('mds.namingRule.seg.values')}</span>
-                    <input className="cim-input mono" value={(seg.values ?? []).join('|')}
-                           placeholder="A|B|C"
-                           onChange={(e) => patchSegment(i, {
-                             values: e.target.value ? e.target.value.split('|') : undefined,
-                             dictKey: '',
-                           })} />
-                  </label>
-                  <label>
-                    <span>{t('mds.namingRule.seg.length')}</span>
-                    <input className="cim-input" type="number" min={1} max={32} value={seg.length ?? ''}
-                           onChange={(e) => patchSegment(i, { length: e.target.value ? Number(e.target.value) : undefined })} />
-                  </label>
-                </>
-              )}
-              {seg.type === 'DATE' && (
-                <label>
-                  <span>{t('mds.namingRule.seg.pattern')}</span>
-                  <input className="cim-input mono" value={seg.pattern ?? ''} placeholder="yyyyMMdd"
-                         onChange={(e) => patchSegment(i, { pattern: e.target.value })} />
-                </label>
-              )}
-              {seg.type === 'SEQ' && (
-                <>
-                  <label>
-                    <span>{t('mds.namingRule.seg.length')}</span>
-                    <input className="cim-input" type="number" min={1} max={9} value={seg.length ?? 3}
-                           onChange={(e) => patchSegment(i, { length: Number(e.target.value) })} />
-                  </label>
-                  <label>
-                    <span>{t('mds.namingRule.field.seqStart')}</span>
-                    <input className="cim-input" type="number" min={0} value={seg.start ?? 1}
-                           onChange={(e) => patchSegment(i, { start: Number(e.target.value) })} />
-                  </label>
-                  <label>
-                    <span>{t('mds.namingRule.field.seqScope')}</span>
-                    <select className="cim-select" value={seg.scope ?? 'GLOBAL'}
-                            onChange={(e) => patchSegment(i, { scope: e.target.value })}>
-                      {SEQ_SCOPES.map((s) => (
-                        <option key={s} value={s}>{t(`mds.namingRule.scope.${s}`)}</option>
-                      ))}
-                    </select>
-                  </label>
-                </>
-              )}
+              <SegmentFields
+                seg={seg}
+                spec={spec}
+                onChange={(patch) => patchSegment(i, patch)}
+              />
             </div>
           </div>
         ))}

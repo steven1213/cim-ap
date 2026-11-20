@@ -363,6 +363,20 @@ table.naming-seg-table {
   margin-top: 6px;
 }
 
+/* 操作列：调序/编辑/删除小按钮一行排开，不随列宽折行 */
+.naming-seg-op-col {
+  white-space: nowrap;
+}
+.naming-seg-table .naming-seg-ops {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* 单段编辑弹窗：复用段参数面布局，顶部不留卡片余白 */
+.naming-seg-modal-body {
+  margin-top: 0;
+}
+
 table.naming-seg-table th,
 table.naming-seg-table td {
   border: 0.5px solid var(--line);
