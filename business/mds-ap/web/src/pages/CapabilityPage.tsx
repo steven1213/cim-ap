@@ -170,7 +170,7 @@ export default function CapabilityPage() {
           headActions={
             <Can perm={MDS_PERMS.capability.create}>
               <CimButton type="primary" size="small" onClick={openCreate}>
-                {t('mds.capability.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

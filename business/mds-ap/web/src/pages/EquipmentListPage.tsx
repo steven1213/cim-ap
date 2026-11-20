@@ -346,7 +346,7 @@ export default function EquipmentListPage({ view }: { view: 'process' | 'amhs' }
             headActions={
               <Can perm={MDS_PERMS.equipment.create}>
                 <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-                  {t('mds.equipment.createNew')}
+                  {t('mds.common.create')}
                 </CimButton>
               </Can>
             }
@@ -870,7 +870,7 @@ function EquipmentUnitModal({
       <div className="unit-toolbar">
         <Can perm={MDS_PERMS.equipment.update}>
           <CimButton type="primary" size="small" onClick={() => setFormState({ mode: 'new' })}>
-            {t('mds.unit.createNew')}
+            {t('mds.common.create')}
           </CimButton>
         </Can>
         <CimButton size="small" onClick={unitRes.refresh}>

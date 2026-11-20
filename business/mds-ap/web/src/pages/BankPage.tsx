@@ -308,7 +308,7 @@ export default function BankPage() {
         headActions={
           <Can perm={MDS_PERMS.bank.create}>
             <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-              {t('mds.bank.createNew')}
+              {t('mds.common.create')}
             </CimButton>
           </Can>
         }

@@ -210,7 +210,7 @@ export default function DictPage() {
         headActions={
           <Can perm={MDS_PERMS.dict.save}>
             <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-              {t('mds.dict.createDict')}
+              {t('mds.common.create')}
             </CimButton>
           </Can>
         }

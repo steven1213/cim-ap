@@ -421,7 +421,7 @@ export default function TopologyPage() {
             )}
             <Can perm={MDS_PERMS.site.create}>
               <CimButton type="primary" size="small" onClick={() => setCreating('site')}>
-                {t('mds.site.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           </div>
@@ -919,7 +919,7 @@ function NodeDetail({
         {node.level === 'fab' && (
           <Can perm={MDS_PERMS.area.create}>
             <CimButton size="small" onClick={onCreateGroup}>
-              {t('mds.group.createNew')}
+              {t('mds.common.create')}
             </CimButton>
           </Can>
         )}

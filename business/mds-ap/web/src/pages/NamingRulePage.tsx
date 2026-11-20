@@ -211,7 +211,7 @@ export default function NamingRulePage() {
           headActions={
             <Can perm={MDS_PERMS.namingRule.create}>
               <CimButton type="primary" size="small" onClick={() => setFormState({ mode: 'create' })}>
-                {t('mds.namingRule.create')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

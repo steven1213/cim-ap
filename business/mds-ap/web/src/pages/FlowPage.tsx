@@ -604,7 +604,7 @@ export default function FlowPage() {
             headActions={
               <Can perm={MDS_PERMS.flow.create}>
                 <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-                  {t('mds.flow.create')}
+                  {t('mds.common.create')}
                 </CimButton>
               </Can>
             }

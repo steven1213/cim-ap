@@ -233,7 +233,7 @@ export default function EquipmentTypePage() {
           headActions={
             <Can perm={MDS_PERMS.equipmentType.create}>
               <CimButton type="primary" size="small" onClick={openCreate}>
-                {t('mds.eqpType.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

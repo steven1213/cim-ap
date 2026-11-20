@@ -229,7 +229,7 @@ export default function ReasonCodePage() {
           headActions={
             <Can perm={MDS_PERMS.reason.create}>
               <CimButton type="primary" size="small" onClick={() => setTypeForm({ mode: 'create' })}>
-                {t('mds.reason.type.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }
@@ -253,7 +253,7 @@ export default function ReasonCodePage() {
                   size="small"
                   onClick={() => setCodeForm({ mode: 'create', typeKey: activeType?.typeKey ?? '' })}
                 >
-                  {t('mds.reason.code.createNew')}
+                  {t('mds.common.create')}
                 </CimButton>
               </Can>
             }

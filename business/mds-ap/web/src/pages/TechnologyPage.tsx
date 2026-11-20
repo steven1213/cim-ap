@@ -176,7 +176,7 @@ export default function TechnologyPage() {
           headActions={
             <Can perm={MDS_PERMS.tech.create}>
               <CimButton type="primary" size="small" onClick={openCreate}>
-                {t('mds.tech.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

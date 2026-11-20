@@ -227,7 +227,7 @@ export default function FlowRulePage() {
               </CimButton>
               <Can perm={MDS_PERMS.flow.update}>
                 <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-                  {t('mds.flowRule.create')}
+                  {t('mds.common.create')}
                 </CimButton>
               </Can>
             </>

@@ -237,7 +237,7 @@ export default function ProductPage() {
           headActions={
             <Can perm={MDS_PERMS.product.create}>
               <CimButton type="primary" size="small" onClick={openCreate}>
-                {t('mds.product.createNew')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

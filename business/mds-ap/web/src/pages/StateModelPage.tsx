@@ -241,7 +241,7 @@ export default function StateModelPage() {
           headActions={
             <Can perm={MDS_PERMS.stateModel.create}>
               <CimButton type="primary" size="small" onClick={() => setFormState({ mode: 'create' })}>
-                {t('mds.stateModel.create')}
+                {t('mds.common.create')}
               </CimButton>
             </Can>
           }

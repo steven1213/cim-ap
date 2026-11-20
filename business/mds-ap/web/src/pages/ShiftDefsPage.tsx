@@ -265,7 +265,7 @@ export default function ShiftDefsPage() {
           flush
           actions={
             <Can perm={MDS_PERMS.shift.create}>
-              <CimButton size="small" onClick={() => setShiftForm({ mode: 'create' })}>
+              <CimButton type="primary" size="small" onClick={() => setShiftForm({ mode: 'create' })}>
                 {t('mds.common.create')}
               </CimButton>
             </Can>
@@ -287,7 +287,7 @@ export default function ShiftDefsPage() {
           flush
           actions={
             <Can perm={MDS_PERMS.shift.create}>
-              <CimButton size="small" onClick={() => setPatternForm({ mode: 'create' })}>
+              <CimButton type="primary" size="small" onClick={() => setPatternForm({ mode: 'create' })}>
                 {t('mds.common.create')}
               </CimButton>
             </Can>
