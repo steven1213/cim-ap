@@ -65,7 +65,9 @@
   display: grid;
   grid-template-columns: minmax(320px, 2fr) minmax(280px, 1fr);
   gap: 12px;
-  align-items: start;
+  /* 吃满 .page 剩余高度：否则卡片底与 footer 之间是一整条页面底色的死空白 */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .topo-tree,
@@ -75,6 +77,12 @@
   border-radius: var(--radius);
   padding: 10px;
   min-height: 320px;
+}
+
+/* 左树纵向铺开：工具栏固定、节点区吃满剩余高度后内部滚动 */
+.topo-tree {
+  display: flex;
+  flex-direction: column;
 }
 
 .topo-toolbar {
@@ -98,7 +106,8 @@
 }
 
 .topo-nodes {
-  max-height: 60vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -1133,7 +1142,15 @@ table.naming-seg-table th {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  /* 吃满 .page 剩余高度：两卡等高拉伸，footer 上方不留页面底色死空白 */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* DataTable 的外壳是 flex 列（cim-datatable > panel）：内层 panel 也要跟着撑满，
+   否则行数少时左卡停在表尾、与右详情不等高（同 ui.css 的 .page > .cim-datatable 模式） */
+.op-layout > .cim-datatable > .panel {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .op-detail-body {
   padding: 4px 2px;

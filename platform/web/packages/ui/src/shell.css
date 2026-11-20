@@ -584,7 +584,8 @@ button.side-cap.page-cap {
   margin: 0 auto;
   /* ⚠️ 顶部不得加 padding：sticky 约束矩形按滚动容器 padding 内缩，
      会把吸顶左列钉在裁切线之下（与右列顶部错位）。初始间距由 .page 自己给 */
-  padding: 0 20px 24px;
+  /* 左右 20 → 12、底部 24 → 12：超宽留白是死空间（用户反馈「红框空白太大」） */
+  padding: 0 12px 12px;
   /* flex 纵向链：.page 撑满可视高度，.split 再撑满 .page——页面不再在 footer 前留大白条 */
   display: flex;
   flex-direction: column;

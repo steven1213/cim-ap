@@ -4,11 +4,11 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   flex: 1 0 auto; /* 撑满 .content 可视高度（内容超出时正常滚动） */
   /* 初始顶部间距（.content 不能给 padding-top，会破坏 sticky 对齐，见 .content 注释）
-     12 → 16：页签栏是 38px 的薄条，下面立刻贴标题会显得挤压 */
-  padding-top: 16px;
+     16 → 10：页签栏下留白是纯空带（尤其无标题页整条都是空的），用户反馈压缩 */
+  padding-top: 10px;
 }
 
 .grid-2 {
