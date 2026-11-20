@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
 import {
@@ -114,6 +114,12 @@ export default function OperationsPage() {
   const selected = useMemo(() => ops.find((r) => r.id === selectedId) ?? null, [ops, selectedId]);
   const dirty = mode === 'edit' || mode === 'create' ? JSON.stringify(form) !== initialRef.current : false;
 
+  // 查看态表单跟随选中行（防止切行后详情残留上一行的表单值）
+  useEffect(() => {
+    if (mode === 'view') setForm(formFrom(selected));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, selected]);
+
   const set = (patch: Partial<OpFormState>) => setForm((f) => ({ ...f, ...patch }));
   const numOrNull = (v: string) => (v.trim() === '' ? null : Number(v));
 
@@ -144,8 +150,8 @@ export default function OperationsPage() {
     if (row.id === selectedId && mode === 'view') return;
     if (dirty) {
       const ok = await confirm({
-        titleKey: 'mds.operation.discardTitle',
-        contentKey: 'mds.operation.discardText',
+        titleKey: 'mds.common.discardTitle',
+        contentKey: 'mds.common.discardText',
         okKey: 'mds.common.ok',
       });
       if (!ok) return;
@@ -280,7 +286,7 @@ export default function OperationsPage() {
       }
     }
     if (failCount === 0) toast.success(t('mds.common.deleted'));
-    else toast.error(t('mds.operation.batchResult', { ok: okCount, fail: failCount }));
+    else toast.error(t('mds.common.batchResult', { ok: okCount, fail: failCount }));
     if (selectedId && checkedKeys.includes(selectedId)) setSelectedId(null);
     setCheckedKeys([]);
     opsRes.refresh();
@@ -483,7 +489,7 @@ export default function OperationsPage() {
                 disabled={!checkedDeletable}
                 onClick={() => void doBatchDelete()}
               >
-                {t('mds.operation.batchDelete')}
+                {t('mds.common.batchDelete')}
                 {checkedDeletable ? ` (${checkedKeys.length})` : ''}
               </CimButton>
             </Can>
@@ -499,7 +505,7 @@ export default function OperationsPage() {
 
         <Panel className="op-detail">
           {!selected && mode !== 'create' ? (
-            <EmptyState titleKey="mds.operation.selectHint" />
+            <EmptyState titleKey="mds.common.selectHint" />
           ) : (
             <div className="op-detail-body">
               <div className="op-detail-head">
@@ -519,7 +525,7 @@ export default function OperationsPage() {
                     )}
                   </>
                 )}
-                {mode === 'edit' && <span className="op-editing-badge">{t('mds.operation.editing')}</span>}
+                {mode === 'edit' && <span className="op-editing-badge">{t('mds.common.editing')}</span>}
                 <div className="op-detail-actions">
                   {mode === 'view' && headerActions}
                   {(mode === 'edit' || mode === 'create') && (

@@ -1,270 +1,244 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useResource } from '@cim/data';
 import {
   Can,
   CimButton,
-  CimModal,
   DataTable,
+  EmptyState,
   FormGrid,
   Page,
-  useConfirm,
+  Panel,
   useToast,
   type DataTableColumn,
   type FormField,
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
+import { useMasterDetail, type DetailMode } from '@/lib/useMasterDetail';
 import type { Capability } from '@/types';
 
 /**
- * 设备能力（Capability）——能力字典。
+ * 设备能力（CapabilityPage，动线改版）——能力字典。
  *
- * <p>能力回答「能不能做」（如 E84 接口、双端口搬运、6 英寸加工）；设备↔能力关联在
- * 设备行内维护。capabilityCode 建后不可改（关联表按 code 引用）；被设备关联的能力
- * 不可删（后端守门 2004）。</p>
+ * <p>布局为「左列表 + 右详情」主从结构（{@link useMasterDetail} 统一动线）：高频动线
+ * （搜索 → 点选 → 就地编辑 → 保存）零弹窗；新建/批量删除在列表工具栏；编辑/删除贴详情头。
+ * 编辑先抢锁（type=capability）、保存同事务清锁、取消显式释放。能力回答「能不能做」
+ * （如 E84 接口、双端口搬运、6 英寸加工）；设备↔能力关联在设备行内维护。
+ * capabilityCode 建后不可改（关联表按 code 引用）；被设备关联的能力不可删（后端守门 2004）。</p>
  */
 
-const NO_CAPS: Capability[] = [];
+interface CapFormState {
+  capabilityCode: string;
+  capabilityName: string;
+  remark: string;
+  enabled: boolean;
+}
+
+function formFrom(row: Capability | null): CapFormState {
+  return {
+    capabilityCode: row?.capabilityCode ?? '',
+    capabilityName: row?.capabilityName ?? '',
+    remark: row?.remark ?? '',
+    enabled: row?.enabled ?? true,
+  };
+}
+
+const EMPTY_JSON = JSON.stringify(formFrom(null));
 
 export default function CapabilityPage() {
   const { t } = useTranslation();
-  const confirm = useConfirm();
   const toast = useToast();
 
-  const [keyword, setKeyword] = useState('');
-  const capRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<Capability | null>(null);
+  const [form, setForm] = useState<CapFormState>(() => formFrom(null));
+  const initialJsonRef = useRef(EMPTY_JSON);
+  const modeRef = useRef<DetailMode>('view');
 
-  const rows = useMemo(() => {
-    const list = capRes.data ?? NO_CAPS;
-    const kw = keyword.trim().toLowerCase();
-    if (!kw) return list;
-    return list.filter(
-      (r) =>
-        r.capabilityCode.toLowerCase().includes(kw) ||
-        r.capabilityName.toLowerCase().includes(kw),
-    );
-  }, [capRes.data, keyword]);
+  const md = useMasterDetail<Capability>({
+    fetchList: (signal) => api.listCapabilities(undefined, signal),
+    remove: (id) => api.deleteCapability(id),
+    lockType: 'capability',
+    filter: (r, kw) =>
+      r.capabilityCode.toLowerCase().includes(kw) || r.capabilityName.toLowerCase().includes(kw),
+    isDirty: () => modeRef.current !== 'view' && JSON.stringify(form) !== initialJsonRef.current,
+  });
+  modeRef.current = md.mode;
+
+  // 查看态表单跟随选中行（防止切行后详情残留上一行的表单值）
+  useEffect(() => {
+    if (md.mode === 'view') setForm(formFrom(md.selected));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [md.mode, md.selected]);
+
+  const openCreate = () => {
+    setForm(formFrom(null));
+    initialJsonRef.current = EMPTY_JSON;
+    md.enterCreate();
+  };
 
   const openEdit = async (row: Capability) => {
-    try {
-      await api.claimLock('capability', row.id);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+    if (!(await md.enterEdit(row))) return;
+    setForm(formFrom(row));
+    initialJsonRef.current = JSON.stringify(formFrom(row));
+  };
+
+  const save = async () => {
+    md.setErr('');
+    if (!form.capabilityName.trim()) {
+      md.setErr(t('mds.common.errNameRequired'));
       return;
     }
-    setEditing(row);
-  };
-
-  const closeEdit = () => {
-    if (editing) {
-      void api.releaseLock('capability', editing.id).catch(() => {});
-    }
-    setEditing(null);
-  };
-
-  const doDelete = async (row: Capability) => {
-    const ok = await confirm({
-      title: t('mds.common.delete'),
-      contentKey: 'mds.common.confirmDelete',
-      danger: true,
-      okKey: 'mds.common.delete',
-    });
-    if (!ok) return;
+    md.setBusy(true);
     try {
-      await api.deleteCapability(row.id);
-      toast.success(t('mds.common.deleted'));
+      const payload = {
+        capabilityName: form.capabilityName.trim(),
+        remark: form.remark || null,
+        enabled: form.enabled,
+      };
+      const ret =
+        md.mode === 'create'
+          ? await api.createCapability({ capabilityCode: form.capabilityCode.trim(), ...payload })
+          : await api.updateCapability(md.selected!.id, payload);
+      toast.success(t('mds.common.saved'));
+      md.saved(ret.id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
-      return;
+      md.setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      md.setBusy(false);
     }
-    capRes.refresh();
   };
 
+  // 左列表列（瘦身：全字段在右侧详情，操作列删除）
   const columns = useMemo<Array<DataTableColumn<Capability>>>(
     () => [
       { key: 'capabilityCode', titleKey: 'mds.capability.code', width: 180, mono: true },
-      { key: 'capabilityName', titleKey: 'mds.capability.name', width: 240 },
+      { key: 'capabilityName', titleKey: 'mds.capability.name', width: 220, ellipsis: true, render: (r) => <span className="flow-name-main">{r.capabilityName}</span> },
       {
         key: 'enabled',
         titleKey: 'mds.topo.status',
         width: 90,
         render: (r) => (
-          <span className={r.enabled ? '' : 'dim'}>
+          <span className={r.enabled ? 'flow-status flow-status-active' : 'flow-status flow-status-disabled'}>
             {r.enabled ? t('mds.topo.enabled') : t('mds.topo.disabled')}
           </span>
         ),
       },
       { key: 'remark', titleKey: 'mds.common.remark', ellipsis: true, render: (r) => r.remark ?? '—' },
-      {
-        key: 'actions',
-        titleKey: 'mds.common.actions',
-        width: 140,
-        render: (r) => (
-          <span className="cell-actions">
-            <Can perm={MDS_PERMS.capability.update}>
-              <CimButton size="small" onClick={() => void openEdit(r)}>
-                {t('mds.common.edit')}
-              </CimButton>
-            </Can>
-            <Can perm={MDS_PERMS.capability.delete}>
-              <CimButton size="small" danger onClick={() => void doDelete(r)}>
-                {t('mds.common.delete')}
-              </CimButton>
-            </Can>
-          </span>
-        ),
-      },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [t],
   );
 
+  // 详情头动作（对象级，贴详情头）
+  const headerActions = md.mode === 'view' && md.selected ? (
+    <>
+      <Can perm={MDS_PERMS.capability.update}>
+        <CimButton type="primary" size="small" onClick={() => void openEdit(md.selected!)}>
+          {t('mds.common.edit')}
+        </CimButton>
+      </Can>
+      <Can perm={MDS_PERMS.capability.delete}>
+        <CimButton size="small" danger onClick={() => void md.doDelete(md.selected!)}>
+          {t('mds.common.delete')}
+        </CimButton>
+      </Can>
+    </>
+  ) : null;
+
+  const fields = useMemo<Array<FormField<CapFormState>>>(
+    () => [
+      { kind: 'text', key: 'capabilityCode', labelKey: 'mds.capability.code', mono: true, disabled: md.mode !== 'create', required: md.mode === 'create' },
+      { kind: 'text', key: 'capabilityName', labelKey: 'mds.capability.name', required: true },
+      { kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' },
+      { kind: 'textarea', key: 'remark', labelKey: 'mds.common.remark', span: 2 },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [md.mode],
+  );
+
   return (
     <Page>
-      <DataTable<Capability>
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        loading={capRes.loading}
-        error={capRes.error?.message ?? null}
-        onRetry={capRes.refresh}
-        headActions={
-          <Can perm={MDS_PERMS.capability.create}>
-            <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-              {t('mds.capability.createNew')}
-            </CimButton>
-          </Can>
-        }
-        search={{
-          value: keyword,
-          onChange: setKeyword,
-          placeholderKey: 'mds.capability.searchPlaceholder',
-        }}
-        onRefresh={capRes.refresh}
-      />
+      <div className="op-layout">
+        <DataTable<Capability>
+          titleKey="mds.capability.listTitle"
+          columns={columns}
+          rows={md.rows}
+          rowKey={(r) => r.id}
+          loading={md.res.loading}
+          error={md.res.error?.message ?? null}
+          onRetry={md.res.refresh}
+          search={{ value: md.keyword, onChange: md.setKeyword, placeholderKey: 'mds.capability.searchPlaceholder' }}
+          headActions={
+            <Can perm={MDS_PERMS.capability.create}>
+              <CimButton type="primary" size="small" onClick={openCreate}>
+                {t('mds.capability.createNew')}
+              </CimButton>
+            </Can>
+          }
+          actions={
+            <Can perm={MDS_PERMS.capability.delete}>
+              <CimButton
+                size="small"
+                danger
+                disabled={!md.checkedKeys.length}
+                onClick={() => void md.doBatchDelete()}
+              >
+                {t('mds.common.batchDelete')}
+                {md.checkedKeys.length ? ` (${md.checkedKeys.length})` : ''}
+              </CimButton>
+            </Can>
+          }
+          onRefresh={md.res.refresh}
+          selectedKeys={md.checkedKeys}
+          onSelectionChange={md.setCheckedKeys}
+          onRowClick={(r) => void md.onRowClick(r)}
+          rowClassName={(r) => (r.id === md.selectedId ? 'row-selected' : '')}
+        />
 
-      {creating && (
-        <CapabilityFormModal
-          initial={null}
-          onClose={() => setCreating(false)}
-          onDone={() => {
-            setCreating(false);
-            toast.success(t('mds.common.created'));
-            capRes.refresh();
-          }}
-        />
-      )}
-      {editing && (
-        <CapabilityFormModal
-          initial={editing}
-          onClose={closeEdit}
-          onDone={() => {
-            setEditing(null);
-            toast.success(t('mds.common.updated'));
-            capRes.refresh();
-          }}
-        />
-      )}
+        <Panel className="op-detail">
+          {!md.selected && md.mode !== 'create' ? (
+            <EmptyState titleKey="mds.common.selectHint" />
+          ) : (
+            <div className="op-detail-body">
+              <div className="op-detail-head">
+                {md.mode === 'create' ? (
+                  <h3 className="op-detail-title">{t('mds.capability.createTitle')}</h3>
+                ) : (
+                  <>
+                    <h3 className="op-detail-title">{md.selected!.capabilityCode}</h3>
+                    <span className={md.selected!.enabled ? 'flow-status flow-status-active' : 'flow-status flow-status-disabled'}>
+                      {md.selected!.enabled ? t('mds.topo.enabled') : t('mds.topo.disabled')}
+                    </span>
+                  </>
+                )}
+                {md.mode === 'edit' && <span className="op-editing-badge">{t('mds.common.editing')}</span>}
+                <div className="op-detail-actions">
+                  {md.mode === 'view' && headerActions}
+                  {(md.mode === 'edit' || md.mode === 'create') && (
+                    <>
+                      <CimButton type="primary" size="small" disabled={md.busy} onClick={() => void save()}>
+                        {t('mds.common.save')}
+                      </CimButton>
+                      <CimButton size="small" onClick={md.backToView}>
+                        {t('mds.common.cancel')}
+                      </CimButton>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {md.err && <p className="op-error">{md.err}</p>}
+
+              <FormGrid
+                fields={fields}
+                value={form}
+                disabled={md.mode === 'view'}
+                onChange={(patch: Record<string, unknown>) => setForm((f) => ({ ...f, ...(patch as Partial<CapFormState>) }))}
+                columns={2}
+              />
+            </div>
+          )}
+        </Panel>
+      </div>
     </Page>
-  );
-}
-
-const CAP_TITLE = {
-  editKey: 'mds.capability.editTitle',
-  createKey: 'mds.capability.createTitle',
-} as const;
-
-/** 能力新建/编辑弹窗（编辑锁由页面层抢/放；capabilityCode 建后不可改）。 */
-function CapabilityFormModal({
-  initial,
-  onClose,
-  onDone,
-}: {
-  initial: Capability | null;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const { t } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState('');
-  const [form, setForm] = useState({
-    code: initial?.capabilityCode ?? '',
-    name: initial?.capabilityName ?? '',
-    remark: initial?.remark ?? '',
-    enabled: initial?.enabled ?? true,
-  });
-
-  const fields = useMemo<Array<FormField<typeof form>>>(
-    () => [
-      ...(!initial
-        ? [
-            {
-              kind: 'text' as const,
-              key: 'code' as const,
-              labelKey: 'mds.capability.code',
-              required: true,
-              mono: true,
-            },
-          ]
-        : []),
-      { kind: 'text' as const, key: 'name' as const, labelKey: 'mds.capability.name', required: true },
-      { kind: 'text' as const, key: 'remark' as const, labelKey: 'mds.common.remark', span: 2 },
-      { kind: 'switch' as const, key: 'enabled' as const, labelKey: 'mds.topo.status' },
-    ],
-    [initial],
-  );
-
-  async function submit() {
-    if (!form.name.trim()) {
-      setErr(t('mds.common.required'));
-      return;
-    }
-    setBusy(true);
-    setErr('');
-    try {
-      if (initial) {
-        await api.updateCapability(initial.id, {
-          capabilityName: form.name.trim(),
-          remark: form.remark || null,
-          enabled: form.enabled,
-        });
-      } else {
-        await api.createCapability({
-          capabilityCode: form.code.trim(),
-          capabilityName: form.name.trim(),
-          remark: form.remark || null,
-          enabled: form.enabled,
-        });
-      }
-      onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <CimModal
-      open
-      onClose={onClose}
-      titleKey={initial ? CAP_TITLE.editKey : CAP_TITLE.createKey}
-      onOk={() => void submit()}
-      okKey="mds.common.save"
-      cancelKey="mds.common.cancel"
-      okLoading={busy}
-      width={480}
-    >
-      <FormGrid
-        fields={fields}
-        value={form}
-        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-        columns={2}
-      />
-      {err ? <p className="cim-field-error form-err">{err}</p> : null}
-    </CimModal>
   );
 }
