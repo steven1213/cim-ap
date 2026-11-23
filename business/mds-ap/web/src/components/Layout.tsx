@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ConsoleShell, useShellWiring } from '@cim/shell';
@@ -40,7 +41,7 @@ export default function Layout() {
   return (
     <ConsoleShell
       storageKey="mds"
-      brand={{ logo: 'MD', title: 'CIM MDS', subtitle: t('mds.shell.brandSub') }}
+      brand={{ logo: <BrandIcon />, title: 'CIM MDS', subtitle: t('mds.shell.brandSub') }}
       groups={wiring.groups}
       labels={wiring.labels}
       collapsibleGroups

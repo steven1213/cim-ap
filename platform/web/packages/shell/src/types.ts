@@ -63,8 +63,8 @@ export interface ShellNavGroup {
 
 /** 品牌区：字标 + 产品名 + 副标题。 */
 export interface ShellBrand {
-  /** 方形字标里的 1–2 个字符，如 `IA` / `RM` / `AP`。 */
-  logo: string;
+  /** 品牌图形标志（本系统的 BrandIcon，SVG）。 */
+  logo: ReactNode;
   title: string;
   subtitle: string;
 }

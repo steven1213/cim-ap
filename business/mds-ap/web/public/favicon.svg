@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- CIM MDS：主数据分层（顶层实心切面 = 唯一定义源） -->
+  <rect width="32" height="32" rx="7" fill="#5e6ad2"/>
+  <g transform="translate(4 4)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3 21 7.7 12 12.4 3 7.7Z" fill="#fff" stroke-width="1.6"/>
+    <path d="M3 12.2 12 16.9l9-4.7"/>
+    <path d="M3 16.6 12 21.3l9-4.7"/>
+  </g>
+</svg>

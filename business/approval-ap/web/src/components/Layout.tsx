@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ConsoleShell, useShellWiring } from '@cim/shell';
@@ -44,7 +45,7 @@ export default function Layout() {
   return (
     <ConsoleShell
       storageKey="approval"
-      brand={{ logo: 'AP', title: 'CIM Approval', subtitle: t('shell.brandSub') }}
+      brand={{ logo: <BrandIcon />, title: 'CIM Approval', subtitle: t('shell.brandSub') }}
       groups={wiring.groups}
       labels={wiring.labels}
       collapsibleGroups

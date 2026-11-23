@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- CIM Approval：单据与勾（图形重心落在结论上） -->
+  <rect width="32" height="32" rx="7" fill="#5e6ad2"/>
+  <g transform="translate(4 4)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 3.5H7.4A1.9 1.9 0 005.5 5.4v13.2a1.9 1.9 0 001.9 1.9h9.2a1.9 1.9 0 001.9-1.9V8Z"/>
+    <path d="M14 3.5V8h4.5"/>
+    <path d="M8.9 14.7l2.2 2.2 4-4.4"/>
+  </g>
+</svg>

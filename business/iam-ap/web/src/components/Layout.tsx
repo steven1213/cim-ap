@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ConsoleShell, normalizeMenuTree, useShellWiring } from '@cim/shell';
@@ -49,7 +50,7 @@ export default function Layout() {
   return (
     <ConsoleShell
       storageKey="iam"
-      brand={{ logo: 'IA', title: 'CIM IAM', subtitle: t('iam.shell.brandSub') }}
+      brand={{ logo: <BrandIcon />, title: 'CIM IAM', subtitle: t('iam.shell.brandSub') }}
       groups={wiring.groups}
       labels={wiring.labels}
       sidebarNote={t('iam.shell.crypto')}

@@ -35,8 +35,8 @@ export function redirectToSso(options: SsoLoginUrlOptions): void {
 }
 
 export interface SsoRelayProps {
-  /** 品牌方块字（如 `IA` / `RM`），不传则不显示品牌区。 */
-  mark?: string;
+  /** 品牌图形标志（本系统的 BrandIcon），不传则不显示品牌区。 */
+  mark?: ReactNode;
   /** 品牌名，如 `CIM RMS`。 */
   brand?: string;
   /** 品牌副标题（通常传应用自己的 brandSub 文案）。 */

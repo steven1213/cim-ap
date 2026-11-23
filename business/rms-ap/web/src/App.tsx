@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -126,7 +127,7 @@ function BootGate({ children }: { children: ReactNode }) {
   if (failure?.kind === 'unavailable') {
     return (
       <SsoRelay
-        mark="RM"
+        mark={<BrandIcon />}
         brand="CIM RMS"
         label={t('rms.boot.backendDown')}
         hint={t('rms.boot.backendDownHint')}
@@ -141,7 +142,7 @@ function BootGate({ children }: { children: ReactNode }) {
   }
 
   if (!ready) {
-    return <SsoRelay mark="RM" brand="CIM RMS" label={t('rms.common.loading')} />;
+    return <SsoRelay mark={<BrandIcon />} brand="CIM RMS" label={t('rms.common.loading')} />;
   }
   return <>{children}</>;
 }

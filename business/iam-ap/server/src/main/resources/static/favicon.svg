@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- CIM IAM：盾牌与钥匙孔（盾而不锁死，孔即入口） -->
+  <rect width="32" height="32" rx="7" fill="#5e6ad2"/>
+  <g transform="translate(4 4)" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3 20 6.1v5.2c0 4.6-3.1 8.1-8 9.7-4.9-1.6-8-5.1-8-9.7V6.1Z"/>
+    <circle cx="12" cy="10.4" r="2.1" fill="#fff" stroke="none"/>
+    <path d="M12 12.5v2.7"/>
+  </g>
+</svg>

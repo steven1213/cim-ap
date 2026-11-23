@@ -16,6 +16,7 @@
 //    令牌怎么读、会话怎么写、跳转怎么发，全部由应用注入。
 
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CimButton, CimInput, InlineAlert } from '@cim/ui';
 import { SsoRelay } from './sso';
@@ -39,8 +40,8 @@ export interface SsoLoginPageLabels {
 }
 
 export interface SsoLoginPageProps {
-  /** 品牌方块字（如 `RM` / `AP` / `MD`）。 */
-  mark: string;
+  /** 品牌图形标志（本系统的 BrandIcon）。 */
+  mark: ReactNode;
   /** 品牌名，如 `CIM RMS`。 */
   brand: string;
   /** 品牌副标题（通常传应用自己的 `brandSub` 文案）。 */

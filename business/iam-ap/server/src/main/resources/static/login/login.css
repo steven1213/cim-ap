@@ -97,6 +97,12 @@ body {
   letter-spacing: 0.02em;
 }
 
+.logo svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
 .login-hero { position: relative; z-index: 1; max-width: 430px; }
 .login-hero h2 {
   margin: 0 0 10px;

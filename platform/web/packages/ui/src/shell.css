@@ -50,6 +50,13 @@
   background: var(--primary);
 }
 
+/* 品牌位从「方块字」升级为图形标（各系统 BrandIcon）：SVG 由 currentColor 取白 */
+.logo svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
 .brand-text {
   display: flex;
   flex-direction: column;
@@ -1019,6 +1026,11 @@ button.side-cap.page-cap {
   letter-spacing: 0.02em;
   color: #fff;
   background: var(--primary); /* 同侧栏品牌块：去掉蓝紫渐变，全站只用 --primary */
+}
+.sso-relay-mark svg {
+  width: 21px;
+  height: 21px;
+  display: block;
 }
 .sso-relay-id {
   display: flex;

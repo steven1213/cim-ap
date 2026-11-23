@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { useTranslation } from 'react-i18next';
 import { SsoCallbackPage } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
@@ -13,7 +14,7 @@ export default function SsoCallback() {
   const { t } = useTranslation();
   return (
     <SsoCallbackPage
-      mark="AP"
+      mark={<BrandIcon />}
       brand="CIM Approval"
       label={t('login.redirecting')}
       setSession={(token, refreshToken) => useAuthStore.getState().setSession(token, refreshToken)}

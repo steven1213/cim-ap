@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,7 +76,7 @@ function LoginEntry() {
   if (token) return redirect ? null : <Navigate to="/" replace />;
   return (
     <SsoRelay
-      mark="IA"
+      mark={<BrandIcon />}
       brand="CIM IAM"
       label={t('iam.login.relay')}
       hint={t('iam.login.relayHint')}

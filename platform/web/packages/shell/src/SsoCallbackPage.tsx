@@ -7,13 +7,13 @@
 // ⚠️ 为什么值得收：这六行决定了「登录成功后能不能进得去」。任何一份漏掉 `refreshToken`
 //    的兜底（`refreshToken || token`），刷新时就会因为没有 refreshToken 被踢出登录。
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SsoRelay } from './sso';
 
 export interface SsoCallbackPageProps {
   /** 品牌方块字（如 `RM` / `MD`）。 */
-  mark: string;
+  mark: ReactNode;
   /** 品牌名，如 `CIM RMS`。 */
   brand: string;
   /** 中转文案，如「正在进入…」。 */

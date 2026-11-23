@@ -1,3 +1,4 @@
+import BrandIcon from '@/components/BrandIcon';
 import { useTranslation } from 'react-i18next';
 import { SsoLoginPage } from '@cim/shell';
 import { useAuthStore } from '@/store/authStore';
@@ -14,7 +15,7 @@ export default function LoginPage() {
   const { t } = useTranslation();
   return (
     <SsoLoginPage
-      mark="MD"
+      mark={<BrandIcon />}
       brand="CIM MDS"
       brandSub={t('mds.shell.brandSub')}
       getToken={() => useAuthStore.getState().token}
