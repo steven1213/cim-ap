@@ -297,6 +297,7 @@ export default function BankPage() {
         </select>
       </div>
       <DataTable<StockerBank>
+        titleKey="mds.bank.listTitle"
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

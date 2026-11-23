@@ -593,6 +593,7 @@ export default function FlowPage() {
       <div className="flow-layout">
         <div className="flow-left">
           <DataTable<FlowView>
+            titleKey="mds.flow.listTitle"
             columns={columns}
             rows={rows}
             rowKey={(r) => r.id}

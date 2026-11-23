@@ -199,6 +199,7 @@ export default function DictPage() {
   return (
     <Page>
       <DataTable<DictInfo>
+        titleKey="mds.dict.listTitle"
         columns={dictColumns}
         rows={rows}
         rowKey={(r) => r.id}
@@ -228,6 +229,7 @@ export default function DictPage() {
             {t('mds.dict.itemsTitle', { name: selected.name ?? selected.code, code: selected.code })}
           </h3>
           <DataTable<DictItem>
+            titleKey="mds.dict.item.listTitle"
             columns={itemColumns}
             rows={itemRes.data ?? NO_ITEMS}
             rowKey={(r) => r.id}

@@ -218,6 +218,7 @@ export default function ReasonCodePage() {
     <Page>
       <div className="reason-layout">
         <DataTable<ReasonCodeTypeView>
+          titleKey="mds.reason.type.listTitle"
           columns={typeColumns}
           rows={typeRows}
           rowKey={(r) => r.typeKey}

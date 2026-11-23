@@ -337,6 +337,7 @@ export default function EquipmentListPage({ view }: { view: 'process' | 'amhs' }
 
         <section className="topo-detail">
           <DataTable<Equipment>
+            titleKey="mds.equipment.listTitle"
             columns={columns}
             rows={rows}
             rowKey={(r) => r.id}
