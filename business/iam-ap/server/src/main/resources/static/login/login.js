@@ -2,7 +2,7 @@
  * CIM 统一登录页脚本（IAM 后端直出，见 SsoLoginPageController）
  *
  * 契约：
- *   1) 文案不硬编码——运行时拉同一后端的 i18n bundle（GET /api/i18n/messages?lang=），
+ *   1) 文案不硬编码——运行时拉同一后端的 i18n bundle（GET /api/v1/i18n/messages?lang=），
  *      键名与控制台完全一致（iam.login.*）；拉取失败才用下面的内置词典。
  *      内置词典**只留 zh-CN**：能拉不到 bundle 时，/api/v1/login 基本也够呛，
  *      再维护一份英文副本只会与 i18n 库里的译文各自漂移。
@@ -75,9 +75,18 @@
   var eMsg = document.getElementById('eMsg');
   var fEl = document.getElementById('f');
   var okEl = document.getElementById('ok');
-  var langZh = document.getElementById('langZh');
-  var langEn = document.getElementById('langEn');
+  var langSelect = document.getElementById('langSelect');
+  var langBtn = document.getElementById('langBtn');
+  var langLabel = document.getElementById('langLabel');
+  var langMenu = document.getElementById('langMenu');
   var submitting = false;
+
+  // 语言目录：运行时拉 GET /api/v1/i18n/locales（公开端点，与 bundle 同源）；
+  // 拉取失败退回内置两种（与 SPA 的内置兜底一致）。目录驱动下拉，后端加语言这里自动出现。
+  var locales = [
+    { code: 'zh-CN', name: '简体中文' },
+    { code: 'en-US', name: 'English' },
+  ];
 
   function txt(key) {
     return bundle[key] || FALLBACK[key] || key;
@@ -97,15 +106,63 @@
     }
   }
 
-  function updateLangButtons() {
-    langZh.classList.toggle('active', currentLang === 'zh-CN');
-    langEn.classList.toggle('active', currentLang === 'en-US');
+  function currentLocale() {
+    for (var i = 0; i < locales.length; i++) {
+      if (locales[i].code === currentLang) return locales[i];
+    }
+    return { code: currentLang, name: currentLang };
+  }
+
+  function updateLangLabel() {
+    langLabel.textContent = currentLocale().name;
+    document.documentElement.lang = currentLang;
+  }
+
+  function renderLangMenu() {
+    langMenu.innerHTML = '';
+    locales.forEach(function (l) {
+      var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.setAttribute('data-lang', l.code);
+      if (l.code === currentLang) li.classList.add('active');
+      var name = document.createElement('span');
+      name.textContent = l.name;
+      var tick = document.createElement('span');
+      tick.className = 'tick';
+      tick.textContent = '✓';
+      li.appendChild(name);
+      li.appendChild(tick);
+      langMenu.appendChild(li);
+    });
+  }
+
+  function fetchLocales() {
+    return fetch('/api/v1/i18n/locales', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var list = j && j.data;
+        if (Array.isArray(list) && list.length) {
+          locales = list
+            .filter(function (l) { return l && l.code && l.status !== 'DISABLED'; })
+            .map(function (l) { return { code: l.code, name: l.name || l.code }; });
+          renderLangMenu();
+          updateLangLabel();
+        }
+      })
+      .catch(function () { /* 目录拉不到就留在内置两种，登录不能因它挂掉 */ });
+  }
+
+  function toggleMenu(open) {
+    var next = typeof open === 'boolean' ? open : !langSelect.classList.contains('open');
+    langSelect.classList.toggle('open', next);
+    langBtn.setAttribute('aria-expanded', next ? 'true' : 'false');
   }
 
   function loadLang(lang) {
     currentLang = lang;
-    updateLangButtons();
-    return fetch('/api/i18n/messages?lang=' + encodeURIComponent(lang), { credentials: 'same-origin' })
+    updateLangLabel();
+    renderLangMenu();
+    return fetch('/api/v1/i18n/messages?lang=' + encodeURIComponent(lang), { credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         var m = j && j.data && j.data.messages;
@@ -240,8 +297,17 @@
       });
   });
 
-  langZh.addEventListener('click', function () { if (currentLang !== 'zh-CN') loadLang('zh-CN'); });
-  langEn.addEventListener('click', function () { if (currentLang !== 'en-US') loadLang('en-US'); });
+  // 下拉交互：按钮开合、菜单项点击切语言、点击外部收起
+  langBtn.addEventListener('click', function (e) { e.stopPropagation(); toggleMenu(); });
+  langMenu.addEventListener('click', function (e) {
+    var li = e.target && e.target.closest ? e.target.closest('li[data-lang]') : null;
+    if (!li) return;
+    var lang = li.getAttribute('data-lang');
+    toggleMenu(false);
+    if (lang && lang !== currentLang) loadLang(lang);
+  });
+  document.addEventListener('click', function () { toggleMenu(false); });
 
   loadLang(currentLang);
+  fetchLocales();
 })();

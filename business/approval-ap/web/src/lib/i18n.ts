@@ -35,6 +35,16 @@ const cim = createI18n({
       if (!payload || !payload.messages) return null;
       return { version: payload.version, lang: payload.lang || lang, messages: payload.messages };
     },
+    // 语言目录同走后端（GET /i18n/locales，公开端点）：i18n 管理页加语言，
+    // 顶栏切换器自动出现，不随前端发版
+    loadLocales: async () => {
+      const r = await axios.get('/api/v1/i18n/locales');
+      const body = r.data as { code?: number; data?: Array<{ code: string; name: string; status?: string }> };
+      const list = body && body.code === 0 ? body.data : undefined;
+      return (list ?? [])
+        .filter((l) => l && l.code && l.status !== 'DISABLED')
+        .map((l) => ({ code: l.code, name: l.name || l.code }));
+    },
   },
   dev: import.meta.env.DEV,
 });

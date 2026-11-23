@@ -158,23 +158,74 @@ body {
   position: absolute;
   top: 18px;
   right: 22px;
-  display: flex;
-  gap: 6px;
+  z-index: 60;
 }
-.login-lang button {
+/* 语言下拉：目录来自 GET /api/i18n/locales，后端加语言这里自动出现（不再写死两种） */
+.lang-select {
+  position: relative;
+}
+.lang-select > button {
   font-family: var(--font-sans);
   font-size: var(--fs-xs);
-  padding: 4px 9px;
+  padding: 4px 11px;
   border: 1px solid var(--line-strong);
   background: var(--panel);
-  color: var(--muted);
+  color: var(--text);
   border-radius: 999px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.login-lang button.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
+.lang-select > button .chev {
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.lang-select.open > button .chev {
+  transform: rotate(180deg);
+}
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 136px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  display: none;
+}
+.lang-select.open .lang-menu {
+  display: block;
+}
+.lang-menu li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lang-menu li:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text);
+}
+.lang-menu li.active {
+  color: var(--primary);
+  font-weight: 650;
+}
+.lang-menu li .tick {
+  visibility: hidden;
+}
+.lang-menu li.active .tick {
+  visibility: visible;
 }
 
 .login-card { width: 100%; max-width: 348px; }

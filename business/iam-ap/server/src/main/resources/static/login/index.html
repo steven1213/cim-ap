@@ -25,9 +25,14 @@
   </section>
 
   <section class="login-panel">
-    <div class="login-lang" role="group" aria-label="Language">
-      <button id="langZh" type="button" class="active" data-lang="zh-CN">中文</button>
-      <button id="langEn" type="button" data-lang="en-US">EN</button>
+    <div class="login-lang">
+      <div class="lang-select" id="langSelect">
+        <button id="langBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span id="langLabel">简体中文</span>
+          <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul id="langMenu" class="lang-menu" role="listbox"></ul>
+      </div>
     </div>
 
     <div class="login-card">
