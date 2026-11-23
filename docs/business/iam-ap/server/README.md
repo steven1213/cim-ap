@@ -62,7 +62,7 @@
 
 **(d) 登录流程（`auth` 包）** — M-login（§1 认证源对接 + §2 登录颁发）
 - `AuthenticationSource` SPI + 两实现：`LocalAuthenticationSource`（`cim.iam.auth.source=local`，默认启用）、`LdapAdAuthenticationSource`（`=ldap`，JNDI simple bind 对接企业 LDAP/AD）。
-- `LoginService.login`：按 `source` 选源 → 认证失败抛 `noAdmission` → 成功先 `bump` 该用户令牌版本（旧令牌即时失效，单会话语义）→ 再签发新令牌（携带最新 `ver`）。
+- `LoginService.login`：按 `source` 选源 → 认证失败抛 `noAdmission` → 成功先 `bump` 该用户令牌版本（旧令牌即时失效）+ 撤销全部活跃刷新令牌（单会话挤下线完整落地）→ 再签发新令牌（携带最新 `ver`）。
 - `LoginController`：`POST /api/v1/login`（入参 `username`/`credential`/`clientSalt`）→ `{token, expiresInSeconds, tokenType}`；`GET /api/v1/login/salt?username=` 下发每用户 `clientSalt`（未知用户返回空盐，防账号枚举）。
 
 **(d.1) 统一登录页与 SSO 会话（`sso` 包）** — 各 ap 共用的唯一登录入口
@@ -80,7 +80,7 @@
 - LDAP 模式下 AD 需明文 bind，故不采用客户端散列、改由 `ldaps://` TLS 承载传输安全；两层派生是「本地凭证」策略，按 `source` 切换，互不耦合。
 
 **(f) 刷新令牌（`auth` 包）** — M-refresh（对应 design.md §2 刷新轮换）
-- `RefreshToken` 实体（`refresh_token` 表：明文令牌只存 `SHA-256(tokenHash)`，`token_hash` 唯一；`access_token_jti` 关联、`expires_at`/`revoked`/`revoked_at`）+ `RefreshTokenRepository` + `RefreshTokenService`：`issue(userId, accessToken)` 返回明文（库内仅散列）、`rotate(plaintext)` 撤销旧刷新令牌并签发新访问令牌+新刷新令牌（防重放）、`revoke(plaintext)`；`jtiOf(accessToken)` 解析 JWT payload 取 `jti`。
+- `RefreshToken` 实体（`refresh_token` 表：明文令牌只存 `SHA-256(tokenHash)`，`token_hash` 唯一；`access_token_jti` 关联、`expires_at`/`revoked`/`revoked_at`）+ `RefreshTokenRepository` + `RefreshTokenService`：`issue(userId, accessToken)` 返回明文（库内仅散列）、`rotate(plaintext)` 撤销旧刷新令牌并签发新访问令牌+新刷新令牌（防重放）、`revoke(plaintext)`；`jtiOf(accessToken)` 解析 JWT payload 取 `jti`。`RefreshTokenCleanupJob` 定期物理清理已撤销/已过期行（`cim.iam.token.cleanup-interval`，默认 1h；`cleanup-enabled=false` 可关）。
 - `LoginController.POST /api/v1/token/refresh`（入参 `refreshToken`）→ `{token, refreshToken, expiresInSeconds, tokenType}`；旧刷新令牌立即失效（再使用 → 403）。
 
 **(g) 登出与黑名单（`token` + `auth` 包）** — M-refresh（对应 design.md §8.1(h)）
@@ -120,7 +120,7 @@
 - **审计（`audit` 包）**：`AuditEvent`（`audit_event` 表，V5 迁移）+ `AuditEventRepository` + `AuditService`。`AuditService.record` 采用 **`REQUIRES_NEW` 独立事务**——审计常出现在「业务即将抛异常」的路径（登录失败、锁定拒绝），同事务会随之回滚导致「失败事件查不到」；独立事务确保审计先落地，且审计自身异常不影响业务（内部 try/catch + 日志）。`AuditType` 为受控词表（`LOGIN_SUCCESS/FAILURE/REJECTED`、`LOGOUT`、`PASSWORD_CHANGED/RESET`、`USER_CREATED/ENABLED/DISABLED/DELETED/UNLOCKED`、`APP_REGISTERED/UPDATED`、`ADMISSION_GRANTED/REVOKED`、`SESSION_REVOKED`）。埋点位点：`LoginService`（登录成功/失败/锁定拒绝/登出）、`LocalCredentialService`（创建/启停/重置/删除/自助改密）、`AppRegistrationService`（注册/更新/授予/撤销）、`UserAdminController`/`LockoutAdminController`/`SessionAdminController`（解锁、强制下线）。
 - **概览**：`GET /api/v1/admin/overview` → 用户数（启用/禁用）、应用数（启用）、活跃会话数、锁定数、登录成功/失败累计、最近 8 条审计事件。
 - **用户账号**（`UserAdminController`，`/api/v1/admin/users`）：`GET` 清单（含启用态、锁定态、准入数、角色组）；`POST` 创建本地账号（收客户端第一层派生的 `clientHash` + `clientSalt`）；`PUT /{userId}/status` 启用/禁用（**禁用即 bump 强制下线**）；`PUT /{userId}/password` 管理员重置口令（**重置即 bump 强制下线**）；`POST /{userId}/unlock` 解锁；`DELETE /{userId}` 删除（**删除即 bump 强制下线**）。
-- **在线会话**（`SessionAdminController`，`/api/v1/admin/sessions`）：`GET` 活跃会话（未撤销且未过期的刷新令牌 ≈ 一个登录会话，回填用户名）；`DELETE /{userId}` 强制下线（bump 版本 → 返回 `{uid,version}`）。
+- **在线会话**（`SessionAdminController`，`/api/v1/admin/sessions`）：`GET` 活跃会话（未撤销且未过期的刷新令牌 ≈ 一个登录会话，回填用户名）；`DELETE /{userId}` 强制下线（bump 版本 + 撤销全部活跃刷新令牌 → 返回 `{uid,version}`）。`bump` 完整语义 = 「该用户全部令牌失效」：版本 +1（访问令牌即时 401）+ 撤销活跃刷新令牌（封死 rotate 复活路径）；登录挤下线 / 强制下线 / 禁用 / 改密 / 准入变更共用。SSO 静默续发不走 bump，多 ap 复用不受影响。
 - **登录锁定**（`LockoutAdminController`，`/api/v1/admin/lockouts`）：`GET` 当前锁定账号（`lockedUntil`/失败次数/首末失败时间，含过期懒清理）；`DELETE /{username}` 手动解锁。`AccountLockService` 相应新增 `listActiveLocks()` / `unlock()` / `find()`。
 - **角色组**（`RoleAdminController`，`/api/v1/admin/roles`）：按接入码聚合**实际在用**的粗角色组与人数（不落独立字典表，避免定义与实际脱节）。
 - **审计查询**（`AuditAdminController`，`/api/v1/admin/audit`）：`GET ?limit=&type=` → 最近事件（`AuditEventDto`，不直接暴露含审计列的实体）。

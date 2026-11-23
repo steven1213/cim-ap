@@ -75,7 +75,9 @@ public class LoginService {
         // 登录成功：清零失败计数（解锁暴力破解防护）
         accountLockService.onSuccess(creds.username());
 
-        // 登录即让该用户旧令牌失效：先 bump 再签发，签发令牌携带最新 ver
+        // 登录即让该用户旧令牌失效：先 bump 再签发，签发令牌携带最新 ver。
+        // bump 同时撤销全部活跃刷新令牌（TokenVersionService.bump 完整语义）——
+        // 旧登录会话被挤下线且无法 rotate 复活，单会话语义完整落地。
         tokenVersionService.bump(result.userId());
 
         String access = tokenIssuerService.issue(

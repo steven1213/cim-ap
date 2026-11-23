@@ -24,7 +24,7 @@ import java.util.List;
  *
  * <p>方法级 {@code iam:session:list} / {@code iam:session:kick}，类级 {@code iam:console:admin} 兜底。
  * 「在线会话」以**未撤销且未过期的刷新令牌**近似表示（一个刷新令牌 ≈ 一个登录会话）。
- * 强制下线 = bump 该用户令牌版本，验证端进程内即时判定，旧访问令牌立即 401。</p>
+ * 强制下线 = bump 该用户令牌版本 + 撤销全部活跃刷新令牌，旧访问令牌即时 401、刷新路径也被封死。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/sessions")
@@ -53,13 +53,13 @@ public class SessionAdminController {
         return Result.ok(rows);
     }
 
-    /** 强制下线：bump 该用户令牌版本，使其所有存量令牌失效。 */
+    /** 强制下线：bump 该用户令牌版本 + 撤销全部活跃刷新令牌，存量令牌立即全失效（无法 rotate 复活）。 */
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasAuthority('" + IamPermissionCodes.SESSION_KICK + "')")
     public Result<KickResult> kick(@PathVariable String userId) {
         long version = tokenVersionService.bump(userId);
         auditService.success(AuditType.SESSION_REVOKED, null, userId,
-                "强制下线（bump 令牌版本 → " + version + "）");
+                "强制下线（bump 令牌版本 → " + version + "，并撤销全部活跃刷新令牌）");
         return Result.ok(new KickResult(userId, version));
     }
 

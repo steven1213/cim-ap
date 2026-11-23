@@ -126,6 +126,36 @@ class SessionIntegrationTest {
         assertThat(refreshStatus(lr2.refreshToken())).isEqualTo(HttpStatus.UNAUTHORIZED.value());
     }
 
+    /**
+     * 单会话挤下线 + bump 完整语义：再次登录 / 令牌版本 bump 后，旧刷新令牌必须被撤销
+     * （refresh → 401），否则被下线端 rotate 按新 ver 重签访问令牌即「复活」。
+     */
+    @org.junit.jupiter.api.Test
+    void bumpAndReloginRevokePreviousRefreshTokens() {
+        String clientHash = PasswordDerivation.derive("secret", "salt-alice", authProps.getPassword().getRounds());
+
+        // 1) 第一次登录
+        LoginResult first = login("alice", clientHash, "salt-alice");
+        String uid = uidOf(first.token());
+
+        // 2) 第二次登录（单会话挤下线）：旧刷新令牌必须已被撤销
+        LoginResult second = login("alice", clientHash, "salt-alice");
+        assertThat(refreshStatus(first.refreshToken())).isEqualTo(401);
+        assertThat(refreshStatus(second.refreshToken())).isEqualTo(200);
+
+        // 3) 管理动作 bump（强制下线/禁用/改密同一语义）：活跃刷新令牌撤销，刷新路径封死
+        org.springframework.http.ResponseEntity<String> bumpResp = rest.postForEntity(
+                "/api/v1/internal/token-version/bump?uid=" + uid, null, String.class);
+        assertThat(bumpResp.getStatusCode().value()).isEqualTo(200);
+        assertThat(refreshStatus(second.refreshToken())).isEqualTo(401);
+    }
+
+    private String uidOf(String token) {
+        RSAPublicKey pub = (RSAPublicKey) rsaKeyService.getPublicKey();
+        Jws<Claims> jws = Jwts.parser().verifyWith(pub).build().parseSignedClaims(token);
+        return jws.getPayload().get("uid", String.class);
+    }
+
     private LoginResult login(String username, String credential, String salt) {
         ResponseEntity<String> resp = rest.postForEntity("/api/v1/login",
                 jsonEntity(new LoginRequest(username, credential, salt)), String.class);
