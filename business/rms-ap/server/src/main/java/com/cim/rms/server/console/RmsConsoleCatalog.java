@@ -394,8 +394,11 @@ public final class RmsConsoleCatalog {
         t.add(new TextDef("rms.shell.adminHint", "您拥有本系统的管理权限", "You hold administrative privileges"));
         t.add(new TextDef("rms.shell.toggleNav", "折叠/展开导航", "Collapse/expand navigation"));
         t.add(new TextDef("rms.shell.toggleGroup", "折叠/展开分组", "Collapse/expand group"));
-        t.add(new TextDef("rms.shell.theme.dark", "切换到深色", "Switch to dark"));
-        t.add(new TextDef("rms.shell.theme.light", "切换到浅色", "Switch to light"));
+        t.add(new TextDef("rms.shell.themePicker", "切换主题", "Switch theme"));
+        t.add(new TextDef("rms.shell.theme.light", "浅色", "Light"));
+        t.add(new TextDef("rms.shell.theme.dark", "深色", "Dark"));
+        t.add(new TextDef("rms.shell.theme.cockpit", "驾驶舱", "Cockpit"));
+        t.add(new TextDef("rms.shell.theme.amber", "琥珀", "Amber"));
         t.add(new TextDef("rms.shell.logout", "退出登录", "Sign out"));
         t.add(new TextDef("rms.shell.language", "语言", "Language"));
         return t;
