@@ -37,6 +37,8 @@ export default function Layout() {
     resolveIcon: (key) => resolveIcon(key),
     useTabStore,
     themeIo: { read: readTheme, persist: persistTheme, apply: applyTheme },
+    // dev 通道无登录身份（用户块为 null），不渲染超管徽标；sso 通道取令牌权限集
+    permissions: isDevChannel ? [] : (me?.permissions ?? []),
   });
 
   return (

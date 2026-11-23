@@ -13,7 +13,8 @@ import NotificationBell from '@/components/NotificationBell';
  *
  * <p>外壳框架与接线逻辑来自共享包（{@link ConsoleShell} + {@link useShellWiring}，
  * 与 IAM / MDS / approval 同一份）。本文件只保留 RMS 自己的差异：菜单树来源、
- * 品牌文案、超管徽标、顶栏插槽（通知铃）、footer 文案与登出流转。</p>
+ * 品牌文案、顶栏插槽（通知铃）、footer 文案与登出流转。超管徽标由接线统一判定
+ * （permissions 含平台通配码 SUPER_ADMIN），不再由本文件自判。</p>
  *
  * <p>侧栏数据源是<b>后端菜单树</b>（`/rms/me/menus`，authStore 启动时拉取、按角色过滤）
  * ——菜单与按钮全部在 {@code sys_menu} 里在线维护（菜单管理页 `/menus`）。三级结构：
@@ -27,10 +28,6 @@ export default function Layout() {
   const menus = useAuthStore((s) => s.menus);
   const logout = useAuthStore((s) => s.logout);
 
-  // 超管判定：后端 DbLocalAuthorityLoader 在解析超管角色时会把 SUPER_ADMIN 展开进 authorities
-  // （与 cim-system 的精确字符串匹配约定一致，见 lib/permissions.ts 注释），故以 SUPER_ADMIN 为准。
-  const admin = permissions.includes('SUPER_ADMIN');
-
   const wiring = useShellWiring({
     app: 'rms',
     labelNs: 'rms',
@@ -38,6 +35,7 @@ export default function Layout() {
     resolveIcon: (key) => resolveIcon(key),
     useTabStore,
     themeIo: { read: readTheme, persist: persistTheme, apply: applyTheme },
+    permissions,
   });
 
   return (
@@ -49,13 +47,7 @@ export default function Layout() {
       collapsibleGroups
       sidebarNote={t('rms.shell.crypto')}
       user={{ name: user?.username ?? t('rms.common.dash'), meta: user?.tenantId ? `tenant:${user.tenantId}` : 'local' }}
-      roleBadge={
-        admin ? (
-          <span className="role-chip" title={t('rms.shell.adminHint')}>
-            {t('rms.shell.adminBadge')}
-          </span>
-        ) : undefined
-      }
+      roleBadge={wiring.roleBadge}
       env={wiring.env}
       topbarExtra={
         <>

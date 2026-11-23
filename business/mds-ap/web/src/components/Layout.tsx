@@ -24,6 +24,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const me = useAuthStore((s) => s.user);
   const menus = useAuthStore((s) => s.menus);
+  const permissions = useAuthStore((s) => s.permissions);
   const logout = useAuthStore((s) => s.logout);
 
   const wiring = useShellWiring({
@@ -33,6 +34,7 @@ export default function Layout() {
     resolveIcon: (key) => resolveIcon(key),
     useTabStore,
     themeIo: { read: readTheme, persist: persistTheme, apply: applyTheme },
+    permissions,
   });
 
   return (
@@ -43,6 +45,7 @@ export default function Layout() {
       labels={wiring.labels}
       collapsibleGroups
       env={wiring.env}
+      roleBadge={wiring.roleBadge}
       topbarExtra={<LanguageSwitcher />}
       user={{ name: me?.username ?? me?.userId ?? '—', meta: me?.tenantId ? `tenant:${me.tenantId}` : 'local' }}
       footerApp="CIM-AP / MDS-AP"

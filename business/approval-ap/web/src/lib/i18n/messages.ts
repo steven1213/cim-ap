@@ -19,6 +19,8 @@ export const zhCN: Record<string, string> = {
 
   // 外壳
   'shell.brandSub': 'Workflow Engine',
+  'shell.adminBadge': '管理员',
+  'shell.adminHint': '您拥有本系统的管理权限',
   'shell.toggleNav': '折叠/展开导航',
   'shell.toggleGroup': '折叠/展开分组',
   'shell.themePicker': '切换主题',
@@ -417,6 +419,8 @@ export const enUS: Record<string, string> = {
 
 
   'shell.brandSub': 'Workflow Engine',
+  'shell.adminBadge': 'ADMIN',
+  'shell.adminHint': 'You hold administrative privileges',
   'shell.toggleNav': 'Toggle navigation',
   'shell.toggleGroup': 'Toggle group',
   'shell.themePicker': 'Switch theme',

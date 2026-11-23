@@ -5,6 +5,7 @@
 // 边界哲学与 ConsoleShell 一致：渲染形态全平台一份，「怎么得到数据」留在各 ap。
 // Layout 收敛后只剩品牌/用户/插槽/登出这类真正的 ap 差异，约 60~80 行。
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { StoreApi, UseBoundStore } from 'zustand';
@@ -20,6 +21,9 @@ import type {
   ShellTabs,
   ShellTheme,
 } from './types';
+
+/** 平台超管通配码（cim-auth 按令牌 is_super 发放，cim-system 据此短路放通）。 */
+const SUPER_ADMIN = 'SUPER_ADMIN';
 
 /** 主题读写三件套（ap 的 lib/theme.ts 薄绑定；shell 刻意不依赖 @cim/theme）。 */
 export interface ShellThemeIo {
@@ -48,6 +52,12 @@ export interface UseShellWiringOptions {
   itemDesc?: boolean;
   /** 顶级 MENU 自成一档时是否带分组标题（IAM 不带，其余 ap 带）。 */
   topMenuCap?: boolean;
+  /**
+   * 当前用户权限码集（内存态）。含平台超管通配码 `SUPER_ADMIN` 时，顶栏渲染
+   * 「管理员」徽标（文案取 `{ns}.shell.adminBadge` / `.adminHint`，未配置键则不渲染）
+   * ——超管标识是平台统一语义，不再由各 Layout 自行判定。
+   */
+  permissions?: string[];
 }
 
 export interface ShellWiring {
@@ -57,6 +67,8 @@ export interface ShellWiring {
   labels: ShellLabels;
   tabs: ShellTabs;
   env: ShellEnv;
+  /** 平台超管徽标（非超管或未配置 `shell.adminBadge` 键时为 undefined）。 */
+  roleBadge?: ReactNode;
   /** 登出时清页签残留（下一个登录者不应看到上一个人的页签）。 */
   clearTabs: () => void;
 }
@@ -131,6 +143,7 @@ export function useShellWiring(opts: UseShellWiringOptions): ShellWiring {
     themeIo,
     itemDesc = false,
     topMenuCap = true,
+    permissions,
   } = opts;
 
   const { t } = useTranslation();
@@ -211,6 +224,20 @@ export function useShellWiring(opts: UseShellWiringOptions): ShellWiring {
     };
   }, []);
 
+  // 平台超管徽标：判定与文案都收敛在壳层（原 IAM/RMS 各写一份、MDS/approval 缺失）
+  const roleBadge = useMemo<ReactNode | undefined>(() => {
+    if (!permissions?.includes(SUPER_ADMIN)) return undefined;
+    const badge = t(k('shell.adminBadge'), { defaultValue: '' });
+    if (!badge) return undefined;
+    const hint = t(k('shell.adminHint'), { defaultValue: '' });
+    return (
+      <span className="role-chip" title={hint || undefined}>
+        {badge}
+      </span>
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [permissions, t, labelNs]);
+
   // 标题解析优先取菜单的文案码（随授权即时更新），回退到开签时快照（只存码不存译文）
   const tabs = useShellTabs(useTabStore, {
     titleOf: (path, code) => {
@@ -219,5 +246,5 @@ export function useShellWiring(opts: UseShellWiringOptions): ShellWiring {
     },
   });
 
-  return { theme, onThemeChange, groups, labels, tabs, env, clearTabs };
+  return { theme, onThemeChange, groups, labels, tabs, env, roleBadge, clearTabs };
 }

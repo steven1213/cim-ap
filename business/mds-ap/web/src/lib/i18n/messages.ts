@@ -14,6 +14,8 @@ export const zhCN: Record<string, string> = {
   'mds.nav.technology': '制程技术',
   // ---------------- 外壳 ----------------
   'mds.shell.brandSub': '主数据服务',
+  'mds.shell.adminBadge': '管理员',
+  'mds.shell.adminHint': '您拥有本系统的管理权限',
   'mds.shell.tagline': '定义向下、实绩向上',
   'mds.shell.toggleNav': '收起/展开侧栏',
   'mds.shell.toggleGroup': '收起/展开分组',
@@ -832,6 +834,8 @@ export const enUS: Record<string, string> = {
   'mds.nav.technology': 'Technologies',
   // ---------------- shell ----------------
   'mds.shell.brandSub': 'Master Data Service',
+  'mds.shell.adminBadge': 'ADMIN',
+  'mds.shell.adminHint': 'You hold administrative privileges',
   'mds.shell.tagline': 'Definitions down, actuals up',
   'mds.shell.toggleNav': 'Collapse or expand navigation',
   'mds.shell.toggleGroup': 'Collapse or expand group',
