@@ -33,6 +33,14 @@ export {
 } from './menuRoutes';
 export { useShellTabs, type UseShellTabsOptions } from './useShellTabs';
 export {
+  buildNavGroups,
+  useShellWiring,
+  type NavBuildOptions,
+  type ShellThemeIo,
+  type ShellWiring,
+  type UseShellWiringOptions,
+} from './useShellWiring';
+export {
   LocaleSwitcher,
   useLocaleSwitcher,
   type LocaleSwitcherProps,

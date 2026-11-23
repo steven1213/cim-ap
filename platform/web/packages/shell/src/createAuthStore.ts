@@ -56,7 +56,7 @@ export interface RawMenuNode {
     type?: 'DIR' | 'MENU' | 'BUTTON';
     path?: string | null;
     component?: string | null;
-    i18nCode?: string;
+    i18nCode?: string | null;
     icon?: string | null;
     permCode?: string | null;
     sortNo?: number;
