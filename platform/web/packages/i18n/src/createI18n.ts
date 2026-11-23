@@ -63,7 +63,11 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     }
     const resources: Record<string, { translation: Record<string, string> }> = {};
     for (const [lang, messages] of Object.entries(builtin)) {
-      resources[lang] = { translation: messages };
+      // ⚠️ 必须拷贝脱钩：init 的 resources 是**引用直存**，而 addResourceBundle(deep)
+      // 会就地 mutate store——不拷贝的话，bootstrap 灌旧缓存那一步就把
+      // 「builtin ⊕ 旧缓存」直接写回 builtin 本体，builtin 从此被污染（键越滚越大），
+      // 版本升级重建时拿到的底包是脏的，服务端已删除的文案永远复活。
+      resources[lang] = { translation: { ...messages } };
       loaded.add(lang);
     }
     i18next.use(initReactI18next).init({
@@ -119,14 +123,27 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     // 服务端的 version 是**全局**的（整表快照算一个号），若切换到从没加载过的语言也带上，
     // 服务端会判定「版本一致」直接回空包 → 该语言一个键都没有 → 界面全退化成 humanize。
     const cached = force ? null : cache.read(lang);
+    const prevVersion = cache.readVersion();
     const payload = await remote.loadBundle({
       lang,
-      version: cached ? cache.readVersion() : undefined,
+      version: cached ? prevVersion : undefined,
     });
     if (!payload) return;
+    const target = payload.lang || lang;
+    const versionChanged = Boolean(payload.version) && payload.version !== prevVersion;
     if (payload.version) cache.writeVersion(payload.version);
+    if (versionChanged && payload.messages && Object.keys(payload.messages).length > 0) {
+      // ⚠️ 版本升级：重建语言资源 = 内置包为底 ⊕ 新远端包，而不是在旧合并结果上叠加。
+      // deep merge 只覆盖不删除——若在「旧缓存 ⊕ 旧远端」的合并结果上灌新远端包，
+      // 上一版远端独有、新版已删掉的键会永远残留（缓存整包正是这份合并结果），
+      // 表现为「后端删改了文案，前端刷新也不生效」。重建后 merged 缓存重新收敛为
+      // 「builtin ⊕ 当前远端」的唯一真源。
+      i18next.removeResourceBundle(target, 'translation');
+      const base = builtin[target] ?? builtin[lang];
+      if (base) i18next.addResourceBundle(target, 'translation', base, true, true);
+    }
     // 版本未变：服务端只回版本号、消息体为空 —— 此时保留刚灌入的缓存，勿清空
-    const applied = applyBundle(payload.lang || lang, payload.messages);
+    const applied = applyBundle(target, payload.messages);
     if (!applied && cached) {
       // ⚠️ 「该语言的整包只在 localStorage 里、内存里没有」这一格必须补。
       // 服务端按 `v` 判版本一致时回空包，若直接 `i18next.changeLanguage(lang)`，
@@ -143,8 +160,11 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     onLanguageChange?.(lang);
     try {
       await pullRemote(lang, opts.force === true);
-    } catch {
-      // 译文拉取失败：退回本地缓存（至少不显示裸 key）；切换本身不因此失败
+    } catch (e) {
+      // 译文拉取失败：退回本地缓存（至少不显示裸 key）；切换本身不因此失败。
+      // ⚠️ 静默吞异常会让「远端包落地失败」无从排查（表现为刷新后文案永远是旧的），
+      // 至少在控制台喊一声。
+      console.warn(`[i18n:${app}] 远端译文拉取/落地失败，退回本地缓存`, e);
       const cached = cache.read(lang);
       if (cached) applyBundle(lang, cached);
     }
