@@ -539,9 +539,11 @@ public final class IamConsoleCatalog {
         t.add(new TextDef("iam.shell.consoleTitle", "IAM 控制台", "IAM Console"));
         t.add(new TextDef("iam.shell.toggleNav", "收起 / 展开菜单", "Collapse / expand menu"));
         t.add(new TextDef("iam.shell.toggleGroup", "展开或收起该分组", "Expand or collapse this group"));
-        t.add(new TextDef("iam.shell.toggleTheme", "切换主题", "Toggle theme"));
-        t.add(new TextDef("iam.shell.theme.dark", "切换到深色主题", "Switch to dark theme"));
-        t.add(new TextDef("iam.shell.theme.light", "切换到浅色主题", "Switch to light theme"));
+        t.add(new TextDef("iam.shell.themePicker", "切换主题", "Switch theme"));
+        t.add(new TextDef("iam.shell.theme.light", "浅色", "Light"));
+        t.add(new TextDef("iam.shell.theme.dark", "深色", "Dark"));
+        t.add(new TextDef("iam.shell.theme.cockpit", "驾驶舱", "Cockpit"));
+        t.add(new TextDef("iam.shell.theme.amber", "琥珀", "Amber"));
         t.add(new TextDef("iam.shell.language", "语言", "Language"));
         t.add(new TextDef("iam.shell.adminHint", "控制台管理员：持有 iam:console:admin 兜底权限码，可进入全部配置页", "Console admin: holds the iam:console:admin fallback code, can enter all config pages"));
         t.add(new TextDef("iam.shell.adminBadge", "管理员", "ADMIN"));

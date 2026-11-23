@@ -53,8 +53,9 @@ export function useAntdTheme(): ThemeConfig {
       getPropertyValue: () => '',
     } as unknown as CSSStyleDeclaration;
     const styles = typeof document === 'undefined' ? empty : getComputedStyle(document.documentElement);
+    // 深色类主题（dark/cockpit）都切 darkAlgorithm；色值全部来自 CSS 变量，主题本身无需在此登记
     const isDark =
-      typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+      typeof document !== 'undefined' && ['dark', 'cockpit'].includes(document.documentElement.getAttribute('data-theme') ?? '');
 
     const primary = readVar(styles, '--primary', '#1f5fe0');
     const panel = readVar(styles, '--panel', '#ffffff');

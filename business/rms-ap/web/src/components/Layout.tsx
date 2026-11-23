@@ -110,9 +110,13 @@ export default function Layout() {
     () => ({
       toggleNav: t('rms.shell.toggleNav'),
       toggleGroup: t('rms.shell.toggleGroup'),
-      toggleTheme: t('rms.shell.toggleTheme'),
-      themeToDark: t('rms.shell.theme.dark'),
-      themeToLight: t('rms.shell.theme.light'),
+      themePicker: t('rms.shell.themePicker'),
+      themeNames: {
+        light: t('rms.shell.theme.light'),
+        dark: t('rms.shell.theme.dark'),
+        cockpit: t('rms.shell.theme.cockpit'),
+        amber: t('rms.shell.theme.amber'),
+      },
       logout: t('rms.shell.logout'),
       tabs: {
         label: t('rms.shell.tabs.label'),
@@ -166,8 +170,7 @@ export default function Layout() {
       footerApp="CIM-AP / RMS-AP"
       footerTagline={t('rms.shell.tagline')}
       theme={theme}
-      onToggleTheme={() => {
-        const next: Theme = theme === 'light' ? 'dark' : 'light';
+      onThemeChange={(next) => {
         setTheme(next);
         persistTheme(next);
       }}

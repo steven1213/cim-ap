@@ -1,17 +1,21 @@
 /* ============================================================================
- * CIM 平台设计令牌（@cim/theme）
- * 来源：由 iam / rms / approval 三个前端 styles.css 的公共前缀抽取（逐字节等价）。
+ * CIM 平台设计令牌（@cim/theme）—— 四主题体系
+ * 设计来源：ui-ux-pro-max（data-dense-dashboard 规格）+ awesome-design-md
+ * （linear.app / vercel DESIGN.md 语料）+ frontend-design 方向纪律。
+ * 主题与切换机制：`<html data-theme>` = light | dark | cockpit | amber，
+ * light 是默认值（落在 :root，未设置属性时同样生效），其余主题按属性覆盖。
+ *
  * 约定：业务 CSS 只用这里的变量，禁止裸色值 / 裸 px；改配色只改本文件。
  *
  * ⚠️ 唯一的例外：IAM 统一登录页（随身份服务打进 jar，不能用前端构建产物）
- * 持有本文件令牌的 17 个变量副本 ——
+ * 持有本文件令牌的变量副本 ——
  * business/iam-ap/server/src/main/resources/static/login/login.css 的 `:root`。
  * 改这里的颜色/字号，那边要同步，否则会看到「控制台换了皮、登录页没换」。
  * ========================================================================== */
 
-/* ---------- 设计令牌 ---------- */
+/* ---------- 排版 / 尺寸（全主题共享） ---------- */
 :root {
-  /* 排版：UI 用无衬线，编码/标识/时间戳用等宽 */
+  /* 排版：UI 用无衬线（Linear 同款 Inter），编码/标识/时间戳用等宽 */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'SF Mono', Consolas, 'Liberation Mono',
@@ -27,21 +31,39 @@
   --fs-metric: 19px; /* 指标数值：需显著大于正文、又小于标题 */
   --fs-xl: 20px;
 
-  /* 中性色（浅色） */
-  --bg: #eef1f6;
-  --panel: #ffffff;
-  --panel-2: #f6f8fb;
-  --panel-3: #eceff5;
-  --line: #e0e5ee;
-  --line-strong: #ccd4e2;
-  --text: #0d1626;
-  --text-2: #46536b;
-  --muted: #7d8899;
+  /* 尺寸：紧凑（data-dense-dashboard 规格：--header-height 56 / sidebar 240± / row 34-36） */
+  --header-h: 56px;
+  --sidebar-w: 232px;
+  --sidebar-w-collapsed: 64px;
+  --radius: 6px; /* 面板级：8px 起每张卡都像「模板卡片」，收到 6px */
+  --radius-sm: 4px; /* 控件级：按钮/输入/标记，与面板拉出层级差 */
 
-  --primary: #1f5fe0;
-  --primary-d: #1749b4;
-  --primary-soft: #e8effd;
-  --primary-ring: rgba(31, 95, 224, 0.2);
+  --ring: 0 0 0 3px var(--primary-ring);
+
+  /* 控件尺寸钩子：给后续 @cim/ui 组件用，密度档切换时同步变化 */
+  --cim-hit: 28px;
+  --cim-row-h: 34px;
+}
+
+/* ---------- 主题 light（默认）：Linear 冷灰靛蓝 · 浅色 ---------- */
+:root,
+html[data-theme='light'] {
+  /* 中性色：冷灰阶（去蓝灰底色的「默认后台感」，hairline 更细） */
+  --bg: #f4f5f8;
+  --panel: #ffffff;
+  --panel-2: #f9fafb;
+  --panel-3: #f0f1f4;
+  --line: #e4e6ea;
+  --line-strong: #d3d6dd;
+  --text: #181a20;
+  --text-2: #4b4f5a;
+  --muted: #82868f;
+
+  /* 主色：Linear lavender-blue */
+  --primary: #5e6ad2;
+  --primary-d: #4f56bd;
+  --primary-soft: #ecedfb;
+  --primary-ring: rgba(94, 106, 210, 0.22);
 
   --ok: #0d8a55;
   --ok-soft: #e4f5ec;
@@ -52,44 +74,37 @@
   --info: #0f6f9e;
   --info-soft: #e5f2f8;
 
-  /* 侧栏 */
-  --sidebar-bg: #101a2c;
-  --sidebar-bg-2: #0a1220;
-  --sidebar-fg: #8e9bb1;
-  --sidebar-fg-strong: #ffffff;
+  /* 侧栏：近黑（Linear canvas），靛蓝 active */
+  --sidebar-bg: #0e1015;
+  --sidebar-bg-2: #0a0c10;
+  --sidebar-fg: #8a8f98;
+  --sidebar-fg-strong: #f7f8f8;
   --sidebar-line: rgba(255, 255, 255, 0.07);
   --sidebar-hover: rgba(255, 255, 255, 0.055);
-  --sidebar-active-bg: rgba(31, 95, 224, 0.28);
+  --sidebar-active-bg: rgba(94, 106, 210, 0.32);
 
-  /* 尺寸：紧凑 */
-  --header-h: 56px;
-  --sidebar-w: 232px;
-  --sidebar-w-collapsed: 64px;
-  --radius: 6px; /* 面板级：8px 起每张卡都像「模板卡片」，收到 6px */
-  --radius-sm: 4px; /* 控件级：按钮/输入/标记，与面板拉出层级差 */
-
-  --shadow-sm: 0 1px 2px rgba(13, 22, 38, 0.05);
-  --shadow-md: 0 8px 24px -14px rgba(13, 22, 38, 0.24);
-  --shadow-lg: 0 20px 48px -20px rgba(13, 22, 38, 0.32);
-
-  --ring: 0 0 0 3px var(--primary-ring);
+  --shadow-sm: 0 1px 2px rgba(13, 15, 20, 0.05);
+  --shadow-md: 0 8px 24px -14px rgba(13, 15, 20, 0.24);
+  --shadow-lg: 0 20px 48px -20px rgba(13, 15, 20, 0.32);
 }
 
+/* ---------- 主题 dark：Linear 近黑 · 深色 ---------- */
 html[data-theme='dark'] {
-  --bg: #06090f;
-  --panel: #0e1626;
-  --panel-2: #121c2f;
-  --panel-3: #172238;
-  --line: #1d2942;
-  --line-strong: #2a3a57;
-  --text: #e6ecf8;
-  --text-2: #a9b6cd;
-  --muted: #74829b;
+  --bg: #0b0c0f;
+  --panel: #141519;
+  --panel-2: #191a1f;
+  --panel-3: #1f2026;
+  --line: #26272e;
+  --line-strong: #34353e;
+  --text: #f7f8f8;
+  --text-2: #b9bfca;
+  --muted: #8a8f98;
 
-  --primary: #4f83f7;
-  --primary-d: #3a6fe0;
-  --primary-soft: #14213a;
-  --primary-ring: rgba(79, 131, 247, 0.26);
+  /* 主色：Linear 深色态 lavender（hover 亮紫蓝） */
+  --primary: #828fff;
+  --primary-d: #6e79e8;
+  --primary-soft: #1c1e2e;
+  --primary-ring: rgba(130, 143, 255, 0.3);
 
   --ok: #34d399;
   --ok-soft: #0e2a20;
@@ -100,12 +115,92 @@ html[data-theme='dark'] {
   --info: #55b9e8;
   --info-soft: #102430;
 
-  --sidebar-bg: #070d18;
-  --sidebar-bg-2: #050a12;
+  --sidebar-bg: #07080b;
+  --sidebar-bg-2: #050608;
+  --sidebar-active-bg: rgba(130, 143, 255, 0.32);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 10px 28px -16px rgba(0, 0, 0, 0.72);
   --shadow-lg: 0 24px 56px -22px rgba(0, 0, 0, 0.8);
+}
+
+/* ---------- 主题 cockpit：数据密集驾驶舱 · 深色监控风 ----------
+ * data-dense-dashboard 规格：蓝黑画布 + 更饱和的数据色（success/warning/alert），
+ * 面向实时监控场景；数字建议消费方加 font-variant-numeric: tabular-nums。 */
+html[data-theme='cockpit'] {
+  --bg: #0f1420;
+  --panel: #1a2233;
+  --panel-2: #202a40;
+  --panel-3: #26334d;
+  --line: #2a3550;
+  --line-strong: #3a4a6d;
+  --text: #e8edf7;
+  --text-2: #b6c2d9;
+  --muted: #7f8ca3;
+
+  --primary: #4f83f7;
+  --primary-d: #3a6fe0;
+  --primary-soft: #14213a;
+  --primary-ring: rgba(79, 131, 247, 0.3);
+
+  /* 数据色比 dark 更饱和：报警灯语义直接拉满 */
+  --ok: #22c55e;
+  --ok-soft: #0d2818;
+  --err: #ef4444;
+  --err-soft: #2d1414;
+  --warn: #f59e0b;
+  --warn-soft: #2d1f0a;
+  --info: #38bdf8;
+  --info-soft: #0c2434;
+
+  --sidebar-bg: #0a0e18;
+  --sidebar-bg-2: #070a12;
+  --sidebar-active-bg: rgba(79, 131, 247, 0.35);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 10px 28px -16px rgba(0, 0, 0, 0.78);
+  --shadow-lg: 0 24px 56px -22px rgba(0, 0, 0, 0.85);
+}
+
+/* ---------- 主题 amber：工业琥珀 · 暖纸面浅色 ----------
+ * fab 里 amber 光的语义映射：暖纸面中性阶 + 琥珀 accent（amber-700，白字对比达标）。 */
+html[data-theme='amber'] {
+  --bg: #f1f0ec;
+  --panel: #ffffff;
+  --panel-2: #faf9f6;
+  --panel-3: #efeee8;
+  --line: #e7e5df;
+  --line-strong: #d6d4cb;
+  --text: #292524;
+  --text-2: #57534e;
+  --muted: #8a857c;
+
+  --primary: #b45309;
+  --primary-d: #92400e;
+  --primary-soft: #faeeda;
+  --primary-ring: rgba(180, 83, 9, 0.22);
+
+  --ok: #15803d;
+  --ok-soft: #e5f3e8;
+  --err: #b91c1c;
+  --err-soft: #fbebe9;
+  --warn: #a16207;
+  --warn-soft: #faf0d4;
+  --info: #0369a1;
+  --info-soft: #e3f1f9;
+
+  /* 侧栏：深灰蓝，琥珀 active */
+  --sidebar-bg: #1c2430;
+  --sidebar-bg-2: #161d27;
+  --sidebar-fg: #94a3b8;
+  --sidebar-fg-strong: #f8fafc;
+  --sidebar-line: rgba(255, 255, 255, 0.07);
+  --sidebar-hover: rgba(255, 255, 255, 0.055);
+  --sidebar-active-bg: rgba(217, 119, 6, 0.3);
+
+  --shadow-sm: 0 1px 2px rgba(41, 37, 36, 0.06);
+  --shadow-md: 0 8px 24px -14px rgba(41, 37, 36, 0.26);
+  --shadow-lg: 0 20px 48px -20px rgba(41, 37, 36, 0.34);
 }
 
 /* ---------- 语义状态色别名（@cim/theme/status 消费） ---------- */
@@ -121,10 +216,6 @@ html[data-theme='dark'] {
   --cim-status-run-soft: var(--info-soft);
   --cim-status-idle: var(--muted);
   --cim-status-idle-soft: var(--panel-3);
-
-  /* 控件尺寸钩子：给后续 @cim/ui 组件用，密度档切换时同步变化 */
-  --cim-hit: 28px;
-  --cim-row-h: 34px;
 }
 
 /* ---------- 密度档 ---------- */

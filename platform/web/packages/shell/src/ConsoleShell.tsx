@@ -12,9 +12,19 @@
 // 插槽交还各 ap。判据很简单：<b>结构性差异进模型，内容性差异进插槽</b>。</p>
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { IconChevron, IconLogout, IconMoon, IconShield, IconSidebar, IconSun } from './icons';
+import { IconCheck, IconChevron, IconLogout, IconPalette, IconShield, IconSidebar } from './icons';
 import { TabStrip } from './TabStrip';
-import type { ShellBrand, ShellEnv, ShellLabels, ShellNavItem, ShellNavGroup, ShellTabs, ShellUser } from './types';
+import {
+  SHELL_THEMES,
+  type ShellBrand,
+  type ShellEnv,
+  type ShellLabels,
+  type ShellNavItem,
+  type ShellNavGroup,
+  type ShellTabs,
+  type ShellTheme,
+  type ShellUser,
+} from './types';
 
 /** 条目（含其后代）是否指向给定路由——用于「激活子项 → 上级自动展开/高亮」。 */
 function containsPath(item: ShellNavItem, path: string): boolean {
@@ -43,8 +53,9 @@ export interface ConsoleShellProps {
   topbarExtra?: ReactNode;
   footerApp: string;
   footerTagline: string;
-  theme: 'light' | 'dark';
-  onToggleTheme: () => void;
+  theme: ShellTheme;
+  /** 顶栏主题菜单选择回调（四主题：light/dark/cockpit/amber）。 */
+  onThemeChange: (theme: ShellTheme) => void;
   onLogout: () => void;
   /** 分组头可折叠（IAM 有，RMS/approval 无）。 */
   collapsibleGroups?: boolean;
@@ -74,7 +85,7 @@ export function ConsoleShell({
   footerApp,
   footerTagline,
   theme,
-  onToggleTheme,
+  onThemeChange,
   onLogout,
   collapsibleGroups = false,
   mobileBreakpoint,
@@ -89,6 +100,8 @@ export function ConsoleShell({
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
+  /** 顶栏主题选择菜单展开态。 */
+  const [themeOpen, setThemeOpen] = useState(false);
   /** 收起的分组 key 集合（持久化；侧栏整体收起为图标态时不生效）。 */
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(() => {
     try {
@@ -280,7 +293,6 @@ export function ConsoleShell({
     });
   }
 
-  const isDark = theme === 'dark';
   const initial = (user?.name || '?').charAt(0).toUpperCase();
 
   return (
@@ -360,14 +372,42 @@ export function ConsoleShell({
 
             {topbarExtra}
 
-            <button
-              className="icon-btn"
-              onClick={onToggleTheme}
-              title={isDark ? labels.themeToLight : labels.themeToDark}
-              aria-label={labels.toggleTheme}
-            >
-              {isDark ? <IconSun width={17} height={17} /> : <IconMoon width={17} height={17} />}
-            </button>
+            <div className="theme-wrap">
+              <button
+                className="icon-btn"
+                onClick={() => setThemeOpen((v) => !v)}
+                title={labels.themePicker}
+                aria-label={labels.themePicker}
+                aria-expanded={themeOpen}
+                aria-haspopup="menu"
+              >
+                <IconPalette width={17} height={17} />
+              </button>
+              {themeOpen && (
+                <>
+                  <div className="theme-backdrop" onClick={() => setThemeOpen(false)} />
+                  <div className="theme-menu" role="menu">
+                    {SHELL_THEMES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={t === theme}
+                        className={'theme-item' + (t === theme ? ' current' : '')}
+                        onClick={() => {
+                          setThemeOpen(false);
+                          if (t !== theme) onThemeChange(t);
+                        }}
+                      >
+                        <span className="theme-swatch" data-theme={t} aria-hidden="true" />
+                        <span className="theme-name">{labels.themeNames[t]}</span>
+                        {t === theme ? <IconCheck width={14} height={14} /> : null}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             {user && (
               <div className="user-chip" title={user.name}>

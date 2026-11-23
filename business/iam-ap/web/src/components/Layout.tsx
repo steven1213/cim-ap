@@ -107,9 +107,13 @@ export default function Layout() {
     () => ({
       toggleNav: t('iam.shell.toggleNav'),
       toggleGroup: t('iam.shell.toggleGroup'),
-      toggleTheme: t('iam.shell.toggleTheme'),
-      themeToDark: t('iam.shell.theme.dark'),
-      themeToLight: t('iam.shell.theme.light'),
+      themePicker: t('iam.shell.themePicker'),
+      themeNames: {
+        light: t('iam.shell.theme.light'),
+        dark: t('iam.shell.theme.dark'),
+        cockpit: t('iam.shell.theme.cockpit'),
+        amber: t('iam.shell.theme.amber'),
+      },
       logout: t('iam.shell.logout'),
       tabs: {
         label: t('iam.shell.tabs.label'),
@@ -160,8 +164,7 @@ export default function Layout() {
       footerApp="CIM-AP / IAM-AP"
       footerTagline={t('iam.shell.tagline')}
       theme={theme}
-      onToggleTheme={() => {
-        const next: Theme = theme === 'light' ? 'dark' : 'light';
+      onThemeChange={(next) => {
         setTheme(next);
         persistTheme(next);
       }}

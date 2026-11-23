@@ -99,9 +99,13 @@ export default function Layout() {
     () => ({
       toggleNav: t('mds.shell.toggleNav'),
       toggleGroup: t('mds.shell.toggleGroup'),
-      toggleTheme: t('mds.shell.toggleTheme'),
-      themeToDark: t('mds.shell.theme.dark'),
-      themeToLight: t('mds.shell.theme.light'),
+      themePicker: t('mds.shell.themePicker'),
+      themeNames: {
+        light: t('mds.shell.theme.light'),
+        dark: t('mds.shell.theme.dark'),
+        cockpit: t('mds.shell.theme.cockpit'),
+        amber: t('mds.shell.theme.amber'),
+      },
       logout: t('mds.shell.logout'),
       tabs: {
         label: t('mds.shell.tabs.label'),
@@ -142,8 +146,7 @@ export default function Layout() {
       footerApp="CIM-AP / MDS-AP"
       footerTagline={t('mds.shell.tagline')}
       theme={theme}
-      onToggleTheme={() => {
-        const next: Theme = theme === 'light' ? 'dark' : 'light';
+      onThemeChange={(next) => {
         setTheme(next);
         persistTheme(next);
       }}

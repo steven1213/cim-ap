@@ -110,9 +110,13 @@ export default function Layout() {
     () => ({
       toggleNav: t('shell.toggleNav'),
       toggleGroup: t('shell.toggleGroup'),
-      toggleTheme: t('shell.toggleTheme'),
-      themeToDark: t('shell.theme.dark'),
-      themeToLight: t('shell.theme.light'),
+      themePicker: t('shell.themePicker'),
+      themeNames: {
+        light: t('shell.theme.light'),
+        dark: t('shell.theme.dark'),
+        cockpit: t('shell.theme.cockpit'),
+        amber: t('shell.theme.amber'),
+      },
       logout: t('shell.logout'),
       tabs: {
         label: t('shell.tabs.label'),
@@ -164,8 +168,7 @@ export default function Layout() {
       footerApp="CIM-AP / Approval-AP"
       footerTagline={t('shell.tagline')}
       theme={theme}
-      onToggleTheme={() => {
-        const next: Theme = theme === 'light' ? 'dark' : 'light';
+      onThemeChange={(next) => {
         setTheme(next);
         persistTheme(next);
       }}

@@ -67,6 +67,28 @@ export function IconShield(p: IconProps) {
   );
 }
 
+/** 主题选择（调色板）*/
+export function IconPalette(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 22a10 10 0 1 1 10-10c0 2.2-1.8 4-4 4h-2a2 2 0 0 0-2 2c0 .6.2 1 .5 1.4.3.4.5.9.5 1.4a2.2 2.2 0 0 1-2.5 2.2" />
+      <circle cx="13.5" cy="6.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="6.5" cy="12.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** 勾选（当前主题标记）*/
+export function IconCheck(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 /** 箭头（分组折叠 / 页签滚动）*/
 export function IconChevron(p: IconProps) {
   return (

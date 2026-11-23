@@ -77,6 +77,18 @@ export interface ShellUser {
 }
 
 /** 环境标识（构建模式）。文案由应用算好，外壳不读 `import.meta.env`。 */
+/**
+ * 外壳支持的主题（与 @cim/theme 的 Theme 字面量一致；shell 刻意不依赖该包，
+ * 类型在本地镜像——包间契约靠结构兼容保证，同 icons 的哲学）。
+ */
+export type ShellTheme = 'light' | 'dark' | 'cockpit' | 'amber';
+
+/** 主题展示顺序（即选择菜单顺序）。 */
+export const SHELL_THEMES: readonly ShellTheme[] = ['light', 'dark', 'cockpit', 'amber'] as const;
+
+/** 深色类主题（外壳据此决定图标与 title 文案）。 */
+export const SHELL_DARK_THEMES: readonly ShellTheme[] = ['dark', 'cockpit'] as const;
+
 export interface ShellEnv {
   label: string;
   tone: 'ok' | 'warn';
@@ -87,11 +99,10 @@ export interface ShellEnv {
 export interface ShellLabels {
   toggleNav: string;
   toggleGroup: string;
-  toggleTheme: string;
-  /** 当前是浅色主题 → 按钮提示「切到暗色」。 */
-  themeToDark: string;
-  /** 当前是暗色主题 → 按钮提示「切到浅色」。 */
-  themeToLight: string;
+  /** 顶栏主题按钮的 aria/title 文案。 */
+  themePicker: string;
+  /** 四个主题的展示名（选择菜单项）。 */
+  themeNames: Record<ShellTheme, string>;
   logout: string;
   tabs: ShellTabLabels;
 }

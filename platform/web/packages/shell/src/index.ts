@@ -56,6 +56,7 @@ export {
   IconSun,
   IconX,
 } from './icons';
+export { SHELL_DARK_THEMES, SHELL_THEMES } from './types';
 export type {
   ShellBrand,
   ShellEnv,
@@ -66,5 +67,6 @@ export type {
   ShellTab,
   ShellTabLabels,
   ShellTabs,
+  ShellTheme,
   ShellUser,
 } from './types';
