@@ -16,8 +16,23 @@ export interface BundleCache {
  * @param app 命名空间前缀，见 `CreateI18nOptions.app`
  */
 export function createBundleCache(app: string): BundleCache {
-  const versionKey = `${app}-i18n-version`;
-  const bundlePrefix = `${app}-i18n-bundle:`;
+  // ⚠️ v2 键带格式版本号：历史 v1 缓存是「builtin ⊕ 旧远端」deep-merge 的产物，
+  // 可能含有服务端早已删除的键（如旧主题文案残留），且版本号已与服务端同步后
+  // 永远不再触发版本重建——残留键无法自愈。v2 直接弃用 v1 数据并顺手清理，
+  // 首次刷新即从服务端整包重建，不做任何迁移逻辑。
+  const versionKey = `${app}-i18n-version:v2`;
+  const bundlePrefix = `${app}-i18n-bundle:v2:`;
+  const legacyVersionKey = `${app}-i18n-version`;
+  const legacyBundlePrefix = `${app}-i18n-bundle:`;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(legacyBundlePrefix) || key === legacyVersionKey) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // 隐私模式等场景清理失败无碍：v1 键只是不再被读取的垃圾
+  }
 
   return {
     read(lang: string): Record<string, string> | null {

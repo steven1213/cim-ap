@@ -130,14 +130,16 @@ export function createI18n(options: CreateI18nOptions): CimI18n {
     });
     if (!payload) return;
     const target = payload.lang || lang;
-    const versionChanged = Boolean(payload.version) && payload.version !== prevVersion;
     if (payload.version) cache.writeVersion(payload.version);
-    if (versionChanged && payload.messages && Object.keys(payload.messages).length > 0) {
-      // ⚠️ 版本升级：重建语言资源 = 内置包为底 ⊕ 新远端包，而不是在旧合并结果上叠加。
+    if (payload.messages && Object.keys(payload.messages).length > 0) {
+      // ⚠️ 拿到非空远端包**一律重建**：语言资源 = 内置包为底 ⊕ 新远端包，而不是在旧合并结果上叠加。
       // deep merge 只覆盖不删除——若在「旧缓存 ⊕ 旧远端」的合并结果上灌新远端包，
       // 上一版远端独有、新版已删掉的键会永远残留（缓存整包正是这份合并结果），
       // 表现为「后端删改了文案，前端刷新也不生效」。重建后 merged 缓存重新收敛为
       // 「builtin ⊕ 当前远端」的唯一真源。
+      // 只在「版本变化」时重建是不够的：存量缓存的版本号可能已与服务端同步
+      // （同步发生在修复前的脏 merge 上），此后永远不触发重建、残留键永不自愈。
+      // 服务端版本一致时回空包，走不到这里——重建成本只在真正有新包时发生。
       i18next.removeResourceBundle(target, 'translation');
       const base = builtin[target] ?? builtin[lang];
       if (base) i18next.addResourceBundle(target, 'translation', base, true, true);
