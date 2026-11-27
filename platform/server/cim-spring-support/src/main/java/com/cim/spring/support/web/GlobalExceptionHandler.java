@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -106,11 +107,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(code.getHttpStatus()).body(Result.fail(code, msg));
     }
 
-    /** 请求方法不支持。 */
+    /** 请求方法不支持。日志带上方法与路径，便于定位调用方打错的端点。 */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+    public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpServletRequest request,
+            HttpRequestMethodNotSupportedException ex) {
         BizCode code = BizCode.OPERATION_NOT_ALLOWED;
         String msg = messageResolver.resolve(code.getI18nKey(), null, code.getDefaultMessage());
+        log.warn("[MethodNotSupported] {} {} supported={} traceId={}", request.getMethod(),
+                request.getRequestURI(), ex.getSupportedMethods() == null ? "-"
+                        : String.join(",", ex.getSupportedMethods()), TraceContext.currentTraceId());
         return ResponseEntity.status(code.getHttpStatus()).body(Result.fail(code, msg));
     }
 

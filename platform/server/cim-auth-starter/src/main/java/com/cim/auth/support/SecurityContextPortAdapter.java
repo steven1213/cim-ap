@@ -36,6 +36,12 @@ public class SecurityContextPortAdapter implements CurrentUserPort {
     }
 
     @Override
+    public String tenantId() {
+        CimUserPrincipal p = principal();
+        return p == null ? null : p.tenantId();
+    }
+
+    @Override
     public boolean isSuper() {
         CimUserPrincipal p = principal();
         return p != null && p.isSuper();

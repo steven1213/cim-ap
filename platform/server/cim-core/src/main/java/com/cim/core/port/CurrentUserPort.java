@@ -19,6 +19,9 @@ public interface CurrentUserPort {
     /** 当前用户权限集（权限码 {@code module:res:action}）。 */
     Set<String> authorities();
 
+    /** 当前用户所属租户（令牌声明；未登录或无租户返回 {@code null}）。 */
+    String tenantId();
+
     /** 是否超级管理员（超管短路放通）。 */
     boolean isSuper();
 }

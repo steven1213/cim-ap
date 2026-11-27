@@ -28,6 +28,11 @@ public class AnonymousCurrentUserPort implements CurrentUserPort {
     }
 
     @Override
+    public String tenantId() {
+        return null;
+    }
+
+    @Override
     public boolean isSuper() {
         return false;
     }

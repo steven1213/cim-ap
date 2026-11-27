@@ -1,5 +1,6 @@
 package com.cim.notify.config;
 
+import com.cim.core.port.CurrentUserPort;
 import com.cim.notify.api.DefaultNotifyPublisher;
 import com.cim.notify.api.NotifyPublisher;
 import com.cim.notify.fanout.LocalSseFanout;
@@ -10,6 +11,7 @@ import com.cim.notify.metrics.NotifyMetrics;
 import com.cim.notify.security.BearerTokenQueryParamFilter;
 import com.cim.notify.transport.SseController;
 import com.cim.notify.transport.SseRegistry;
+import com.cim.spring.support.tenant.TenantProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -95,8 +97,10 @@ public class NotifyAutoConfiguration {
     /** SSE 端点以 Bean 注册（库 jar 不依赖宿主组件扫描）。 */
     @Bean
     @ConditionalOnMissingBean
-    public SseController sseController(SseRegistry registry, NotifyProperties props) {
-        return new SseController(registry, props);
+    public SseController sseController(SseRegistry registry, NotifyProperties props,
+                                       ObjectProvider<CurrentUserPort> currentUser,
+                                       TenantProperties tenantProps) {
+        return new SseController(registry, props, currentUser, tenantProps);
     }
 
     @Bean

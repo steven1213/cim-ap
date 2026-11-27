@@ -1,11 +1,14 @@
 package com.cim.notify.transport;
 
+import com.cim.core.port.CurrentUserPort;
 import com.cim.notify.config.NotifyProperties;
 import com.cim.spring.support.tenant.TenantContext;
+import com.cim.spring.support.tenant.TenantProperties;
 import com.cim.spring.support.web.RawResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -43,10 +46,15 @@ public class SseController {
 
     private final SseRegistry registry;
     private final NotifyProperties props;
+    private final ObjectProvider<CurrentUserPort> currentUser;
+    private final TenantProperties tenantProps;
 
-    public SseController(SseRegistry registry, NotifyProperties props) {
+    public SseController(SseRegistry registry, NotifyProperties props,
+                         ObjectProvider<CurrentUserPort> currentUser, TenantProperties tenantProps) {
         this.registry = registry;
         this.props = props;
+        this.currentUser = currentUser;
+        this.tenantProps = tenantProps;
     }
 
     @RawResponse(reason = RawResponse.Reason.STREAM,
@@ -75,7 +83,17 @@ public class SseController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "notify stream requires authenticated identity");
         }
         if (tenantId == null || tenantId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "notify stream requires tenant");
+            // TenantContext 仅由 TenantFilter（X-Tenant-Id 头）写入；SSE 经 ?token=/Authorization
+            // 建连时请求头表达不了租户。兜底链与 TenantResolver 语义一致：
+            // 令牌租户声明（JWT tenantId）→ cim.tenant.default-tenant。
+            String fromIdentity = currentUser.getIfAvailable() != null
+                    ? currentUser.getIfAvailable().tenantId() : null;
+            String fallback = (fromIdentity != null && !fromIdentity.isBlank())
+                    ? fromIdentity : tenantProps.getDefaultTenant();
+            if (fallback == null || fallback.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "notify stream requires tenant");
+            }
+            tenantId = fallback;
         }
         return registry.subscribe(tenantId, userId, roles);
     }

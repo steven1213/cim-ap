@@ -46,6 +46,11 @@ public class TestApplication {
         }
 
         @Override
+        public String tenantId() {
+            return null;
+        }
+
+        @Override
         public boolean isSuper() {
             return false;
         }
