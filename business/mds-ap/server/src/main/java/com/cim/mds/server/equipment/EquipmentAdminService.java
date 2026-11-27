@@ -71,6 +71,8 @@ public class EquipmentAdminService {
     private final CimStageRepository stageRepository;
     private final StateModelAdminService stateModelService;
     private final NamingRuleAdminService namingRuleService;
+    private final com.cim.mds.server.flow.CimEquipAssignRepository assignRepository;
+    private final com.cim.mds.server.edc.CimEdcEquipMapRepository edcMapRepository;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -212,6 +214,13 @@ public class EquipmentAdminService {
     public void delete(String id) {
         CimEquipment entity = requireEquipment(id);
         assertNotLockedByOther(entity);
+        // 反向引用守门（与工序 isReferenced 同口径）：候选池 EQUIP 指派 / EDC 设备映射任一存活即拒删
+        if (assignRepository.existsByAssignTypeAndAssignRefAndDeletedFalse(
+                com.cim.mds.server.flow.CimEquipAssign.TYPE_EQUIP, entity.getEquipmentCode())
+                || !edcMapRepository.findByEquipmentCodeAndDeletedFalse(entity.getEquipmentCode()).isEmpty()) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.equipment.referencedNoDelete", entity.getEquipmentCode());
+        }
         // 子单元随设备物理级联（软删会撞 uk_cim_equipment_unit）；能力关联/组成员/自定义属性同口径
         unitRepository.deleteByEquipmentId(id);
         eqpCapRepository.deleteByEquipmentId(id);

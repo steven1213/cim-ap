@@ -36,6 +36,7 @@ public class EdcAdminService {
     private final CimEdcEquipMapRepository mapRepository;
     private final CimParamDefRepository defRepository;
     private final CimEdcPlanRepository planRepository;
+    private final com.cim.mds.server.equipment.CimEquipmentRepository equipmentRepository;
 
     // ================================================================ 参数集
 
@@ -293,6 +294,7 @@ public class EdcAdminService {
     @Transactional
     public CimEdcEquipMap createMap(MapReq req) {
         String equipmentCode = requireText(req.equipmentCode(), "equipmentCode");
+        requireEquipment(equipmentCode);
         if (req.ceid() == null) {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.common.fieldRequired", "ceid");
         }
@@ -312,6 +314,14 @@ public class EdcAdminService {
         entity.setSourceChannel(normalizeChannel(req.sourceChannel()));
         entity.setDescription(req.description());
         return mapRepository.save(entity);
+    }
+
+    /** 映射机台须存在且启用（与候选池 EQUIP 引用同口径）。 */
+    private void requireEquipment(String equipmentCode) {
+        if (equipmentRepository.findByEquipmentCodeAndDeletedFalse(equipmentCode)
+                .filter(e -> Boolean.TRUE.equals(e.getEnabled())).isEmpty()) {
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.edc.equipmentNotFound", equipmentCode);
+        }
     }
 
     @Transactional

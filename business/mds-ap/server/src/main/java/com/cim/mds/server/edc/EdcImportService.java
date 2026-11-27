@@ -96,7 +96,7 @@ public class EdcImportService {
                         "1001|ETCH_GAS_FLOW|1");
                 case KIND_EQUIP_MAP -> exampleSheet(wb, "equip_maps",
                         new String[]{"equipment_code", "ceid", "tpl_code", "source_channel"},
-                        "ETCH-01|1001|RPT-ETCH-PROC|GEM");
+                        "EQP-ETCH-01|1001|RPT-ETCH-PROC|GEM");
                 default -> throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.edc.importKindInvalid", kind);
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();

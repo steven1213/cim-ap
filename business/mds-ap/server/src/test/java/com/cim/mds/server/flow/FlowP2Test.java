@@ -108,6 +108,11 @@ class FlowP2Test {
         opB = createActiveOp("OP-P2-B", "P2 工序乙");
         assertThat(opA).isNotBlank();
         assertThat(opB).isNotBlank();
+        // edcPlanCode 引用守门：不存在的方案 → 2001
+        assertThat(postJson("/api/v1/mds/operations", om.writeValueAsString(Map.of(
+                "opCode", "OP-P2-NOPLAN", "opName", "方案缺失", "opType", "PROCESS",
+                "edcPlanCode", "NO-SUCH-PLAN")), 404))
+                .contains("\"code\":2001");
         // 机台组（导入指派段引用）+ 参数定义（导入参数段引用）
         postJson("/api/v1/mds/tool-groups", om.writeValueAsString(Map.of(
                 "groupCode", "TG-P2", "groupName", "P2 测试组",

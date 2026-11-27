@@ -293,8 +293,24 @@ class EquipmentDomainTest {
         mvc.perform(delete("/api/v1/mds/equipment-classes/" + classId))
                 .andExpect(status().isBadRequest());
 
-        // 机台可删；子单元/组成员随设备物理级联
+        // 机台可删；子单元/组成员随设备物理级联；被候选池 EQUIP 指派引用时拒删
         mvc.perform(post("/api/v1/mds/tool-groups/" + groupId + "/members/" + eqpId))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/mds/operations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of(
+                                "opCode", "OPE-REF-PROBE", "opName", "引用探针", "opType", "PROCESS"))))
+                .andExpect(status().isOk());
+        String probe = mvc.perform(post("/api/v1/mds/operations/OPE-REF-PROBE/assigns")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of(
+                                "assignType", "EQUIP", "assignRef", "EQP-TEST-01",
+                                "recipeRule", "FIXED", "recipeRef", "PPID-X", "priority", 100))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String probeAssignId = om.readTree(probe).path("data").path("id").asText();
+        mvc.perform(delete("/api/v1/mds/equipments/" + eqpId))
+                .andExpect(status().isBadRequest());
+        mvc.perform(delete("/api/v1/mds/assigns/" + probeAssignId))
                 .andExpect(status().isOk());
         mvc.perform(delete("/api/v1/mds/equipments/" + eqpId))
                 .andExpect(status().isOk());

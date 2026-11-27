@@ -190,17 +190,20 @@ class EdcAdminTest {
         String view = getJson("/api/v1/mds/edc/report-tpls/" + tplId);
         assertThat(view).contains("\"svid\":1001").contains("\"P-GAS\"").contains("\"unit\":\"sccm\"");
 
-        // 绑定守门：未知模板 → 2001；重复绑定 → 2003；非法通道 → 2000；停用模板 → 2000
+        // 绑定守门：未知机台 → 2001；未知模板 → 2001；重复绑定 → 2003；非法通道 → 2000；停用模板 → 2000
         assertThat(postJson("/api/v1/mds/edc/equip-maps", om.writeValueAsString(Map.of(
-                "equipmentCode", "ETCH-01", "ceid", 1001, "tplId", "NO-TPL")), 404))
+                "equipmentCode", "ETCH-01", "ceid", 1001, "tplId", tplId)), 404))
+                .contains("\"code\":2001");
+        assertThat(postJson("/api/v1/mds/edc/equip-maps", om.writeValueAsString(Map.of(
+                "equipmentCode", "EQP-ETCH-01", "ceid", 1001, "tplId", "NO-TPL")), 404))
                 .contains("\"code\":2001");
         String mapBody = om.writeValueAsString(Map.of(
-                "equipmentCode", "ETCH-01", "ceid", 1001, "tplId", tplId, "sourceChannel", "GEM"));
+                "equipmentCode", "EQP-ETCH-01", "ceid", 1001, "tplId", tplId, "sourceChannel", "GEM"));
         postJson("/api/v1/mds/edc/equip-maps", mapBody, 200);
         assertThat(postJson("/api/v1/mds/edc/equip-maps", mapBody, 409))
                 .contains("\"code\":2003");
         assertThat(postJson("/api/v1/mds/edc/equip-maps", om.writeValueAsString(Map.of(
-                "equipmentCode", "ETCH-01", "ceid", 1002, "tplId", tplId, "sourceChannel", "XX")), 400))
+                "equipmentCode", "EQP-ETCH-01", "ceid", 1002, "tplId", tplId, "sourceChannel", "XX")), 400))
                 .contains("\"code\":2000");
         String off = postJson("/api/v1/mds/edc/report-tpls", om.writeValueAsString(Map.of(
                 "tplCode", "RPT-OFF", "tplName", "停用模板")), 200);
@@ -208,7 +211,7 @@ class EdcAdminTest {
         putJson("/api/v1/mds/edc/report-tpls/" + offId,
                 om.writeValueAsString(Map.of("tplName", "停用模板", "enabled", false)), 200);
         assertThat(postJson("/api/v1/mds/edc/equip-maps", om.writeValueAsString(Map.of(
-                "equipmentCode", "ETCH-01", "ceid", 1003, "tplId", offId)), 400))
+                "equipmentCode", "EQP-ETCH-01", "ceid", 1003, "tplId", offId)), 400))
                 .contains("\"code\":2000");
 
         // 模板被绑定 → 删除守门 2004
