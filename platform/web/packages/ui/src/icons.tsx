@@ -404,3 +404,65 @@ export function IconFile(p: IconProps) {
   );
 }
 
+
+/** 网格（光罩/矩阵布局类） */
+export function IconGrid(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="1.8" />
+      <path d="M3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17" />
+    </svg>
+  );
+}
+
+/** 分栏对比（并排差异类） */
+export function IconColumns(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.8" />
+      <path d="M12 4.5v15" />
+    </svg>
+  );
+}
+
+/** 上传导入（箭头入托盘） */
+export function IconUpload(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 15.5V4.5M8 8l4-3.8L16 8" />
+      <path d="M4.5 14.5v4a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4" />
+    </svg>
+  );
+}
+
+/** 机器人（自动解算/智能类） */
+export function IconRobot(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="5" y="8.5" width="14" height="10" rx="2.2" />
+      <path d="M12 8.5V4.8M12 4.8h3M9.2 13.2v1.6M14.8 13.2v1.6M2.8 12.5v3M21.2 12.5v3" />
+    </svg>
+  );
+}
+
+/** 单箱（库存/容器类） */
+export function IconBox(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M3.5 8.2L12 3.8l8.5 4.4v7.6L12 20.2l-8.5-4.4z" />
+      <path d="M3.5 8.2L12 12.5l8.5-4.3M12 12.5v7.7" />
+    </svg>
+  );
+}
+
+/** 多箱（集合/群组容器类） */
+export function IconBoxes(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="3.5" width="8" height="8" rx="1.4" />
+      <rect x="13" y="3.5" width="8" height="8" rx="1.4" />
+      <rect x="3" y="13" width="8" height="8" rx="1.4" />
+      <rect x="13" y="13" width="8" height="8" rx="1.4" />
+    </svg>
+  );
+}

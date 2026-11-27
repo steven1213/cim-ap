@@ -7,11 +7,16 @@ import type { ComponentType, SVGProps } from 'react';
 import {
   IconAlert,
   IconApps,
+  IconBox,
+  IconBoxes,
   IconCalendar,
   IconCheckCircle,
   IconClock,
+  IconColumns,
+  IconEye,
   IconFile,
   IconGauge,
+  IconGrid,
   IconInbox,
   IconKey,
   IconLink,
@@ -19,10 +24,12 @@ import {
   IconLock,
   IconMonitor,
   IconOrgGrant,
+  IconRobot,
   IconShield,
   IconSliders,
   IconSync,
   IconTree,
+  IconUpload,
   IconUser,
   IconUsers,
 } from '@cim/ui';
@@ -58,6 +65,13 @@ const REGISTRY: Record<string, IconComponent> = {
   calendar: IconCalendar,
   file: IconFile,
   sync: IconSync,
+  grid: IconGrid,
+  columns: IconColumns,
+  upload: IconUpload,
+  robot: IconRobot,
+  eye: IconEye,
+  box: IconBox,
+  boxes: IconBoxes,
 };
 
 /** 解析图标标识；未知返回回退图标。 */

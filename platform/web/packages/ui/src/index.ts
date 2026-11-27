@@ -160,4 +160,10 @@ export {
   IconClock,
   IconCalendar,
   IconFile,
+  IconGrid,
+  IconColumns,
+  IconUpload,
+  IconRobot,
+  IconBox,
+  IconBoxes,
 } from './icons';
