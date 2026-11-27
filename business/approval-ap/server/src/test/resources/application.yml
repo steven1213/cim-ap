@@ -13,11 +13,8 @@ spring:
     password: ""
     driver-class-name: org.h2.Driver
   jpa:
-    hibernate:
-      ddl-auto: update
     open-in-view: false
-  flyway:
-    enabled: false
+  # ddl-auto / flyway 继承主配置（validate + Flyway 管 DDL，平台红线同口径）
 
 cim:
   auth:

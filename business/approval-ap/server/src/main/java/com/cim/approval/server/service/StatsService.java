@@ -42,6 +42,7 @@ public class StatsService {
         // 现在域只有一个来源，越域 403；这里的 domain 同时用于下面每一条查询。
         String domain = securityGuard.resolveDomain(tenantId);
         Instant since = Instant.now().minus(Duration.ofDays(days));
+        java.time.LocalDateTime sinceLdt = java.time.LocalDateTime.ofInstant(since, java.time.ZoneId.systemDefault());
 
         // ---- 已完成实例：平均耗时 + 按日完成趋势 ----
         List<HistoricProcessInstance> finished = historyService.createHistoricProcessInstanceQuery()
@@ -81,8 +82,8 @@ public class StatsService {
         }
 
         // ---- 驳回率 ----
-        long approveCount = auditRepository.countByActionAndAppCodeAndCreatedAtAfter("COMPLETE_APPROVE", domain, since);
-        long rejectCount = auditRepository.countByActionAndAppCodeAndCreatedAtAfter("COMPLETE_REJECT", domain, since);
+        long approveCount = auditRepository.countByActionAndAppCodeAndCreateTimeAfter("COMPLETE_APPROVE", domain, sinceLdt);
+        long rejectCount = auditRepository.countByActionAndAppCodeAndCreateTimeAfter("COMPLETE_REJECT", domain, sinceLdt);
         Double rejectRate = (approveCount + rejectCount) > 0
                 ? (double) rejectCount / (approveCount + rejectCount) : null;
 

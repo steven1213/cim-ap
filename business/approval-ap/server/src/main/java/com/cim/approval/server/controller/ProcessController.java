@@ -123,7 +123,7 @@ public class ProcessController {
             @RequestParam(required = false) String userId,
             @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "30") int size) {
         return Result.ok(processService.listInitiatedPaged(
                 currentUser.resolve(userId), tenantId, Math.max(page, 1), Math.min(size, 100)));
     }

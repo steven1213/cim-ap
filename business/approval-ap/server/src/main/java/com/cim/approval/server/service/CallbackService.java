@@ -24,6 +24,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -69,7 +70,7 @@ public class CallbackService {
                 pendingConfirmations.put(token, new PendingToken(appCode, Instant.now().plusSeconds(CONFIRM_TTL_MINUTES * 60)));
                 CallbackRegistration e = existing.get();
                 return new CallbackRegistrationView(e.getId(), e.getAppCode(), e.getBaseUrl(),
-                        e.isEnabled(), e.getCreatedAt(), e.getUpdatedAt(), true, token);
+                        e.isEnabled(), e.getCreateTime(), e.getEventTime(), true, token);
             }
             // 二次确认回填：校验令牌归属与有效期
             PendingToken pt = pendingConfirmations.get(confirmToken);
@@ -85,30 +86,25 @@ public class CallbackService {
             if (req.secret() != null && !req.secret().isBlank()) {
                 e.setSecret(req.secret());
             }
-            e.setUpdatedAt(Instant.now());
             registrationRepository.save(e);
             auditService.appendCallback(appCode, "-", "CALLBACK_UPDATE", actorName, before, req.baseUrl(),
                     "二次确认覆盖回调配置");
             return new CallbackRegistrationView(e.getId(), e.getAppCode(), e.getBaseUrl(),
-                    e.isEnabled(), e.getCreatedAt(), e.getUpdatedAt(), false, null);
+                    e.isEnabled(), e.getCreateTime(), e.getEventTime(), false, null);
         }
-        // 首次注册：新建
+        // 首次注册：新建（主键/审计时间由平台基类回调注入）
         CallbackRegistration r = new CallbackRegistration();
-        r.setId(UUID.randomUUID().toString());
         r.setAppCode(appCode);
         r.setBaseUrl(req.baseUrl());
         String secret = (req.secret() != null && !req.secret().isBlank())
                 ? req.secret() : randomHex(32);
         r.setSecret(secret);
         r.setEnabled(true);
-        Instant now = Instant.now();
-        r.setCreatedAt(now);
-        r.setUpdatedAt(now);
         registrationRepository.save(r);
         auditService.appendCallback(appCode, "-", "CALLBACK_REGISTER", actorName, null, "REGISTERED",
                 "baseUrl=" + req.baseUrl());
         return new CallbackRegistrationView(r.getId(), r.getAppCode(), r.getBaseUrl(),
-                r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt(), false, null);
+                r.isEnabled(), r.getCreateTime(), r.getEventTime(), false, null);
     }
 
     @Transactional
@@ -131,7 +127,7 @@ public class CallbackService {
             throw new IllegalStateException(e);
         }
         CallbackOutbox o = new CallbackOutbox();
-        o.setId(UUID.randomUUID().toString());
+        // 主键/审计时间由平台基类回调注入
         o.setMessageId(UUID.randomUUID().toString());
         o.setAppCode(appCode);
         o.setBusinessKey(businessKey);
@@ -140,15 +136,14 @@ public class CallbackService {
         o.setStatus(CallbackOutbox.Status.PENDING);
         o.setAttempts(0);
         o.setMaxAttempts(6);
-        o.setNextRetryAt(Instant.now());
-        o.setCreatedAt(Instant.now());
+        o.setNextRetryAt(LocalDateTime.now());
         outboxRepository.save(o);
     }
 
     /** 调度器：每 5s 拉取到期待投递记录。 */
     @Scheduled(fixedDelay = 5000)
     public void deliverDue() {
-        List<CallbackOutbox> due = outboxRepository.findDue(Instant.now());
+        List<CallbackOutbox> due = outboxRepository.findDue(LocalDateTime.now());
         for (CallbackOutbox o : due) {
             deliver(o);
         }
@@ -191,7 +186,7 @@ public class CallbackService {
             HttpResponse<String> resp = HTTP.send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() >= 200 && resp.statusCode() < 300) {
                 o.setStatus(CallbackOutbox.Status.SENT);
-                o.setSentAt(Instant.now());
+                o.setSentAt(LocalDateTime.now());
                 auditService.appendCallback(o.getAppCode(), o.getBusinessKey(), "CALLBACK_SENT", "system",
                         "PENDING", "SENT", "messageId=" + o.getMessageId());
             } else {
@@ -216,7 +211,7 @@ public class CallbackService {
                     + " err=" + o.getLastError());
         } else {
             o.setStatus(CallbackOutbox.Status.PENDING);
-            o.setNextRetryAt(Instant.now().plusSeconds(backoff(o.getAttempts())));
+            o.setNextRetryAt(LocalDateTime.now().plusSeconds(backoff(o.getAttempts())));
         }
     }
 
@@ -243,7 +238,7 @@ public class CallbackService {
         double avgCostMs = all.stream()
                 .filter(o -> o.getStatus() == CallbackOutbox.Status.SENT)
                 .filter(o -> o.getSentAt() != null)
-                .mapToLong(o -> java.time.Duration.between(o.getCreatedAt(), o.getSentAt()).toMillis())
+                .mapToLong(o -> java.time.Duration.between(o.getCreateTime(), o.getSentAt()).toMillis())
                 .average().orElse(0);
         Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("sent", sent);
@@ -260,7 +255,7 @@ public class CallbackService {
         CallbackRegistration reg = registrationRepository.findByAppCode(appCode)
                 .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "回调配置不存在: " + appCode));
         CallbackOutbox o = new CallbackOutbox();
-        o.setId(UUID.randomUUID().toString());
+        // 主键/审计时间由平台基类回调注入
         o.setMessageId(UUID.randomUUID().toString());
         o.setAppCode(appCode);
         o.setBusinessKey("TEST-" + UUID.randomUUID().toString().substring(0, 8));
@@ -276,8 +271,7 @@ public class CallbackService {
         o.setStatus(CallbackOutbox.Status.PENDING);
         o.setAttempts(0);
         o.setMaxAttempts(1);
-        o.setNextRetryAt(Instant.now());
-        o.setCreatedAt(Instant.now());
+        o.setNextRetryAt(LocalDateTime.now());
         outboxRepository.save(o);
         deliver(o);
         Map<String, Object> r = new java.util.LinkedHashMap<>();
@@ -309,7 +303,7 @@ public class CallbackService {
                 continue; // businessKey 路径也要按域收敛
             }
             views.add(new OutboxView(o.getId(), o.getMessageId(), o.getAppCode(), o.getBusinessKey(),
-                    o.getEventType(), o.getStatus().name(), o.getAttempts(), o.getCreatedAt(),
+                    o.getEventType(), o.getStatus().name(), o.getAttempts(), o.getCreateTime(),
                     o.getSentAt(), o.getLastError()));
         }
         return views;
@@ -334,7 +328,7 @@ public class CallbackService {
         List<CallbackRegistrationView> views = new ArrayList<>();
         for (CallbackRegistration r : registrationRepository.findAll()) {
             views.add(new CallbackRegistrationView(r.getId(), r.getAppCode(), r.getBaseUrl(),
-                    r.isEnabled(), r.getCreatedAt(), r.getUpdatedAt(), false, null));
+                    r.isEnabled(), r.getCreateTime(), r.getEventTime(), false, null));
         }
         return views;
     }

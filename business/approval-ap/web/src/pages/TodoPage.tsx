@@ -12,6 +12,7 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
+  getPaginationDefaults,
 } from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
 import CompleteModal from '@/components/CompleteModal';
@@ -48,7 +49,6 @@ type ModalType = 'complete' | 'return' | 'addsign' | 'reassign' | 'delegate';
 /** 重提态任务名（与后端 ApprovalReturnService.RESUBMIT_TASK_NAME 对齐）。 */
 const RESUBMIT_TASK_NAME = '修改并重新提交';
 
-const PAGE_SIZE = 20;
 
 export default function TodoPage() {
   const { t } = useTranslation();
@@ -57,7 +57,7 @@ export default function TodoPage() {
   const { userId } = useIdentityStore();
 
   const [page, setPage] = useState(1);
-  const [size, setSize] = useState(PAGE_SIZE);
+  const [size, setSize] = useState(() => getPaginationDefaults().defaultSize);
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [active, setActive] = useState<{ type: ModalType; task: TaskView } | null>(null);
@@ -291,7 +291,6 @@ export default function TodoPage() {
               setPage(s === size ? p : 1);
               setSize(s);
             },
-            sizeOptions: [10, 20, 50, 100],
           }}
           emptyTitleKey="todo.empty"
           scrollX="max-content"

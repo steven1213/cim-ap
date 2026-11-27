@@ -1,5 +1,6 @@
 package com.cim.approval.server.domain;
 
+import com.cim.core.model.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -9,23 +10,25 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.Instant;
-
 /**
  * 不可篡改审计日志：顺序哈希链，覆盖审批全动作。
  *
  * <p>action 取值：START / COMPLETE_APPROVE / COMPLETE_REJECT / RETURN / ADD_SIGN /
  * REASSIGN / CALLBACK_SENT / CALLBACK_FAILED。哈希链由 {@code HashChainUtil} 计算。</p>
+ *
+ * <p>追加不可变（无 deleted/version），审计维度走平台 {@link Auditable}：
+ * 事件时间=create_time、操作人=create_user（dev 态由服务显式写入 actor，认证态回调自动填充）。</p>
  */
 @Entity
 @Table(name = "approval_audit")
 @Getter
 @Setter
 @NoArgsConstructor
-public class ApprovalAudit {
+public class ApprovalAudit extends Auditable {
 
+    /** 主键（应用层雪花，PrePersist 注入）。 */
     @Id
-    @Column(length = 40)
+    @Column(name = "id", length = 64, updatable = false, nullable = false)
     private String id;
 
     /** 同一 businessKey 内的序号（从 1 递增），用于链条定位。 */
@@ -66,7 +69,4 @@ public class ApprovalAudit {
 
     @Column(name = "hash", nullable = false, length = 64)
     private String hash;
-
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 }

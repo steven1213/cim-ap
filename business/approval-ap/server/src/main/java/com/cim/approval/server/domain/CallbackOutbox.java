@@ -1,5 +1,6 @@
 package com.cim.approval.server.domain;
 
+import com.cim.core.model.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -11,17 +12,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 /**
  * 回调 Outbox：流程结束事件先落库，再由调度器可靠投递，保证最终一致。
+ *
+ * <p>审计维度走平台 {@link Auditable}：入队时间=create_time、状态推进时间=event_time
+ * （均由回调自动填充）；业务时间 next_retry_at / sent_at 为投递语义，保留业务列。</p>
  */
 @Entity
 @Table(name = "callback_outbox")
 @Getter
 @Setter
 @NoArgsConstructor
-public class CallbackOutbox {
+public class CallbackOutbox extends Auditable {
 
     public enum Status {
         PENDING,   // 待投递
@@ -30,8 +34,9 @@ public class CallbackOutbox {
         DEAD       // 超过最大重试次数，进入死信
     }
 
+    /** 主键（应用层雪花，PrePersist 注入）。 */
     @Id
-    @Column(length = 40)
+    @Column(name = "id", length = 64, updatable = false, nullable = false)
     private String id;
 
     /** 幂等键：业务方据此去重。 */
@@ -65,14 +70,11 @@ public class CallbackOutbox {
     private int maxAttempts = 6;
 
     @Column(name = "next_retry_at")
-    private Instant nextRetryAt;
+    private LocalDateTime nextRetryAt;
 
     @Column(name = "last_error", length = 1024)
     private String lastError;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     @Column(name = "sent_at")
-    private Instant sentAt;
+    private LocalDateTime sentAt;
 }

@@ -287,13 +287,10 @@ class ApprovalFlowIntegrationTest {
 
     private CallbackRegistration reg(String appCode, String baseUrl) {
         CallbackRegistration r = new CallbackRegistration();
-        r.setId(java.util.UUID.randomUUID().toString());
         r.setAppCode(appCode);
         r.setBaseUrl(baseUrl);
         r.setSecret(SECRET);
         r.setEnabled(true);
-        r.setCreatedAt(java.time.Instant.now());
-        r.setUpdatedAt(java.time.Instant.now());
         return r;
     }
 
@@ -316,7 +313,7 @@ class ApprovalFlowIntegrationTest {
         for (ApprovalAudit a : audits) {
             String expected = HashChainUtil.hashEvent(prev, a.getBusinessKey(), a.getAction(),
                     a.getActor(), a.getBeforeState(), a.getAfterState(), a.getDetail(),
-                    a.getCreatedAt().toEpochMilli());
+                    a.getCreateTime().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
             assertEquals(expected, a.getHash(), "审计哈希链在第 " + a.getSeq() + " 条断裂");
             prev = a.getHash();
         }

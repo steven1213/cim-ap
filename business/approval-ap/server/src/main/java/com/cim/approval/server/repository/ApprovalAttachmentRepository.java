@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface ApprovalAttachmentRepository extends JpaRepository<ApprovalAttachment, String> {
 
-    List<ApprovalAttachment> findByBusinessKeyOrderByUploadedAtAsc(String businessKey);
+    List<ApprovalAttachment> findByBusinessKeyOrderByCreateTimeAsc(String businessKey);
 
-    boolean existsByProcessInstanceIdAndUploader(String processInstanceId, String uploader);
+    boolean existsByProcessInstanceIdAndCreateUser(String processInstanceId, String uploader);
 }

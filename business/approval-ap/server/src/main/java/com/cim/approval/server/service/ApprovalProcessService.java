@@ -847,7 +847,7 @@ public class ApprovalProcessService {
         for (ApprovalAudit a : auditList) {
             history.add(new AuditView(a.getId(), a.getSeq(), a.getBusinessKey(), a.getProcessInstanceId(),
                     a.getTaskId(), a.getAction(), a.getActor(), a.getBeforeState(), a.getAfterState(),
-                    a.getDetail(), a.getPrevHash(), a.getHash(), a.getCreatedAt()));
+                    a.getDetail(), a.getPrevHash(), a.getHash(), a.getCreateTime()));
         }
 
         List<FlowNodeTrace> flowNodes = resolveFlowNodes(instanceId, hpi.getProcessDefinitionId(),

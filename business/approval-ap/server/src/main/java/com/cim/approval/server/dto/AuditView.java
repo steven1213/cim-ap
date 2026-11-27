@@ -1,6 +1,6 @@
 package com.cim.approval.server.dto;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 public record AuditView(
         String id,
@@ -15,6 +15,6 @@ public record AuditView(
         String detail,
         String prevHash,
         String hash,
-        Instant createdAt
+        LocalDateTime createTime
 ) {
 }

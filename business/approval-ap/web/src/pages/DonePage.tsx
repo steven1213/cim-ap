@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useResource } from '@cim/data';
-import { CimButton, DataTable, Page, type DataTableColumn } from '@cim/ui';
+import { CimButton, DataTable, Page, type DataTableColumn, getPaginationDefaults } from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
 import { IconSearch } from '@/components/Icons';
 import { listDone } from '@/lib/api';
@@ -9,14 +9,13 @@ import { useIdentityStore } from '@/store/identityStore';
 import { fmtDate } from '@/lib/format';
 import type { TaskView } from '@/types';
 
-const PAGE_SIZE = 20;
 
 export default function DonePage() {
   const { t } = useTranslation();
   const { userId } = useIdentityStore();
 
   const [page, setPage] = useState(1);
-  const [size, setSize] = useState(PAGE_SIZE);
+  const [size, setSize] = useState(() => getPaginationDefaults().defaultSize);
   const [q, setQ] = useState('');
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -96,7 +95,6 @@ export default function DonePage() {
               setPage(s === size ? p : 1);
               setSize(s);
             },
-            sizeOptions: [10, 20, 50, 100],
           }}
           emptyTitleKey="common.empty"
           scrollX="max-content"

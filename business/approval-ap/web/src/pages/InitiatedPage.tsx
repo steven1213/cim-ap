@@ -11,6 +11,7 @@ import {
   useToast,
   StatusTag,
   type DataTableColumn,
+  getPaginationDefaults,
 } from '@cim/ui';
 import DetailModal from '@/components/DetailModal';
 import { IconBell, IconSearch, IconShield, IconUndo } from '@/components/Icons';
@@ -20,7 +21,6 @@ import { useIdentityStore } from '@/store/identityStore';
 import { fmtDate, fmtOverdue } from '@/lib/format';
 import type { ProcessInstanceView } from '@/types';
 
-const PAGE_SIZE = 20;
 
 export default function InitiatedPage() {
   const { t } = useTranslation();
@@ -30,7 +30,7 @@ export default function InitiatedPage() {
   const { userId } = useIdentityStore();
 
   const [page, setPage] = useState(1);
-  const [size, setSize] = useState(PAGE_SIZE);
+  const [size, setSize] = useState(() => getPaginationDefaults().defaultSize);
   const [q, setQ] = useState('');
   const [detailId, setDetailId] = useState<string | null>(null);
   /** 逐行锁：只锁被点的那一行，别把整张表的按钮都变灰。 */
@@ -180,7 +180,6 @@ export default function InitiatedPage() {
               setPage(s === size ? p : 1);
               setSize(s);
             },
-            sizeOptions: [10, 20, 50, 100],
           }}
           emptyTitleKey="common.empty"
           scrollX="max-content"

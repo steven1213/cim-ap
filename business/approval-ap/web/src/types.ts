@@ -65,8 +65,8 @@ export interface CallbackRegistrationView {
   appCode: string;
   baseUrl: string;
   enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createTime: string;
+  eventTime: string;
   /** G2 二次确认：重复注册同 appCode 时首调返回 true，需携带 confirmToken 再次提交 */
   confirmRequired?: boolean;
   /** G2 二次确认令牌（confirmRequired=true 时非空） */
@@ -81,7 +81,7 @@ export interface OutboxView {
   eventType: string;
   status: string; // PENDING | SENT | DEAD
   attempts: number;
-  createdAt: string;
+  createTime: string;
   sentAt: string | null;
   lastError: string | null;
 }
@@ -99,7 +99,7 @@ export interface AuditView {
   detail: string;
   prevHash: string;
   hash: string;
-  createdAt: string;
+  createTime: string;
 }
 
 export interface AttachmentView {
@@ -109,8 +109,8 @@ export interface AttachmentView {
   fileName: string;
   contentType: string | null;
   sizeBytes: number;
-  uploader: string;
-  uploadedAt: string;
+  createUser: string;
+  createTime: string;
 }
 
 export interface ProcessDetailView {

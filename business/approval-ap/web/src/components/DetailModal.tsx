@@ -350,7 +350,7 @@ export default function DetailModal({
         width: 90,
         render: (a) => fmtSize(a.sizeBytes),
       },
-      { key: 'uploader', titleKey: 'detail.attachUploader', width: 110 },
+      { key: 'createUser', titleKey: 'detail.attachUploader', width: 110 },
       {
         key: 'actions',
         titleKey: 'common.actions',
@@ -498,7 +498,7 @@ export default function DetailModal({
                     <b>{h.actor}</b>
                     {h.afterState && <span className="dim"> → {h.afterState}</span>}
                   </div>
-                  <div className="timeline-time">{formatDateTime(h.createdAt)}</div>
+                  <div className="timeline-time">{formatDateTime(h.createTime)}</div>
                   {comment && <div className="timeline-detail">“{comment}”</div>}
                   <div className="detail-hash mono" title={h.hash}>
                     #{h.seq} {h.hash.slice(0, 12)}…

@@ -1,6 +1,6 @@
 package com.cim.approval.server.dto;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 public record OutboxView(
         String id,
@@ -10,8 +10,8 @@ public record OutboxView(
         String eventType,
         String status,
         int attempts,
-        Instant createdAt,
-        Instant sentAt,
+        LocalDateTime createTime,
+        LocalDateTime sentAt,
         String lastError
 ) {
 }

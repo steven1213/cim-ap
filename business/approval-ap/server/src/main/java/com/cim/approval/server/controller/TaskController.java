@@ -73,7 +73,7 @@ public class TaskController {
                                                   @RequestParam(required = false) List<String> roles,
                                                   @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
-                                                  @RequestParam(defaultValue = "20") int size) {
+                                                  @RequestParam(defaultValue = "30") int size) {
         String uid = currentUser.resolve(userId);
         return Result.ok(processService.listTodoPaged(
                 uid, currentUser.resolveRoles(roles), tenantId, Math.max(page, 1), Math.min(size, 100)));
@@ -84,7 +84,7 @@ public class TaskController {
                                                   @RequestParam(required = false) List<String> roles,
                                                   @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                   @RequestParam(defaultValue = "1") int page,
-                                                  @RequestParam(defaultValue = "20") int size) {
+                                                  @RequestParam(defaultValue = "30") int size) {
         String uid = currentUser.resolve(userId);
         return Result.ok(processService.listDonePaged(
                 uid, currentUser.resolveRoles(roles), tenantId, Math.max(page, 1), Math.min(size, 100)));
@@ -94,7 +94,7 @@ public class TaskController {
     public Result<PageResult<ProcessInstanceView>> initiatedPaged(@RequestParam(required = false) String userId,
                                                                   @RequestParam(defaultValue = SecurityGuard.SHARED_DOMAIN) String tenantId,
                                                                   @RequestParam(defaultValue = "1") int page,
-                                                                  @RequestParam(defaultValue = "20") int size) {
+                                                                  @RequestParam(defaultValue = "30") int size) {
         return Result.ok(processService.listInitiatedPaged(
                 currentUser.resolve(userId), tenantId, Math.max(page, 1), Math.min(size, 100)));
     }

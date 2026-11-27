@@ -189,7 +189,7 @@ export default function CallbacksPage() {
         </CimButton>
       ),
     },
-    { key: 'updatedAt', titleKey: 'cb.colUpdated', width: 170, mono: true, render: (r) => fmtDate(r.updatedAt) },
+    { key: 'eventTime', titleKey: 'cb.colUpdated', width: 170, mono: true, render: (r) => fmtDate(r.eventTime) },
   ];
 
   const outboxColumns: Array<DataTableColumn<OutboxView>> = [

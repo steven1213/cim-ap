@@ -27,7 +27,7 @@ public interface ApprovalAuditRepository extends JpaRepository<ApprovalAudit, St
     boolean existsByProcessInstanceIdAndActor(String processInstanceId, String actor);
 
     /** 按域统计动作次数（统计看板的驳回率，G3：不再跨域聚合）。 */
-    long countByActionAndAppCodeAndCreatedAtAfter(String action, String appCode, java.time.Instant since);
+    long countByActionAndAppCodeAndCreateTimeAfter(String action, String appCode, java.time.LocalDateTime since);
 
     /** 撤回策略：实例已产生任一审批票（COMPLETE_*）则不可撤回。 */
     boolean existsByProcessInstanceIdAndActionStartingWith(String processInstanceId, String actionPrefix);

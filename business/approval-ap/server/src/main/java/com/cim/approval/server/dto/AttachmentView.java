@@ -1,6 +1,6 @@
 package com.cim.approval.server.dto;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 public record AttachmentView(
         String id,
@@ -9,7 +9,7 @@ public record AttachmentView(
         String fileName,
         String contentType,
         long sizeBytes,
-        String uploader,
-        Instant uploadedAt
+        String createUser,
+        LocalDateTime createTime
 ) {
 }

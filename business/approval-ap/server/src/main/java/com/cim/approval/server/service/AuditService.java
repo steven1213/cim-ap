@@ -12,8 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 不可篡改审计：顺序哈希链。每条记录 hash = SHA-256(prevHash | 关键字段)，首条 prevHash 取 GENESIS。
@@ -37,7 +38,10 @@ public class AuditService {
         String hash = HashChainUtil.hashEvent(prevHash, businessKey, action, actor, before, after, detail, now.toEpochMilli());
 
         ApprovalAudit record = new ApprovalAudit();
-        record.setId(UUID.randomUUID().toString());
+        // 主键由平台基类回调注入；create_time 与哈希时间戳严格同源（回调只补空值，显式值保留），
+        // 供验链时按系统时区还原 epochMilli；create_user dev 态显式写操作人，认证态与 JWT 一致
+        record.setCreateUser(actor);
+        record.setCreateTime(LocalDateTime.ofInstant(now, ZoneId.systemDefault()));
         record.setSeq(seq);
         record.setBusinessKey(businessKey);
         record.setProcessInstanceId(processInstanceId);
@@ -50,7 +54,6 @@ public class AuditService {
         record.setPrevHash(prevHash);
         record.setHash(hash);
         record.setAppCode(resolveAppCode(processInstanceId));
-        record.setCreatedAt(now);
         auditRepository.save(record);
     }
 
@@ -68,7 +71,9 @@ public class AuditService {
         String hash = HashChainUtil.hashEvent(prevHash, businessKey, action, actor, before, after, detail, now.toEpochMilli());
 
         ApprovalAudit record = new ApprovalAudit();
-        record.setId(UUID.randomUUID().toString());
+        // 主键由平台基类回调注入；create_time 与哈希时间戳严格同源（同 append 方法注释）
+        record.setCreateUser(actor);
+        record.setCreateTime(LocalDateTime.ofInstant(now, ZoneId.systemDefault()));
         record.setSeq(seq);
         record.setBusinessKey(businessKey);
         record.setProcessInstanceId(null);
@@ -81,7 +86,6 @@ public class AuditService {
         record.setPrevHash(prevHash);
         record.setAppCode(appCode);
         record.setHash(hash);
-        record.setCreatedAt(now);
         auditRepository.save(record);
     }
 

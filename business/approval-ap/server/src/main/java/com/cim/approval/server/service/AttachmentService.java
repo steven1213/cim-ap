@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -84,7 +83,8 @@ public class AttachmentService {
         }
 
         ApprovalAttachment a = new ApprovalAttachment();
-        a.setId(UUID.randomUUID().toString());
+        // 主键/时间由平台基类回调注入；dev 态无 JWT 时 create_user 显式写上传人，认证态与 JWT 一致
+        a.setCreateUser(uploader);
         a.setBusinessKey(businessKey);
         a.setProcessInstanceId(processInstanceId);
         a.setTenantId(tenantId);
@@ -92,8 +92,6 @@ public class AttachmentService {
         a.setContentType(file.getContentType());
         a.setSizeBytes(file.getSize());
         a.setStoragePath(relative);
-        a.setUploader(uploader);
-        a.setUploadedAt(Instant.now());
         attachmentRepository.save(a);
 
         auditService.append(businessKey, processInstanceId, null, "ATTACHMENT_ADD",
@@ -117,7 +115,7 @@ public class AttachmentService {
 
     public List<AttachmentView> listByBusinessKey(String businessKey) {
         List<AttachmentView> views = new ArrayList<>();
-        for (ApprovalAttachment a : attachmentRepository.findByBusinessKeyOrderByUploadedAtAsc(businessKey)) {
+        for (ApprovalAttachment a : attachmentRepository.findByBusinessKeyOrderByCreateTimeAsc(businessKey)) {
             views.add(toView(a));
         }
         return views;
@@ -145,6 +143,6 @@ public class AttachmentService {
 
     private AttachmentView toView(ApprovalAttachment a) {
         return new AttachmentView(a.getId(), a.getBusinessKey(), a.getProcessInstanceId(),
-                a.getFileName(), a.getContentType(), a.getSizeBytes(), a.getUploader(), a.getUploadedAt());
+                a.getFileName(), a.getContentType(), a.getSizeBytes(), a.getCreateUser(), a.getCreateTime());
     }
 }

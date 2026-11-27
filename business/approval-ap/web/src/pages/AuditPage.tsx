@@ -78,11 +78,11 @@ export default function AuditPage() {
     { key: 'afterState', titleKey: 'audit.colAfter', width: 110, mono: true },
     { key: 'detail', titleKey: 'audit.colDetail', ellipsis: true },
     {
-      key: 'createdAt',
+      key: 'createTime',
       titleKey: 'audit.colTime',
       width: 160,
       mono: true,
-      render: (a) => fmtDate(a.createdAt),
+      render: (a) => fmtDate(a.createTime),
     },
     {
       key: 'hash',

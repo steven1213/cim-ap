@@ -48,6 +48,7 @@ export default function Layout() {
       brand={{ logo: <BrandIcon />, title: 'CIM Approval', subtitle: t('shell.brandSub') }}
       groups={wiring.groups}
       labels={wiring.labels}
+      roleBadge={wiring.roleBadge}
       collapsibleGroups
       sidebarNote={t('shell.crypto')}
       env={wiring.env}
