@@ -37,6 +37,8 @@ public final class MdsBizMessages {
             Map.entry("mds.biz.operation.edcPlanNotFound", "EDC 方案不存在: {0}"),
             Map.entry("mds.biz.operation.reticleNotFound", "光罩不存在: {0}"),
             Map.entry("mds.biz.bind.reticleNotFound", "光罩覆盖引用的光罩不存在: {0}"),
+            // ---- 位置（Area，V36 Hold Setting）----
+            Map.entry("mds.biz.area.dictInvalid", "{0} 取值不在数据字典内: {1}"),
             // ---- 载具（Carrier，V31）----
             Map.entry("mds.biz.carrier.codeDuplicate", "载具编码 {0} 已存在"),
             Map.entry("mds.biz.carrier.notFound", "载具不存在: {0}"),
@@ -224,6 +226,8 @@ public final class MdsBizMessages {
             Map.entry("mds.biz.operation.edcPlanNotFound", "EDC plan does not exist: {0}"),
             Map.entry("mds.biz.operation.reticleNotFound", "Reticle does not exist: {0}"),
             Map.entry("mds.biz.bind.reticleNotFound", "Reticle referenced by product override does not exist: {0}"),
+            // ---- Location (Area, V36 Hold Setting) ----
+            Map.entry("mds.biz.area.dictInvalid", "{0} is not in dictionary: {1}"),
             // ---- Carrier (V31) ----
             Map.entry("mds.biz.carrier.codeDuplicate", "Carrier code {0} already exists"),
             Map.entry("mds.biz.carrier.notFound", "Carrier not found: {0}"),

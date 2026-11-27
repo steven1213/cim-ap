@@ -51,6 +51,8 @@ export interface Area {
   areaName: string;
   areaType: string | null;
   areaGroupId: string | null;
+  /** 默认 Hold 处置部门（V36 Hold Setting，挂 mds.owning_dept 字典；Hold 执行归 MES）。 */
+  holdDept: string | null;
   remark: string | null;
   enabled: boolean;
   description: string | null;
@@ -130,6 +132,7 @@ export interface AreaPayload {
   areaName: string;
   areaType?: string | null;
   areaGroupId?: string | null;
+  holdDept?: string | null;
   remark?: string | null;
   enabled?: boolean;
 }

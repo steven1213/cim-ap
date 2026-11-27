@@ -135,6 +135,8 @@ interface TopoNode {
   fabCode: string | null;
   /** 所属区域组 id（仅 area 层有值；§9.1 树内虚拟分节的归组依据）。 */
   areaGroupId?: string | null;
+  /** 默认 Hold 处置部门（仅 area 层；V36 Hold Setting）。 */
+  holdDept?: string | null;
   enabled: boolean;
   occupied: boolean;
   occupiedBy: string | null;
@@ -227,6 +229,7 @@ export default function TopologyPage() {
       parentCode: a.fabCode,
       fabCode: a.fabCode,
       areaGroupId: a.areaGroupId,
+      holdDept: a.holdDept,
       enabled: a.enabled,
       occupied: a.occupied,
       occupiedBy: a.occupiedBy,
@@ -914,6 +917,8 @@ function NodeDetail({
           <>
             <dt>{t('mds.area.group')}</dt>
             <dd>{groups.find((g) => g.id === node.areaGroupId)?.groupName ?? '—'}</dd>
+            <dt>{t('mds.area.holdDept')}</dt>
+            <dd>{node.holdDept ?? '—'}</dd>
           </>
         )}
       </dl>
@@ -1013,6 +1018,8 @@ interface NodeForm {
   extra3: string;
   /** 所属区域组 id（仅 area；可空，§9.1）。 */
   groupId: string;
+  /** 默认 Hold 处置部门（仅 area；V36 Hold Setting，挂 mds.owning_dept 字典）。 */
+  holdDept: string;
   remark: string;
   enabled: boolean;
 }
@@ -1021,24 +1028,24 @@ interface NodeForm {
 function extrasOf(
   level: Level,
   raw: Site | Fab | Area | Bay | Stage | null,
-): { extra: string; extra2: string; extra3: string; groupId: string; remark: string } {
-  if (!raw) return { extra: '', extra2: '', extra3: '', groupId: '', remark: '' };
+): { extra: string; extra2: string; extra3: string; groupId: string; holdDept: string; remark: string } {
+  if (!raw) return { extra: '', extra2: '', extra3: '', groupId: '', holdDept: '', remark: '' };
   switch (level) {
     case 'site': {
       const r = raw as Site;
-      return { extra: r.address ?? '', extra2: r.contactPerson ?? '', extra3: r.contactPhone ?? '', groupId: '', remark: r.remark ?? '' };
+      return { extra: r.address ?? '', extra2: r.contactPerson ?? '', extra3: r.contactPhone ?? '', groupId: '', holdDept: '', remark: r.remark ?? '' };
     }
     case 'fab': {
       const r = raw as Fab;
-      return { extra: r.fabType ?? '', extra2: r.amhsType ?? '', extra3: r.cleanGrade ?? '', groupId: '', remark: r.remark ?? '' };
+      return { extra: r.fabType ?? '', extra2: r.amhsType ?? '', extra3: r.cleanGrade ?? '', groupId: '', holdDept: '', remark: r.remark ?? '' };
     }
     case 'area': {
       const r = raw as Area;
-      return { extra: r.areaType ?? '', extra2: '', extra3: '', groupId: r.areaGroupId ?? '', remark: r.remark ?? '' };
+      return { extra: r.areaType ?? '', extra2: '', extra3: '', groupId: r.areaGroupId ?? '', holdDept: r.holdDept ?? '', remark: r.remark ?? '' };
     }
     default: {
       const r = raw as Bay | Stage;
-      return { extra: '', extra2: '', extra3: '', groupId: '', remark: r.remark ?? '' };
+      return { extra: '', extra2: '', extra3: '', groupId: '', holdDept: '', remark: r.remark ?? '' };
     }
   }
 }
@@ -1212,6 +1219,14 @@ function NodeFormModal({
         placeholderKey: 'mds.area.groupPlaceholder',
         disabled: !!initialGroupId,
       });
+      // V36 Hold Setting：该区 WIP 被 Hold 时 MES 带出的默认处置部门（空 = 人工指定）
+      base.push({
+        kind: 'select',
+        key: 'holdDept',
+        labelKey: 'mds.area.holdDept',
+        dict: 'mds.owning_dept',
+        allowClear: true,
+      });
     }
     base.push({ kind: 'text', key: 'remark', labelKey: 'mds.common.remark', span: 2 });
     base.push({ kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' });
@@ -1267,6 +1282,7 @@ function NodeFormModal({
             areaName: form.name.trim(),
             areaType: form.extra || null,
             areaGroupId: form.groupId || null,
+            holdDept: form.holdDept || null,
             remark: form.remark || null,
             enabled,
           };

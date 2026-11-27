@@ -118,7 +118,8 @@ class SiteAdminTest {
     @Order(6)
     void createAndUpdateArea() throws Exception {
         String body = om.writeValueAsString(Map.of(
-                "areaCode", "ETCH", "fabCode", "F1", "areaName", "刻蚀区", "areaType", "Etch"));
+                "areaCode", "ETCH", "fabCode", "F1", "areaName", "刻蚀区", "areaType", "Etch",
+                "holdDept", "PE"));
         String json = mvc.perform(post("/api/v1/mds/areas")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
@@ -127,11 +128,22 @@ class SiteAdminTest {
         areaId = om.readTree(json).path("data").path("id").asText();
 
         String patch = om.writeValueAsString(Map.of(
-                "areaCode", "ETCH", "fabCode", "F1", "areaName", "刻蚀一区", "areaType", "Etch"));
+                "areaCode", "ETCH", "fabCode", "F1", "areaName", "刻蚀一区", "areaType", "Etch",
+                "holdDept", "QC"));
         mvc.perform(put("/api/v1/mds/areas/" + areaId)
                         .contentType(MediaType.APPLICATION_JSON).content(patch))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.areaName").value("刻蚀一区"));
+                .andExpect(jsonPath("$.data.areaName").value("刻蚀一区"))
+                .andExpect(jsonPath("$.data.holdDept").value("QC"));
+
+        // V36 Hold Setting 守门：holdDept 必须在 mds.owning_dept 字典内
+        mvc.perform(post("/api/v1/mds/areas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(om.writeValueAsString(Map.of(
+                                "areaCode", "BAD-DEPT", "fabCode", "F1", "areaName", "坏字典值",
+                                "holdDept", "NO_SUCH_DEPT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2000));
     }
 
     @Test

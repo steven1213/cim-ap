@@ -3,6 +3,7 @@ package com.cim.mds.server.site;
 import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
+import com.cim.system.dict.SysDictService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,8 @@ public class SiteAdminService {
     private final AreaGroupAdminService areaGroupAdminService;
     private final CimBayRepository bayRepository;
     private final NamingRuleAdminService namingRuleService;
+    /** Hold 处置部门字典值守门（mds.owning_dept）。 */
+    private final SysDictService dictService;
 
     // ------------------------------------------------------------------ 视图
 
@@ -55,7 +58,7 @@ public class SiteAdminService {
     }
 
     public record AreaView(String id, String areaCode, String fabCode, String fabName, String areaName,
-                           String areaType, String areaGroupId, String remark, Boolean enabled,
+                           String areaType, String areaGroupId, String holdDept, String remark, Boolean enabled,
                            String description, Boolean occupied, String occupiedBy) {
     }
 
@@ -70,7 +73,7 @@ public class SiteAdminService {
     }
 
     public record AreaReq(String areaCode, String fabCode, String areaName, String areaType,
-                          String areaGroupId, String remark, Boolean enabled, String description) {
+                          String areaGroupId, String holdDept, String remark, Boolean enabled, String description) {
     }
 
     // ------------------------------------------------------------------ Site
@@ -189,8 +192,8 @@ public class SiteAdminService {
         return areaRepository.search(blankToNull(fabCode), blankToNull(keyword)).stream()
                 .map(a -> new AreaView(a.getId(), a.getAreaCode(), a.getFabCode(),
                         fabNames.get(a.getFabCode()), a.getAreaName(), a.getAreaType(),
-                        a.getAreaGroupId(), a.getRemark(), a.getEnabled(), a.getDescription(),
-                        a.getOccupied(), a.getOccupiedBy()))
+                        a.getAreaGroupId(), a.getHoldDept(), a.getRemark(), a.getEnabled(),
+                        a.getDescription(), a.getOccupied(), a.getOccupiedBy()))
                 .toList();
     }
 
@@ -344,11 +347,18 @@ public class SiteAdminService {
         entity.setEnabled(req.enabled() == null || req.enabled());
     }
 
-    private static void applyArea(CimArea entity, AreaReq req) {
+    private void applyArea(CimArea entity, AreaReq req) {
         entity.setAreaCode(entity.getAreaCode() == null ? req.areaCode().trim() : entity.getAreaCode());
         entity.setFabCode(entity.getFabCode() == null ? req.fabCode().trim() : entity.getFabCode());
         entity.setAreaName(req.areaName().trim());
         entity.setAreaType(req.areaType());
+        // 默认 Hold 处置部门：字典值守门（空入空出；词表复用 mds.owning_dept）
+        String holdDept = blankToNull(req.holdDept());
+        if (holdDept != null && dictService.items("mds.owning_dept").stream()
+                .noneMatch(i -> holdDept.equals(i.getItemKey()))) {
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.area.dictInvalid", "holdDept", holdDept);
+        }
+        entity.setHoldDept(holdDept);
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setEnabled(req.enabled() == null || req.enabled());
@@ -370,8 +380,8 @@ public class SiteAdminService {
 
     private static AreaView toView(Map<String, String> fabNames, CimArea a) {
         return new AreaView(a.getId(), a.getAreaCode(), a.getFabCode(), fabNames.get(a.getFabCode()),
-                a.getAreaName(), a.getAreaType(), a.getAreaGroupId(), a.getRemark(), a.getEnabled(),
-                a.getDescription(), a.getOccupied(), a.getOccupiedBy());
+                a.getAreaName(), a.getAreaType(), a.getAreaGroupId(), a.getHoldDept(), a.getRemark(),
+                a.getEnabled(), a.getDescription(), a.getOccupied(), a.getOccupiedBy());
     }
 
     private static String blankToNull(String v) {

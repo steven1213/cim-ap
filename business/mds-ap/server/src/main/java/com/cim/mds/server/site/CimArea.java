@@ -43,6 +43,14 @@ public class CimArea extends EditLockDefData {
     @Column(name = "area_group_id", length = 64)
     private String areaGroupId;
 
+    /**
+     * 默认 Hold 处置部门（V36，Hold Setting；挂字典 {@code mds.owning_dept}）。
+     * <p>WIP 批在该区被 Hold 时，MES 取此值作处置部门默认值（可被 Hold Code
+     * 维度或人工覆盖）；Hold 执行/UnHold 权限归 MES，此处只存配置。</p>
+     */
+    @Column(name = "hold_dept", length = 32)
+    private String holdDept;
+
     /** 备注。 */
     @Column(name = "remark", length = 512)
     private String remark;
