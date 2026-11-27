@@ -60,6 +60,12 @@ export { CimScrollArea, type CimScrollAreaProps } from './content/ScrollArea';
 
 // ── data 数据展示 ───────────────────────────────────────────────
 export { DataTable, type DataTableColumn, type DataTableProps, type SortDir } from './data/DataTable';
+export {
+  configurePagination,
+  getPaginationDefaults,
+  resetPaginationDefaults,
+  type PaginationDefaults,
+} from './data/paginationDefaults';
 export { StatusTag } from './data/StatusTag';
 export { KpiCard, KpiGrid, type KpiCardProps, type KpiTone } from './data/KpiCard';
 export { useColumns, type ColumnMeta, type ColumnState } from './data/useColumns';

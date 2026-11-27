@@ -61,8 +61,10 @@ export function Panel({
   className,
   style,
   titleKey,
+  titleValues,
   title,
   subKey,
+  subValues,
   sub,
   actions,
   flush = false,
@@ -73,9 +75,13 @@ export function Panel({
   className?: string;
   style?: CSSProperties;
   titleKey?: string;
+  /** titleKey 含 i18next 插值占位符（{{name}}）时的取值表。 */
+  titleValues?: Record<string, unknown>;
   title?: ReactNode;
   /** 标题下方的小号说明。 */
   subKey?: string;
+  /** subKey 含插值占位符时的取值表。 */
+  subValues?: Record<string, unknown>;
   sub?: ReactNode;
   /** 头部右侧操作区。 */
   actions?: ReactNode;
@@ -83,8 +89,8 @@ export function Panel({
   flush?: boolean;
 }) {
   const t = useUiT();
-  const head = titleKey ? t(titleKey) : title;
-  const desc = subKey ? t(subKey) : sub;
+  const head = titleKey ? t(titleKey, titleValues) : title;
+  const desc = subKey ? t(subKey, subValues) : sub;
   return (
     <section className={cx('panel', className)} style={style}>
       {head || actions ? (

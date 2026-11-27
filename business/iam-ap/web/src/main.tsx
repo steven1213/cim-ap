@@ -4,17 +4,20 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { CimProvider, UiLocaleProvider, UiPermissionProvider, UiToastProvider } from '@cim/ui';
+import { CimProvider, UiLocaleProvider, UiPermissionProvider, UiToastProvider, configurePagination } from '@cim/ui';
 import { usePermissions } from '@/lib/usePermission';
 import { useAuthStore } from '@/store/authStore';
 import { bootstrapI18n } from './lib/i18n';
 import '@cim/ui/index.css';
 import './styles.css';
 
+// 全局分页默认：每页条数候选 10/30/50，默认 30（DataTable 未传 sizeOptions 时生效；页面可覆盖）
+configurePagination({ sizeOptions: [10, 30, 50], defaultSize: 30 });
+
 /** 平台组件的文案由应用注入（@cim/ui 不依赖 i18n），locale 变化时随之重渲染。 */
 function Root() {
   const { t, i18n } = useTranslation();
-  const uiT = useCallback((key: string) => String(t(key)), [t]);
+  const uiT = useCallback((key: string, vars?: Record<string, unknown>) => String(t(key, vars)), [t]);
   // 「键是否存在」交给 i18n 判断：各组件的内置文案兜底只在真的缺键时才生效
   const uiHas = useCallback((key: string) => i18n.exists(key), [i18n]);
 

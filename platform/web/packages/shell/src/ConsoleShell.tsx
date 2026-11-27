@@ -283,10 +283,8 @@ export function ConsoleShell({
           ) : null}
           <span className="side-text">
             <span className="side-label">{m.label}</span>
-            {/* 用 undefined 判断而非真假值：IAM 的副标题键可能缺翻译（回退空串），
-                那里原本就渲染一个空的 .side-desc 占位，不能因为空就少一个节点。
-                三级行不显示副标题：每行都是两行高的话，层级反而不易辨认（完整文案进 title）。 */}
-            {depth === 0 && m.desc !== undefined ? <span className="side-desc">{m.desc}</span> : null}
+            {/* 副标题不再常驻（描述行会让长导航翻倍），完整文案在 NavLink title
+                上悬停可读：`label · desc`。 */}
           </span>
         </NavLink>
       );

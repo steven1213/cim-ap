@@ -13,8 +13,18 @@
 
 import { Button, Checkbox, Input, Popover, Table } from 'antd';
 import type { TableProps } from 'antd';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type ThHTMLAttributes,
+} from 'react';
 import { useUiLabel } from '../locale';
+import { getPaginationDefaults } from './paginationDefaults';
 import { useColumns } from './useColumns';
 import { EmptyState } from '../content/Page';
 
@@ -109,7 +119,11 @@ export interface DataTableProps<T> {
   headActions?: ReactNode;
   sticky?: boolean;
   size?: 'small' | 'middle';
-  /** 横向滚动；列多且固定宽度时传 'max-content'。 */
+  /**
+   * 横向滚动的最小宽度下限（px）。默认行为已统一内置：
+   * 列宽合计超出容器 → 自动出横向滚动条；未超出 → 表格铺满容器。
+   * 数字仅在需要给表格一个「比列宽合计更宽」的下限时才传。
+   */
   scrollX?: number | 'max-content';
   /**
    * 虚拟滚动：传视口高度（px）启用，只渲染视口内的行。
@@ -130,6 +144,76 @@ export interface DataTableProps<T> {
    * 内层再画一层会出现框套框（历史上各页为此各写一遍 `table-wrap`）。
    */
   flat?: boolean;
+}
+
+/** 未显式声明 width 的列的默认宽度：仅虚拟滚动模式使用（虚拟要求每列定宽）。
+ *  非虚拟模式下未声明 width 的列保持**弹性**——吸收剩余空间，表不必要地撑出滚动条。 */
+const DEFAULT_COL_W = 180;
+/** 列宽拖拽的下限，防止拖没。 */
+const MIN_COL_W = 60;
+/** 弹性列在溢出态的保底宽度：固定列合计吃满表格宽时，弹性列至少留这么多，防止塌 0。 */
+const FLEX_MIN_W = 80;
+/** 行选择列（antd 自动加的 checkbox 列）占位宽度，计入横向滚动宽度。 */
+const SELECTION_COL_W = 32;
+
+interface ResizableHeaderProps extends ThHTMLAttributes<HTMLTableCellElement> {
+  width?: number;
+  onResize?: (width: number) => void;
+  onReset?: () => void;
+}
+
+/**
+ * 表头单元格包装：右缘挂列宽拖拽手柄。
+ *
+ * <p>拖拽以 th 的实际渲染宽度为起点（对未声明 width 的弹性列同样成立），
+ * mousemove 期间实时回调 onResize → DataTable 更新列宽状态 → antd colgroup 重排，
+ * 列宽合计超过容器时横向滚动条自动出现。双击手柄恢复该列出厂宽度。</p>
+ */
+function ResizableHeaderCell({ onResize, onReset, children, ...rest }: ResizableHeaderProps) {
+  const startRef = useRef<{ x: number; w: number } | null>(null);
+  const handleRef = useRef<HTMLSpanElement | null>(null);
+
+  const onMouseDown = (e: ReactMouseEvent<HTMLSpanElement>) => {
+    if (!onResize) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const th = e.currentTarget.parentElement as HTMLElement | null;
+    if (!th) return;
+    startRef.current = { x: e.clientX, w: th.offsetWidth };
+    handleRef.current?.classList.add('is-dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    const move = (ev: MouseEvent) => {
+      if (!startRef.current) return;
+      onResize(Math.max(MIN_COL_W, startRef.current.w + (ev.clientX - startRef.current.x)));
+    };
+    const up = () => {
+      startRef.current = null;
+      handleRef.current?.classList.remove('is-dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  return (
+    <th {...rest}>
+      {children}
+      {onResize ? (
+        <span
+          ref={handleRef}
+          className="cim-col-resizer"
+          title="拖拽调整列宽，双击恢复默认"
+          onMouseDown={onMouseDown}
+          onDoubleClick={() => onReset?.()}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : null}
+    </th>
+  );
 }
 
 function GearIcon() {
@@ -204,16 +288,66 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const virtualEnabled = typeof virtual === 'number' && virtual > 0;
 
-  // antd 虚拟表格要求 scroll.x 是数字，且每列都有 width（缺宽会塌成 0 宽列）。
-  // 'max-content' 在虚拟模式下不可用，故按列宽求和兜底（缺宽的列按 160 计）。
-  const virtualScroll = useMemo(() => {
-    if (!virtualEnabled) return undefined;
-    const width =
-      typeof scrollX === 'number'
-        ? scrollX
-        : visibleColumns.reduce((sum, c) => sum + (c.width ?? 160), 0);
-    return { x: width, y: virtual };
-  }, [virtualEnabled, scrollX, virtual, visibleColumns]);
+  // —— 列宽拖拽 + 按需横向滚动（统一行为，调用方零配置）——
+  // 每列有效宽度：拖拽值 > 出厂 width > 弹性（非虚拟模式下未声明 width 的列不占固定宽，
+  // 在固定布局里吸收剩余空间——多数表因此正好铺满容器，不出滚动条）。
+  // scroll.x = max(容器宽, 显式列宽合计 + 弹性列保底)——只有真放不下才出横向滚动条。
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const [containerW, setContainerW] = useState(0);
+  useEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el) return;
+    setContainerW(el.clientWidth);
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerW(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const resizeColumn = useCallback((key: string, w: number) => {
+    setWidths((prev) => ({ ...prev, [key]: Math.max(MIN_COL_W, w) }));
+  }, []);
+  const resetColumn = useCallback((key: string) => {
+    setWidths((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  // 显式定宽合计 + 弹性列数（虚拟模式没有弹性列：缺 width 的列按 DEFAULT_COL_W 兜底，
+  // antd 虚拟表格按列宽定位列，任一列缺宽会塌成 0）。
+  const { fixedSum, flexCount } = useMemo(() => {
+    let fixed = 0;
+    let flex = 0;
+    for (const c of visibleColumns) {
+      const w = widths[c.key] ?? c.width ?? (virtualEnabled ? DEFAULT_COL_W : undefined);
+      if (w == null) flex += 1;
+      else fixed += w;
+    }
+    return { fixedSum: fixed, flexCount: flex };
+  }, [visibleColumns, widths, virtualEnabled]);
+
+  const scroll = useMemo(() => {
+    // scrollX 语义收敛为「最小宽度下限」：仅在显式传数字时参与 max。
+    const floor = typeof scrollX === 'number' ? scrollX : 0;
+    const fixedAll = fixedSum + (onSelectionChange ? SELECTION_COL_W : 0);
+    // 容器宽取整：ResizeObserver 给的是小数（如 710.453），antd 照设后
+    // scrollWidth 向上取整会比 clientWidth 多出 ~3px 伪滚动，滚动条凭空出现。
+    const target = Math.max(floor, Math.floor(containerW));
+    let x: number;
+    if (fixedAll + flexCount * FLEX_MIN_W <= target) {
+      // 固定列 + 弹性列保底都放得下 → 铺满容器，弹性列吸收剩余空间，不出滚动条
+      x = target;
+    } else {
+      // 固定列都放不下 → 出横向滚动条（弹性列按保底宽计入）
+      x = Math.max(floor, fixedAll + flexCount * FLEX_MIN_W);
+    }
+    if (!x) return undefined;
+    return virtualEnabled ? { x, y: virtual } : { x };
+  }, [scrollX, fixedSum, flexCount, containerW, virtualEnabled, virtual, onSelectionChange]);
 
   useEffect(() => {
     if (!virtualEnabled) return;
@@ -226,23 +360,29 @@ export function DataTable<T>(props: DataTableProps<T>) {
   }, [virtualEnabled, visibleColumns]);
 
   const antdColumns = useMemo<TableProps<T>['columns']>(() => {
-    return visibleColumns.map((c) => ({
-      key: c.key,
-      dataIndex: c.key,
-      title: label(c.titleKey, c.key),
-      width: c.width,
-      align: c.align,
-      ellipsis: c.ellipsis,
-      sorter: c.sortable && onSortChange ? true : undefined,
-      sortOrder: c.sortable && sort?.key === c.key ? (sort.dir === 'asc' ? 'ascend' : 'descend') : null,
-      render: (_value: unknown, row: T) => {
-        if (c.render) return c.render(row);
-        const raw = (row as Record<string, unknown>)[c.key];
-        const text = raw === null || raw === undefined || raw === '' ? '—' : String(raw);
-        return c.mono ? <span className="cim-mono">{text}</span> : text;
-      },
-    }));
-  }, [visibleColumns, label, sort, onSortChange]);
+    return visibleColumns.map((c) => {
+      const w = widths[c.key] ?? c.width ?? (virtualEnabled ? DEFAULT_COL_W : undefined);
+      return {
+        key: c.key,
+        dataIndex: c.key,
+        title: label(c.titleKey, c.key),
+        width: w,
+        align: c.align,
+        ellipsis: c.ellipsis,
+        sorter: c.sortable && onSortChange ? true : undefined,
+        sortOrder: c.sortable && sort?.key === c.key ? (sort.dir === 'asc' ? 'ascend' : 'descend') : null,
+        // 列宽拖拽：把宽度与回调塞进表头单元格（ResizableHeaderCell 消费）
+        onHeaderCell: () =>
+          ({ width: w, onResize: (nw: number) => resizeColumn(c.key, nw), onReset: () => resetColumn(c.key) }) as ThHTMLAttributes<HTMLTableCellElement>,
+        render: (_value: unknown, row: T) => {
+          if (c.render) return c.render(row);
+          const raw = (row as Record<string, unknown>)[c.key];
+          const text = raw === null || raw === undefined || raw === '' ? '—' : String(raw);
+          return c.mono ? <span className="cim-mono">{text}</span> : text;
+        },
+      };
+    });
+  }, [visibleColumns, label, sort, onSortChange, widths, resizeColumn, resetColumn]);
 
   const total = pagination?.total ?? rows.length;
   const selectedCount = selectedKeys?.length ?? 0;
@@ -402,16 +542,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
             ) : null}
           </div>
         ) : (
-          <Table<T>
-            size={size}
-            columns={antdColumns}
-            dataSource={rows}
-            rowKey={(row) => rowKey(row)}
-            loading={loading}
-            sticky={sticky ? { offsetHeader: 0 } : undefined}
-            scroll={virtualScroll ?? (scrollX ? { x: scrollX } : undefined)}
-            virtual={virtualEnabled || undefined}
-            locale={{ emptyText: emptyNode }}
+          <div ref={tableWrapRef} style={{ width: '100%' }}>
+            <Table<T>
+              size={size}
+              columns={antdColumns}
+              dataSource={rows}
+              rowKey={(row) => rowKey(row)}
+              loading={loading}
+              sticky={sticky ? { offsetHeader: 0 } : undefined}
+              scroll={scroll}
+              virtual={virtualEnabled || undefined}
+              components={{ header: { cell: ResizableHeaderCell } }}
+              locale={{ emptyText: emptyNode }}
             rowClassName={(row) => (rowClassName ? rowClassName(row) : '')}
             rowSelection={
               onSelectionChange
@@ -441,15 +583,16 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     pageSize: pagination.size,
                     total: pagination.total,
                     showSizeChanger: true,
-                    pageSizeOptions: (pagination.sizeOptions ?? [20, 50, 100]).map(String),
+                    pageSizeOptions: (pagination.sizeOptions ?? getPaginationDefaults().sizeOptions).map(String),
                     size: 'small',
                     showTotal: undefined,
                     onChange: (page, pageSize) => pagination.onChange(page, pageSize),
                   }
                 : false
             }
-          />
-      )}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

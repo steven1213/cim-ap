@@ -148,6 +148,38 @@
 .cim-datatable > .panel > .ant-table-wrapper:last-child .ant-table {
   border-radius: 0 0 var(--radius) var(--radius);
 }
+/* 横向/纵向滚动条压窄（原生 ~16px 太厚，把行高顶得很怪）：webkit + Firefox */
+.cim-datatable .ant-table-content,
+.cim-datatable .ant-table-header,
+.cim-datatable .ant-table-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.cim-datatable .ant-table-content::-webkit-scrollbar,
+.cim-datatable .ant-table-header::-webkit-scrollbar,
+.cim-datatable .ant-table-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.cim-datatable .ant-table-content::-webkit-scrollbar-thumb,
+.cim-datatable .ant-table-header::-webkit-scrollbar-thumb,
+.cim-datatable .ant-table-body::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+.cim-datatable .ant-table-content::-webkit-scrollbar-thumb:hover,
+.cim-datatable .ant-table-header::-webkit-scrollbar-thumb:hover,
+.cim-datatable .ant-table-body::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+.cim-datatable .ant-table-content::-webkit-scrollbar-track,
+.cim-datatable .ant-table-header::-webkit-scrollbar-track,
+.cim-datatable .ant-table-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cim-datatable .ant-table-content::-webkit-scrollbar-corner {
+  background: transparent;
+}
 
 /* 表格内等宽文本（编码 / 时间戳） */
 .cim-mono {
@@ -160,6 +192,26 @@
   font-size: var(--fs-xs);
   letter-spacing: 0.02em;
   text-transform: none;
+  position: relative; /* 列宽拖拽手柄的定位锚点 */
+}
+/* 列宽拖拽手柄：贴 th 右缘内侧的透明热区，hover / 拖拽中显形。
+   注意 right 必须 ≥0：探出 th 右缘会撑大最后一列的 scrollWidth，
+   让铺满容器的表也凭空多出 3px 伪横向滚动。 */
+.cim-col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  user-select: none;
+}
+.cim-col-resizer:hover,
+.cim-col-resizer.is-dragging {
+  background: var(--primary, #5e6ad2);
+  opacity: 0.45;
+  border-radius: 2px;
 }
 .cim-datatable .ant-table-tbody > tr > td {
   padding-top: 6px;

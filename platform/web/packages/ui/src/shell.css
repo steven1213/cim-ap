@@ -199,14 +199,6 @@ button.side-cap.page-cap {
   font-weight: 550;
   white-space: nowrap;
 }
-.side-desc {
-  font-size: 10px;
-  color: rgba(142, 155, 177, 0.72);
-  white-space: nowrap;
-}
-.side-link.active .side-desc {
-  color: rgba(255, 255, 255, 0.62);
-}
 
 /* ---------- 三级菜单 ----------
    结构：分组标题（一级）→ .side-node 上级节点（二级，可展开，不导航）→ .side-sub 内页面（三级）。

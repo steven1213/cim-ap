@@ -57,6 +57,7 @@ const enUS: Record<string, string> = {
   'admin.admin.menus.root': 'Root',
   'admin.admin.menus.selectNode': 'Select a node on the left',
   'admin.admin.menus.empty': 'No menu nodes yet',
+  'admin.admin.menus.emptyHint': 'Create a root node on the left to start building the menu tree',
   'admin.admin.perms.new': 'New permission code',
   'admin.admin.perms.count': 'Permissions',
   'admin.admin.perms.ifaceTag': 'API-level',

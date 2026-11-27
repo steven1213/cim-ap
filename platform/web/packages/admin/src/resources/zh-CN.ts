@@ -58,6 +58,7 @@ const zhCN: Record<string, string> = {
   'admin.admin.menus.root': '根节点',
   'admin.admin.menus.selectNode': '请选择左侧节点',
   'admin.admin.menus.empty': '暂无菜单节点',
+  'admin.admin.menus.emptyHint': '在左侧新建根节点，开始搭建菜单树',
   'admin.admin.perms.new': '新建权限码',
   'admin.admin.perms.count': '权限点',
   'admin.admin.perms.ifaceTag': '接口级',
