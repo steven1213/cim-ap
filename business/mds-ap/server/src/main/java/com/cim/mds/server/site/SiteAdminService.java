@@ -1,9 +1,9 @@
 package com.cim.mds.server.site;
 
+import com.cim.mds.server.admin.DirectoryClient;
 import com.cim.mds.server.namingrule.NamingRuleAdminService;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
-import com.cim.system.dict.SysDictService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,8 +40,8 @@ public class SiteAdminService {
     private final AreaGroupAdminService areaGroupAdminService;
     private final CimBayRepository bayRepository;
     private final NamingRuleAdminService namingRuleService;
-    /** Hold 处置部门字典值守门（mds.owning_dept）。 */
-    private final SysDictService dictService;
+    /** Hold 处置部门引用守门（IAM 组织架构 DEPT 节点，V36 起部门真源=组织架构）。 */
+    private final DirectoryClient directoryClient;
 
     // ------------------------------------------------------------------ 视图
 
@@ -352,13 +352,8 @@ public class SiteAdminService {
         entity.setFabCode(entity.getFabCode() == null ? req.fabCode().trim() : entity.getFabCode());
         entity.setAreaName(req.areaName().trim());
         entity.setAreaType(req.areaType());
-        // 默认 Hold 处置部门：字典值守门（空入空出；词表复用 mds.owning_dept）
-        String holdDept = blankToNull(req.holdDept());
-        if (holdDept != null && dictService.items("mds.owning_dept").stream()
-                .noneMatch(i -> holdDept.equals(i.getItemKey()))) {
-            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.area.dictInvalid", "holdDept", holdDept);
-        }
-        entity.setHoldDept(holdDept);
+        // 默认 Hold 处置部门：引用守门（必须是 IAM 组织架构中启用的行政 DEPT 节点；空入空出）
+        entity.setHoldDept(directoryClient.requireDeptCode(req.holdDept()));
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setEnabled(req.enabled() == null || req.enabled());

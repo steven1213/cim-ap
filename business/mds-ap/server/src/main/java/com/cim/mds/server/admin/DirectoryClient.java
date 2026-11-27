@@ -1,5 +1,7 @@
 package com.cim.mds.server.admin;
 
+import com.cim.spring.support.web.BizCode;
+import com.cim.spring.support.web.BizException;
 import com.cim.spring.support.web.Result;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +48,48 @@ public class DirectoryClient {
     public List<Map<String, Object>> list(String path, Map<String, String> query) {
         return listTyped(path, query, new ParameterizedTypeReference<Result<List<Map<String, Object>>>>() {
         });
+    }
+
+    /** 部门下拉选项（行政维度 {@code nodeType=DEPT} 且启用）。 */
+    public List<DeptOption> deptOptions() {
+        return list("/api/v1/directory/orgs", Map.of()).stream()
+                .filter(o -> "DEPT".equals(String.valueOf(o.get("nodeType"))))
+                .filter(o -> {
+                    Object st = o.get("status");
+                    return st == null || "ENABLED".equals(String.valueOf(st));
+                })
+                .map(o -> new DeptOption(
+                        String.valueOf(o.get("code")),
+                        String.valueOf(o.get("name")),
+                        String.valueOf(o.getOrDefault("path", ""))))
+                .toList();
+    }
+
+    /**
+     * 部门编码引用守门（V36 起部门真源 = IAM 组织架构，不再用静态字典）。
+     * 空入空出；非空必须是启用 DEPT 节点编码，否则 PARAM_INVALID；
+     * 目录服务不可达 → OPERATION_NOT_ALLOWED（明确报错而非静默放过）。
+     */
+    public String requireDeptCode(String value) {
+        String code = value == null || value.isBlank() ? null : value.trim();
+        if (code == null) {
+            return null;
+        }
+        List<DeptOption> depts;
+        try {
+            depts = deptOptions();
+        } catch (Exception e) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.dept.directoryDown", e.getMessage());
+        }
+        if (depts.stream().noneMatch(d -> code.equals(d.code()))) {
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.dept.notFound", code);
+        }
+        return code;
+    }
+
+    /** 部门选项行（code 为引用真值，name 供展示，path 供层级上下文）。 */
+    public record DeptOption(String code, String name, String path) {
     }
 
     /** 元素为标量（如用户 ID 字符串数组）的列表取数。 */

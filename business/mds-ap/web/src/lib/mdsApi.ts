@@ -77,6 +77,19 @@ import type {
 
 const BASE = '/mds';
 
+// ---------- 组织架构部门（V36 起部门真源 = IAM 组织架构，静态字典废弃） ----------
+
+/** 部门下拉选项（IAM 行政 DEPT 节点；code 为引用真值）。 */
+export interface DeptOption {
+  code: string;
+  name: string;
+  path: string;
+}
+
+export function listDeptOptions(signal?: AbortSignal): Promise<DeptOption[]> {
+  return http.get<DeptOption[]>('/mds/admin/directory/dept-options', undefined, { signal });
+}
+
 // ---------- 基地 ----------
 
 export function listSites(keyword?: string, signal?: AbortSignal): Promise<Site[]> {

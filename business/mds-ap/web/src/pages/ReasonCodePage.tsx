@@ -10,7 +10,6 @@ import {
   Page,
   Panel,
   useConfirm,
-  useDict,
   useToast,
   type DataTableColumn,
   type FormField,
@@ -47,7 +46,8 @@ export default function ReasonCodePage() {
   const { t } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
-  const deptDict = useDict('mds.owning_dept');
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构，静态字典废弃）：列表列展示名映射
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
 
   const typesRes = useResource(({ signal }) => api.listReasonCodeTypes(signal));
   const types = typesRes.data ?? NO_TYPES;
@@ -178,7 +178,7 @@ export default function ReasonCodePage() {
         ),
       },
       { key: 'parentCode', titleKey: 'mds.reason.code.parent', width: 150, mono: true, render: (r) => r.parentCode ?? '—' },
-      { key: 'owningDept', titleKey: 'mds.reason.code.dept', width: 110, render: (r) => deptDict.labelOf(r.owningDept ?? '') || '—' },
+      { key: 'owningDept', titleKey: 'mds.reason.code.dept', width: 110, render: (r) => (deptRes.data ?? []).find((d) => d.code === r.owningDept)?.name ?? r.owningDept ?? '—' },
       { key: 'sortNo', titleKey: 'mds.reason.code.sortNo', width: 80 },
       {
         key: 'enabled',
@@ -211,7 +211,7 @@ export default function ReasonCodePage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, deptDict.items],
+    [t, deptRes.data],
   );
 
   return (
@@ -408,6 +408,9 @@ function CodeFormModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const initial = state.mode === 'edit' ? state.code : null;
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
+  const deptOptions = useMemo(() => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.name })), [deptRes.data]);
   const [form, setForm] = useState({
     reasonCode: initial?.reasonCode ?? '',
     typeKey: initial?.typeKey ?? (state.mode === 'create' ? state.typeKey : ''),
@@ -443,12 +446,12 @@ function CodeFormModal({
       { kind: 'select' as const, key: 'typeKey' as const, labelKey: 'mds.reason.type.key', options: typeOptions, disabled: !!initial },
       { kind: 'text' as const, key: 'shortName' as const, labelKey: 'mds.reason.code.name' },
       { kind: 'select' as const, key: 'parentId' as const, labelKey: 'mds.reason.code.parent', options: parentOptions, allowClear: true, placeholderKey: 'mds.reason.code.parentPlaceholder' },
-      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.reason.code.dept', dict: 'mds.owning_dept', allowClear: true },
+      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.reason.code.dept', options: deptOptions, allowClear: true },
       { kind: 'number' as const, key: 'sortNo' as const, labelKey: 'mds.reason.code.sortNo', precision: 0 },
       { kind: 'switch' as const, key: 'enabled' as const, labelKey: 'mds.reason.code.enabled' },
       { kind: 'text' as const, key: 'description' as const, labelKey: 'mds.common.remark', span: 2 },
     ],
-    [initial, typeOptions, parentOptions],
+    [initial, typeOptions, parentOptions, deptOptions],
   );
 
   async function submit() {

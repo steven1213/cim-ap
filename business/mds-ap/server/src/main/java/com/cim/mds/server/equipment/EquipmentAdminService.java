@@ -56,8 +56,6 @@ public class EquipmentAdminService {
 
     /** 生产/工程模式字典。 */
     public static final String DICT_EQUIP_PRODUCTION_MODE = "mds.equip_production_mode";
-    /** 归属部门（mds.owning_dept，V35 接线到设备台账）。 */
-    public static final String DICT_OWNING_DEPT = "mds.owning_dept";
     /** 晶圆尺寸（mds.wafer_size，V35 混线资格口径）。 */
     public static final String DICT_WAFER_SIZE = "mds.wafer_size";
 
@@ -69,6 +67,8 @@ public class EquipmentAdminService {
     private final CimToolGroupMemberRepository toolGroupMemberRepository;
     private final CimEquipmentAttrRepository attrRepository;
     private final SysDictService dictService;
+    /** 归属部门引用守门（IAM 组织架构 DEPT 节点，V36 起部门真源=组织架构）。 */
+    private final com.cim.mds.server.admin.DirectoryClient directoryClient;
     private final CimFabRepository fabRepository;
     private final CimAreaRepository areaRepository;
     private final CimBayRepository bayRepository;
@@ -176,7 +176,7 @@ public class EquipmentAdminService {
         entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
         entity.setProductionMode(requireProductionMode(req.productionMode()));
         entity.setStateCode(requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode"));
-        entity.setOwningDept(requireDictItem(DICT_OWNING_DEPT, req.owningDept(), "owningDept"));
+        entity.setOwningDept(directoryClient.requireDeptCode(req.owningDept()));
         return toView(equipmentRepository.save(entity), cls);
     }
 
@@ -197,7 +197,7 @@ public class EquipmentAdminService {
         entity.setLocationType(req.locationType());
         entity.setLocationId(req.locationId());
         entity.setOwnerUser(blankToNull(req.ownerUser()));
-        entity.setOwningDept(requireDictItem(DICT_OWNING_DEPT, req.owningDept(), "owningDept"));
+        entity.setOwningDept(directoryClient.requireDeptCode(req.owningDept()));
         entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
         entity.setProductionMode(requireProductionMode(req.productionMode()));
         entity.setVendor(blankToNull(req.vendor()));

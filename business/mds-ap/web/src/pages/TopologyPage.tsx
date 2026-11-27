@@ -185,6 +185,8 @@ export default function TopologyPage() {
   const groupsRes = useResource(({ signal }) => api.listAreaGroups(undefined, signal), {
     enabled: can.area,
   });
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）：属性面板展示名映射用
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
 
   const sites = sitesRes.data ?? NO_SITES;
   const fabs = fabsRes.data ?? NO_FABS;
@@ -478,6 +480,7 @@ export default function TopologyPage() {
             <NodeDetail
               node={selected}
               groups={groups}
+              depts={deptRes.data ?? []}
               onEdit={() => void openEdit(selected)}
               onDelete={() => void doDelete(selected)}
               onCreateChild={() => setCreating(CHILD_LEVEL[selected.level])}
@@ -878,6 +881,7 @@ function renderFabChildren(
 function NodeDetail({
   node,
   groups,
+  depts,
   onEdit,
   onDelete,
   onCreateChild,
@@ -885,6 +889,7 @@ function NodeDetail({
 }: {
   node: TopoNode;
   groups: AreaGroup[];
+  depts: api.DeptOption[];
   onEdit: () => void;
   onDelete: () => void;
   onCreateChild: () => void;
@@ -918,7 +923,7 @@ function NodeDetail({
             <dt>{t('mds.area.group')}</dt>
             <dd>{groups.find((g) => g.id === node.areaGroupId)?.groupName ?? '—'}</dd>
             <dt>{t('mds.area.holdDept')}</dt>
-            <dd>{node.holdDept ?? '—'}</dd>
+            <dd>{depts.find((d) => d.code === node.holdDept)?.name ?? node.holdDept ?? '—'}</dd>
           </>
         )}
       </dl>
@@ -1099,6 +1104,13 @@ function NodeFormModal({
   const [err, setErr] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof NodeForm, string>>>({});
 
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）：Hold 处置部门下拉用
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
+  const deptOptions = useMemo<FormOption[]>(
+    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.name, hint: d.code })),
+    [deptRes.data],
+  );
+
   const meta = LEVEL_META[level];
   // Fab 语境：bay/stage 的归属候选项按它过滤（fabCode 后端不可改）
   const fabContext = parentHint?.fabCode ?? initial?.fabCode ?? null;
@@ -1224,14 +1236,14 @@ function NodeFormModal({
         kind: 'select',
         key: 'holdDept',
         labelKey: 'mds.area.holdDept',
-        dict: 'mds.owning_dept',
+        options: deptOptions,
         allowClear: true,
       });
     }
     base.push({ kind: 'text', key: 'remark', labelKey: 'mds.common.remark', span: 2 });
     base.push({ kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' });
     return base;
-  }, [level, initial, parentHint, meta, initialGroupId, siteOptions, fabOptions, areaOptions, bayOptions, groupOptions]);
+  }, [level, initial, parentHint, meta, initialGroupId, siteOptions, fabOptions, areaOptions, bayOptions, groupOptions, deptOptions]);
 
   async function submit() {
     const next: Partial<Record<keyof NodeForm, string>> = {};

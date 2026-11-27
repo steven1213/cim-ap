@@ -41,7 +41,7 @@ public class CimReasonCode extends BaseDefData {
     @Column(name = "short_name", length = 128)
     private String shortName;
 
-    /** 归属部门（平台字典 mds.owning_dept；统计聚合与改善路由用，非处置权限）。 */
+    /** 归属部门（逻辑引用 IAM 组织架构 DEPT 节点 code；统计聚合与改善路由用，非处置权限）。 */
     @Column(name = "owning_dept", length = 64)
     private String owningDept;
 

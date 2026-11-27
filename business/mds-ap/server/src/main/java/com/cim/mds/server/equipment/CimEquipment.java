@@ -64,7 +64,7 @@ public class CimEquipment extends EditLockDefData {
     @Column(name = "owner_user", length = 64)
     private String ownerUser;
 
-    /** 归属部门（mds.owning_dept 字典：EQP/PE/QC/PROD/MAT/PLAN/ENG/OTHER；可空）。 */
+    /** 归属部门（逻辑引用 IAM 组织架构 DEPT 节点 code；V36 起部门真源=组织架构）。 */
     @Column(name = "owning_dept", length = 32)
     private String owningDept;
 

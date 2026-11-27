@@ -34,6 +34,8 @@ public class ReasonCodeAdminService {
     private final CimReasonCodeTypeRepository typeRepository;
     private final CimReasonCodeRepository codeRepository;
     private final NamingRuleAdminService namingRuleService;
+    /** 归属部门引用守门（IAM 组织架构 DEPT 节点，V36 起部门真源=组织架构）。 */
+    private final com.cim.mds.server.admin.DirectoryClient directoryClient;
 
     // ---------------------------------------------------------------- 视图 / 请求
 
@@ -157,7 +159,7 @@ public class ReasonCodeAdminService {
         reason.setReasonCode(code);
         reason.setTypeKey(type.getTypeKey());
         reason.setShortName(blankToNull(req.shortName()));
-        reason.setOwningDept(blankToNull(req.owningDept()));
+        reason.setOwningDept(directoryClient.requireDeptCode(req.owningDept()));
         reason.setSortNo(req.sortNo() == null ? 100 : req.sortNo());
         reason.setDescription(blankToNull(req.description()));
         reason.setEnabled(req.enabled() == null ? Boolean.TRUE : req.enabled());
@@ -172,7 +174,7 @@ public class ReasonCodeAdminService {
     public ReasonView updateCode(String id, ReasonUpdateReq req) {
         CimReasonCode reason = requireCode(id);
         reason.setShortName(blankToNull(req.shortName()));
-        reason.setOwningDept(blankToNull(req.owningDept()));
+        reason.setOwningDept(directoryClient.requireDeptCode(req.owningDept()));
         reason.setSortNo(req.sortNo() == null ? reason.getSortNo() : req.sortNo());
         reason.setDescription(blankToNull(req.description()));
         reason.setEnabled(req.enabled() == null ? reason.getEnabled() : req.enabled());

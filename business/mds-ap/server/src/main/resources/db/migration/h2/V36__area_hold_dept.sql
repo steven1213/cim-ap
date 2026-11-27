@@ -7,5 +7,6 @@
 -- Hold Code 原因码域暂不建（用户明确先不做），MES 侧以后可以：
 --   Hold Code 默认部门优先 → Area 默认部门兜底 → 人工可改。
 
--- 字典复用 mds.owning_dept（V35）：Hold 处置部门与设备归属部门是同一套工艺部门词表。
+-- 部门真源 = IAM 组织架构（nodeType=DEPT），V36 起静态字典 mds.owning_dept 废弃删除，
+-- 业务取数/守门统一走 DirectoryClient（dept-options）。
 ALTER TABLE cim_area ADD COLUMN hold_dept VARCHAR(32);

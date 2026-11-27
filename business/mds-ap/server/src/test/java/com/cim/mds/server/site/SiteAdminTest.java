@@ -1,7 +1,9 @@
 package com.cim.mds.server.site;
 
+import com.cim.mds.server.admin.DirectoryClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -9,15 +11,18 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -49,6 +54,19 @@ class SiteAdminTest {
     MockMvc mvc;
     @Autowired
     ObjectMapper om;
+
+    /** 部门目录 mock（V36 部门真源=IAM 组织架构；单测不依赖外部 IAM）。 */
+    @MockBean
+    DirectoryClient directoryClient;
+
+    @BeforeEach
+    void mockDeptDirectory() {
+        when(directoryClient.deptOptions()).thenReturn(List.of(
+                new DirectoryClient.DeptOption("PE", "工艺部（PE）", "/root/pe/"),
+                new DirectoryClient.DeptOption("QC", "质量部（QC）", "/root/qc/")));
+        // requireDeptCode 走真实实现（内部调上面 stub 的 deptOptions）；mock 类默认把该方法也替掉了
+        when(directoryClient.requireDeptCode(org.mockito.ArgumentMatchers.any())).thenCallRealMethod();
+    }
 
     private static String siteId;
     private static String fabId;

@@ -15,6 +15,7 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
+  type FormOption,
 } from '@cim/ui';
 import { useHasPermission } from '@/lib/usePermission';
 import * as api from '@/lib/mdsApi';
@@ -94,7 +95,8 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
   const [searchParams, setSearchParams] = useSearchParams();
   const stateDict = useDict('mds.equip_state');
   const kindDict = useDict('mds.equip_kind');
-  const owningDeptDict = useDict('mds.owning_dept');
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构，静态字典废弃）
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
 
   const [keyword, setKeyword] = useState('');
   const [classFilter, setClassFilter] = useState('');
@@ -290,7 +292,7 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
         titleKey: 'mds.equipment.owningDept',
         width: 80,
         ellipsis: true,
-        render: (r) => owningDeptDict.labelOf(r.owningDept) ?? '—',
+        render: (r) => (deptRes.data ?? []).find((d) => d.code === r.owningDept)?.name ?? r.owningDept ?? '—',
       },
       {
         key: 'stateCode',
@@ -342,7 +344,7 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, locLabel, kindDict, stateDict, owningDeptDict],
+    [t, locLabel, kindDict, stateDict, deptRes.data],
   );
 
   return (
@@ -495,6 +497,12 @@ function EquipmentFormModal({
   const stateDict = useDict('mds.equip_state');
   const controlDict = useDict('mds.equip_control_mode');
   const prodDict = useDict('mds.equip_production_mode');
+  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）
+  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
+  const owningDeptOptions = useMemo<FormOption[]>(
+    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.name, hint: d.code })),
+    [deptRes.data],
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({
@@ -670,7 +678,7 @@ function EquipmentFormModal({
       },
       // —— 资产与 Owner（ISA-95 PhysicalAsset）——
       { kind: 'text' as const, key: 'owner' as const, labelKey: 'mds.equipment.owner' },
-      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.equipment.owningDept', dict: 'mds.owning_dept', allowClear: true },
+      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.equipment.owningDept', options: owningDeptOptions, allowClear: true },
       { kind: 'text' as const, key: 'vendor' as const, labelKey: 'mds.equipment.vendor' },
       { kind: 'text' as const, key: 'modelNo' as const, labelKey: 'mds.equipment.modelNo' },
       { kind: 'text' as const, key: 'serialNo' as const, labelKey: 'mds.equipment.serialNo' },
