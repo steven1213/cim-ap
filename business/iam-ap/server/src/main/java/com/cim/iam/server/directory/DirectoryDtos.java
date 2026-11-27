@@ -30,7 +30,7 @@ public final class DirectoryDtos {
             List<OrgBriefDto> orgs) {
     }
 
-    /** 组织节点（{@code since} 增量拉取用 {@code updatedAt} 合并）。 */
+    /** 组织节点（{@code since} 增量拉取用 {@code updatedAt} 合并；leader* 为负责人引用与显示名）。 */
     public record OrgNodeDto(
             String id,
             String parentId,
@@ -41,6 +41,8 @@ public final class DirectoryDtos {
             int sortNo,
             String source,
             String status,
+            String leaderUserId,
+            String leaderName,
             Instant updatedAt) {
     }
 

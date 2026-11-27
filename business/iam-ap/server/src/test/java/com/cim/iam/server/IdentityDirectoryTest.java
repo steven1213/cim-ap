@@ -95,9 +95,9 @@ class IdentityDirectoryTest {
 
     @Test
     void orgGrantExpandsToMemberThroughAncestorChain() {
-        OrgNode area = orgNodeService.createManaged(null, "AREA-T1", "A 厂", OrgNodeType.AREA, 0);
-        OrgNode ws = orgNodeService.createManaged(area.getId(), "WS-T1", "蚀刻车间", OrgNodeType.WORKSHOP, 0);
-        OrgNode line = orgNodeService.createManaged(ws.getId(), "LINE-T1", "蚀刻 1 线", OrgNodeType.LINE, 0);
+        OrgNode area = orgNodeService.createManaged(null, "AREA-T1", "A 厂", OrgNodeType.AREA, 0, null);
+        OrgNode ws = orgNodeService.createManaged(area.getId(), "WS-T1", "蚀刻车间", OrgNodeType.WORKSHOP, 0, null);
+        OrgNode line = orgNodeService.createManaged(ws.getId(), "LINE-T1", "蚀刻 1 线", OrgNodeType.LINE, 0, null);
 
         appRegistrationService.registerApp("mds-ap", "MDS", 1);
         appRegistrationService.registerApp("mes-ap", "MES", 2);
@@ -128,7 +128,7 @@ class IdentityDirectoryTest {
         assertThat(adNode.getId()).isNotBlank();
 
         // AD 同步节点不可在 IAM 侧修改 / 删除
-        assertThatThrownBy(() -> orgNodeService.update(adNode.getId(), "改名", null, null))
+        assertThatThrownBy(() -> orgNodeService.update(adNode.getId(), "改名", null, null, null))
                 .isInstanceOf(BizException.class)
                 .extracting("bizCode")
                 .isEqualTo(BizCode.PARAM_INVALID);
@@ -138,15 +138,15 @@ class IdentityDirectoryTest {
                 .isEqualTo(BizCode.PARAM_INVALID);
 
         // 同 code 的 IAM 自建节点可与 AD 节点共存（source 隔离，互不覆盖）
-        OrgNode managed = orgNodeService.createManaged(null, "制造部", "制造部（自建）", OrgNodeType.WORKSHOP, 0);
+        OrgNode managed = orgNodeService.createManaged(null, "制造部", "制造部（自建）", OrgNodeType.WORKSHOP, 0, null);
         assertThat(managed.getId()).isNotEqualTo(adNode.getId());
         assertThat(managed.getSource().name()).isEqualTo("IAM_MANAGED");
     }
 
     @Test
     void orgChangeBumpsTokenVersionAndWatermark() {
-        OrgNode area = orgNodeService.createManaged(null, "AREA-T3", "B 厂", OrgNodeType.AREA, 0);
-        OrgNode ws = orgNodeService.createManaged(area.getId(), "WS-T3", "薄膜车间", OrgNodeType.WORKSHOP, 0);
+        OrgNode area = orgNodeService.createManaged(null, "AREA-T3", "B 厂", OrgNodeType.AREA, 0, null);
+        OrgNode ws = orgNodeService.createManaged(area.getId(), "WS-T3", "薄膜车间", OrgNodeType.WORKSHOP, 0, null);
         profileService.createManaged("dir-u3", "李四", "1003", null, null, "技师");
         profileService.setUserOrgs("dir-u3", List.of(new ProfileService.OrgRef(ws.getId(), true)));
 
@@ -211,7 +211,7 @@ class IdentityDirectoryTest {
 
     @Test
     void orgGrantChangeInvalidatesExistingToken() throws Exception {
-        OrgNode area = orgNodeService.createManaged(null, "AREA-T7", "D 厂", OrgNodeType.AREA, 0);
+        OrgNode area = orgNodeService.createManaged(null, "AREA-T7", "D 厂", OrgNodeType.AREA, 0, null);
         appRegistrationService.registerApp("eap-ap", "EAP", 7);
         profileService.createManaged("dir-u7", "王五", "1007", null, null, "工程师");
 

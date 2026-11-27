@@ -61,8 +61,15 @@ public class DirectoryClient {
                 .map(o -> new DeptOption(
                         String.valueOf(o.get("code")),
                         String.valueOf(o.get("name")),
-                        String.valueOf(o.getOrDefault("path", ""))))
+                        String.valueOf(o.getOrDefault("path", "")),
+                        nullIfNone(o.get("leaderUserId")),
+                        nullIfNone(o.get("leaderName"))))
                 .toList();
+    }
+
+    /** 目录 JSON 的 "null" 字符串哨兵 → Java null（GET /directory/orgs 的 map 通道）。 */
+    private static String nullIfNone(Object v) {
+        return v == null || "null".equals(String.valueOf(v)) ? null : String.valueOf(v);
     }
 
     /**
@@ -88,8 +95,11 @@ public class DirectoryClient {
         return code;
     }
 
-    /** 部门选项行（code 为引用真值，name 供展示，path 供层级上下文）。 */
-    public record DeptOption(String code, String name, String path) {
+    /**
+     * 部门选项行（code 为引用真值，name 供展示，path 供层级上下文；
+     * leader* 为负责人引用与显示名——Hold 到部门的任务路由目标）。
+     */
+    public record DeptOption(String code, String name, String path, String leaderUserId, String leaderName) {
     }
 
     /** 元素为标量（如用户 ID 字符串数组）的列表取数。 */

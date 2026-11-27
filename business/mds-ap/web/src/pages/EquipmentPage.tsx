@@ -500,7 +500,7 @@ function EquipmentFormModal({
   // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）
   const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
   const owningDeptOptions = useMemo<FormOption[]>(
-    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.name, hint: d.code })),
+    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.leaderName ? `${d.name} · ${d.leaderName}` : d.name, hint: d.code })),
     [deptRes.data],
   );
   const [busy, setBusy] = useState(false);

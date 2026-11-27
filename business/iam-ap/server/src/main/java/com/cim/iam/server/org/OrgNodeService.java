@@ -4,6 +4,8 @@ import com.cim.core.port.IdGenerator;
 import com.cim.iam.server.audit.AuditService;
 import com.cim.iam.server.audit.AuditType;
 import com.cim.iam.server.common.DataOrigin;
+import com.cim.iam.server.profile.UserProfileRepository;
+import com.cim.iam.server.profile.UserStatus;
 import com.cim.iam.server.token.TokenVersionService;
 import com.cim.iam.server.watermark.DirectoryWatermarkService;
 import com.cim.iam.server.watermark.WatermarkScope;
@@ -41,6 +43,8 @@ public class OrgNodeService {
     private final AuditService auditService;
     private final DirectoryWatermarkService watermarkService;
     private final TokenVersionService tokenVersionService;
+    /** 负责人引用校验（存在且 ACTIVE 的用户档案；直接查仓储——ProfileService 依赖本服务，构造注入会成环）。 */
+    private final UserProfileRepository profileRepository;
 
     public List<OrgNode> listAll() {
         return repository.findAll();
@@ -57,7 +61,8 @@ public class OrgNodeService {
 
     /** 新建 IAM 自建组织节点（AD 同步层由 {@link #upsertAdSynced} 负责）。 */
     @Transactional
-    public OrgNode createManaged(String parentId, String code, String name, OrgNodeType type, int sortNo) {
+    public OrgNode createManaged(String parentId, String code, String name, OrgNodeType type, int sortNo,
+                                 String leaderUserId) {
         if (repository.findBySourceAndCode(DataOrigin.IAM_MANAGED, code).isPresent()) {
             throw BizException.paramInvalid("组织编码已存在: " + code);
         }
@@ -72,19 +77,20 @@ public class OrgNodeService {
         n.setSortNo(sortNo);
         n.setSource(DataOrigin.IAM_MANAGED);
         n.setStatus(OrgStatus.ENABLED);
+        n.setLeaderUserId(requireLeader(leaderUserId));
         n.setPath(parent == null ? "/" + n.getId() + "/" : parent.getPath() + n.getId() + "/");
         n.setUpdatedAt(Instant.now());
         OrgNode saved = repository.save(n);
         watermarkService.bump(WatermarkScope.ORG);
         auditService.success(AuditType.ORG_CREATED, null, code,
                 "新建组织节点 " + name + "（" + type + "）");
-        log.info("[org] 新建组织 code={} name={} type={}", code, name, type);
+        log.info("[org] 新建组织 code={} name={} type={} leader={}", code, name, type, n.getLeaderUserId());
         return saved;
     }
 
-    /** 更新名称 / 排序 / 状态（仅 IAM_MANAGED）。 */
+    /** 更新名称 / 排序 / 状态 / 负责人（仅 IAM_MANAGED）。 */
     @Transactional
-    public OrgNode update(String id, String name, Integer sortNo, OrgStatus status) {
+    public OrgNode update(String id, String name, Integer sortNo, OrgStatus status, String leaderUserId) {
         OrgNode n = require(id);
         guardManaged(n, "修改");
         if (name != null && !name.isBlank()) {
@@ -96,11 +102,32 @@ public class OrgNodeService {
         if (status != null) {
             n.setStatus(status);
         }
+        if (leaderUserId != null) {
+            n.setLeaderUserId(requireLeader(leaderUserId));
+        }
         n.setUpdatedAt(Instant.now());
         OrgNode saved = repository.save(n);
         watermarkService.bump(WatermarkScope.ORG);
         auditService.success(AuditType.ORG_UPDATED, null, n.getCode(), "更新组织节点 " + n.getName());
         return saved;
+    }
+
+    /**
+     * 负责人引用守门（空入空出；非空必须是存在且 ACTIVE 的用户档案）。
+     * 负责人是「任务路由目标」而非权限，不做组织归属校验——工艺部负责人
+     * 可以是兼管该部门的品质人员（现实组织里常见）。
+     */
+    private String requireLeader(String userId) {
+        String uid = userId == null || userId.isBlank() ? null : userId.trim();
+        if (uid == null) {
+            return null;
+        }
+        var profile = profileRepository.findByUserId(uid)
+                .orElseThrow(() -> BizException.paramInvalid("负责人用户不存在: " + uid));
+        if (profile.getStatus() != UserStatus.ACTIVE) {
+            throw BizException.paramInvalid("负责人用户未启用: " + uid);
+        }
+        return uid;
     }
 
     /**

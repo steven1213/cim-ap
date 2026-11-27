@@ -87,10 +87,19 @@ public class DirectoryService {
                 p.getStatus().name(), p.getSource().name(), orgs);
     }
 
+    /** 单节点 DTO（管理端 create 后回显复用）。 */
+    public OrgNodeDto orgDto(OrgNode n) {
+        return toDto(n);
+    }
+
     private OrgNodeDto toDto(OrgNode n) {
+        String leaderUserId = n.getLeaderUserId();
+        String leaderName = leaderUserId == null ? null
+                : profileService.findByUserId(leaderUserId).map(UserProfile::getDisplayName).orElse(null);
         return new OrgNodeDto(n.getId(), n.getParentId(), n.getCode(), n.getName(),
                 n.getNodeType() == null ? null : n.getNodeType().name(),
-                n.getPath(), n.getSortNo(), n.getSource().name(), n.getStatus().name(), n.getUpdatedAt());
+                n.getPath(), n.getSortNo(), n.getSource().name(), n.getStatus().name(),
+                leaderUserId, leaderName, n.getUpdatedAt());
     }
 
     /** 供内部复用：按 orgId 建索引（避免 N+1 的展示场景）。 */

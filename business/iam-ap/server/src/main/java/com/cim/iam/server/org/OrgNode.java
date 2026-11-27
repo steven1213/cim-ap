@@ -51,6 +51,15 @@ public class OrgNode extends BaseDefData {
     @Column(name = "path", length = 512)
     private String path;
 
+    /**
+     * 负责人 userId（可空；本地用户 userId 即用户名，与凭证/档案同源）。
+     * <p>「归属关系 ≠ 负责关系」：负责人是组织属性而非 {@code user_org} 归属属性
+     * （副属人员不因归属而负责）。语义为任务路由目标（如 WIP Hold 到部门时
+     * 派给该 DEPT 节点负责人），<b>不是权限</b>——处理权限仍由角色/准入控制。</p>
+     */
+    @Column(name = "leader_user_id", length = 128)
+    private String leaderUserId;
+
     /** 同级排序。 */
     @Column(name = "sort_no")
     private int sortNo = 0;

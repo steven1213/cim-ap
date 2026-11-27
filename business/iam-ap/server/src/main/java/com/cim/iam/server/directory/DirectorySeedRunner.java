@@ -56,8 +56,9 @@ public class DirectorySeedRunner implements ApplicationRunner {
     private final IamAuthProperties authProperties;
     private final DirectorySeedProperties properties;
 
-    /** 组织节点种子定义（parents 先于 children；parentCode 为 null 即根）。 */
-    private record OrgDef(String code, String name, OrgNodeType type, String parentCode, int sortNo) {
+    /** 组织节点种子定义（parents 先于 children；parentCode 为 null 即根；leader 可空 = 暂不指定）。 */
+    private record OrgDef(String code, String name, OrgNodeType type, String parentCode, int sortNo,
+                          String leader) {
     }
 
     /** 演示用户种子定义（secondaryOrg 非空即多归属演示）。 */
@@ -69,26 +70,27 @@ public class DirectorySeedRunner implements ApplicationRunner {
      * 组织树种子：制造维度（AREA→WORKSHOP→LINE→PROCESS→TEAM）+ 行政维度（DEPT）。
      *
      * <p>DEPT 编码沿用原 {@code mds.owning_dept} 词表口径（PE/QC/EQP/PROD/MAT/PLAN/ENG），
-     * 业务侧历史数据无需迁移；IT 为通用支撑部门。</p>
+     * 业务侧历史数据无需迁移；IT 为通用支撑部门。负责人 = 各部门演示用户
+     * （Hold 到部门 → 部门负责人处理的链路闭环）。</p>
      */
     private static final List<OrgDef> ORGS = List.of(
             // —— 制造维度：6 英寸厂动线 ——
-            new OrgDef("FAB1", "6英寸一号厂", OrgNodeType.AREA, null, 10),
-            new OrgDef("WS1", "一号车间", OrgNodeType.WORKSHOP, "FAB1", 10),
-            new OrgDef("L1", "一号产线", OrgNodeType.LINE, "WS1", 10),
-            new OrgDef("PHOTO", "光刻工序", OrgNodeType.PROCESS, "L1", 10),
-            new OrgDef("ETCH", "刻蚀工序", OrgNodeType.PROCESS, "L1", 20),
-            new OrgDef("QCP", "品保工序", OrgNodeType.PROCESS, "L1", 30),
-            new OrgDef("T1", "运行一班", OrgNodeType.TEAM, "L1", 40),
+            new OrgDef("FAB1", "6英寸一号厂", OrgNodeType.AREA, null, 10, null),
+            new OrgDef("WS1", "一号车间", OrgNodeType.WORKSHOP, "FAB1", 10, null),
+            new OrgDef("L1", "一号产线", OrgNodeType.LINE, "WS1", 10, null),
+            new OrgDef("PHOTO", "光刻工序", OrgNodeType.PROCESS, "L1", 10, "pe01"),
+            new OrgDef("ETCH", "刻蚀工序", OrgNodeType.PROCESS, "L1", 20, "eqp01"),
+            new OrgDef("QCP", "品保工序", OrgNodeType.PROCESS, "L1", 30, "qc01"),
+            new OrgDef("T1", "运行一班", OrgNodeType.TEAM, "L1", 40, "prod01"),
             // —— 行政维度：部门真源（业务 ap 部门下拉数据源）——
-            new OrgDef("PE", "工艺部（PE）", OrgNodeType.DEPT, null, 10),
-            new OrgDef("QC", "质量部（QC）", OrgNodeType.DEPT, null, 20),
-            new OrgDef("EQP", "设备部", OrgNodeType.DEPT, null, 30),
-            new OrgDef("PROD", "生产部", OrgNodeType.DEPT, null, 40),
-            new OrgDef("MAT", "物料仓储部", OrgNodeType.DEPT, null, 50),
-            new OrgDef("PLAN", "计划部", OrgNodeType.DEPT, null, 60),
-            new OrgDef("ENG", "工程部", OrgNodeType.DEPT, null, 70),
-            new OrgDef("IT", "信息技术部", OrgNodeType.DEPT, null, 80));
+            new OrgDef("PE", "工艺部（PE）", OrgNodeType.DEPT, null, 10, "pe01"),
+            new OrgDef("QC", "质量部（QC）", OrgNodeType.DEPT, null, 20, "qc01"),
+            new OrgDef("EQP", "设备部", OrgNodeType.DEPT, null, 30, "eqp01"),
+            new OrgDef("PROD", "生产部", OrgNodeType.DEPT, null, 40, "prod01"),
+            new OrgDef("MAT", "物料仓储部", OrgNodeType.DEPT, null, 50, "mat01"),
+            new OrgDef("PLAN", "计划部", OrgNodeType.DEPT, null, 60, "plan01"),
+            new OrgDef("ENG", "工程部", OrgNodeType.DEPT, null, 70, null),
+            new OrgDef("IT", "信息技术部", OrgNodeType.DEPT, null, 80, null));
 
     /** 演示用户：每部门一名；pe01/prod01 多归属（跨线支援演示）。 */
     private static final List<UserDef> USERS = List.of(
@@ -108,6 +110,7 @@ public class DirectorySeedRunner implements ApplicationRunner {
         try {
             Map<String, String> orgIds = ensureOrgs();
             ensureUsers(orgIds);
+            ensureLeaders();
         } catch (Exception e) {
             log.warn("[iam-directory-seed] 目录种子失败（可在控制台手工补建）：{}", e.getMessage(), e);
         }
@@ -126,7 +129,9 @@ public class DirectorySeedRunner implements ApplicationRunner {
                 continue;
             }
             String parentId = def.parentCode() == null ? null : ids.get(def.parentCode());
-            OrgNode n = orgNodeService.createManaged(parentId, def.code(), def.name(), def.type(), def.sortNo());
+            // 建树阶段不带 leader——负责人引用的用户可能尚未建（建树先于建用户）；
+            // leader 由 ensureLeaders 在用户就位后统一补齐
+            OrgNode n = orgNodeService.createManaged(parentId, def.code(), def.name(), def.type(), def.sortNo(), null);
             ids.put(def.code(), n.getId());
             created++;
         }
@@ -134,6 +139,31 @@ public class DirectorySeedRunner implements ApplicationRunner {
             log.info("[iam-directory-seed] 组织树种子完成：新建 {} 个节点（共 {} 个定义）", created, ORGS.size());
         }
         return ids;
+    }
+
+    /** 幂等补负责人（在用户就位后执行；已指定的不覆盖，兼容老库已建组织场景）。 */
+    private void ensureLeaders() {
+        int set = 0;
+        for (OrgDef def : ORGS) {
+            if (def.leader() == null || def.leader().isBlank()) {
+                continue;
+            }
+            var node = orgNodeService.listAll().stream()
+                    .filter(n -> def.code().equals(n.getCode()))
+                    .findFirst()
+                    .orElse(null);
+            if (node == null || node.getLeaderUserId() != null) {
+                continue;
+            }
+            orgNodeService.update(node.getId(), null, null, null, def.leader());
+            set++;
+        }
+        if (set > 0) {
+            log.info("[iam-directory-seed] 组织负责人补齐：{} 个节点（{}）",
+                    set, ORGS.stream().filter(d -> d.leader() != null)
+                            .map(d -> d.code() + "→" + d.leader())
+                            .reduce((a, b) -> a + "、" + b).orElse(""));
+        }
     }
 
     /** 幂等建演示用户：本地凭证 + 档案 + 组织归属 + ap 准入（接入码未登记的跳过并告警）。 */

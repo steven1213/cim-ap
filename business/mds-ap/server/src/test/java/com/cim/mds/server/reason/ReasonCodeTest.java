@@ -66,8 +66,8 @@ class ReasonCodeTest {
     @BeforeEach
     void mockDeptDirectory() {
         when(directoryClient.deptOptions()).thenReturn(List.of(
-                new DirectoryClient.DeptOption("EQP", "设备部", "/root/eqp/"),
-                new DirectoryClient.DeptOption("PE", "工艺部（PE）", "/root/pe/")));
+                new DirectoryClient.DeptOption("EQP", "设备部", "/root/eqp/", null, null),
+                new DirectoryClient.DeptOption("PE", "工艺部（PE）", "/root/pe/", "pe01", "张明")));
         // requireDeptCode 走真实实现（内部调上面 stub 的 deptOptions）；mock 类默认把该方法也替掉了
         when(directoryClient.requireDeptCode(org.mockito.ArgumentMatchers.any())).thenCallRealMethod();
     }

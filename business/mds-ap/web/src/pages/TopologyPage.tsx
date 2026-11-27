@@ -923,7 +923,12 @@ function NodeDetail({
             <dt>{t('mds.area.group')}</dt>
             <dd>{groups.find((g) => g.id === node.areaGroupId)?.groupName ?? '—'}</dd>
             <dt>{t('mds.area.holdDept')}</dt>
-            <dd>{depts.find((d) => d.code === node.holdDept)?.name ?? node.holdDept ?? '—'}</dd>
+            <dd>
+              {(() => {
+                const d = depts.find((x) => x.code === node.holdDept);
+                return d ? (d.leaderName ? `${d.name}（负责人：${d.leaderName}）` : d.name) : (node.holdDept ?? '—');
+              })()}
+            </dd>
           </>
         )}
       </dl>
@@ -1107,7 +1112,7 @@ function NodeFormModal({
   // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）：Hold 处置部门下拉用
   const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
   const deptOptions = useMemo<FormOption[]>(
-    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.name, hint: d.code })),
+    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.leaderName ? `${d.name} · ${d.leaderName}` : d.name, hint: d.code })),
     [deptRes.data],
   );
 

@@ -198,9 +198,9 @@ class UserListProjectionTest {
         String token = login("admin", "Admin@123456");
         credentialService.registerLocalUser("orgmem", hash("Org@123456", "s7"), "s7");
 
-        OrgNode factory = orgNodeService.createManaged(null, "T-FAC", "A厂", OrgNodeType.AREA, 1);
+        OrgNode factory = orgNodeService.createManaged(null, "T-FAC", "A厂", OrgNodeType.AREA, 1, null);
         OrgNode workshop = orgNodeService.createManaged(factory.getId(), "T-WS", "蚀刻车间",
-                OrgNodeType.WORKSHOP, 1);
+                OrgNodeType.WORKSHOP, 1, null);
         profileService.setUserOrgs("orgmem", List.of(new ProfileService.OrgRef(workshop.getId(), true)));
 
         List<String> orgNames = new ArrayList<>();

@@ -129,6 +129,10 @@ export interface OrgNode {
   sortNo: number;
   source: DataOrigin;
   status: OrgStatus;
+  /** 负责人 userId（可空；任务路由目标——如 Hold 到部门派给负责人，非权限）。 */
+  leaderUserId: string | null;
+  /** 负责人显示名（后端联查档案派生）。 */
+  leaderName: string | null;
   updatedAt: string | null;
 }
 

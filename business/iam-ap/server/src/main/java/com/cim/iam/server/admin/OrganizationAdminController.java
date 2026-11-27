@@ -41,10 +41,11 @@ public class OrganizationAdminController {
     private final ProfileService profileService;
     private final DirectoryService directoryService;
 
-    public record CreateOrgRequest(String parentId, String code, String name, OrgNodeType nodeType, int sortNo) {
+    public record CreateOrgRequest(String parentId, String code, String name, OrgNodeType nodeType, int sortNo,
+                                   String leaderUserId) {
     }
 
-    public record UpdateOrgRequest(String name, Integer sortNo, OrgStatus status) {
+    public record UpdateOrgRequest(String name, Integer sortNo, OrgStatus status, String leaderUserId) {
     }
 
     public record MoveOrgRequest(String newParentId) {
@@ -68,17 +69,15 @@ public class OrganizationAdminController {
     @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_CREATE + "')")
     public Result<OrgNodeDto> create(@RequestBody CreateOrgRequest req) {
         OrgNode n = orgNodeService.createManaged(req.parentId(), req.code(), req.name(),
-                req.nodeType(), req.sortNo());
-        return Result.ok(new OrgNodeDto(n.getId(), n.getParentId(), n.getCode(), n.getName(),
-                n.getNodeType().name(), n.getPath(), n.getSortNo(),
-                n.getSource().name(), n.getStatus().name(), n.getUpdatedAt()));
+                req.nodeType(), req.sortNo(), req.leaderUserId());
+        return Result.ok(directoryService.orgDto(n));
     }
 
     /** 更新名称 / 排序 / 状态（仅 IAM 自建节点）。 */
     @PutMapping("/orgs/{id}")
     @PreAuthorize("hasAuthority('" + IamPermissionCodes.ORG_UPDATE + "')")
     public Result<Void> update(@PathVariable String id, @RequestBody UpdateOrgRequest req) {
-        orgNodeService.update(id, req.name(), req.sortNo(), req.status());
+        orgNodeService.update(id, req.name(), req.sortNo(), req.status(), req.leaderUserId());
         return Result.ok();
     }
 

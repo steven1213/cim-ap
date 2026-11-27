@@ -86,6 +86,9 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
   const [editName, setEditName] = useState('');
   const [editSort, setEditSort] = useState(0);
   const [editStatus, setEditStatus] = useState<'ENABLED' | 'DISABLED'>('ENABLED');
+  const [editLeader, setEditLeader] = useState('');
+  // 新建负责人
+  const [createLeader, setCreateLeader] = useState('');
   // 移动
   const [moveTo, setMoveTo] = useState('');
   // 挂人
@@ -133,6 +136,7 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
     setEditName(selectedNode.name);
     setEditSort(selectedNode.sortNo);
     setEditStatus(selectedNode.status);
+    setEditLeader(selectedNode.leaderUserId ?? '');
     setMoveTo(selectedNode.parentId ?? '');
   }, [selectedNode]);
 
@@ -197,10 +201,12 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
         name: name.trim(),
         nodeType,
         sortNo: Number(sortNo) || 0,
+        leaderUserId: createLeader || null,
       });
       toast.success(t('admin.orgs.msgCreated', { name: name.trim() }));
       setCode('');
       setName('');
+      setCreateLeader('');
       setShowCreate(false);
       bundleRes.refresh();
     } catch (e: any) {
@@ -218,6 +224,8 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
         name: editName.trim(),
         sortNo: Number(editSort) || 0,
         status: editStatus,
+        // 空串 = 显式清空负责人；与名称/排序不同，负责人是「三态」语义（不动/设置/清空）
+        leaderUserId: editLeader,
       });
       toast.success(t('admin.orgs.msgSaved'));
       bundleRes.refresh();
@@ -375,6 +383,8 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
                       : t('admin.orgs.statusDisabled')}
                   </CimTag>
                 </dd>
+                <dt>{t('admin.orgs.dt.leader')}</dt>
+                <dd>{selectedNode.leaderName ?? selectedNode.leaderUserId ?? '—'}</dd>
                 <dt>{t('admin.orgs.dt.path')}</dt>
                 <dd className="mono dim">{selectedNode.path}</dd>
                 <dt>{t('admin.orgs.dt.updated')}</dt>
@@ -409,6 +419,19 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
                         ]}
                         allowClear={false}
                         width={140}
+                      />
+                    </CimField>
+                    <CimField label={t('admin.orgs.f.leader')} htmlFor="old">
+                      <CimSelect
+                        id="old"
+                        value={editLeader}
+                        onChange={(v) => setEditLeader(typeof v === 'string' ? v : '')}
+                        options={users.map((u) => ({
+                          value: u.userId,
+                          label: `${u.displayName || u.username} (${u.username})`,
+                        }))}
+                        allowClear
+                        width={180}
                       />
                     </CimField>
                     {canUpdate && (
@@ -559,6 +582,19 @@ export default function OrgPage({ readOnly = false, perms, orgPath = '/admin/org
                 value={String(sortNo)}
                 onChange={(v) => setSortNo(Number(v) || 0)}
                 width={90}
+              />
+            </CimField>
+            <CimField label={t('admin.orgs.f.leader')} htmlFor="cl">
+              <CimSelect
+                id="cl"
+                value={createLeader}
+                onChange={(v) => setCreateLeader(typeof v === 'string' ? v : '')}
+                options={users.map((u) => ({
+                  value: u.userId,
+                  label: `${u.displayName || u.username} (${u.username})`,
+                }))}
+                allowClear
+                width={180}
               />
             </CimField>
             <CimButton
