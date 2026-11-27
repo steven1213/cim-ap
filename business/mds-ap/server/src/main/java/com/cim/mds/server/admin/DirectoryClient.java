@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,19 +51,23 @@ public class DirectoryClient {
         });
     }
 
-    /** 部门下拉选项（行政维度 {@code nodeType=DEPT} 且启用）。 */
-    public List<DeptOption> deptOptions() {
-        return list("/api/v1/directory/orgs", Map.of()).stream()
-                .filter(o -> "DEPT".equals(String.valueOf(o.get("nodeType"))))
-                .filter(o -> {
-                    Object st = o.get("status");
-                    return st == null || "ENABLED".equals(String.valueOf(st));
-                })
-                .map(o -> new DeptOption(
+    /**
+     * 组织节点选项（全维度全量启用节点，带 {@code parentCode} 父子关系——前端建组织树）。
+     * 下拉展示整棵组织树作层级上下文，仅 {@code nodeType=DEPT} 且启用的节点可选。
+     */
+    public List<OrgNodeOption> orgOptions() {
+        List<Map<String, Object>> rows = list("/api/v1/directory/orgs", Map.of());
+        Map<String, String> idToCode = new HashMap<>();
+        for (Map<String, Object> o : rows) {
+            idToCode.put(String.valueOf(o.get("id")), String.valueOf(o.get("code")));
+        }
+        return rows.stream()
+                .map(o -> new OrgNodeOption(
                         String.valueOf(o.get("code")),
                         String.valueOf(o.get("name")),
-                        String.valueOf(o.getOrDefault("path", "")),
-                        nullIfNone(o.get("leaderUserId")),
+                        resolveParentCode(o, idToCode),
+                        String.valueOf(o.getOrDefault("nodeType", "")),
+                        isEnabled(o.get("status")),
                         nullIfNone(o.get("leaderName"))))
                 .toList();
     }
@@ -70,6 +75,29 @@ public class DirectoryClient {
     /** 目录 JSON 的 "null" 字符串哨兵 → Java null（GET /directory/orgs 的 map 通道）。 */
     private static String nullIfNone(Object v) {
         return v == null || "null".equals(String.valueOf(v)) ? null : String.valueOf(v);
+    }
+
+    /** parentId（id 引用）→ 父节点 code；根节点或父缺失（目录被删）为 null，前端按根挂载。 */
+    private static String resolveParentCode(Map<String, Object> o, Map<String, String> idToCode) {
+        Object parentId = o.get("parentId");
+        if (parentId == null || "null".equals(String.valueOf(parentId))) {
+            return null;
+        }
+        return idToCode.get(String.valueOf(parentId));
+    }
+
+    /** 目录节点状态 → 启用与否（status 缺省视为启用，与 IAM 控制台口径一致）。 */
+    private static boolean isEnabled(Object status) {
+        return status == null || "ENABLED".equals(String.valueOf(status));
+    }
+
+    /**
+     * 组织节点选项行（code 为引用真值；parentCode 供前端建树；
+     * leaderName 为负责人显示名——Hold 到部门的任务路由目标）。
+     */
+    public record OrgNodeOption(
+            String code, String name, String parentCode, String nodeType,
+            boolean enabled, String leaderName) {
     }
 
     /**
@@ -82,24 +110,19 @@ public class DirectoryClient {
         if (code == null) {
             return null;
         }
-        List<DeptOption> depts;
+        List<OrgNodeOption> orgs;
         try {
-            depts = deptOptions();
+            orgs = orgOptions();
         } catch (Exception e) {
             throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
                     "mds.biz.dept.directoryDown", e.getMessage());
         }
-        if (depts.stream().noneMatch(d -> code.equals(d.code()))) {
+        boolean valid = orgs.stream().anyMatch(o ->
+                code.equals(o.code()) && "DEPT".equals(o.nodeType()) && o.enabled());
+        if (!valid) {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.dept.notFound", code);
         }
         return code;
-    }
-
-    /**
-     * 部门选项行（code 为引用真值，name 供展示，path 供层级上下文；
-     * leader* 为负责人引用与显示名——Hold 到部门的任务路由目标）。
-     */
-    public record DeptOption(String code, String name, String path, String leaderUserId, String leaderName) {
     }
 
     /** 元素为标量（如用户 ID 字符串数组）的列表取数。 */

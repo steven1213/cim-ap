@@ -8,5 +8,5 @@
 --   Hold Code 默认部门优先 → Area 默认部门兜底 → 人工可改。
 
 -- 部门真源 = IAM 组织架构（nodeType=DEPT），V36 起静态字典 mds.owning_dept 废弃删除，
--- 业务取数/守门统一走 DirectoryClient（dept-options）。
+-- 业务取数/守门统一走 DirectoryClient（org-options）。
 ALTER TABLE cim_area ADD COLUMN hold_dept VARCHAR(32);

@@ -155,7 +155,7 @@ public class MdsDictSeedService {
                     new ItemDef("GENERAL", "普通暂存", 90))),
             // 原因码归属部门（V16 → V36 改版）：部门真源已迁移到 IAM 组织架构
             // （nodeType=DEPT），静态字典 mds.owning_dept 废弃删除（不留双轨）；
-            // 业务取数走 DirectoryClient.deptOptions()。
+            // 业务取数走 DirectoryClient.orgOptions()。
             // 载具类型（V31，SEMI E87 Carrier 口径）：AMHS 全链物理载体分类
             new DictDef("mds.carrier_type", "载具类型", List.of(
                     new ItemDef("CASSETTE", "花篮（Cassette）", 10),

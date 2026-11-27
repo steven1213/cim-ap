@@ -17,6 +17,7 @@ import { useUiLabel } from '../locale';
 import { CimInput } from './Input';
 import { CimInputNumber } from './InputNumber';
 import { CimSelect } from './Select';
+import { CimTreeSelect } from './TreeSelect';
 import { CimDatePicker, CimTimePicker } from './DatePicker';
 import { CimChoice } from './Choice';
 
@@ -27,6 +28,17 @@ export interface FormOption {
   /** 右侧补充说明（如编码后面跟名称），同时参与搜索命中。 */
   hint?: string;
   disabled?: boolean;
+}
+
+/** 树形下拉选项（treeSelect 用；children 嵌套由调用方建好）。 */
+export interface FormTreeOption {
+  value: string;
+  labelKey?: string;
+  label?: string;
+  hint?: string;
+  /** 不可选节点仅作层级上下文展示（可展开、不可选中）。 */
+  disabled?: boolean;
+  children?: FormTreeOption[];
 }
 
 interface FieldBase<V> {
@@ -69,6 +81,14 @@ export type FormField<V> =
       options?: FormOption[];
       /** 字典码：由 UiDictProvider 提供选项，无需页面自己拉字典。 */
       dict?: string;
+      allowClear?: boolean;
+      showSearch?: boolean;
+      placeholderKey?: string;
+    })
+  | (FieldBase<V> & {
+      kind: 'treeSelect';
+      /** 树形选项（children 嵌套由调用方建好）。 */
+      options?: FormTreeOption[];
       allowClear?: boolean;
       showSearch?: boolean;
       placeholderKey?: string;
@@ -230,6 +250,19 @@ function FieldControl<V>({
           value={(raw as string) ?? null}
           disabled={off}
           dict={field.dict}
+          options={field.options}
+          allowClear={field.allowClear ?? true}
+          showSearch={field.showSearch ?? true}
+          placeholder={placeholder(field.placeholderKey)}
+          onChange={(v) => patch(key, v)}
+        />
+      );
+    case 'treeSelect':
+      return (
+        <CimTreeSelect
+          id={id}
+          value={(raw as string) ?? null}
+          disabled={off}
           options={field.options}
           allowClear={field.allowClear ?? true}
           showSearch={field.showSearch ?? true}

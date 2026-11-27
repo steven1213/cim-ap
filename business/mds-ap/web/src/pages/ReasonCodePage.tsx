@@ -13,8 +13,10 @@ import {
   useToast,
   type DataTableColumn,
   type FormField,
+  type FormTreeOption,
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
+import { buildOrgTreeOptions } from '@/lib/orgTree';
 import { MDS_PERMS } from '@/lib/permCodes';
 import type { ReasonCodeTypeView, ReasonCodeView } from '@/types';
 
@@ -46,8 +48,8 @@ export default function ReasonCodePage() {
   const { t } = useTranslation();
   const toast = useToast();
   const confirm = useConfirm();
-  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构，静态字典废弃）：列表列展示名映射
-  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
+  // 组织节点（IAM 组织架构；V36 起部门真源=组织架构，静态字典废弃）：列表列展示名映射用
+  const orgRes = useResource(({ signal }) => api.listOrgOptions(signal));
 
   const typesRes = useResource(({ signal }) => api.listReasonCodeTypes(signal));
   const types = typesRes.data ?? NO_TYPES;
@@ -178,7 +180,7 @@ export default function ReasonCodePage() {
         ),
       },
       { key: 'parentCode', titleKey: 'mds.reason.code.parent', width: 150, mono: true, render: (r) => r.parentCode ?? '—' },
-      { key: 'owningDept', titleKey: 'mds.reason.code.dept', width: 110, render: (r) => (deptRes.data ?? []).find((d) => d.code === r.owningDept)?.name ?? r.owningDept ?? '—' },
+      { key: 'owningDept', titleKey: 'mds.reason.code.dept', width: 110, render: (r) => (orgRes.data ?? []).find((d) => d.code === r.owningDept)?.name ?? r.owningDept ?? '—' },
       { key: 'sortNo', titleKey: 'mds.reason.code.sortNo', width: 80 },
       {
         key: 'enabled',
@@ -211,7 +213,7 @@ export default function ReasonCodePage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, deptRes.data],
+    [t, orgRes.data],
   );
 
   return (
@@ -408,9 +410,9 @@ function CodeFormModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const initial = state.mode === 'edit' ? state.code : null;
-  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）
-  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
-  const deptOptions = useMemo(() => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.leaderName ? `${d.name} · ${d.leaderName}` : d.name })), [deptRes.data]);
+  // 组织树选项（IAM 组织架构全树；仅启用 DEPT 可选）：归属部门下拉用
+  const orgRes = useResource(({ signal }) => api.listOrgOptions(signal));
+  const deptTree = useMemo<FormTreeOption[]>(() => buildOrgTreeOptions(orgRes.data ?? []), [orgRes.data]);
   const [form, setForm] = useState({
     reasonCode: initial?.reasonCode ?? '',
     typeKey: initial?.typeKey ?? (state.mode === 'create' ? state.typeKey : ''),
@@ -446,12 +448,12 @@ function CodeFormModal({
       { kind: 'select' as const, key: 'typeKey' as const, labelKey: 'mds.reason.type.key', options: typeOptions, disabled: !!initial },
       { kind: 'text' as const, key: 'shortName' as const, labelKey: 'mds.reason.code.name' },
       { kind: 'select' as const, key: 'parentId' as const, labelKey: 'mds.reason.code.parent', options: parentOptions, allowClear: true, placeholderKey: 'mds.reason.code.parentPlaceholder' },
-      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.reason.code.dept', options: deptOptions, allowClear: true },
+      { kind: 'treeSelect' as const, key: 'owningDept' as const, labelKey: 'mds.reason.code.dept', options: deptTree, allowClear: true },
       { kind: 'number' as const, key: 'sortNo' as const, labelKey: 'mds.reason.code.sortNo', precision: 0 },
       { kind: 'switch' as const, key: 'enabled' as const, labelKey: 'mds.reason.code.enabled' },
       { kind: 'text' as const, key: 'description' as const, labelKey: 'mds.common.remark', span: 2 },
     ],
-    [initial, typeOptions, parentOptions, deptOptions],
+    [initial, typeOptions, parentOptions, deptTree],
   );
 
   async function submit() {

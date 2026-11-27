@@ -16,8 +16,10 @@ import {
   useToast,
   type FormField,
   type FormOption,
+  type FormTreeOption,
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
+import { buildOrgTreeOptions } from '@/lib/orgTree';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useHasPermission } from '@/lib/usePermission';
 import type { Area, AreaGroup, Bay, Fab, Site, Stage } from '@/types';
@@ -185,8 +187,8 @@ export default function TopologyPage() {
   const groupsRes = useResource(({ signal }) => api.listAreaGroups(undefined, signal), {
     enabled: can.area,
   });
-  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）：属性面板展示名映射用
-  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
+  // 组织节点（IAM 组织架构；V36 起部门真源=组织架构）：属性面板展示名映射用
+  const orgRes = useResource(({ signal }) => api.listOrgOptions(signal));
 
   const sites = sitesRes.data ?? NO_SITES;
   const fabs = fabsRes.data ?? NO_FABS;
@@ -480,7 +482,7 @@ export default function TopologyPage() {
             <NodeDetail
               node={selected}
               groups={groups}
-              depts={deptRes.data ?? []}
+              orgs={orgRes.data ?? []}
               onEdit={() => void openEdit(selected)}
               onDelete={() => void doDelete(selected)}
               onCreateChild={() => setCreating(CHILD_LEVEL[selected.level])}
@@ -881,7 +883,7 @@ function renderFabChildren(
 function NodeDetail({
   node,
   groups,
-  depts,
+  orgs,
   onEdit,
   onDelete,
   onCreateChild,
@@ -889,7 +891,7 @@ function NodeDetail({
 }: {
   node: TopoNode;
   groups: AreaGroup[];
-  depts: api.DeptOption[];
+  orgs: api.OrgNodeOption[];
   onEdit: () => void;
   onDelete: () => void;
   onCreateChild: () => void;
@@ -925,7 +927,7 @@ function NodeDetail({
             <dt>{t('mds.area.holdDept')}</dt>
             <dd>
               {(() => {
-                const d = depts.find((x) => x.code === node.holdDept);
+                const d = orgs.find((x) => x.code === node.holdDept);
                 return d ? (d.leaderName ? `${d.name}（负责人：${d.leaderName}）` : d.name) : (node.holdDept ?? '—');
               })()}
             </dd>
@@ -1109,11 +1111,11 @@ function NodeFormModal({
   const [err, setErr] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof NodeForm, string>>>({});
 
-  // 部门选项（IAM 组织架构 DEPT；V36 起部门真源=组织架构）：Hold 处置部门下拉用
-  const deptRes = useResource(({ signal }) => api.listDeptOptions(signal));
-  const deptOptions = useMemo<FormOption[]>(
-    () => (deptRes.data ?? []).map((d) => ({ value: d.code, label: d.leaderName ? `${d.name} · ${d.leaderName}` : d.name, hint: d.code })),
-    [deptRes.data],
+  // 组织树选项（IAM 组织架构全树；仅启用 DEPT 可选）：Hold 处置部门下拉用
+  const orgRes = useResource(({ signal }) => api.listOrgOptions(signal));
+  const deptTree = useMemo<FormTreeOption[]>(
+    () => buildOrgTreeOptions(orgRes.data ?? []),
+    [orgRes.data],
   );
 
   const meta = LEVEL_META[level];
@@ -1238,17 +1240,17 @@ function NodeFormModal({
       });
       // V36 Hold Setting：该区 WIP 被 Hold 时 MES 带出的默认处置部门（空 = 人工指定）
       base.push({
-        kind: 'select',
+        kind: 'treeSelect',
         key: 'holdDept',
         labelKey: 'mds.area.holdDept',
-        options: deptOptions,
+        options: deptTree,
         allowClear: true,
       });
     }
     base.push({ kind: 'text', key: 'remark', labelKey: 'mds.common.remark', span: 2 });
     base.push({ kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' });
     return base;
-  }, [level, initial, parentHint, meta, initialGroupId, siteOptions, fabOptions, areaOptions, bayOptions, groupOptions, deptOptions]);
+  }, [level, initial, parentHint, meta, initialGroupId, siteOptions, fabOptions, areaOptions, bayOptions, groupOptions, deptTree]);
 
   async function submit() {
     const next: Partial<Record<keyof NodeForm, string>> = {};

@@ -79,17 +79,18 @@ const BASE = '/mds';
 
 // ---------- 组织架构部门（V36 起部门真源 = IAM 组织架构，静态字典废弃） ----------
 
-/** 部门下拉选项（IAM 行政 DEPT 节点；code 为引用真值；leader* 为负责人——Hold 到部门的任务路由目标）。 */
-export interface DeptOption {
+/** IAM 组织节点（全维度全量，带父子关系——前端建组织树；部门下拉仅启用 DEPT 可选）。 */
+export interface OrgNodeOption {
   code: string;
   name: string;
-  path: string;
-  leaderUserId: string | null;
+  parentCode: string | null;
+  nodeType: string;
+  enabled: boolean;
   leaderName: string | null;
 }
 
-export function listDeptOptions(signal?: AbortSignal): Promise<DeptOption[]> {
-  return http.get<DeptOption[]>('/mds/admin/directory/dept-options', undefined, { signal });
+export function listOrgOptions(signal?: AbortSignal): Promise<OrgNodeOption[]> {
+  return http.get<OrgNodeOption[]>('/mds/admin/directory/org-options', undefined, { signal });
 }
 
 // ---------- 基地 ----------

@@ -59,16 +59,17 @@ class ReasonCodeTest {
     @Autowired
     ObjectMapper om;
 
-    /** 部门目录 mock（V36 部门真源=IAM 组织架构；单测不依赖外部 IAM）。 */
+    /** 组织目录 mock（V36 部门真源=IAM 组织架构；单测不依赖外部 IAM）。 */
     @MockBean
     DirectoryClient directoryClient;
 
     @BeforeEach
     void mockDeptDirectory() {
-        when(directoryClient.deptOptions()).thenReturn(List.of(
-                new DirectoryClient.DeptOption("EQP", "设备部", "/root/eqp/", null, null),
-                new DirectoryClient.DeptOption("PE", "工艺部（PE）", "/root/pe/", "pe01", "张明")));
-        // requireDeptCode 走真实实现（内部调上面 stub 的 deptOptions）；mock 类默认把该方法也替掉了
+        when(directoryClient.orgOptions()).thenReturn(List.of(
+                new DirectoryClient.OrgNodeOption("FAB1", "6英寸一号厂", null, "AREA", true, null),
+                new DirectoryClient.OrgNodeOption("EQP", "设备部", null, "DEPT", true, null),
+                new DirectoryClient.OrgNodeOption("PE", "工艺部（PE）", null, "DEPT", true, "张明")));
+        // requireDeptCode 走真实实现（内部调上面 stub 的 orgOptions）；mock 类默认把该方法也替掉了
         when(directoryClient.requireDeptCode(org.mockito.ArgumentMatchers.any())).thenCallRealMethod();
     }
 

@@ -71,13 +71,14 @@ public class MdsDirectoryProxyController {
     }
 
     /**
-     * 部门下拉选项（行政维度 DEPT、启用；V36 起业务表单的「部门」统一走组织架构，
-     * 不再用静态字典）。权限放宽到已认证——Area Hold 处置部门 / 设备归属部门等
+     * 组织节点选项（全量、带 parentCode 父子关系——前端建组织树；V36 起业务表单的
+     * 「部门」统一走组织架构，不再用静态字典；树整棵展示作层级上下文，
+     * 仅启用 DEPT 节点可选）。权限放宽到已认证——Area Hold 处置部门 / 设备归属部门等
      * 业务表单的维护员不必持有组织管理页的 {@code mds:org:view}。
      */
-    @GetMapping("/dept-options")
-    public Result<List<DirectoryClient.DeptOption>> deptOptions() {
-        return Result.ok(directory.deptOptions());
+    @GetMapping("/org-options")
+    public Result<List<DirectoryClient.OrgNodeOption>> orgOptions() {
+        return Result.ok(directory.orgOptions());
     }
 
     /** 全量人员档案（映射为前端 AdminUserRow 行形状；无 username 时以 userId 补位）。 */
