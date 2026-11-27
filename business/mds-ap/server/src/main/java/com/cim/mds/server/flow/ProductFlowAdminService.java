@@ -31,6 +31,7 @@ public class ProductFlowAdminService {
     private final CimProductRepository productRepository;
     private final CimFlowRepository flowRepository;
     private final FlowNotifyService flowNotifyService;
+    private final com.cim.mds.server.reticle.CimReticleRepository reticleRepository;
 
     /** 绑定请求（POST = 绑定/换版激活）。 */
     public record BindReq(String productCode, String flowFamilyCode, Integer flowVersionNo) {
@@ -163,7 +164,15 @@ public class ProductFlowAdminService {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.npwLimitPositive",
                     row.getProductCode(), req.npwLimit());
         }
-        row.setReticleRef(req.reticleRef() == null || req.reticleRef().isBlank() ? null : req.reticleRef().trim());
+        // V32：光罩覆盖引用闭环——非空才校验存在（cim_reticle 先行建，覆盖挂接）
+        String reticleRef = req.reticleRef() == null || req.reticleRef().isBlank()
+                ? null : req.reticleRef().trim();
+        if (reticleRef != null
+                && reticleRepository.findByReticleCodeAndDeletedFalse(reticleRef).isEmpty()) {
+            throw BizException.of(BizCode.DATA_NOT_FOUND,
+                    "mds.biz.bind.reticleNotFound", reticleRef);
+        }
+        row.setReticleRef(reticleRef);
         row.setContamLevel(req.contamLevel() == null || req.contamLevel().isBlank() ? null : req.contamLevel().trim());
         row.setContamForbidden(req.contamForbidden() == null || req.contamForbidden().isBlank() ? null : req.contamForbidden().trim());
         row.setNpwLimit(req.npwLimit());

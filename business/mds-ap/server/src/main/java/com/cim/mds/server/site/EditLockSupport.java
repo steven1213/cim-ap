@@ -47,7 +47,11 @@ public class EditLockSupport {
             Map.entry("stockerBank", "cim_stocker_bank"),
             Map.entry("edcSet", "cim_edc_param_set"),
             Map.entry("edcReportTpl", "cim_edc_report_tpl"),
-            Map.entry("edcPlan", "cim_edc_plan"));
+            Map.entry("edcPlan", "cim_edc_plan"),
+            Map.entry("carrier", "cim_carrier"),
+            Map.entry("reticle", "cim_reticle"),
+            Map.entry("inspectionStd", "cim_inspection_std"),
+            Map.entry("consumable", "cim_consumable"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();

@@ -91,6 +91,30 @@ public final class MdsPermissions {
     public static final String BANK_UPDATE = "mds:bank:update";
     public static final String BANK_DELETE = "mds:bank:delete";
 
+    // ---------------- 载具（Carrier，设备管理域，SEMI E87 Carrier 口径，V31） ----------------
+    public static final String CARRIER_VIEW = "mds:carrier:view";
+    public static final String CARRIER_CREATE = "mds:carrier:create";
+    public static final String CARRIER_UPDATE = "mds:carrier:update";
+    public static final String CARRIER_DELETE = "mds:carrier:delete";
+
+    // ---------------- 光罩（Reticle，产品管理域，光刻关键耗材级主数据，V32） ----------------
+    public static final String RETICLE_VIEW = "mds:reticle:view";
+    public static final String RETICLE_CREATE = "mds:reticle:create";
+    public static final String RETICLE_UPDATE = "mds:reticle:update";
+    public static final String RETICLE_DELETE = "mds:reticle:delete";
+
+    // ---------------- 检验标准（InspectionStd，质量域，AQL/检验项模板，V33） ----------------
+    public static final String INSP_VIEW = "mds:inspection:view";
+    public static final String INSP_CREATE = "mds:inspection:create";
+    public static final String INSP_UPDATE = "mds:inspection:update";
+    public static final String INSP_DELETE = "mds:inspection:delete";
+
+    // ---------------- 耗材台账（Consumable，质量域，V34） ----------------
+    public static final String CONS_VIEW = "mds:consumable:view";
+    public static final String CONS_CREATE = "mds:consumable:create";
+    public static final String CONS_UPDATE = "mds:consumable:update";
+    public static final String CONS_DELETE = "mds:consumable:delete";
+
     // ---------------- 状态模型（StateModel，系统管理域，SEMI E30 状态机口径） ----------------
     public static final String STATE_MODEL_VIEW = "mds:stateModel:view";
     public static final String STATE_MODEL_CREATE = "mds:stateModel:create";
@@ -268,6 +292,22 @@ public final class MdsPermissions {
         codes.add(BANK_CREATE);
         codes.add(BANK_UPDATE);
         codes.add(BANK_DELETE);
+        codes.add(CARRIER_VIEW);
+        codes.add(CARRIER_CREATE);
+        codes.add(CARRIER_UPDATE);
+        codes.add(CARRIER_DELETE);
+        codes.add(RETICLE_VIEW);
+        codes.add(RETICLE_CREATE);
+        codes.add(RETICLE_UPDATE);
+        codes.add(RETICLE_DELETE);
+        codes.add(INSP_VIEW);
+        codes.add(INSP_CREATE);
+        codes.add(INSP_UPDATE);
+        codes.add(INSP_DELETE);
+        codes.add(CONS_VIEW);
+        codes.add(CONS_CREATE);
+        codes.add(CONS_UPDATE);
+        codes.add(CONS_DELETE);
         codes.add(STATE_MODEL_VIEW);
         codes.add(STATE_MODEL_CREATE);
         codes.add(STATE_MODEL_UPDATE);

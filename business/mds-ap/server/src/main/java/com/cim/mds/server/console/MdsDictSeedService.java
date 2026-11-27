@@ -159,15 +159,71 @@ public class MdsDictSeedService {
                     new ItemDef("PLAN", "计划部", 60),
                     new ItemDef("ENG", "工程部", 70),
                     new ItemDef("OTHER", "其他", 90))),
-            // 制造流程步骤类型（Flow 域，V12/V14）：业务步骤四类 + 结构节点——START/END 不进字典
-            new DictDef("mds.process_step_type", "流程步骤类型", List.of(
-                    new ItemDef("PROCESS", "加工（工艺机台作业）", 10),
-                    new ItemDef("INSPECT", "检验（量测/检测）", 20),
-                    new ItemDef("REWORK", "返工（重做工序）", 30),
-                    new ItemDef("DECISION", "决策（分档 Go/No-Go）", 40),
-                    new ItemDef("SUBFLOW", "子流程（嵌套引用）", 50),
-                    new ItemDef("SPLIT", "分批（批次拆分）", 60),
-                    new ItemDef("MERGE", "合批（支路汇合）", 70))));
+            // 载具类型（V31，SEMI E87 Carrier 口径）：AMHS 全链物理载体分类
+            new DictDef("mds.carrier_type", "载具类型", List.of(
+                    new ItemDef("CASSETTE", "花篮（晶圆载具）", 10),
+                    new ItemDef("RETICLE_BOX", "光罩盒", 20),
+                    new ItemDef("WAFER_BOX", "晶圆盒", 30),
+                    new ItemDef("OTHER", "其他", 90))),
+            // 载具台账状态（V31）：运行时状态机归 MCS，主数据只存台账级状态
+            new DictDef("mds.carrier_status", "载具状态", List.of(
+                    new ItemDef("IN_STOCK", "空闲在库", 10),
+                    new ItemDef("IN_USE", "使用中", 20),
+                    new ItemDef("IN_CLEANING", "清洗中", 30),
+                    new ItemDef("MAINTENANCE", "维护中", 40),
+                    new ItemDef("SCRAPPED", "报废", 90))),
+            // 光罩状态（V32）：寿命双轨（次数/有效期），判定归运行域
+            new DictDef("mds.reticle_status", "光罩状态", List.of(
+                    new ItemDef("IN_STOCK", "在库", 10),
+                    new ItemDef("ACTIVE", "在用", 20),
+                    new ItemDef("DAMAGED", "损伤", 30),
+                    new ItemDef("EXPIRED", "过期", 40),
+                    new ItemDef("SCRAPPED", "报废", 90))),
+            // 抽样方案（V33，检验标准头）
+            new DictDef("mds.sampling_type", "抽样方案", List.of(
+                    new ItemDef("FULL", "全检", 10),
+                    new ItemDef("SAMPLING", "抽检", 20),
+                    new ItemDef("FIRST_ARTICLE", "首件检验", 30),
+                    new ItemDef("PERIODIC", "周期抽检", 40))),
+            // AQL 允收水准（V33，GB/T 2828.1 / ANSI/ASQ Z1.4 特殊检验水准常用值）
+            new DictDef("mds.aql_level", "AQL 允收水准", List.of(
+                    new ItemDef("0.065", "AQL 0.065", 10),
+                    new ItemDef("0.10", "AQL 0.10", 20),
+                    new ItemDef("0.15", "AQL 0.15", 30),
+                    new ItemDef("0.25", "AQL 0.25", 40),
+                    new ItemDef("0.40", "AQL 0.40", 50),
+                    new ItemDef("0.65", "AQL 0.65", 60),
+                    new ItemDef("1.0", "AQL 1.0", 70),
+                    new ItemDef("1.5", "AQL 1.5", 80),
+                    new ItemDef("2.5", "AQL 2.5", 90))),
+            // 缺陷等级（V33，检验项明细）
+            new DictDef("mds.defect_level", "缺陷等级", List.of(
+                    new ItemDef("CRITICAL", "致命缺陷（CRITICAL）", 10),
+                    new ItemDef("MAJOR", "主要缺陷（MAJOR）", 20),
+                    new ItemDef("MINOR", "次要缺陷（MINOR）", 30))),
+            // 耗材类别（V34）
+            new DictDef("mds.consumable_type", "耗材类别", List.of(
+                    new ItemDef("CHEMICAL", "化学品", 10),
+                    new ItemDef("SLURRY", "研磨液", 20),
+                    new ItemDef("GAS", "特气", 30),
+                    new ItemDef("PART", "备件耗材", 40),
+                    new ItemDef("TOOL", "消耗工具", 50),
+                    new ItemDef("OTHER", "其他", 90))),
+            // 计量单位（V34，耗材）
+            new DictDef("mds.measure_unit", "计量单位", List.of(
+                    new ItemDef("EA", "个（EA）", 10),
+                    new ItemDef("BOX", "盒（BOX）", 20),
+                    new ItemDef("SET", "套（SET）", 30),
+                    new ItemDef("PACK", "包（PACK）", 40),
+                    new ItemDef("BOTTLE", "瓶（BOTTLE）", 50),
+                    new ItemDef("CAN", "罐（CAN）", 60),
+                    new ItemDef("ROLL", "卷（ROLL）", 70))),
+            // 耗材寿命管理方式（V34）：到期判定与预警触发归运行域
+            new DictDef("mds.consumable_life_type", "寿命管理方式", List.of(
+                    new ItemDef("CYCLE", "按使用次数", 10),
+                    new ItemDef("DAYS", "按天数", 20),
+                    new ItemDef("QTY", "按产量", 30),
+                    new ItemDef("NONE", "无寿命管理", 90))));
 
     private final SysDictRepository dictRepository;
     private final SysDictItemRepository itemRepository;

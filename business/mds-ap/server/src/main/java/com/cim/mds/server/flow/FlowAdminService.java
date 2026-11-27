@@ -51,8 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class FlowAdminService {
 
-    /** 数据字典码（V12 Java 种子）：流程步骤类型业务词表。 */
-    public static final String DICT_PROCESS_STEP_TYPE = "mds.process_step_type";
 
     /** 合法 step_type 全集（结构性两类 + 业务四类 + SUBFLOW 引用节点 + SPLIT/MERGE 结构节点）。 */
     private static final Set<String> VALID_STEP_TYPES = Set.of(
@@ -88,6 +86,7 @@ public class FlowAdminService {
     private final CimEquipmentClassRepository equipmentClassRepository;
     private final com.cim.mds.server.equipment.CimCapabilityRepository capabilityRepository;
     private final CimOperationRepository operationRepository;
+    private final com.cim.mds.server.reticle.CimReticleRepository reticleRepository;
     private final NamingRuleAdminService namingRuleService;
     // ICM（V22）：约束校验 / 指派 / KV / 绑定 / 校验明细
     private final FlowValidateService flowValidateService;
@@ -540,6 +539,12 @@ public class FlowAdminService {
                     && capabilityRepository.findByCapabilityCodeAndDeletedFalse(n.capabilityCode()).isEmpty()) {
                 throw BizException.of(BizCode.DATA_NOT_FOUND,
                         "mds.biz.flow.capabilityNotFound", n.capabilityCode(), n.stepCode());
+            }
+            // V32：光罩引用非空才校验存在（引用闭环——cim_reticle 先行建，节点挂接）
+            if (n.reticleRef() != null
+                    && reticleRepository.findByReticleCodeAndDeletedFalse(n.reticleRef().trim()).isEmpty()) {
+                throw BizException.of(BizCode.DATA_NOT_FOUND,
+                        "mds.biz.flow.reticleNotFound", n.reticleRef(), n.stepCode());
             }
             checkQtime(n.qtimeMin(), n.qtimeMax(), n.stepCode());
             // SUBFLOW：flowRef 必填且引用真实（发布状态在发布守门再查）

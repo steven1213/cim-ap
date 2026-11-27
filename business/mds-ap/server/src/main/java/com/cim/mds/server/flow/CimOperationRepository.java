@@ -20,6 +20,9 @@ public interface CimOperationRepository extends JpaRepository<CimOperation, Stri
     /** 族内当前最大版本号（复制递增用）。 */
     Optional<CimOperation> findFirstByOpFamilyCodeAndDeletedFalseOrderByVersionNoDesc(String opFamilyCode);
 
+    /** 光罩反向引用守门（V32）：reticleRef 引用计数查据。 */
+    boolean existsByReticleRefAndDeletedFalse(String reticleRef);
+
     /** 列表 + 关键字（编码/名称/工艺编码模糊，{@code kw} 可空）。 */
     @Query("""
             select o from CimOperation o

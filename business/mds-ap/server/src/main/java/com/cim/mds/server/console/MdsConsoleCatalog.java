@@ -141,6 +141,15 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.OPERATION_UPDATE, 20));
         m.add(button("btn.operation.delete", "operations", "mds.nav.operations.action.delete",
                 MdsPermissions.OPERATION_DELETE, 30));
+        // —— 光罩（V32：光刻关键耗材级主数据；工序/流程步骤 reticleRef 引用闭环）——
+        m.add(menu("reticles", "grp.product", "/reticles", "ReticlePage",
+                "mds.nav.reticles", "grid", MdsPermissions.RETICLE_VIEW, 31));
+        m.add(button("btn.reticle.create", "reticles", "mds.nav.reticles.action.create",
+                MdsPermissions.RETICLE_CREATE, 10));
+        m.add(button("btn.reticle.update", "reticles", "mds.nav.reticles.action.update",
+                MdsPermissions.RETICLE_UPDATE, 20));
+        m.add(button("btn.reticle.delete", "reticles", "mds.nav.reticles.action.delete",
+                MdsPermissions.RETICLE_DELETE, 30));
         // —— ICM 继承式约束模型（V22，2026-11-25 定稿：ContextChain 三级 + 统一指派 + KV + 校验闸）——
         m.add(menu("stepParams", "grp.product", "/step-params", "StepParamPage",
                 "mds.nav.stepParams", "sliders", MdsPermissions.STEP_ASSIGN_VIEW, 36));
@@ -237,6 +246,35 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.BANK_UPDATE, 20));
         m.add(button("btn.bank.delete", "banks", "mds.nav.banks.action.delete",
                 MdsPermissions.BANK_DELETE, 30));
+
+        // —— 载具（V31：SEMI E87 Carrier 口径，AMHS 全链物理载体台账）——
+        m.add(menu("carriers", "grp.equipment", "/carriers", "CarrierPage",
+                "mds.nav.carriers", "box", MdsPermissions.CARRIER_VIEW, 60));
+        m.add(button("btn.carrier.create", "carriers", "mds.nav.carriers.action.create",
+                MdsPermissions.CARRIER_CREATE, 10));
+        m.add(button("btn.carrier.update", "carriers", "mds.nav.carriers.action.update",
+                MdsPermissions.CARRIER_UPDATE, 20));
+        m.add(button("btn.carrier.delete", "carriers", "mds.nav.carriers.action.delete",
+                MdsPermissions.CARRIER_DELETE, 30));
+
+        // —— 质量与耗材（V33/V34：检验标准 + 耗材台账）——
+        m.add(dir("grp.quality", "mds.nav.group.quality", 34));
+        m.add(menu("inspectionStds", "grp.quality", "/inspection-stds", "InspectionPage",
+                "mds.nav.inspectionStds", "check", MdsPermissions.INSP_VIEW, 10));
+        m.add(button("btn.inspection.create", "inspectionStds", "mds.nav.inspectionStds.action.create",
+                MdsPermissions.INSP_CREATE, 10));
+        m.add(button("btn.inspection.update", "inspectionStds", "mds.nav.inspectionStds.action.update",
+                MdsPermissions.INSP_UPDATE, 20));
+        m.add(button("btn.inspection.delete", "inspectionStds", "mds.nav.inspectionStds.action.delete",
+                MdsPermissions.INSP_DELETE, 30));
+        m.add(menu("consumables", "grp.quality", "/consumables", "ConsumablePage",
+                "mds.nav.consumables", "box", MdsPermissions.CONS_VIEW, 20));
+        m.add(button("btn.consumable.create", "consumables", "mds.nav.consumables.action.create",
+                MdsPermissions.CONS_CREATE, 10));
+        m.add(button("btn.consumable.update", "consumables", "mds.nav.consumables.action.update",
+                MdsPermissions.CONS_UPDATE, 20));
+        m.add(button("btn.consumable.delete", "consumables", "mds.nav.consumables.action.delete",
+                MdsPermissions.CONS_DELETE, 30));
 
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
@@ -498,6 +536,26 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.BANK_CREATE, "存储区新建"));
         p.add(new PermDef(MdsPermissions.BANK_UPDATE, "存储区编辑"));
         p.add(new PermDef(MdsPermissions.BANK_DELETE, "存储区删除"));
+        // 载具（SEMI E87 Carrier 口径，V31）
+        p.add(new PermDef(MdsPermissions.CARRIER_VIEW, "载具查看"));
+        p.add(new PermDef(MdsPermissions.CARRIER_CREATE, "载具新建"));
+        p.add(new PermDef(MdsPermissions.CARRIER_UPDATE, "载具编辑"));
+        p.add(new PermDef(MdsPermissions.CARRIER_DELETE, "载具删除"));
+        // 光罩（V32）
+        p.add(new PermDef(MdsPermissions.RETICLE_VIEW, "光罩查看"));
+        p.add(new PermDef(MdsPermissions.RETICLE_CREATE, "光罩新建"));
+        p.add(new PermDef(MdsPermissions.RETICLE_UPDATE, "光罩编辑"));
+        p.add(new PermDef(MdsPermissions.RETICLE_DELETE, "光罩删除"));
+        // 检验标准（V33）
+        p.add(new PermDef(MdsPermissions.INSP_VIEW, "检验标准查看"));
+        p.add(new PermDef(MdsPermissions.INSP_CREATE, "检验标准新建"));
+        p.add(new PermDef(MdsPermissions.INSP_UPDATE, "检验标准编辑/检验项维护"));
+        p.add(new PermDef(MdsPermissions.INSP_DELETE, "检验标准删除"));
+        // 耗材台账（V34）
+        p.add(new PermDef(MdsPermissions.CONS_VIEW, "耗材查看"));
+        p.add(new PermDef(MdsPermissions.CONS_CREATE, "耗材新建"));
+        p.add(new PermDef(MdsPermissions.CONS_UPDATE, "耗材编辑"));
+        p.add(new PermDef(MdsPermissions.CONS_DELETE, "耗材删除"));
         // 状态模型（SEMI E30 状态机口径，模型/状态/转换矩阵页面维护）
         p.add(new PermDef(MdsPermissions.STATE_MODEL_VIEW, "状态模型查看"));
         p.add(new PermDef(MdsPermissions.STATE_MODEL_CREATE, "状态模型新建"));
@@ -579,6 +637,10 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.EQUIPMENT_CREATE, MdsPermissions.EQUIPMENT_UPDATE,
                 MdsPermissions.CAPABILITY_VIEW, MdsPermissions.CAPABILITY_CREATE, MdsPermissions.CAPABILITY_UPDATE,
                 MdsPermissions.BANK_VIEW, MdsPermissions.BANK_CREATE, MdsPermissions.BANK_UPDATE,
+                MdsPermissions.CARRIER_VIEW, MdsPermissions.CARRIER_CREATE, MdsPermissions.CARRIER_UPDATE,
+                MdsPermissions.RETICLE_VIEW, MdsPermissions.RETICLE_CREATE, MdsPermissions.RETICLE_UPDATE,
+                MdsPermissions.INSP_VIEW, MdsPermissions.INSP_CREATE, MdsPermissions.INSP_UPDATE,
+                MdsPermissions.CONS_VIEW, MdsPermissions.CONS_CREATE, MdsPermissions.CONS_UPDATE,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.STATE_MODEL_CREATE, MdsPermissions.STATE_MODEL_UPDATE,
                 MdsPermissions.NAMING_RULE_VIEW, MdsPermissions.NAMING_RULE_CREATE, MdsPermissions.NAMING_RULE_UPDATE,
                 MdsPermissions.REASON_VIEW, MdsPermissions.REASON_CREATE, MdsPermissions.REASON_UPDATE,
@@ -591,6 +653,8 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.EQC_VIEW, MdsPermissions.TOOL_GROUP_VIEW,
                 MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
                 MdsPermissions.BANK_VIEW,
+                MdsPermissions.CARRIER_VIEW, MdsPermissions.RETICLE_VIEW,
+                MdsPermissions.INSP_VIEW, MdsPermissions.CONS_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
                 MdsPermissions.REASON_VIEW,
                 PermissionCodes.DICT_LIST);
@@ -713,6 +777,23 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.banks.action.create", "存储区·新建", "Stocker bank · create"));
         t.add(new TextDef("mds.nav.banks.action.update", "存储区·编辑", "Stocker bank · update"));
         t.add(new TextDef("mds.nav.banks.action.delete", "存储区·删除", "Stocker bank · delete"));
+        t.add(new TextDef("mds.nav.carriers", "载具台账", "Carriers"));
+        t.add(new TextDef("mds.nav.carriers.action.create", "载具·新建", "Carrier · create"));
+        t.add(new TextDef("mds.nav.carriers.action.update", "载具·编辑", "Carrier · update"));
+        t.add(new TextDef("mds.nav.carriers.action.delete", "载具·删除", "Carrier · delete"));
+        t.add(new TextDef("mds.nav.reticles", "光罩管理", "Reticles"));
+        t.add(new TextDef("mds.nav.reticles.action.create", "光罩·新建", "Reticle · create"));
+        t.add(new TextDef("mds.nav.reticles.action.update", "光罩·编辑", "Reticle · update"));
+        t.add(new TextDef("mds.nav.reticles.action.delete", "光罩·删除", "Reticle · delete"));
+        t.add(new TextDef("mds.nav.group.quality", "质量与耗材", "Quality & consumables"));
+        t.add(new TextDef("mds.nav.inspectionStds", "检验标准", "Inspection standards"));
+        t.add(new TextDef("mds.nav.inspectionStds.action.create", "检验标准·新建", "Inspection std · create"));
+        t.add(new TextDef("mds.nav.inspectionStds.action.update", "检验标准·编辑", "Inspection std · update"));
+        t.add(new TextDef("mds.nav.inspectionStds.action.delete", "检验标准·删除", "Inspection std · delete"));
+        t.add(new TextDef("mds.nav.consumables", "耗材台账", "Consumables"));
+        t.add(new TextDef("mds.nav.consumables.action.create", "耗材·新建", "Consumable · create"));
+        t.add(new TextDef("mds.nav.consumables.action.update", "耗材·编辑", "Consumable · update"));
+        t.add(new TextDef("mds.nav.consumables.action.delete", "耗材·删除", "Consumable · delete"));
         t.add(new TextDef("mds.nav.stateModels", "状态模型", "State models"));
         t.add(new TextDef("mds.nav.stateModels.action.create", "状态模型·新建", "State model · create"));
         t.add(new TextDef("mds.nav.stateModels.action.save", "状态模型·维护", "State model · save"));

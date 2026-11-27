@@ -13,6 +13,10 @@ import type {
   BayPayload,
   Capability,
   CapabilityPayload,
+  Carrier,
+  CarrierPayload,
+  Consumable,
+  ConsumablePayload,
   DictInfo,
   DictItem,
   DictItemPayload,
@@ -21,6 +25,12 @@ import type {
   EquipmentPayload,
   EquipmentClass,
   EquipmentClassPayload,
+  InspectionItem,
+  InspectionItemPayload,
+  InspectionStd,
+  InspectionStdPayload,
+  Reticle,
+  ReticlePayload,
   ToolGroup,
   ToolGroupPayload,
   EquipmentUnit,
@@ -457,6 +467,107 @@ export function deleteBankTransferRule(id: string): Promise<void> {
   return http.del<void>(`${BASE}/bank-transfer-rules/${encodeURIComponent(id)}`);
 }
 
+// ---------- 载具（V31：SEMI E87 Carrier 口径，AMHS 全链物理载体台账） ----------
+
+export function listCarriers(
+  params?: { status?: string; equipmentId?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<Carrier[]> {
+  return http.get<Carrier[]>(`${BASE}/carriers`, params, { signal });
+}
+
+export function createCarrier(payload: CarrierPayload): Promise<Carrier> {
+  return http.post<Carrier>(`${BASE}/carriers`, payload);
+}
+
+export function updateCarrier(id: string, payload: Partial<CarrierPayload>): Promise<Carrier> {
+  return http.put<Carrier>(`${BASE}/carriers/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteCarrier(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/carriers/${encodeURIComponent(id)}`);
+}
+
+// ---------- 光罩（V32：光刻关键耗材级主数据，工序/流程步骤按 code 引用） ----------
+
+export function listReticles(
+  params?: { status?: string; equipmentId?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<Reticle[]> {
+  return http.get<Reticle[]>(`${BASE}/reticles`, params, { signal });
+}
+
+export function createReticle(payload: ReticlePayload): Promise<Reticle> {
+  return http.post<Reticle>(`${BASE}/reticles`, payload);
+}
+
+export function updateReticle(id: string, payload: Partial<ReticlePayload>): Promise<Reticle> {
+  return http.put<Reticle>(`${BASE}/reticles/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteReticle(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/reticles/${encodeURIComponent(id)}`);
+}
+
+// ---------- 检验标准（V33：AQL/检验项模板，明细全量替换） ----------
+
+export function listInspectionStds(
+  params?: { productGroup?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<InspectionStd[]> {
+  return http.get<InspectionStd[]>(`${BASE}/inspection-stds`, params, { signal });
+}
+
+export function listInspectionItems(stdId: string, signal?: AbortSignal): Promise<InspectionItem[]> {
+  return http.get<InspectionItem[]>(`${BASE}/inspection-stds/${encodeURIComponent(stdId)}/items`, undefined, { signal });
+}
+
+export function createInspectionStd(payload: InspectionStdPayload): Promise<InspectionStd> {
+  return http.post<InspectionStd>(`${BASE}/inspection-stds`, payload);
+}
+
+export function updateInspectionStd(
+  id: string,
+  payload: Partial<InspectionStdPayload>,
+): Promise<InspectionStd> {
+  return http.put<InspectionStd>(`${BASE}/inspection-stds/${encodeURIComponent(id)}`, payload);
+}
+
+export function replaceInspectionItems(
+  id: string,
+  items: InspectionItemPayload[],
+): Promise<InspectionItem[]> {
+  return http.put<InspectionItem[]>(
+    `${BASE}/inspection-stds/${encodeURIComponent(id)}/items`,
+    items,
+  );
+}
+
+export function deleteInspectionStd(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/inspection-stds/${encodeURIComponent(id)}`);
+}
+
+// ---------- 耗材（V34：生产辅助物料台账级主数据） ----------
+
+export function listConsumables(
+  params?: { consType?: string; equipmentId?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<Consumable[]> {
+  return http.get<Consumable[]>(`${BASE}/consumables`, params, { signal });
+}
+
+export function createConsumable(payload: ConsumablePayload): Promise<Consumable> {
+  return http.post<Consumable>(`${BASE}/consumables`, payload);
+}
+
+export function updateConsumable(id: string, payload: Partial<ConsumablePayload>): Promise<Consumable> {
+  return http.put<Consumable>(`${BASE}/consumables/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteConsumable(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/consumables/${encodeURIComponent(id)}`);
+}
+
 // ---------- 状态模型（SEMI E30 状态机口径：状态集 + 转换 allowlist + 触发条件） ----------
 
 export function listStateModels(signal?: AbortSignal): Promise<StateModel[]> {
@@ -620,7 +731,11 @@ export type LocationType =
   | 'stockerBank'
   | 'edcSet'
   | 'edcReportTpl'
-  | 'edcPlan';
+  | 'edcPlan'
+  | 'carrier'
+  | 'reticle'
+  | 'inspectionStd'
+  | 'consumable';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {

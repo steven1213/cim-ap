@@ -86,6 +86,34 @@ export const MDS_PERMS = {
     update: 'mds:bank:update',
     delete: 'mds:bank:delete',
   },
+  // 载具（V31：SEMI E87 Carrier 口径，AMHS 全链物理载体台账）
+  carrier: {
+    view: 'mds:carrier:view',
+    create: 'mds:carrier:create',
+    update: 'mds:carrier:update',
+    delete: 'mds:carrier:delete',
+  },
+  // 光罩（V32：光刻关键耗材级主数据，工序/流程步骤按 code 引用）
+  reticle: {
+    view: 'mds:reticle:view',
+    create: 'mds:reticle:create',
+    update: 'mds:reticle:update',
+    delete: 'mds:reticle:delete',
+  },
+  // 检验标准（V33：AQL/检验项模板）
+  inspection: {
+    view: 'mds:inspection:view',
+    create: 'mds:inspection:create',
+    update: 'mds:inspection:update',
+    delete: 'mds:inspection:delete',
+  },
+  // 耗材台账（V34）
+  consumable: {
+    view: 'mds:consumable:view',
+    create: 'mds:consumable:create',
+    update: 'mds:consumable:update',
+    delete: 'mds:consumable:delete',
+  },
   // 状态模型：模型/状态集/转换矩阵均页面维护（SEMI E30 状态机口径）
   stateModel: {
     view: 'mds:stateModel:view',

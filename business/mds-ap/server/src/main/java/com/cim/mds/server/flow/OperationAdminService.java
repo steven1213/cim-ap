@@ -50,6 +50,8 @@ public class OperationAdminService {
     private final CimCapabilityRepository capabilityRepository;
     private final CimOperationVariableParamRepository varParamRepository;
     private final CimParamDefRepository paramDefRepository;
+    private final com.cim.mds.server.edc.CimEdcPlanRepository edcPlanRepository;
+    private final com.cim.mds.server.reticle.CimReticleRepository reticleRepository;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -124,7 +126,7 @@ public class OperationAdminService {
         entity.setTechCode(techCode);
         entity.setEquipType(equipType);
         entity.setCapabilityCode(capabilityCode);
-        entity.setEdcPlanCode(req.edcPlanCode());
+        entity.setEdcPlanCode(requireEdcPlan(req.edcPlanCode()));
         entity.setRecipeRef(req.recipeRef());
         entity.setQtimeMin(req.qtimeMin());
         entity.setQtimeMax(req.qtimeMax());
@@ -135,7 +137,7 @@ public class OperationAdminService {
         entity.setBatchSize(req.batchSize());
         entity.setInspectPlan(req.inspectPlan());
         entity.setSamplingRate(req.samplingRate());
-        entity.setReticleRef(req.reticleRef());
+        entity.setReticleRef(requireReticle(req.reticleRef()));
         entity.setTestProgram(req.testProgram());
         entity.setInhibitGroup(req.inhibitGroup());
         entity.setNpwPlan(req.npwPlan());
@@ -164,7 +166,7 @@ public class OperationAdminService {
         entity.setTechCode(techCode);
         entity.setEquipType(equipType);
         entity.setCapabilityCode(capabilityCode);
-        entity.setEdcPlanCode(req.edcPlanCode());
+        entity.setEdcPlanCode(requireEdcPlan(req.edcPlanCode()));
         entity.setRecipeRef(req.recipeRef());
         entity.setQtimeMin(req.qtimeMin());
         entity.setQtimeMax(req.qtimeMax());
@@ -175,7 +177,7 @@ public class OperationAdminService {
         entity.setBatchSize(req.batchSize());
         entity.setInspectPlan(req.inspectPlan());
         entity.setSamplingRate(req.samplingRate());
-        entity.setReticleRef(req.reticleRef());
+        entity.setReticleRef(requireReticle(req.reticleRef()));
         entity.setTestProgram(req.testProgram());
         entity.setInhibitGroup(req.inhibitGroup());
         entity.setNpwPlan(req.npwPlan());
@@ -287,7 +289,7 @@ public class OperationAdminService {
         entity.setRecipeRef(source.getRecipeRef());
         entity.setEquipType(source.getEquipType());
         entity.setCapabilityCode(source.getCapabilityCode());
-        entity.setEdcPlanCode(source.getEdcPlanCode());
+        entity.setEdcPlanCode(requireEdcPlan(source.getEdcPlanCode()));
         entity.setQtimeMin(source.getQtimeMin());
         entity.setQtimeMax(source.getQtimeMax());
         entity.setReworkLimit(source.getReworkLimit());
@@ -297,7 +299,7 @@ public class OperationAdminService {
         entity.setBatchSize(source.getBatchSize());
         entity.setInspectPlan(source.getInspectPlan());
         entity.setSamplingRate(source.getSamplingRate());
-        entity.setReticleRef(source.getReticleRef());
+        entity.setReticleRef(requireReticle(source.getReticleRef()));
         entity.setTestProgram(source.getTestProgram());
         entity.setInhibitGroup(source.getInhibitGroup());
         entity.setNpwPlan(source.getNpwPlan());
@@ -320,6 +322,28 @@ public class OperationAdminService {
                     "mds.biz.operation.opTypeInvalid", String.valueOf(opType));
         }
         return opType;
+    }
+
+    /** EDC 方案引用校验（非空才校验；逻辑引用 cim_edc_plan——数采方案先行建，工序挂接）。 */
+    private String requireEdcPlan(String planCode) {
+        if (!StringUtils.hasText(planCode)) {
+            return null;
+        }
+        if (edcPlanRepository.countByPlanCodeAndDeletedFalse(planCode) == 0) {
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.edcPlanNotFound", planCode);
+        }
+        return planCode;
+    }
+
+    /** 光罩引用校验（非空才校验；逻辑引用 cim_reticle——光罩主数据先行建，工序挂接，V32）。 */
+    private String requireReticle(String reticleCode) {
+        if (!StringUtils.hasText(reticleCode)) {
+            return null;
+        }
+        if (reticleRepository.findByReticleCodeAndDeletedFalse(reticleCode.trim()).isEmpty()) {
+            throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.reticleNotFound", reticleCode);
+        }
+        return reticleCode;
     }
 
     private String requireTech(String techCode) {

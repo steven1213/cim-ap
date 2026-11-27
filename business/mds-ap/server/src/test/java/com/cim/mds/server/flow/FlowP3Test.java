@@ -317,8 +317,8 @@ class FlowP3Test {
         String bindId = om.readTree(bindBody).path("data").path("id").asText();
 
         String upd = putJson("/api/v1/mds/product-flows/" + bindId, om.writeValueAsString(Map.of(
-                "reticleRef", "RET-P", "contamLevel", "AL", "contamForbidden", "HF", "npwLimit", 8)), 200);
-        assertThat(om.readTree(upd).path("data").path("reticleRef").asText()).isEqualTo("RET-P");
+                "reticleRef", "RT-LT-001", "contamLevel", "AL", "contamForbidden", "HF", "npwLimit", 8)), 200);
+        assertThat(om.readTree(upd).path("data").path("reticleRef").asText()).isEqualTo("RT-LT-001");
         assertThat(om.readTree(upd).path("data").path("npwLimit").asInt()).isEqualTo(8);
 
         String pa = postJson("/api/v1/mds/product-flows/" + bindId + "/assigns", om.writeValueAsString(Map.of(
@@ -332,7 +332,7 @@ class FlowP3Test {
         // 按产品解析：PRODUCT 层生效（列型 > 节点；KV > 三层；池 > 三层）
         String body = getJson("/api/v1/mds/flows/" + flowIdL3 + "/effective?product=P-001");
         var node0 = om.readTree(body).path("data").get(0);
-        assertThat(node0.path("reticleRef").path("value").asText()).isEqualTo("RET-P");
+        assertThat(node0.path("reticleRef").path("value").asText()).isEqualTo("RT-LT-001");
         assertThat(node0.path("reticleRef").path("source").asText()).isEqualTo("PRODUCT_OVERRIDE");
         assertThat(node0.path("contamLevel").path("value").asText()).isEqualTo("AL");
         assertThat(node0.path("npwLimit").path("value").asInt()).isEqualTo(8);

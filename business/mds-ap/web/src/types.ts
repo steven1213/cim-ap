@@ -445,6 +445,148 @@ export interface CapabilityPayload {
   description?: string | null;
 }
 
+// ---------------------------------------------------------------- 载具 / 光罩 / 检验标准 / 耗材（V31-V34）
+
+/** 载具（Carrier/Cassette）：SEMI E87 Carrier 口径，AMHS 全链物理载体台账。 */
+export interface Carrier {
+  id: string;
+  carrierCode: string;
+  carrierName: string;
+  carrierType: string | null;
+  status: string | null;
+  homeEquipmentId: string | null;
+  homeEquipmentCode: string | null;
+  currentLotId: string | null;
+  waferQty: number | null;
+  enabled: boolean;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface CarrierPayload {
+  carrierCode: string;
+  carrierName: string;
+  carrierType?: string | null;
+  status?: string | null;
+  homeEquipmentId?: string | null;
+  currentLotId?: string | null;
+  waferQty?: number | null;
+  enabled?: boolean;
+}
+
+/** 光罩（Reticle）：光刻关键耗材级主数据，工序/流程步骤按 code 引用。 */
+export interface Reticle {
+  id: string;
+  reticleCode: string;
+  reticleName: string;
+  layer: string | null;
+  status: string | null;
+  homeEquipmentId: string | null;
+  homeEquipmentCode: string | null;
+  usageCount: number;
+  usageLimit: number | null;
+  expiryDate: string | null;
+  enabled: boolean;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ReticlePayload {
+  reticleCode: string;
+  reticleName: string;
+  layer?: string | null;
+  status?: string | null;
+  homeEquipmentId?: string | null;
+  usageCount?: number;
+  usageLimit?: number | null;
+  expiryDate?: string | null;
+  enabled?: boolean;
+}
+
+/** 检验标准（头）：AQL/抽样方案 + 适用产品分组。 */
+export interface InspectionStd {
+  id: string;
+  stdCode: string;
+  stdName: string;
+  productGroup: string | null;
+  samplingType: string | null;
+  aqlLevel: string | null;
+  sampleQty: number | null;
+  enabled: boolean;
+  itemCount: number;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface InspectionStdPayload {
+  stdCode: string;
+  stdName: string;
+  productGroup?: string | null;
+  samplingType?: string | null;
+  aqlLevel?: string | null;
+  sampleQty?: number | null;
+  enabled?: boolean;
+}
+
+/** 检验项（明细）：规格/方法/量具/缺陷等级。 */
+export interface InspectionItem {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  spec: string | null;
+  method: string | null;
+  instrument: string | null;
+  defectLevel: string | null;
+  sortNo: number;
+}
+
+export interface InspectionItemPayload {
+  itemCode: string;
+  itemName: string;
+  spec?: string | null;
+  method?: string | null;
+  instrument?: string | null;
+  defectLevel?: string | null;
+  sortNo?: number;
+}
+
+/** 耗材（Consumable）：生产辅助物料台账级主数据。 */
+export interface Consumable {
+  id: string;
+  consCode: string;
+  consName: string;
+  specModel: string | null;
+  consType: string | null;
+  unit: string | null;
+  lifeType: string | null;
+  lifeLimit: number | null;
+  lifeUsed: number;
+  warnPercent: number | null;
+  stockQty: number;
+  minQty: number | null;
+  homeEquipmentId: string | null;
+  homeEquipmentCode: string | null;
+  enabled: boolean;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ConsumablePayload {
+  consCode: string;
+  consName: string;
+  specModel?: string | null;
+  consType?: string | null;
+  unit?: string | null;
+  lifeType?: string | null;
+  lifeLimit?: number | null;
+  lifeUsed?: number;
+  warnPercent?: number | null;
+  stockQty?: number;
+  minQty?: number | null;
+  homeEquipmentId?: string | null;
+  enabled?: boolean;
+}
+
 // ---------------------------------------------------------------- 数据字典（平台 sys_dict）
 
 /** 字典（sys_dict）。isSystem=true 的不可删除（种子/内置枚举保护位）。 */

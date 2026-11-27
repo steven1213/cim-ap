@@ -17,4 +17,7 @@ public interface CimFlowStepRepository extends JpaRepository<CimFlowStep, String
 
     /** 工序引用守门查据：是否有路线步骤引用该工序（工序库删/禁用守门用，V20）。 */
     boolean existsByOperationCodeAndDeletedFalse(String operationCode);
+
+    /** 光罩反向引用守门（V32）：步骤 reticleRef 引用计数查据。 */
+    boolean existsByReticleRefAndDeletedFalse(String reticleRef);
 }
