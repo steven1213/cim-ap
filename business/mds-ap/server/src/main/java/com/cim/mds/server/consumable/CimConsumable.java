@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * 耗材（Consumable）——生产辅助物料台账级主数据（V34）。
@@ -77,6 +78,18 @@ public class CimConsumable extends EditLockDefData {
     /** 存放设备主键（cim_equipment.id，MATERIAL 大类：Stocker/OHB/NTB）。 */
     @Column(name = "home_equipment_id", length = 64)
     private String homeEquipmentId;
+
+    /** 供应商名称（采购对齐；可空）。 */
+    @Column(name = "vendor", length = 128)
+    private String vendor;
+
+    /** 供应商料号（Part No，采购/收货对齐；可空）。 */
+    @Column(name = "part_no", length = 64)
+    private String partNo;
+
+    /** 有效期（化学品/胶水等入库批次效期，与寿命三轨正交；空 = 不限）。 */
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
 
     /** 是否启用。 */
     @Column(name = "is_enabled", nullable = false)

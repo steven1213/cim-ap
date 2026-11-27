@@ -30,4 +30,8 @@ public class CimToolGroupMember extends BaseDefData {
     /** 成员机台主键（cim_equipment.id）。 */
     @Column(name = "equipment_id", length = 64, nullable = false)
     private String equipmentId;
+
+    /** 派工优先级（候选池权重，小者优先；空 = 无偏好）。 */
+    @Column(name = "priority")
+    private Integer priority;
 }

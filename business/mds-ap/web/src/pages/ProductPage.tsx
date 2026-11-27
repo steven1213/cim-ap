@@ -38,7 +38,10 @@ interface ProductFormState {
   usageType: ProductUsage;
   npwType: ProductNpwType | '';
   productGroup: string;
-  waferType: string;
+  substrateType: string;
+  waferSize: string;
+  dieSizeX: string;
+  dieSizeY: string;
   owner: string;
   remark: string;
   enabled: boolean;
@@ -52,7 +55,10 @@ function formFrom(row: Product | null): ProductFormState {
     usageType: row?.usageType ?? 'PRODUCTION',
     npwType: row?.npwType ?? '',
     productGroup: row?.productGroup ?? '',
-    waferType: row?.waferType ?? '',
+    substrateType: row?.substrateType ?? '',
+    waferSize: row?.waferSize ?? '',
+    dieSizeX: row?.dieSizeX != null ? String(row.dieSizeX) : '',
+    dieSizeY: row?.dieSizeY != null ? String(row.dieSizeY) : '',
     owner: row?.owner ?? '',
     remark: row?.remark ?? '',
     enabled: row?.enabled ?? true,
@@ -65,7 +71,7 @@ export default function ProductPage() {
   const { t } = useTranslation();
   const toast = useToast();
   const groupDict = useDict('mds.product_group');
-  const waferDict = useDict('mds.wafer_type');
+  const substrateDict = useDict('mds.substrate_type');
 
   const [form, setForm] = useState<ProductFormState>(() => formFrom(null));
   const initialJsonRef = useRef(EMPTY_JSON);
@@ -152,7 +158,10 @@ export default function ProductPage() {
         usageType: form.usageType,
         npwType: form.usageType === 'NPW' ? form.npwType || null : null,
         productGroup: form.productGroup || null,
-        waferType: form.waferType || null,
+        substrateType: form.substrateType || null,
+        waferSize: form.waferSize || null,
+        dieSizeX: form.dieSizeX === '' ? null : Number(form.dieSizeX),
+        dieSizeY: form.dieSizeY === '' ? null : Number(form.dieSizeY),
         owner: form.owner || null,
         remark: form.remark || null,
         enabled: form.enabled,
@@ -199,7 +208,8 @@ export default function ProductPage() {
           );
         },
       },
-      { key: 'waferType', titleKey: 'mds.product.waferType', width: 100, render: (r) => waferDict.labelOf(r.waferType) },
+      { key: 'substrateType', titleKey: 'mds.product.substrateType', width: 100, render: (r) => substrateDict.labelOf(r.substrateType) },
+      { key: 'waferSize', titleKey: 'mds.product.waferSize', width: 90, render: (r) => (r.waferSize ? `${r.waferSize}"` : '—') },
       {
         key: 'enabled',
         titleKey: 'mds.topo.status',
@@ -213,7 +223,7 @@ export default function ProductPage() {
       { key: 'owner', titleKey: 'mds.product.owner', width: 90, render: (r) => r.owner ?? '—' },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, groupDict, waferDict, activeByProduct],
+    [t, groupDict, substrateDict, activeByProduct],
   );
 
   // 详情头动作（对象级，贴详情头）
@@ -281,7 +291,10 @@ export default function ProductPage() {
         placeholderKey: 'mds.product.techPlaceholder',
       },
       { kind: 'select', key: 'productGroup', labelKey: 'mds.product.group', dict: 'mds.product_group', allowClear: true },
-      { kind: 'select', key: 'waferType', labelKey: 'mds.product.waferType', dict: 'mds.wafer_type', allowClear: true },
+      { kind: 'select', key: 'substrateType', labelKey: 'mds.product.substrateType', dict: 'mds.substrate_type', allowClear: true },
+      { kind: 'select', key: 'waferSize', labelKey: 'mds.product.waferSize', dict: 'mds.wafer_size', allowClear: true },
+      { kind: 'number', key: 'dieSizeX', labelKey: 'mds.product.dieSizeX', min: 0, step: 0.001 },
+      { kind: 'number', key: 'dieSizeY', labelKey: 'mds.product.dieSizeY', min: 0, step: 0.001 },
       { kind: 'text', key: 'owner', labelKey: 'mds.product.owner' },
       { kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' },
       { kind: 'textarea', key: 'remark', labelKey: 'mds.common.remark', span: 2 },

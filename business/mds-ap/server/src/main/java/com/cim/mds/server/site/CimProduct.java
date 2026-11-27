@@ -51,9 +51,21 @@ public class CimProduct extends EditLockDefData {
     @Column(name = "product_group", length = 64)
     private String productGroup;
 
-    /** 晶圆类型（例：外延片、P 型衬底；可空）。 */
-    @Column(name = "wafer_type", length = 64)
-    private String waferType;
+    /** 衬底材料类型（mds.substrate_type 字典，例：外延片、P 型衬底；可空）。 */
+    @Column(name = "substrate_type", length = 64)
+    private String substrateType;
+
+    /** 适用晶圆尺寸（英寸数字串，mds.wafer_size 字典："6"/"8"/"12"；可空 = 未限定）。 */
+    @Column(name = "wafer_size", length = 16)
+    private String waferSize;
+
+    /** 裸片尺寸 X（mm，good-die 统计前置；可空）。 */
+    @Column(name = "die_size_x", precision = 8, scale = 3)
+    private java.math.BigDecimal dieSizeX;
+
+    /** 裸片尺寸 Y（mm，good-die 统计前置；可空）。 */
+    @Column(name = "die_size_y", precision = 8, scale = 3)
+    private java.math.BigDecimal dieSizeY;
 
     /** 业务责任人账号（可空，不关联组织架构）。 */
     @Column(name = "owner", length = 64)

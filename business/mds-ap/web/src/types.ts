@@ -204,7 +204,10 @@ export interface Product {
   usageType: ProductUsage;
   npwType: ProductNpwType | null;
   productGroup: string | null;
-  waferType: string | null;
+  substrateType: string | null;
+  waferSize: string | null;
+  dieSizeX: number | null;
+  dieSizeY: number | null;
   owner: string | null;
   remark: string | null;
   enabled: boolean;
@@ -219,7 +222,10 @@ export interface ProductPayload {
   usageType?: ProductUsage;
   npwType?: ProductNpwType | null;
   productGroup?: string | null;
-  waferType?: string | null;
+  substrateType?: string | null;
+  waferSize?: string | null;
+  dieSizeX?: number | null;
+  dieSizeY?: number | null;
   owner?: string | null;
   remark?: string | null;
   enabled?: boolean;
@@ -279,12 +285,18 @@ export interface ToolGroup {
   groupName: string;
   classCode: string;
   className: string | null;
-  memberEquipmentCodes: string[];
+  members: ToolGroupMemberItem[];
   remark: string | null;
   enabled: boolean;
   description: string | null;
   occupied: boolean;
   occupiedBy: string | null;
+}
+
+/** 组成员条目（V35：带派工优先级，小者优先，空 = 无偏好）。 */
+export interface ToolGroupMemberItem {
+  equipmentCode: string;
+  priority: number | null;
 }
 
 export interface ToolGroupPayload {
@@ -294,6 +306,12 @@ export interface ToolGroupPayload {
   remark?: string | null;
   enabled?: boolean;
   description?: string | null;
+}
+
+/** 设备↔能力关联条目（V35：混线资格可按尺寸区分，空 waferSize = 全尺寸通用）。 */
+export interface EquipmentCapabilityItem {
+  capabilityCode: string;
+  waferSize: string | null;
 }
 
 /** 机台（Equipment，v2）：实例主数据，约束字段从模板派生可覆盖。 */
@@ -307,6 +325,7 @@ export interface Equipment {
   locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
   locationId: string;
   ownerUser: string | null;
+  owningDept: string | null;
   controlMode: string | null;
   productionMode: string;
   vendor: string | null;
@@ -334,6 +353,7 @@ export interface EquipmentPayload {
   locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
   locationId: string;
   ownerUser?: string | null;
+  owningDept?: string | null;
   controlMode?: string | null;
   productionMode?: string | null;
   vendor?: string | null;
@@ -453,6 +473,8 @@ export interface Carrier {
   carrierCode: string;
   carrierName: string;
   carrierType: string | null;
+  waferSize: string | null;
+  capacity: number | null;
   status: string | null;
   homeEquipmentId: string | null;
   homeEquipmentCode: string | null;
@@ -467,6 +489,8 @@ export interface CarrierPayload {
   carrierCode: string;
   carrierName: string;
   carrierType?: string | null;
+  waferSize?: string | null;
+  capacity?: number | null;
   status?: string | null;
   homeEquipmentId?: string | null;
   currentLotId?: string | null;
@@ -480,6 +504,9 @@ export interface Reticle {
   reticleCode: string;
   reticleName: string;
   layer: string | null;
+  waferSize: string | null;
+  plateSize: string | null;
+  techCode: string | null;
   status: string | null;
   homeEquipmentId: string | null;
   homeEquipmentCode: string | null;
@@ -495,6 +522,9 @@ export interface ReticlePayload {
   reticleCode: string;
   reticleName: string;
   layer?: string | null;
+  waferSize?: string | null;
+  plateSize?: string | null;
+  techCode?: string | null;
   status?: string | null;
   homeEquipmentId?: string | null;
   usageCount?: number;
@@ -564,6 +594,9 @@ export interface Consumable {
   warnPercent: number | null;
   stockQty: number;
   minQty: number | null;
+  vendor: string | null;
+  partNo: string | null;
+  expiryDate: string | null;
   homeEquipmentId: string | null;
   homeEquipmentCode: string | null;
   enabled: boolean;
@@ -583,6 +616,9 @@ export interface ConsumablePayload {
   warnPercent?: number | null;
   stockQty?: number;
   minQty?: number | null;
+  vendor?: string | null;
+  partNo?: string | null;
+  expiryDate?: string | null;
   homeEquipmentId?: string | null;
   enabled?: boolean;
 }

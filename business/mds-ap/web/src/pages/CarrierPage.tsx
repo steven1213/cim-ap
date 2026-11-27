@@ -35,6 +35,8 @@ interface CarrierFormState {
   carrierCode: string;
   carrierName: string;
   carrierType: string;
+  waferSize: string;
+  capacity: string;
   status: string;
   homeEquipmentId: string;
   currentLotId: string;
@@ -47,6 +49,8 @@ function formFrom(row: Carrier | null): CarrierFormState {
     carrierCode: row?.carrierCode ?? '',
     carrierName: row?.carrierName ?? '',
     carrierType: row?.carrierType ?? '',
+    waferSize: row?.waferSize ?? '',
+    capacity: row?.capacity != null ? String(row.capacity) : '',
     status: row?.status ?? '',
     homeEquipmentId: row?.homeEquipmentId ?? '',
     currentLotId: row?.currentLotId ?? '',
@@ -116,6 +120,8 @@ export default function CarrierPage() {
       const payload = {
         carrierName: form.carrierName.trim(),
         carrierType: form.carrierType || null,
+        waferSize: form.waferSize || null,
+        capacity: form.capacity === '' ? null : Number(form.capacity),
         status: form.status || null,
         homeEquipmentId: form.homeEquipmentId || null,
         currentLotId: form.currentLotId.trim() || null,
@@ -140,6 +146,8 @@ export default function CarrierPage() {
       { key: 'carrierCode', titleKey: 'mds.carrier.code', width: 130, mono: true },
       { key: 'carrierName', titleKey: 'mds.carrier.name', width: 200, ellipsis: true, render: (r) => <span className="flow-name-main">{r.carrierName}</span> },
       { key: 'carrierType', titleKey: 'mds.carrier.type', width: 110, render: (r) => r.carrierType ?? '—' },
+      { key: 'waferSize', titleKey: 'mds.carrier.waferSize', width: 90, render: (r) => (r.waferSize ? `${r.waferSize}"` : '—') },
+      { key: 'capacity', titleKey: 'mds.carrier.capacity', width: 90, render: (r) => r.capacity ?? '—' },
       { key: 'status', titleKey: 'mds.carrier.status', width: 110, render: (r) => r.status ?? '—' },
       { key: 'homeEquipmentCode', titleKey: 'mds.carrier.homeEqp', width: 140, render: (r) => r.homeEquipmentCode ?? '—' },
       { key: 'currentLotId', titleKey: 'mds.carrier.lot', width: 140, mono: true, render: (r) => r.currentLotId ?? '—' },
@@ -185,6 +193,8 @@ export default function CarrierPage() {
         allowClear: true,
         options: typeDict.items.filter((i) => !i.disabled).map((i) => ({ value: i.value, label: i.label })),
       },
+      { kind: 'select', key: 'waferSize', labelKey: 'mds.carrier.waferSize', dict: 'mds.wafer_size', allowClear: true },
+      { kind: 'number', key: 'capacity', labelKey: 'mds.carrier.capacity', min: 0 },
       {
         kind: 'select',
         key: 'status',

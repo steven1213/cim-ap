@@ -64,6 +64,10 @@ public class CimEquipment extends EditLockDefData {
     @Column(name = "owner_user", length = 64)
     private String ownerUser;
 
+    /** 归属部门（mds.owning_dept 字典：EQP/PE/QC/PROD/MAT/PLAN/ENG/OTHER；可空）。 */
+    @Column(name = "owning_dept", length = 32)
+    private String owningDept;
+
     /** 通信控制模式（mds.equip_control_mode 字典，SEMI E30 口径；可空=未声明）。 */
     @Column(name = "control_mode", length = 16)
     private String controlMode;

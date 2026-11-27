@@ -184,8 +184,8 @@ class EquipmentDomainTest {
 
         mvc.perform(post("/api/v1/mds/tool-groups/" + groupId + "/members/" + eqpId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberEquipmentCodes.length()").value(1))
-                .andExpect(jsonPath("$.data.memberEquipmentCodes[0]").value("EQP-TEST-01"));
+                .andExpect(jsonPath("$.data.members.length()").value(1))
+                .andExpect(jsonPath("$.data.members[0].equipmentCode").value("EQP-TEST-01"));
 
         // 异机型机台（种子 ET-ETCH）入组 → 拒绝（同机型守门）
         mvc.perform(post("/api/v1/mds/tool-groups/" + groupId + "/members/seed-eqp-05"))
@@ -194,12 +194,12 @@ class EquipmentDomainTest {
         // 重复入组幂等（不报错不重复）
         mvc.perform(post("/api/v1/mds/tool-groups/" + groupId + "/members/" + eqpId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberEquipmentCodes.length()").value(1));
+                .andExpect(jsonPath("$.data.members.length()").value(1));
 
         // 移出成员
         mvc.perform(delete("/api/v1/mds/tool-groups/" + groupId + "/members/" + eqpId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberEquipmentCodes.length()").value(0));
+                .andExpect(jsonPath("$.data.members.length()").value(0));
     }
 
     @Test
@@ -208,24 +208,24 @@ class EquipmentDomainTest {
         // 全量替换：先挂 CAP-TESTX + 种子 CAP-E84，再替换成只剩 CAP-E84
         mvc.perform(put("/api/v1/mds/equipments/" + eqpId + "/capabilities")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(List.of("CAP-TESTX", "CAP-E84"))))
+                        .content(om.writeValueAsString(List.of(Map.of("capabilityCode", "CAP-TESTX"), Map.of("capabilityCode", "CAP-E84")))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2));
 
         mvc.perform(put("/api/v1/mds/equipments/" + eqpId + "/capabilities")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(List.of("CAP-E84"))))
+                        .content(om.writeValueAsString(List.of(Map.of("capabilityCode", "CAP-E84")))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1));
 
         mvc.perform(get("/api/v1/mds/equipments/" + eqpId + "/capabilities"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0]").value("CAP-E84"));
+                .andExpect(jsonPath("$.data[0].capabilityCode").value("CAP-E84"));
 
         // 不存在的能力码 → 404
         mvc.perform(put("/api/v1/mds/equipments/" + eqpId + "/capabilities")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(List.of("CAP-NOPE"))))
+                        .content(om.writeValueAsString(List.of(Map.of("capabilityCode", "CAP-NOPE")))))
                 .andExpect(status().isNotFound());
     }
 

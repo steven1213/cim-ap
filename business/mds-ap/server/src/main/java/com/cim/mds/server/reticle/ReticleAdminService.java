@@ -31,17 +31,22 @@ public class ReticleAdminService {
 
     /** 光罩状态字典。 */
     public static final String DICT_RETICLE_STATUS = "mds.reticle_status";
+    /** 晶圆尺寸 / 光罩版尺寸字典（V35 多尺寸厂）。 */
+    public static final String DICT_WAFER_SIZE = "mds.wafer_size";
+    public static final String DICT_RETICLE_PLATE_SIZE = "mds.reticle_plate_size";
 
     private final CimReticleRepository reticleRepository;
     private final CimEquipmentRepository equipmentRepository;
     private final CimOperationRepository operationRepository;
     private final CimFlowStepRepository stepRepository;
+    private final com.cim.mds.server.site.CimTechnologyRepository technologyRepository;
     private final SysDictService dictService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
     public record ReticleView(String id, String reticleCode, String reticleName,
-                              String layer, String status,
+                              String layer, String waferSize, String plateSize, String techCode,
+                              String status,
                               String homeEquipmentId, String homeEquipmentCode,
                               Integer usageCount, Integer usageLimit,
                               String expiryDate, Boolean enabled,
@@ -49,6 +54,7 @@ public class ReticleAdminService {
     }
 
     public record ReticleReq(String reticleCode, String reticleName, String layer,
+                             String waferSize, String plateSize, String techCode,
                              String status, String homeEquipmentId,
                              Integer usageCount, Integer usageLimit,
                              String expiryDate, Boolean enabled) {
@@ -75,7 +81,7 @@ public class ReticleAdminService {
             throw BizException.of(BizCode.DATA_DUPLICATE, "mds.biz.reticle.codeDuplicate", code);
         }
         requireEquipment(req.homeEquipmentId());
-        requireDictItem(req.status());
+        requireDictItem(DICT_RETICLE_STATUS, req.status());
         CimReticle entity = new CimReticle();
         entity.setReticleCode(code);
         apply(entity, req);
@@ -87,7 +93,7 @@ public class ReticleAdminService {
         CimReticle entity = requireReticle(id);
         requireText(req.reticleName(), "reticleName");
         requireEquipment(req.homeEquipmentId());
-        requireDictItem(req.status());
+        requireDictItem(DICT_RETICLE_STATUS, req.status());
         assertNotLockedByOther(entity);
         apply(entity, req);
         clearLock(entity);
@@ -113,6 +119,14 @@ public class ReticleAdminService {
     private void apply(CimReticle entity, ReticleReq req) {
         entity.setReticleName(req.reticleName().trim());
         entity.setLayer(trimToNull(req.layer()));
+        entity.setWaferSize(requireDictItem(DICT_WAFER_SIZE, req.waferSize()));
+        entity.setPlateSize(requireDictItem(DICT_RETICLE_PLATE_SIZE, req.plateSize()));
+        // tech_code 引用守门（与产品 tech_code 同口径：填了必须是库内有效制程技术）
+        String tech = trimToNull(req.techCode());
+        if (tech != null && technologyRepository.findByTechCodeAndDeletedFalse(tech).isEmpty()) {
+            throw new BizException(BizCode.DATA_NOT_FOUND, "制程技术不存在: " + tech);
+        }
+        entity.setTechCode(tech);
         entity.setStatus(trimToNull(req.status()));
         entity.setHomeEquipmentId(trimToNull(req.homeEquipmentId()));
         entity.setUsageCount(req.usageCount() == null ? 0 : req.usageCount());
@@ -141,24 +155,27 @@ public class ReticleAdminService {
         }
     }
 
-    private void requireDictItem(String value) {
+    /** 字典值守门：非空值必须是该字典的启用 itemKey；返回归一化值（trim 后，空入空出）。 */
+    private String requireDictItem(String dictCode, String value) {
         String v = trimToNull(value);
         if (v == null) {
-            return;
+            return null;
         }
-        boolean hit = dictService.items(DICT_RETICLE_STATUS).stream()
+        boolean hit = dictService.items(dictCode).stream()
                 .anyMatch(i -> v.equals(i.getItemKey()));
         if (!hit) {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.reticle.dictInvalid",
-                    DICT_RETICLE_STATUS, v);
+                    dictCode, v);
         }
+        return v;
     }
 
     private ReticleView toView(CimReticle r) {
         CimEquipment eqp = r.getHomeEquipmentId() == null
                 ? null : equipmentRepository.findById(r.getHomeEquipmentId()).orElse(null);
         return new ReticleView(r.getId(), r.getReticleCode(), r.getReticleName(),
-                r.getLayer(), r.getStatus(), r.getHomeEquipmentId(),
+                r.getLayer(), r.getWaferSize(), r.getPlateSize(), r.getTechCode(),
+                r.getStatus(), r.getHomeEquipmentId(),
                 eqp == null ? null : eqp.getEquipmentCode(),
                 r.getUsageCount(), r.getUsageLimit(),
                 r.getExpiryDate() == null ? null : r.getExpiryDate().toString(),

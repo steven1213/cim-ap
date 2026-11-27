@@ -16,7 +16,7 @@ import { useResource } from '@cim/data';
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useMasterDetail, type DetailMode } from '@/lib/useMasterDetail';
-import type { Equipment, EquipmentClass, ToolGroup } from '@/types';
+import type { Equipment, EquipmentClass, ToolGroup, ToolGroupMemberItem } from '@/types';
 import GuideBar from '@/components/GuideBar';
 
 /**
@@ -24,11 +24,12 @@ import GuideBar from '@/components/GuideBar';
  *
  * <p>布局「左组列表 + 右详情」，详情含成员块：添加成员按「同机型 + 启用」预筛
  * （派工候选池同质性，后端守门同机型才能入组）；成员 chip 就地移出。
+ * V35：成员携带 priority（派工优先级，小值优先），入组时可选填。
  * 组编辑先抢锁（type=toolGroup）、保存同事务清锁、取消显式释放。</p>
  */
 
 const NO_EQP: Equipment[] = [];
-const NO_MEMBERS: string[] = [];
+const NO_MEMBERS: ToolGroupMemberItem[] = [];
 
 interface GroupFormState {
   groupCode: string;
@@ -53,6 +54,7 @@ export default function ToolGroupPage() {
   const toast = useToast();
 
   const [memberOp, setMemberOp] = useState(false);
+  const [pendingPriority, setPendingPriority] = useState('');
   const modeRef = useRef<DetailMode>('view');
 
   const classRes = useResource(({ signal }) => api.listEquipmentClasses(undefined, signal));
@@ -125,7 +127,7 @@ export default function ToolGroupPage() {
    *  添加器仅在维护态渲染，若此处再按 memberOp 清空候选，添加器将永远为空。 */
   const memberCandidates = useMemo(() => {
     if (!md.selected) return NO_EQP;
-    const inGroup = new Set(md.selected.memberEquipmentCodes ?? NO_MEMBERS);
+    const inGroup = new Set((md.selected.members ?? NO_MEMBERS).map((m) => m.equipmentCode));
     return (eqpRes.data ?? NO_EQP).filter(
       (e) => e.classCode === md.selected!.classCode && e.enabled && !inGroup.has(e.equipmentCode),
     );
@@ -133,7 +135,10 @@ export default function ToolGroupPage() {
 
   const addMember = async (equipment: Equipment) => {
     try {
-      await api.addToolGroupMember(md.selected!.id, equipment.id);
+      const priority = pendingPriority === '' ? null : Number(pendingPriority);
+      await api.addToolGroupMember(md.selected!.id, equipment.id, priority);
+      setPendingPriority('');
+      setMemberOp(false);
       toast.success(t('mds.common.saved'));
       md.res.refresh();
     } catch (e) {
@@ -170,10 +175,14 @@ export default function ToolGroupPage() {
       {
         key: 'members',
         titleKey: 'mds.toolGroup.members',
-        width: 160,
+        width: 180,
         ellipsis: true,
         render: (r) => (
-          <span className="mono">{(r.memberEquipmentCodes ?? NO_MEMBERS).join('、') || '—'}</span>
+          <span className="mono">
+            {(r.members ?? NO_MEMBERS)
+              .map((m) => (m.priority != null ? `${m.equipmentCode}#${m.priority}` : m.equipmentCode))
+              .join('、') || '—'}
+          </span>
         ),
       },
       {
@@ -225,7 +234,7 @@ export default function ToolGroupPage() {
         labelKey: 'mds.toolGroup.boundClass',
         required: true,
         allowClear: false,
-        disabled: md.mode === 'edit' && (md.selected?.memberEquipmentCodes.length ?? 0) > 0,
+        disabled: md.mode === 'edit' && (md.selected?.members.length ?? 0) > 0,
         options: classOptions,
       },
       { kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' },
@@ -309,14 +318,17 @@ export default function ToolGroupPage() {
                 <div className="toolgroup-members">
                   <h4 className="toolgroup-members-title">{t('mds.toolGroup.members')}</h4>
                   <div className="toolgroup-chips">
-                    {(md.selected.memberEquipmentCodes ?? NO_MEMBERS).map((code) => (
-                      <span key={code} className="toolgroup-chip">
-                        <span className="mono">{code}</span>
+                    {(md.selected.members ?? NO_MEMBERS).map((m) => (
+                      <span key={m.equipmentCode} className="toolgroup-chip">
+                        <span className="mono">
+                          {m.equipmentCode}
+                          {m.priority != null ? ` #${m.priority}` : ''}
+                        </span>
                         <Can perm={MDS_PERMS.toolGroup.update}>
                           <button
                             type="button"
                             className="toolgroup-chip-x"
-                            onClick={() => void removeMember(code)}
+                            onClick={() => void removeMember(m.equipmentCode)}
                             title={t('mds.toolGroup.removeMember')}
                           >
                             ×
@@ -324,7 +336,7 @@ export default function ToolGroupPage() {
                         </Can>
                       </span>
                     ))}
-                    {!md.selected.memberEquipmentCodes?.length && (
+                    {!md.selected.members?.length && (
                       <span className="dim">{t('mds.toolGroup.noMembers')}</span>
                     )}
                   </div>
@@ -336,12 +348,21 @@ export default function ToolGroupPage() {
                         </CimButton>
                       ) : (
                         <>
+                          <input
+                            className="topo-group-filter"
+                            type="number"
+                            min={0}
+                            style={{ width: 90 }}
+                            value={pendingPriority}
+                            onChange={(e) => setPendingPriority(e.target.value)}
+                            placeholder={t('mds.toolGroup.priority')}
+                            title={t('mds.toolGroup.priorityHint')}
+                          />
                           <select
                             className="topo-group-filter"
                             onChange={(e) => {
                               const target = memberCandidates.find((c) => c.id === e.target.value);
                               if (target) void addMember(target);
-                              setMemberOp(false);
                             }}
                             defaultValue=""
                           >
@@ -354,7 +375,7 @@ export default function ToolGroupPage() {
                               </option>
                             ))}
                           </select>
-                          <CimButton size="small" onClick={() => setMemberOp(false)}>
+                          <CimButton size="small" onClick={() => { setMemberOp(false); setPendingPriority(''); }}>
                             {t('mds.common.cancel')}
                           </CimButton>
                         </>

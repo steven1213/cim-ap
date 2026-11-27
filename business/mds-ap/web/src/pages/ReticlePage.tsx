@@ -35,6 +35,9 @@ interface ReticleFormState {
   reticleCode: string;
   reticleName: string;
   layer: string;
+  waferSize: string;
+  plateSize: string;
+  techCode: string;
   status: string;
   homeEquipmentId: string;
   usageCount: string;
@@ -48,6 +51,9 @@ function formFrom(row: Reticle | null): ReticleFormState {
     reticleCode: row?.reticleCode ?? '',
     reticleName: row?.reticleName ?? '',
     layer: row?.layer ?? '',
+    waferSize: row?.waferSize ?? '',
+    plateSize: row?.plateSize ?? '',
+    techCode: row?.techCode ?? '',
     status: row?.status ?? '',
     homeEquipmentId: row?.homeEquipmentId ?? '',
     usageCount: row?.usageCount != null ? String(row.usageCount) : '0',
@@ -78,6 +84,22 @@ export default function ReticlePage() {
   const [form, setForm] = useState<ReticleFormState>(() => formFrom(null));
   const initialJsonRef = useRef(EMPTY_JSON);
   const modeRef = useRef<DetailMode>('view');
+
+  // 制程技术下拉（techCode 逻辑引用守门在后端，前端只做选择）
+  const [techs, setTechs] = useState<Awaited<ReturnType<typeof api.listTechnologies>>>([]);
+  useEffect(() => {
+    let alive = true;
+    api.listTechnologies().then((rows) => {
+      if (alive) setTechs(rows);
+    }).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const techOptions = useMemo(
+    () => techs.map((x) => ({ value: x.techCode, label: `${x.techCode} · ${x.techName}` })),
+    [techs],
+  );
 
   const md = useMasterDetail<Reticle>({
     fetchList: (signal) => api.listReticles(undefined, signal),
@@ -117,6 +139,9 @@ export default function ReticlePage() {
       const payload = {
         reticleName: form.reticleName.trim(),
         layer: form.layer.trim() || null,
+        waferSize: form.waferSize || null,
+        plateSize: form.plateSize || null,
+        techCode: form.techCode || null,
         status: form.status || null,
         homeEquipmentId: form.homeEquipmentId || null,
         usageCount: form.usageCount === '' ? 0 : Number(form.usageCount),
@@ -142,6 +167,9 @@ export default function ReticlePage() {
       { key: 'reticleCode', titleKey: 'mds.reticle.code', width: 140, mono: true },
       { key: 'reticleName', titleKey: 'mds.reticle.name', width: 200, ellipsis: true, render: (r) => <span className="flow-name-main">{r.reticleName}</span> },
       { key: 'layer', titleKey: 'mds.reticle.layer', width: 90, render: (r) => r.layer ?? '—' },
+      { key: 'waferSize', titleKey: 'mds.reticle.waferSize', width: 80, render: (r) => (r.waferSize ? `${r.waferSize}"` : '—') },
+      { key: 'plateSize', titleKey: 'mds.reticle.plateSize', width: 90, render: (r) => r.plateSize ?? '—' },
+      { key: 'techCode', titleKey: 'mds.reticle.techCode', width: 100, mono: true, render: (r) => r.techCode ?? '—' },
       { key: 'status', titleKey: 'mds.reticle.status', width: 100, render: (r) => r.status ?? '—' },
       { key: 'homeEquipmentCode', titleKey: 'mds.reticle.homeEqp', width: 140, render: (r) => r.homeEquipmentCode ?? '—' },
       {
@@ -186,6 +214,15 @@ export default function ReticlePage() {
       { kind: 'text', key: 'reticleCode', labelKey: 'mds.reticle.code', mono: true, disabled: md.mode !== 'create', required: md.mode === 'create' },
       { kind: 'text', key: 'reticleName', labelKey: 'mds.reticle.name', required: true },
       { kind: 'text', key: 'layer', labelKey: 'mds.reticle.layer', mono: true },
+      { kind: 'select', key: 'waferSize', labelKey: 'mds.reticle.waferSize', dict: 'mds.wafer_size', allowClear: true },
+      { kind: 'select', key: 'plateSize', labelKey: 'mds.reticle.plateSize', dict: 'mds.reticle_plate_size', allowClear: true },
+      {
+        kind: 'select',
+        key: 'techCode',
+        labelKey: 'mds.reticle.techCode',
+        options: techOptions,
+        allowClear: true,
+      },
       {
         kind: 'select',
         key: 'status',
@@ -206,7 +243,7 @@ export default function ReticlePage() {
       { kind: 'switch', key: 'enabled', labelKey: 'mds.topo.status' },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [md.mode, equipmentOptions, statusDict.items],
+    [md.mode, equipmentOptions, statusDict.items, techOptions],
   );
 
   return (

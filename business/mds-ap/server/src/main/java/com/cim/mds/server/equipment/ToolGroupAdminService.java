@@ -36,8 +36,12 @@ public class ToolGroupAdminService {
     // ------------------------------------------------------------------ 视图 / 请求
 
     /** 组视图（带成员机台编码清单，供主从页右侧成员块直显）。 */
+    /** 组成员条目（V35：带派工优先级，小者优先）。 */
+    public record MemberItem(String equipmentCode, Integer priority) {
+    }
+
     public record ToolGroupView(String id, String groupCode, String groupName, String classCode,
-                                String className, List<String> memberEquipmentCodes,
+                                String className, List<MemberItem> members,
                                 String remark, Boolean enabled, String description,
                                 Boolean occupied, String occupiedBy) {
     }
@@ -109,7 +113,7 @@ public class ToolGroupAdminService {
     // ------------------------------------------------------------------ 成员写
 
     @Transactional
-    public ToolGroupView addMember(String groupId, String equipmentId) {
+    public ToolGroupView addMember(String groupId, String equipmentId, Integer priority) {
         CimToolGroup group = requireGroup(groupId);
         assertNotLockedByOther(group);
         CimEquipment equipment = equipmentRepository.findById(equipmentId)
@@ -121,12 +125,18 @@ public class ToolGroupAdminService {
                     "机台 " + equipment.getEquipmentCode() + "（" + equipment.getClassCode()
                             + "）与组机型 " + group.getClassCode() + " 不一致，不能入组");
         }
-        if (!memberRepository.existsByGroupIdAndEquipmentIdAndDeletedFalse(groupId, equipmentId)) {
-            CimToolGroupMember link = new CimToolGroupMember();
+        CimToolGroupMember link = memberRepository
+                .findByGroupIdAndDeletedFalse(groupId).stream()
+                .filter(m -> equipmentId.equals(m.getEquipmentId()))
+                .findFirst().orElse(null);
+        if (link == null) {
+            link = new CimToolGroupMember();
             link.setGroupId(groupId);
             link.setEquipmentId(equipmentId);
-            memberRepository.save(link);
         }
+        // 新入组给优先级；重复入组 = 改优先级（免单独编辑端点的轻口径）
+        link.setPriority(priority);
+        memberRepository.save(link);
         return toView(group);
     }
 
@@ -175,13 +185,16 @@ public class ToolGroupAdminService {
     }
 
     private ToolGroupView toView(CimToolGroup g) {
-        List<String> members = memberRepository.findByGroupIdAndDeletedFalse(g.getId()).stream()
+        List<MemberItem> members = memberRepository.findByGroupIdAndDeletedFalse(g.getId()).stream()
                 .map(m -> equipmentRepository.findById(m.getEquipmentId())
                         .filter(e -> !Boolean.TRUE.equals(e.getDeleted()))
-                        .map(CimEquipment::getEquipmentCode)
+                        .map(e -> new MemberItem(e.getEquipmentCode(), m.getPriority()))
                         .orElse(null))
                 .filter(java.util.Objects::nonNull)
-                .sorted()
+                .sorted(java.util.Comparator
+                        .comparing(MemberItem::priority,
+                                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                        .thenComparing(MemberItem::equipmentCode))
                 .toList();
         String className = classRepository.findByClassCodeAndDeletedFalse(g.getClassCode())
                 .map(CimEquipmentClass::getClassName).orElse(null);

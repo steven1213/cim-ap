@@ -30,9 +30,10 @@ public class ProductAdminService {
     /** NPW 二级细分（SEMI M8/M38 应用类锚：MONITOR/DUMMY/SEASON/LITHO/GENERIC）。 */
     private static final Set<String> NPW_TYPES = Set.of("MONITOR", "DUMMY", "SEASON", "LITHO", "GENERIC");
 
-    /** 数据字典码（V7 种子）：产品分组 / 晶圆类型。 */
+    /** 数据字典码（V7 种子）：产品分组 / 衬底材料；V35：晶圆尺寸。 */
     public static final String DICT_PRODUCT_GROUP = "mds.product_group";
-    public static final String DICT_WAFER_TYPE = "mds.wafer_type";
+    public static final String DICT_SUBSTRATE_TYPE = "mds.substrate_type";
+    public static final String DICT_WAFER_SIZE = "mds.wafer_size";
 
     private final CimProductRepository productRepository;
     private final CimTechnologyRepository technologyRepository;
@@ -42,13 +43,15 @@ public class ProductAdminService {
     // ------------------------------------------------------------------ 视图 / 请求
 
     public record ProductView(String id, String productCode, String productName, String techCode,
-                              String usageType, String npwType, String productGroup, String waferType,
+                              String usageType, String npwType, String productGroup, String substrateType,
+                              String waferSize, java.math.BigDecimal dieSizeX, java.math.BigDecimal dieSizeY,
                               String owner, String remark, Boolean enabled, String description,
                               Boolean occupied, String occupiedBy) {
     }
 
     public record ProductReq(String productCode, String productName, String techCode,
-                             String usageType, String npwType, String productGroup, String waferType,
+                             String usageType, String npwType, String productGroup, String substrateType,
+                             String waferSize, java.math.BigDecimal dieSizeX, java.math.BigDecimal dieSizeY,
                              String owner, String remark, Boolean enabled, String description) {
     }
 
@@ -153,7 +156,10 @@ public class ProductAdminService {
         entity.setTechCode(techCode);
         // 分类字段挂数据字典（V7）：落库存 itemKey，保存时校验必须在字典启用项内
         entity.setProductGroup(requireDictItem(DICT_PRODUCT_GROUP, req.productGroup(), "productGroup"));
-        entity.setWaferType(requireDictItem(DICT_WAFER_TYPE, req.waferType(), "waferType"));
+        entity.setSubstrateType(requireDictItem(DICT_SUBSTRATE_TYPE, req.substrateType(), "substrateType"));
+        entity.setWaferSize(requireDictItem(DICT_WAFER_SIZE, req.waferSize(), "waferSize"));
+        entity.setDieSizeX(req.dieSizeX());
+        entity.setDieSizeY(req.dieSizeY());
         entity.setOwner(blankToNull(req.owner()));
     }
 
@@ -173,7 +179,8 @@ public class ProductAdminService {
 
     private static ProductView toView(CimProduct p) {
         return new ProductView(p.getId(), p.getProductCode(), p.getProductName(), p.getTechCode(),
-                p.getUsageType(), p.getNpwType(), p.getProductGroup(), p.getWaferType(), p.getOwner(),
+                p.getUsageType(), p.getNpwType(), p.getProductGroup(), p.getSubstrateType(),
+                p.getWaferSize(), p.getDieSizeX(), p.getDieSizeY(), p.getOwner(),
                 p.getRemark(), p.getEnabled(), p.getDescription(), p.getOccupied(), p.getOccupiedBy());
     }
 

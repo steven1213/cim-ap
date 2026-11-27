@@ -41,6 +41,18 @@ public class CimReticle extends EditLockDefData {
     @Column(name = "layer", length = 64)
     private String layer;
 
+    /** 适用晶圆尺寸（英寸数字串，mds.wafer_size 字典："6"/"8"/"12"；可空 = 未限定）。 */
+    @Column(name = "wafer_size", length = 16)
+    private String waferSize;
+
+    /** 光罩版尺寸（英寸，mds.reticle_plate_size 字典："5"/"6"/"9"；曝光机兼容性判断依据）。 */
+    @Column(name = "plate_size", length = 16)
+    private String plateSize;
+
+    /** 所属制程技术编码（逻辑引用 cim_technology.tech_code；可空，写入守门校验存在）。 */
+    @Column(name = "tech_code", length = 64)
+    private String techCode;
+
     /** 台账状态（mds.reticle_status 字典：IN_STOCK/ACTIVE/DAMAGED/EXPIRED/SCRAPPED）。 */
     @Column(name = "status", length = 32)
     private String status;

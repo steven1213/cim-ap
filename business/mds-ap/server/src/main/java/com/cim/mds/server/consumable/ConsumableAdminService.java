@@ -41,6 +41,7 @@ public class ConsumableAdminService {
                                  String consType, String unit, String lifeType,
                                  BigDecimal lifeLimit, BigDecimal lifeUsed, Integer warnPercent,
                                  BigDecimal stockQty, BigDecimal minQty,
+                                 String vendor, String partNo, String expiryDate,
                                  String homeEquipmentId, String homeEquipmentCode,
                                  Boolean enabled, Boolean occupied, String occupiedBy) {
     }
@@ -49,6 +50,7 @@ public class ConsumableAdminService {
                                 String consType, String unit, String lifeType,
                                 BigDecimal lifeLimit, BigDecimal lifeUsed, Integer warnPercent,
                                 BigDecimal stockQty, BigDecimal minQty,
+                                String vendor, String partNo, String expiryDate,
                                 String homeEquipmentId, Boolean enabled) {
     }
 
@@ -119,6 +121,10 @@ public class ConsumableAdminService {
         entity.setWarnPercent(req.warnPercent());
         entity.setStockQty(req.stockQty() == null ? BigDecimal.ZERO : req.stockQty());
         entity.setMinQty(req.minQty());
+        entity.setVendor(trimToNull(req.vendor()));
+        entity.setPartNo(trimToNull(req.partNo()));
+        entity.setExpiryDate(req.expiryDate() == null || req.expiryDate().isBlank()
+                ? null : java.time.LocalDate.parse(req.expiryDate()));
         entity.setHomeEquipmentId(trimToNull(req.homeEquipmentId()));
         entity.setEnabled(req.enabled() == null || req.enabled());
     }
@@ -166,7 +172,10 @@ public class ConsumableAdminService {
                 ? null : equipmentRepository.findById(c.getHomeEquipmentId()).orElse(null);
         return new ConsumableView(c.getId(), c.getConsCode(), c.getConsName(), c.getSpecModel(),
                 c.getConsType(), c.getUnit(), c.getLifeType(), c.getLifeLimit(), c.getLifeUsed(),
-                c.getWarnPercent(), c.getStockQty(), c.getMinQty(), c.getHomeEquipmentId(),
+                c.getWarnPercent(), c.getStockQty(), c.getMinQty(),
+                c.getVendor(), c.getPartNo(),
+                c.getExpiryDate() == null ? null : c.getExpiryDate().toString(),
+                c.getHomeEquipmentId(),
                 eqp == null ? null : eqp.getEquipmentCode(), c.getEnabled(),
                 c.getOccupied(), c.getOccupiedBy());
     }

@@ -38,13 +38,18 @@ public class MdsDictSeedService {
 
     /** MDS 业务字典目录。 */
     static final List<DictDef> DICTS = List.of(
-            new DictDef("mds.wafer_type", "晶圆类型", List.of(
+            new DictDef("mds.substrate_type", "衬底材料", List.of(
                     new ItemDef("P_SUB", "P 型衬底", 10),
                     new ItemDef("N_SUB", "N 型衬底", 20),
                     new ItemDef("EPI", "外延片", 30),
                     new ItemDef("SOI", "SOI 片", 40),
                     new ItemDef("SAPPHIRE", "蓝宝石", 50),
                     new ItemDef("OTHER", "其他", 90))),
+            // 晶圆尺寸（V35 多尺寸厂口径：英寸数字串，产品/载具/光罩/能力资格同词表）
+            new DictDef("mds.wafer_size", "晶圆尺寸", List.of(
+                    new ItemDef("6", "6 英寸", 10),
+                    new ItemDef("8", "8 英寸", 20),
+                    new ItemDef("12", "12 英寸", 30))),
             new DictDef("mds.product_group", "产品分组", List.of(
                     new ItemDef("CIS", "CIS（图像传感器）", 10),
                     new ItemDef("PMIC", "PMIC（电源管理）", 20),
@@ -161,10 +166,16 @@ public class MdsDictSeedService {
                     new ItemDef("OTHER", "其他", 90))),
             // 载具类型（V31，SEMI E87 Carrier 口径）：AMHS 全链物理载体分类
             new DictDef("mds.carrier_type", "载具类型", List.of(
-                    new ItemDef("CASSETTE", "花篮（晶圆载具）", 10),
-                    new ItemDef("RETICLE_BOX", "光罩盒", 20),
-                    new ItemDef("WAFER_BOX", "晶圆盒", 30),
+                    new ItemDef("CASSETTE", "花篮（Cassette）", 10),
+                    new ItemDef("FOUP", "FOUP（300mm 真空载具）", 20),
+                    new ItemDef("RETICLE_BOX", "光罩盒", 30),
+                    new ItemDef("WAFER_BOX", "晶圆盒", 40),
                     new ItemDef("OTHER", "其他", 90))),
+            // 光罩版尺寸（V35：曝光机兼容性判断依据；6 寸线常用 5/6 寸版，12 寸线 6/9 寸版）
+            new DictDef("mds.reticle_plate_size", "光罩版尺寸", List.of(
+                    new ItemDef("5", "5 英寸版", 10),
+                    new ItemDef("6", "6 英寸版", 20),
+                    new ItemDef("9", "9 英寸版", 30))),
             // 载具台账状态（V31）：运行时状态机归 MCS，主数据只存台账级状态
             new DictDef("mds.carrier_status", "载具状态", List.of(
                     new ItemDef("IN_STOCK", "空闲在库", 10),
@@ -297,16 +308,16 @@ public class MdsDictSeedService {
     private int alignProductSeedWaferTypes() {
         int n = 0;
         for (var p : productRepository.findAll()) {
-            if (Boolean.TRUE.equals(p.getDeleted()) || p.getWaferType() == null) {
+            if (Boolean.TRUE.equals(p.getDeleted()) || p.getSubstrateType() == null) {
                 continue;
             }
-            String mapped = switch (p.getWaferType()) {
+            String mapped = switch (p.getSubstrateType()) {
                 case "外延片" -> "EPI";
                 case "P 型衬底" -> "P_SUB";
                 default -> null;
             };
             if (mapped != null) {
-                p.setWaferType(mapped);
+                p.setSubstrateType(mapped);
                 productRepository.save(p);
                 n++;
             }

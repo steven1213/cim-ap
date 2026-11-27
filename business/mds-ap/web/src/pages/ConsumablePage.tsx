@@ -37,6 +37,9 @@ interface ConsFormState {
   specModel: string;
   consType: string;
   unit: string;
+  vendor: string;
+  partNo: string;
+  expiryDate: string;
   lifeType: string;
   lifeLimit: string;
   lifeUsed: string;
@@ -54,6 +57,9 @@ function formFrom(row: Consumable | null): ConsFormState {
     specModel: row?.specModel ?? '',
     consType: row?.consType ?? '',
     unit: row?.unit ?? '',
+    vendor: row?.vendor ?? '',
+    partNo: row?.partNo ?? '',
+    expiryDate: row?.expiryDate ?? '',
     lifeType: row?.lifeType ?? '',
     lifeLimit: row?.lifeLimit != null ? String(row.lifeLimit) : '',
     lifeUsed: row?.lifeUsed != null ? String(row.lifeUsed) : '0',
@@ -131,6 +137,9 @@ export default function ConsumablePage() {
         specModel: form.specModel.trim() || null,
         consType: form.consType || null,
         unit: form.unit || null,
+        vendor: form.vendor.trim() || null,
+        partNo: form.partNo.trim() || null,
+        expiryDate: form.expiryDate || null,
         lifeType: form.lifeType || null,
         lifeLimit: num(form.lifeLimit),
         lifeUsed: form.lifeUsed === '' ? 0 : Number(form.lifeUsed),
@@ -159,6 +168,9 @@ export default function ConsumablePage() {
       { key: 'consName', titleKey: 'mds.consumable.name', width: 200, ellipsis: true, render: (r) => <span className="flow-name-main">{r.consName}</span> },
       { key: 'specModel', titleKey: 'mds.consumable.spec', width: 130, mono: true, render: (r) => r.specModel ?? '—' },
       { key: 'consType', titleKey: 'mds.consumable.type', width: 100, render: (r) => r.consType ?? '—' },
+      { key: 'vendor', titleKey: 'mds.consumable.vendor', width: 110, ellipsis: true, render: (r) => r.vendor ?? '—' },
+      { key: 'partNo', titleKey: 'mds.consumable.partNo', width: 110, mono: true, ellipsis: true, render: (r) => r.partNo ?? '—' },
+      { key: 'expiryDate', titleKey: 'mds.consumable.expiry', width: 110, render: (r) => r.expiryDate ?? '—' },
       { key: 'stockQty', titleKey: 'mds.consumable.stock', width: 100, render: (r) => `${r.stockQty}${r.unit ? ' ' + r.unit : ''}` },
       { key: 'minQty', titleKey: 'mds.consumable.min', width: 90, render: (r) => r.minQty ?? '—' },
       {
@@ -216,6 +228,9 @@ export default function ConsumablePage() {
         allowClear: true,
         options: unitDict.items.filter((i) => !i.disabled).map((i) => ({ value: i.value, label: i.label })),
       },
+      { kind: 'text', key: 'vendor', labelKey: 'mds.consumable.vendor' },
+      { kind: 'text', key: 'partNo', labelKey: 'mds.consumable.partNo', mono: true },
+      { kind: 'date', key: 'expiryDate', labelKey: 'mds.consumable.expiry', valueFormat: 'YYYY-MM-DD', displayFormat: 'YYYY-MM-DD' },
       {
         kind: 'select',
         key: 'lifeType',

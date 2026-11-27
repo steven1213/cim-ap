@@ -56,6 +56,10 @@ public class EquipmentAdminService {
 
     /** 生产/工程模式字典。 */
     public static final String DICT_EQUIP_PRODUCTION_MODE = "mds.equip_production_mode";
+    /** 归属部门（mds.owning_dept，V35 接线到设备台账）。 */
+    public static final String DICT_OWNING_DEPT = "mds.owning_dept";
+    /** 晶圆尺寸（mds.wafer_size，V35 混线资格口径）。 */
+    public static final String DICT_WAFER_SIZE = "mds.wafer_size";
 
     private final CimEquipmentRepository equipmentRepository;
     private final CimEquipmentClassRepository classRepository;
@@ -79,7 +83,8 @@ public class EquipmentAdminService {
     public record EquipmentView(String id, String equipmentCode, String equipmentName,
                                 String classCode, String className, String kindCode,
                                 String locationType, String locationId,
-                                String ownerUser, String controlMode, String productionMode,
+                                String ownerUser, String owningDept,
+                                String controlMode, String productionMode,
                                 String vendor, String modelNo, String serialNo, String assetNo,
                                 java.time.LocalDate installDate,
                                 String waferSizes, String carrierTypes,
@@ -92,7 +97,8 @@ public class EquipmentAdminService {
 
     public record EquipmentReq(String equipmentCode, String equipmentName, String classCode,
                                String locationType, String locationId,
-                               String ownerUser, String controlMode, String productionMode,
+                               String ownerUser, String owningDept,
+                               String controlMode, String productionMode,
                                String vendor, String modelNo, String serialNo, String assetNo,
                                java.time.LocalDate installDate,
                                String waferSizes, String carrierTypes,
@@ -170,6 +176,7 @@ public class EquipmentAdminService {
         entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
         entity.setProductionMode(requireProductionMode(req.productionMode()));
         entity.setStateCode(requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode"));
+        entity.setOwningDept(requireDictItem(DICT_OWNING_DEPT, req.owningDept(), "owningDept"));
         return toView(equipmentRepository.save(entity), cls);
     }
 
@@ -190,6 +197,7 @@ public class EquipmentAdminService {
         entity.setLocationType(req.locationType());
         entity.setLocationId(req.locationId());
         entity.setOwnerUser(blankToNull(req.ownerUser()));
+        entity.setOwningDept(requireDictItem(DICT_OWNING_DEPT, req.owningDept(), "owningDept"));
         entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
         entity.setProductionMode(requireProductionMode(req.productionMode()));
         entity.setVendor(blankToNull(req.vendor()));
@@ -232,36 +240,46 @@ public class EquipmentAdminService {
 
     // ------------------------------------------------------------------ 能力关联
 
-    @Transactional
-    public Set<String> capabilities(String equipmentId) {
-        requireEquipment(equipmentId);
-        return eqpCapRepository.findByEquipmentIdAndDeletedFalse(equipmentId).stream()
-                .map(CimEquipmentCapability::getCapabilityCode)
-                .collect(Collectors.toCollection(HashSet::new));
+    /** 设备↔能力关联条目（V35：混线资格可按尺寸区分，空尺寸 = 全尺寸通用）。 */
+    public record EqpCapItem(String capabilityCode, String waferSize) {
     }
 
-    /** 全量替换设备能力关联（前端勾选提交）。 */
     @Transactional
-    public Set<String> setCapabilities(String equipmentId, List<String> capabilityCodes) {
+    public List<EqpCapItem> capabilities(String equipmentId) {
+        requireEquipment(equipmentId);
+        return eqpCapRepository.findByEquipmentIdAndDeletedFalse(equipmentId).stream()
+                .map(l -> new EqpCapItem(l.getCapabilityCode(), l.getWaferSize()))
+                .sorted(java.util.Comparator.comparing(EqpCapItem::capabilityCode)
+                        .thenComparing(EqpCapItem::waferSize,
+                                java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
+                .toList();
+    }
+
+    /** 全量替换设备能力关联（前端勾选提交，条目含可选适用尺寸）。 */
+    @Transactional
+    public List<EqpCapItem> setCapabilities(String equipmentId, List<EqpCapItem> items) {
         CimEquipment equipment = requireEquipment(equipmentId);
-        List<String> codes = capabilityCodes == null ? List.of() : capabilityCodes.stream()
-                .filter(c -> c != null && !c.isBlank())
-                .map(String::trim)
+        List<EqpCapItem> normalized = items == null ? List.of() : items.stream()
+                .filter(i -> i != null && i.capabilityCode() != null && !i.capabilityCode().isBlank())
+                .map(i -> new EqpCapItem(i.capabilityCode().trim(),
+                        requireDictItem(DICT_WAFER_SIZE, i.waferSize(), "waferSize")))
                 .distinct()
                 .toList();
-        for (String code : codes) {
-            capabilityRepository.findByCapabilityCodeAndDeletedFalse(code)
-                    .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "设备能力不存在: " + code));
+        for (EqpCapItem item : normalized) {
+            capabilityRepository.findByCapabilityCodeAndDeletedFalse(item.capabilityCode())
+                    .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND,
+                            "设备能力不存在: " + item.capabilityCode()));
         }
         // 全量替换 = 物理删旧 + 插新（软删会撞 uk_cim_eqp_cap：Hibernate 先 flush insert 后 update）
         eqpCapRepository.deleteByEquipmentId(equipment.getId());
-        for (String code : codes) {
+        for (EqpCapItem item : normalized) {
             CimEquipmentCapability link = new CimEquipmentCapability();
             link.setEquipmentId(equipment.getId());
-            link.setCapabilityCode(code);
+            link.setCapabilityCode(item.capabilityCode());
+            link.setWaferSize(item.waferSize());
             eqpCapRepository.save(link);
         }
-        return new HashSet<>(codes);
+        return capabilities(equipment.getId());
     }
 
     // ------------------------------------------------------------------ 内部
@@ -410,7 +428,7 @@ public class EquipmentAdminService {
                 cls == null ? null : cls.getClassName(),
                 cls == null ? null : cls.getKindCode(),
                 e.getLocationType(), e.getLocationId(),
-                e.getOwnerUser(), e.getControlMode(), e.getProductionMode(),
+                e.getOwnerUser(), e.getOwningDept(), e.getControlMode(), e.getProductionMode(),
                 e.getVendor(), e.getModelNo(), e.getSerialNo(), e.getAssetNo(),
                 e.getInstallDate(),
                 e.getWaferSizes(), e.getCarrierTypes(), e.getBatchMin(), e.getBatchMax(),

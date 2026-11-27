@@ -82,15 +82,16 @@ public class EquipmentController {
 
     @PreAuthorize("hasAuthority('mds:equipment:view')")
     @GetMapping("/equipments/{id}/capabilities")
-    public Result<Set<String>> capabilities(@PathVariable String id) {
+    public Result<List<EquipmentAdminService.EqpCapItem>> capabilities(@PathVariable String id) {
         return Result.ok(service.capabilities(id));
     }
 
     @PreAuthorize("hasAuthority('mds:equipment:update')")
     @PutMapping("/equipments/{id}/capabilities")
-    public Result<Set<String>> setCapabilities(
-            @PathVariable String id, @RequestBody List<String> capabilityCodes) {
-        return Result.ok(service.setCapabilities(id, capabilityCodes));
+    public Result<List<EquipmentAdminService.EqpCapItem>> setCapabilities(
+            @PathVariable String id,
+            @RequestBody List<EquipmentAdminService.EqpCapItem> items) {
+        return Result.ok(service.setCapabilities(id, items));
     }
 
     // ------------------------------------------------------------------ 子单元（E120 结构树）

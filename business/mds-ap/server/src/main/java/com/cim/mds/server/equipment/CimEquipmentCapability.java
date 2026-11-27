@@ -30,4 +30,8 @@ public class CimEquipmentCapability extends BaseDefData {
     /** 能力编码（cim_capability.capability_code）。 */
     @Column(name = "capability_code", length = 64, nullable = false)
     private String capabilityCode;
+
+    /** 资格适用晶圆尺寸（英寸数字串，mds.wafer_size 字典；空 = 全尺寸通用）。 */
+    @Column(name = "wafer_size", length = 16)
+    private String waferSize;
 }

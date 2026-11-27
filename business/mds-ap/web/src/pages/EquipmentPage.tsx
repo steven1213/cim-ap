@@ -24,7 +24,7 @@ import LocationTree, {
   collectSubtreeIds,
   filterLocTree,
 } from '@/components/LocationTree';
-import type { Capability, Equipment, EquipmentClass, EquipmentUnit } from '@/types';
+import type { Capability, Equipment, EquipmentCapabilityItem, EquipmentClass, EquipmentUnit } from '@/types';
 import GuideBar from '@/components/GuideBar';
 
 /**
@@ -94,6 +94,7 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
   const [searchParams, setSearchParams] = useSearchParams();
   const stateDict = useDict('mds.equip_state');
   const kindDict = useDict('mds.equip_kind');
+  const owningDeptDict = useDict('mds.owning_dept');
 
   const [keyword, setKeyword] = useState('');
   const [classFilter, setClassFilter] = useState('');
@@ -285,6 +286,13 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
         render: (r) => r.ownerUser ?? '—',
       },
       {
+        key: 'owningDept',
+        titleKey: 'mds.equipment.owningDept',
+        width: 80,
+        ellipsis: true,
+        render: (r) => owningDeptDict.labelOf(r.owningDept) ?? '—',
+      },
+      {
         key: 'stateCode',
         titleKey: 'mds.equipment.state',
         width: 110,
@@ -334,7 +342,7 @@ export default function EquipmentPage({ initialKind }: { initialKind?: string } 
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, locLabel, kindDict, stateDict],
+    [t, locLabel, kindDict, stateDict, owningDeptDict],
   );
 
   return (
@@ -496,6 +504,7 @@ function EquipmentFormModal({
     locationType: (initial?.locationType ?? 'STAGE') as string,
     locationId: initial?.locationId ?? '',
     owner: initial?.ownerUser ?? '',
+    owningDept: initial?.owningDept ?? '',
     controlMode: initial?.controlMode ?? '',
     productionMode: initial?.productionMode ?? 'PRODUCTION',
     vendor: initial?.vendor ?? '',
@@ -661,6 +670,7 @@ function EquipmentFormModal({
       },
       // —— 资产与 Owner（ISA-95 PhysicalAsset）——
       { kind: 'text' as const, key: 'owner' as const, labelKey: 'mds.equipment.owner' },
+      { kind: 'select' as const, key: 'owningDept' as const, labelKey: 'mds.equipment.owningDept', dict: 'mds.owning_dept', allowClear: true },
       { kind: 'text' as const, key: 'vendor' as const, labelKey: 'mds.equipment.vendor' },
       { kind: 'text' as const, key: 'modelNo' as const, labelKey: 'mds.equipment.modelNo' },
       { kind: 'text' as const, key: 'serialNo' as const, labelKey: 'mds.equipment.serialNo' },
@@ -697,6 +707,7 @@ function EquipmentFormModal({
       locationType: form.locationType as Equipment['locationType'],
       locationId: form.locationId,
       ownerUser: form.owner.trim() || null,
+      owningDept: form.owningDept || null,
       controlMode: form.controlMode || null,
       productionMode: form.productionMode || null,
       vendor: form.vendor.trim() || null,
@@ -778,7 +789,13 @@ function EquipmentFormModal({
   );
 }
 
-/** 设备↔能力关联弹窗（全量替换提交；checkbox 勾选）。 */
+/**
+ * 设备↔能力关联弹窗（V35 条目化：{capabilityCode, waferSize} 全量替换提交）。
+ *
+ * <p>混线厂同机可跑多尺寸晶圆，资格可按尺寸区分：同一能力可登记多行
+ * （如 PROC_6" + 6、PROC_8" + 8），waferSize 留空 = 全尺寸通用资格。
+ * 后端按 (equipment, capabilityCode, waferSize) 判重并物理删旧插新。</p>
+ */
 function CapabilityLinkModal({
   equipment,
   onClose,
@@ -790,6 +807,7 @@ function CapabilityLinkModal({
 }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const sizeDict = useDict('mds.wafer_size');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const capRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
@@ -797,39 +815,37 @@ function CapabilityLinkModal({
     api.listEquipmentCapabilities(equipment.id, signal),
   );
 
-  const options = useMemo(
+  const capOptions = useMemo(
     () =>
       (capRes.data ?? NO_CAPS)
         .filter((c) => c.enabled)
         .map((c) => ({ value: c.capabilityCode, label: `${c.capabilityCode} ${c.capabilityName}` })),
     [capRes.data],
   );
+  const sizeOptions = useMemo(
+    () => sizeDict.items.filter((i) => !i.disabled).map((i) => ({ value: i.value, label: i.label })),
+    [sizeDict.items],
+  );
 
-  const [form, setForm] = useState<{ caps: string[] }>({ caps: [] });
-  // 现有关联到达后初始化勾选（只初始化一次）
+  const [items, setItems] = useState<EquipmentCapabilityItem[]>([]);
+  // 现有关联到达后初始化条目（只初始化一次）
   useEffect(() => {
-    if (linkRes.data) setForm({ caps: linkRes.data });
+    if (linkRes.data) setItems(linkRes.data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkRes.data]);
 
-  const fields = useMemo<Array<FormField<{ caps: string[] }>>>(
-    () => [
-      {
-        kind: 'checkbox' as const,
-        key: 'caps' as const,
-        labelKey: 'mds.equipment.capabilities',
-        options,
-        span: 2,
-      },
-    ],
-    [options],
-  );
+  const patchItem = (idx: number, patch: Partial<EquipmentCapabilityItem>) => {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
 
   async function submit() {
     setBusy(true);
     setErr('');
     try {
-      await api.setEquipmentCapabilities(equipment.id, form.caps);
+      await api.setEquipmentCapabilities(
+        equipment.id,
+        items.map((it) => ({ ...it, capabilityCode: it.capabilityCode.trim() })),
+      );
       onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
@@ -850,17 +866,58 @@ function CapabilityLinkModal({
       okKey="mds.common.save"
       cancelKey="mds.common.cancel"
       okLoading={busy}
-      width={560}
+      width={640}
     >
       {linkRes.loading ? (
         <p className="dim">{t('mds.common.loading')}</p>
       ) : (
-        <FormGrid
-          fields={fields}
-          value={form}
-          onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-          columns={2}
-        />
+        <div>
+          <p className="dim" style={{ marginTop: 0 }}>{t('mds.equipment.capabilityHint')}</p>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <select
+                className="topo-group-filter"
+                value={it.capabilityCode}
+                onChange={(e) => patchItem(idx, { capabilityCode: e.target.value })}
+              >
+                <option value="" disabled>
+                  {t('mds.equipment.capabilityPick')}
+                </option>
+                {capOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="topo-group-filter"
+                value={it.waferSize ?? ''}
+                onChange={(e) => patchItem(idx, { waferSize: e.target.value || null })}
+              >
+                <option value="">{t('mds.equipment.capabilityAllSizes')}</option>
+                {sizeOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <CimButton
+                size="small"
+                danger
+                onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+              >
+                {t('mds.common.delete')}
+              </CimButton>
+            </div>
+          ))}
+          <CimButton
+            size="small"
+            disabled={!capOptions.length}
+            onClick={() => setItems((prev) => [...prev, { capabilityCode: '', waferSize: null }])}
+          >
+            {t('mds.equipment.capabilityAdd')}
+          </CimButton>
+        </div>
       )}
       {err ? <p className="cim-field-error form-err">{err}</p> : null}
     </CimModal>

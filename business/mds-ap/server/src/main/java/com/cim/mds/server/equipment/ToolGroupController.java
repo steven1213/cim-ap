@@ -61,8 +61,9 @@ public class ToolGroupController {
     @PreAuthorize("hasAuthority('mds:toolGroup:update')")
     @PostMapping("/tool-groups/{id}/members/{equipmentId}")
     public Result<ToolGroupAdminService.ToolGroupView> addMember(
-            @PathVariable String id, @PathVariable String equipmentId) {
-        return Result.ok(service.addMember(id, equipmentId));
+            @PathVariable String id, @PathVariable String equipmentId,
+            @RequestParam(required = false) Integer priority) {
+        return Result.ok(service.addMember(id, equipmentId, priority));
     }
 
     @PreAuthorize("hasAuthority('mds:toolGroup:update')")

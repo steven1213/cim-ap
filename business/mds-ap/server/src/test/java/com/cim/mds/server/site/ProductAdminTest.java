@@ -114,11 +114,11 @@ class ProductAdminTest {
         productId = create("""
                 {"productCode":"PROD-TEST-01","productName":"集成测试产品",
                  "techCode":"TECH-01","usageType":"PRODUCTION","productGroup":"CIS",
-                 "waferType":"EPI","owner":"tester","enabled":true}
+                 "substrateType":"EPI","owner":"tester","enabled":true}
                 """);
         assertThat(productId).isNotBlank();
 
-        // 字典值守门：productGroup/waferType 必须在 mds.product_group / mds.wafer_type 启用项内
+        // 字典值守门：productGroup/substrateType 必须在 mds.product_group / mds.substrate_type 启用项内
         mvc.perform(post("/api/v1/mds/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -134,7 +134,7 @@ class ProductAdminTest {
                 .andExpect(jsonPath("$.data[0].usageType").value("PRODUCTION"))
                 .andExpect(jsonPath("$.data[0].npwType").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.data[0].productGroup").value("CIS"))
-                .andExpect(jsonPath("$.data[0].waferType").value("EPI"));
+                .andExpect(jsonPath("$.data[0].substrateType").value("EPI"));
     }
 
     @Test

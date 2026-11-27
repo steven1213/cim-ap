@@ -31,6 +31,8 @@ public class CarrierAdminService {
     public static final String DICT_CARRIER_TYPE = "mds.carrier_type";
     /** 载具台账状态字典。 */
     public static final String DICT_CARRIER_STATUS = "mds.carrier_status";
+    /** 晶圆尺寸（V35：英寸数字串，与产品/光罩/能力资格同词表）。 */
+    public static final String DICT_WAFER_SIZE = "mds.wafer_size";
 
     private final CimCarrierRepository carrierRepository;
     private final CimEquipmentRepository equipmentRepository;
@@ -39,13 +41,15 @@ public class CarrierAdminService {
     // ------------------------------------------------------------------ 视图 / 请求
 
     public record CarrierView(String id, String carrierCode, String carrierName,
-                              String carrierType, String status,
+                              String carrierType, String waferSize, Integer capacity,
+                              String status,
                               String homeEquipmentId, String homeEquipmentCode,
                               String currentLotId, Integer waferQty,
                               Boolean enabled, Boolean occupied, String occupiedBy) {
     }
 
     public record CarrierReq(String carrierCode, String carrierName, String carrierType,
+                             String waferSize, Integer capacity,
                              String status, String homeEquipmentId,
                              String currentLotId, Integer waferQty, Boolean enabled) {
     }
@@ -105,6 +109,8 @@ public class CarrierAdminService {
     private void apply(CimCarrier entity, CarrierReq req) {
         entity.setCarrierName(req.carrierName().trim());
         entity.setCarrierType(trimToNull(req.carrierType()));
+        entity.setWaferSize(requireDictItem(DICT_WAFER_SIZE, req.waferSize()));
+        entity.setCapacity(req.capacity());
         entity.setStatus(trimToNull(req.status()));
         entity.setHomeEquipmentId(trimToNull(req.homeEquipmentId()));
         entity.setCurrentLotId(trimToNull(req.currentLotId()));
@@ -131,23 +137,26 @@ public class CarrierAdminService {
         }
     }
 
-    private void requireDictItem(String dictCode, String value) {
+    /** 字典值守门：非空值必须是该字典的启用 itemKey；返回归一化值（trim 后，空入空出）。 */
+    private String requireDictItem(String dictCode, String value) {
         String v = trimToNull(value);
         if (v == null) {
-            return;
+            return null;
         }
         boolean hit = dictService.items(dictCode).stream().anyMatch(i -> v.equals(i.getItemKey()));
         if (!hit) {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.carrier.dictInvalid",
                     dictCode, v);
         }
+        return v;
     }
 
     private CarrierView toView(CimCarrier c) {
         CimEquipment eqp = c.getHomeEquipmentId() == null
                 ? null : equipmentRepository.findById(c.getHomeEquipmentId()).orElse(null);
         return new CarrierView(c.getId(), c.getCarrierCode(), c.getCarrierName(),
-                c.getCarrierType(), c.getStatus(), c.getHomeEquipmentId(),
+                c.getCarrierType(), c.getWaferSize(), c.getCapacity(),
+                c.getStatus(), c.getHomeEquipmentId(),
                 eqp == null ? null : eqp.getEquipmentCode(),
                 c.getCurrentLotId(), c.getWaferQty(), c.getEnabled(),
                 c.getOccupied(), c.getOccupiedBy());

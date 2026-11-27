@@ -35,9 +35,17 @@ public class CimCarrier extends EditLockDefData {
     @Column(name = "carrier_name", length = 128, nullable = false)
     private String carrierName;
 
-    /** 载具类型（mds.carrier_type 字典：CASSETTE/RETICLE_BOX/WAFER_BOX/OTHER）。 */
+    /** 载具类型（mds.carrier_type 字典：CASSETTE/FOUP/RETICLE_BOX/WAFER_BOX/OTHER）。 */
     @Column(name = "carrier_type", length = 32)
     private String carrierType;
+
+    /** 适用晶圆尺寸（英寸数字串，mds.wafer_size 字典："6"/"8"/"12"；可空 = 未限定）。 */
+    @Column(name = "wafer_size", length = 16)
+    private String waferSize;
+
+    /** 额定槽数（E87 口径：FOUP=25 / 6 寸花篮=13 / 8 寸花篮=25；可空）。 */
+    @Column(name = "capacity")
+    private Integer capacity;
 
     /** 台账状态（mds.carrier_status 字典：IN_STOCK/IN_USE/IN_CLEANING/MAINTENANCE/SCRAPPED）。 */
     @Column(name = "status", length = 32)

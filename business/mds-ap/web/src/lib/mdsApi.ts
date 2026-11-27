@@ -22,6 +22,7 @@ import type {
   DictItemPayload,
   DictPayload,
   Equipment,
+  EquipmentCapabilityItem,
   EquipmentPayload,
   EquipmentClass,
   EquipmentClassPayload,
@@ -368,9 +369,14 @@ export function deleteToolGroup(id: string): Promise<void> {
   return http.del<void>(`${BASE}/tool-groups/${encodeURIComponent(id)}`);
 }
 
-export function addToolGroupMember(groupId: string, equipmentId: string): Promise<ToolGroup> {
+export function addToolGroupMember(
+  groupId: string,
+  equipmentId: string,
+  priority?: number | null,
+): Promise<ToolGroup> {
+  const qs = priority != null ? `?priority=${priority}` : '';
   return http.post<ToolGroup>(
-    `${BASE}/tool-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(equipmentId)}`,
+    `${BASE}/tool-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(equipmentId)}${qs}`,
   );
 }
 
@@ -380,11 +386,16 @@ export function removeToolGroupMember(groupId: string, equipmentId: string): Pro
   );
 }
 
-/** 设备已关联的能力码集合。 */
-export function listEquipmentCapabilities(id: string, signal?: AbortSignal): Promise<string[]> {
-  return http.get<string[]>(`${BASE}/equipments/${encodeURIComponent(id)}/capabilities`, undefined, {
-    signal,
-  });
+/** 设备已关联的能力条目（V35：混线资格可按尺寸区分，空尺寸 = 全尺寸通用）。 */
+export function listEquipmentCapabilities(
+  id: string,
+  signal?: AbortSignal,
+): Promise<EquipmentCapabilityItem[]> {
+  return http.get<EquipmentCapabilityItem[]>(
+    `${BASE}/equipments/${encodeURIComponent(id)}/capabilities`,
+    undefined,
+    { signal },
+  );
 }
 
 /** 能力 → 可加工设备解析（V21，AMAT 口径）：Step.capabilityCode 反查挂该能力的设备。 */
@@ -395,11 +406,14 @@ export function listEquipmentsByCapability(
   return http.get<Equipment[]>(`${BASE}/equipments/by-capability`, { capabilityCode }, { signal });
 }
 
-/** 全量替换设备能力关联（勾选提交）。 */
-export function setEquipmentCapabilities(id: string, capabilityCodes: string[]): Promise<string[]> {
-  return http.put<string[]>(
+/** 全量替换设备能力关联（条目提交，含可选适用尺寸）。 */
+export function setEquipmentCapabilities(
+  id: string,
+  items: EquipmentCapabilityItem[],
+): Promise<EquipmentCapabilityItem[]> {
+  return http.put<EquipmentCapabilityItem[]>(
     `${BASE}/equipments/${encodeURIComponent(id)}/capabilities`,
-    capabilityCodes,
+    items,
   );
 }
 
