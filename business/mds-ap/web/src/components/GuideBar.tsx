@@ -12,11 +12,12 @@ import { useTranslation } from 'react-i18next';
  * 链上下文用查询参数 `?chain=<id>` 携带：引导条内点击始终带上当前链 id，
  * 无参数进入时取注册序第一条（产品链优先）——侧栏直达 = 原动线，EDC 页跳转 = 数采动线。
  *
- * 产品管理 7 步：工艺 → 产品 → 参数定义 → 工序 → 流程 → 节点参数 → 产品绑定；
- * 设备管理 5 步：机型模板 → 机台 → 机台组 → 机台能力 → 存储区；
+ * 产品管理 8 步：工艺 → 产品 → 参数定义 → 光罩 → 工序 → 流程 → 节点参数 → 产品绑定；
+ * 设备管理 6 步：机型模板 → 机台 → 机台组 → 机台能力 → 存储区 → 载具；
  * 班次管理 4 步：班次定义 → 排班 → 换班 → 交接班日志；
  * 数采管理 5 步：参数定义(产品管理组) → 参数集 → 报告模板 → 设备接口映射 → EDC 方案；
- * 配方链 2 步：工序（可变参数）→ 配方解算。
+ * 配方链 2 步：工序（可变参数）→ 配方解算；
+ * 质量与耗材（检验标准/耗材台账）为独立台账无先后依赖，按约定不设链。
  */
 const CHAINS: readonly { id: string; steps: readonly { path: string | readonly string[]; key: string }[] }[] = [
   {
@@ -25,6 +26,7 @@ const CHAINS: readonly { id: string; steps: readonly { path: string | readonly s
       { path: '/technologies', key: 'technology' },
       { path: '/products', key: 'products' },
       { path: '/param-defs', key: 'paramDefs' },
+      { path: '/reticles', key: 'reticles' },
       { path: '/operations', key: 'operations' },
       { path: '/flows', key: 'flows' },
       { path: '/step-params', key: 'stepParams' },
@@ -39,6 +41,7 @@ const CHAINS: readonly { id: string; steps: readonly { path: string | readonly s
       { path: '/tool-groups', key: 'toolGroups' },
       { path: '/capabilities', key: 'capabilities' },
       { path: '/banks', key: 'banks' },
+      { path: '/carriers', key: 'carriers' },
     ],
   },
   {

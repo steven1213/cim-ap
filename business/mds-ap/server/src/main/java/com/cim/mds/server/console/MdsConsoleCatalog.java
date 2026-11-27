@@ -132,6 +132,15 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.FLOW_UPDATE, 20));
         m.add(button("btn.flowRule.delete", "flowRules", "mds.nav.flowRules.action.delete",
                 MdsPermissions.FLOW_UPDATE, 30));
+        // —— 光罩（V32：光刻关键耗材级主数据；工序/流程步骤 reticleRef 引用闭环；引导链第 4 步先于工序）——
+        m.add(menu("reticles", "grp.product", "/reticles", "ReticlePage",
+                "mds.nav.reticles", "grid", MdsPermissions.RETICLE_VIEW, 26));
+        m.add(button("btn.reticle.create", "reticles", "mds.nav.reticles.action.create",
+                MdsPermissions.RETICLE_CREATE, 10));
+        m.add(button("btn.reticle.update", "reticles", "mds.nav.reticles.action.update",
+                MdsPermissions.RETICLE_UPDATE, 20));
+        m.add(button("btn.reticle.delete", "reticles", "mds.nav.reticles.action.delete",
+                MdsPermissions.RETICLE_DELETE, 30));
         // —— 工序库（V20：P-T-R-O 四层建模 O 层；Operation 独立主数据，跨路线复用）——
         m.add(menu("operations", "grp.product", "/operations", "OperationsPage",
                 "mds.nav.operations", "layers", MdsPermissions.OPERATION_VIEW, 30));
@@ -141,15 +150,6 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.OPERATION_UPDATE, 20));
         m.add(button("btn.operation.delete", "operations", "mds.nav.operations.action.delete",
                 MdsPermissions.OPERATION_DELETE, 30));
-        // —— 光罩（V32：光刻关键耗材级主数据；工序/流程步骤 reticleRef 引用闭环）——
-        m.add(menu("reticles", "grp.product", "/reticles", "ReticlePage",
-                "mds.nav.reticles", "grid", MdsPermissions.RETICLE_VIEW, 31));
-        m.add(button("btn.reticle.create", "reticles", "mds.nav.reticles.action.create",
-                MdsPermissions.RETICLE_CREATE, 10));
-        m.add(button("btn.reticle.update", "reticles", "mds.nav.reticles.action.update",
-                MdsPermissions.RETICLE_UPDATE, 20));
-        m.add(button("btn.reticle.delete", "reticles", "mds.nav.reticles.action.delete",
-                MdsPermissions.RETICLE_DELETE, 30));
         // —— ICM 继承式约束模型（V22，2026-11-25 定稿：ContextChain 三级 + 统一指派 + KV + 校验闸）——
         m.add(menu("stepParams", "grp.product", "/step-params", "StepParamPage",
                 "mds.nav.stepParams", "sliders", MdsPermissions.STEP_ASSIGN_VIEW, 36));
@@ -258,7 +258,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.CARRIER_DELETE, 30));
 
         // —— 质量与耗材（V33/V34：检验标准 + 耗材台账）——
-        m.add(dir("grp.quality", "mds.nav.group.quality", 34));
+        m.add(dir("grp.quality", "mds.nav.group.quality", 36));
         m.add(menu("inspectionStds", "grp.quality", "/inspection-stds", "InspectionPage",
                 "mds.nav.inspectionStds", "check", MdsPermissions.INSP_VIEW, 10));
         m.add(button("btn.inspection.create", "inspectionStds", "mds.nav.inspectionStds.action.create",
