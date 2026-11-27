@@ -136,4 +136,22 @@ public class CimFlowStep extends BaseDefData {
     /** 抽样率（INSPECT 专用，V14；百分比 0-100，null = 100% 全检）。 */
     @Column(name = "sampling_rate", precision = 5, scale = 2)
     private java.math.BigDecimal samplingRate;
+
+    // ---------------- 覆盖列（V22 ICM；NULL = 继承工序默认） ----------------
+
+    /** 覆盖光罩引用（CSV，可空 = 继承 operation.reticle_ref 单值；V22 ICM 覆盖层）。 */
+    @Column(name = "reticle_ref", length = 256)
+    private String reticleRef;
+
+    /** 覆盖进站污染级（可空 = 继承；对标 myCIM 污染等级控制；V22 ICM）。 */
+    @Column(name = "contam_level", length = 16)
+    private String contamLevel;
+
+    /** CSV 禁止进入的污染级（可空 = 继承；CONTAM_VALID：forbidden 不含自身 level；V22 ICM）。 */
+    @Column(name = "contam_forbidden", length = 128)
+    private String contamForbidden;
+
+    /** NPW 投片上限（片数，可空 = 不限；V23 产品域口径——工程批数量控制在工艺路线落点）。 */
+    @Column(name = "npw_limit")
+    private Integer npwLimit;
 }

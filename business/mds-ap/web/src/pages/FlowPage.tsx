@@ -12,6 +12,7 @@ import { Snapline } from '@antv/x6-plugin-snapline';
 import {
   Can,
   CimButton,
+  CimCheckbox,
   CimModal,
   DataTable,
   FormGrid,
@@ -25,7 +26,9 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useHasPermission } from '@/lib/usePermission';
-import type { FlowDetail, FlowView, OperationView } from '@/types';
+import { useResource } from '@cim/data';
+import type { FlowDetail, FlowEventView, FlowView, OperationView } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 制造流程（Flow）——产品管理域 Route 口径页面：左列表右画布。
@@ -124,14 +127,22 @@ interface StepNodeData extends Record<string, unknown> {
   samplingRate?: string;
   /** DECISION 节点的 bin 词表。 */
   bins?: BinDef[];
+  // ---- V22/V23 覆盖列透传（编辑入口在节点参数页/Excel 导入；画布保存原样带回防抹除） ----
+  reticleRef?: string;
+  contamLevel?: string;
+  contamForbidden?: string;
+  /** NPW 投片上限（片数，V23；可空 = 不限）。 */
+  npwLimit?: string;
 }
 
-/** 跨站 Q-time 约束（V14；flow 级，序列化为 <canvas> 下 <qtime> 元素）。 */
+/** 跨站 Q-time 约束（V14；flow 级，序列化为 <canvas> 下 <qtime> 元素；alarmCode V23）。 */
 interface QtimeDef {
   from: string;
   to: string;
   maxMinutes: string;
   action: 'HOLD' | 'SCRAP';
+  /** 超限联动告警码（V23；可空 = 不告警）。 */
+  alarmCode?: string;
 }
 
 /** X6 边数据：语义 + 条件 + 拐点（vertices 持久化进 XML）。 */
@@ -172,6 +183,8 @@ function serializeCanvasXml(graph: Graph, qtimes: QtimeDef[]): string {
       + ` holdPoint="${d.holdPoint ? 'true' : 'false'}" holdReason="${esc(d.holdReason)}"`
       + ` inspectPlan="${esc(d.inspectPlan)}" samplingRate="${esc(d.samplingRate)}"`
       + ` capabilityCode="${esc(d.capabilityCode)}" edcPlanCode="${esc(d.edcPlanCode)}"`
+      + ` reticleRef="${esc(d.reticleRef)}" contamLevel="${esc(d.contamLevel)}" contamForbidden="${esc(d.contamForbidden)}"`
+      + ` npwLimit="${esc(d.npwLimit)}"`
       + ` x="${Math.round(pos.x)}" y="${Math.round(pos.y)}"`;
     const bins = d.bins ?? [];
     if (bins.length) {
@@ -204,7 +217,7 @@ function serializeCanvasXml(graph: Graph, qtimes: QtimeDef[]): string {
   }
   sb.push('  </edges>');
   for (const q of qtimes) {
-    sb.push(`  <qtime from="${esc(q.from)}" to="${esc(q.to)}" maxMinutes="${esc(q.maxMinutes)}" action="${esc(q.action)}"/>`);
+    sb.push(`  <qtime from="${esc(q.from)}" to="${esc(q.to)}" maxMinutes="${esc(q.maxMinutes)}" action="${esc(q.action)}"${q.alarmCode ? ` alarmCode="${esc(q.alarmCode)}"` : ''}/>`);
   }
   sb.push('</canvas>');
   return sb.join('\n');
@@ -247,6 +260,10 @@ function parseCanvasXml(xml: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
         samplingRate: get('samplingRate'),
         capabilityCode: get('capabilityCode'),
         edcPlanCode: get('edcPlanCode'),
+        reticleRef: get('reticleRef'),
+        contamLevel: get('contamLevel'),
+        contamForbidden: get('contamForbidden'),
+        npwLimit: get('npwLimit'),
         bins: bins.length ? bins : undefined,
       },
     });
@@ -281,6 +298,7 @@ function parseCanvasXml(xml: string): { nodes: ParsedNode[]; edges: ParsedEdge[]
         to,
         maxMinutes: el.getAttribute('maxMinutes') ?? '',
         action: (el.getAttribute('action') ?? 'HOLD') as QtimeDef['action'],
+        alarmCode: el.getAttribute('alarmCode') ?? undefined,
       });
     }
   }
@@ -376,6 +394,8 @@ function nodeAttrs(d: StepNodeData, t: (k: string) => string): KeyValue {
   }
   if (d.holdPoint) tipParts.push(`Hold${d.holdReason ? `: ${d.holdReason}` : ''}`);
   if (d.batchMode) tipParts.push(`Batch: ${d.batchMode}${d.batchSize ? ` × ${d.batchSize}` : ''}`);
+  if (d.npwLimit) tipParts.push(`NPW: ${d.npwLimit}`);
+  if (d.contamLevel) tipParts.push(`Contam: ${d.contamLevel}`);
   return {
     bar: { fill: color },
     typeLabel: { text: typeText, fill: color },
@@ -543,7 +563,14 @@ export default function FlowPage() {
         key: 'status',
         titleKey: 'mds.flow.field.status',
         width: 64,
-        render: (r) => <span className={`flow-status flow-status-${r.status.toLowerCase()}`}>{t(`mds.flow.status.${r.status}`)}</span>,
+        render: (r) => (
+          <span className={`flow-status flow-status-${r.status.toLowerCase()}`}>
+            {t(`mds.flow.status.${r.status}`)}
+            {r.validateState === 'VALID' && <em className="icm-src-flow" title={r.validateMsg ?? ''}>✓</em>}
+            {r.validateState === 'INVALID' && <em className="icm-src-missing" title={r.validateMsg ?? ''}>✗</em>}
+            {r.isOccupied && <em className="icm-warn" title={r.occupiedBy ?? ''}>🔒</em>}
+          </span>
+        ),
       },
       {
         key: 'versionNo',
@@ -551,6 +578,22 @@ export default function FlowPage() {
         width: 78,
         mono: true,
         render: (r) => `V${r.versionNo ?? 1} · ${r.stepCount}`,
+      },
+      {
+        key: 'stageCode',
+        titleKey: 'mds.flow.field.stageCode',
+        width: 84,
+        render: (r) => (r.stageCode ? <span className="mono">{r.stageCode}</span> : <span className="dim">—</span>),
+      },
+      {
+        key: 'rework',
+        titleKey: 'mds.flow.field.reworkTag',
+        width: 70,
+        render: (r) => (r.reworkOfFamily ? (
+          <em className="icm-warn" title={`${r.reworkOfFamily}${r.reworkCountLimit != null ? ` · ${r.reworkCountLimit}` : ''}`}>
+            {t('mds.flow.reworkBadge')}
+          </em>
+        ) : <span className="dim">—</span>),
       },
       {
         key: 'actions',
@@ -590,6 +633,7 @@ export default function FlowPage() {
 
   return (
     <Page className="flow-page">
+      <GuideBar />
       <div className="flow-layout">
         <div className="flow-left">
           <DataTable<FlowView>
@@ -685,9 +729,10 @@ function CanvasPane({
   const toolDragRef = useRef(false);
 
   const [dirty, setDirty] = useState(false);
-  const [nodeModal, setNodeModal] = useState<X6Node | null>(null);
-  const [edgeModal, setEdgeModal] = useState<X6Edge | null>(null);
+  const [nodeModal, setNodeModal] = useState<X6Node | null>(null);  const [edgeModal, setEdgeModal] = useState<X6Edge | null>(null);
   const [qtimeModal, setQtimeModal] = useState(false);
+  const [designModal, setDesignModal] = useState(false);
+  const [histModal, setHistModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [selCount, setSelCount] = useState(0);
   // 画布全屏（覆盖层式 fixed 铺满视口，Esc 退出；组件按 flow id 重挂载，切流程自动复位）
@@ -980,6 +1025,49 @@ function CanvasPane({
     }
   };
 
+  /** 编辑锁（V22 ICM：画布 XML 整份回传覆盖的并发保护；锁管人 vs 人，四态管生命周期）。 */
+  const doLockToggle = async () => {
+    try {
+      if (detail.flow.isOccupied) await api.unlockFlow(detail.flow.id);
+      else await api.lockFlow(detail.flow.id);
+      toast.success(t('mds.common.updated'));
+      await onChanged(await api.getFlow(detail.flow.id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /** 直线流程生成（P2）：按选中的工序列重建画布（覆盖现有画布，二次确认）。 */
+  const doGenerate = async (operationCodes: string[]) => {
+    setBusy(true);
+    try {
+      const next = await api.generateDesign(detail.flow.id, operationCodes);
+      toast.success(t('mds.flow.generateDone', { n: operationCodes.length }));
+      await onChanged(next);
+      setDesignModal(false);
+      setDirty(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** 刷新工序引用（V22 ICM）：节点指到工序族内最新 ACTIVE 版本（WIP 稳定 = 钉版本行，跟随靠显式刷新）。 */
+  const doRefreshOps = async () => {
+    setBusy(true);
+    try {
+      const diffs = await api.refreshOperations(detail.flow.id);
+      const changed = diffs.filter((d) => d.changed).length;
+      toast.success(t('mds.flow.refreshOpsDone', { changed, total: diffs.length }));
+      await onChanged(await api.getFlow(detail.flow.id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const zoomBy = (delta: number) => {
     const g = graphRef.current;
     if (g) g.zoomTo(Math.min(3, Math.max(0.2, g.zoom() + delta)));
@@ -1016,11 +1104,20 @@ function CanvasPane({
             <CimButton size="small" loading={busy} onClick={() => void doValidate()}>
               {t('mds.flow.validate')}
             </CimButton>
+            <CimButton size="small" loading={busy} onClick={() => void doRefreshOps()}>
+              {t('mds.flow.refreshOps')}
+            </CimButton>
             <CimButton size="small" onClick={() => setQtimeModal(true)}>
               {t('mds.flow.qtime.manage')}
             </CimButton>
+            <CimButton size="small" onClick={() => setDesignModal(true)}>
+              {t('mds.flow.generate')}
+            </CimButton>
             <CimButton size="small" onClick={() => deleteSelectedRef.current()} disabled={selCount === 0}>
               {t('mds.flow.deleteSelected')}
+            </CimButton>
+            <CimButton size="small" onClick={() => void doLockToggle()}>
+              {detail.flow.isOccupied ? t('mds.flow.unlock') : t('mds.flow.lock')}
             </CimButton>
             <CimButton size="small" type="primary" onClick={() => void doTransition('freezeFlow', 'mds.flow.freezeConfirm')}>
               {t('mds.flow.freeze')}
@@ -1049,6 +1146,9 @@ function CanvasPane({
           </CimButton>
         )}
         {!editable && <span className="dim">{t('mds.flow.readonly')}</span>}
+        <CimButton size="small" onClick={() => setHistModal(true)}>
+          {t('mds.flow.history')}
+        </CimButton>
         <em className="flow-canvas-hint">{t('mds.flow.canvasHint')}</em>
       </div>
       <div className="flow-canvas-wrap">
@@ -1115,6 +1215,16 @@ function CanvasPane({
           </div>
         </div>
       </div>
+      {designModal && (
+        <GenerateDesignModal
+          busy={busy}
+          onClose={() => setDesignModal(false)}
+          onSubmit={(opCodes) => void doGenerate(opCodes)}
+        />
+      )}
+      {histModal && (
+        <HistoryModal flowId={detail.flow.id} onClose={() => setHistModal(false)} />
+      )}
       {qtimeModal && (
         <QtimeModal
           qtimes={qtimes}
@@ -1204,6 +1314,9 @@ function FlowMasterModal({
     techCode: initial?.techCode ?? '',
     flowKind: (initial?.flowKind ?? 'MAIN') as 'MAIN' | 'SUB',
     remark: initial?.remark ?? '',
+    stageCode: initial?.stageCode ?? '',
+    reworkOfFamily: initial?.reworkOfFamily ?? '',
+    reworkCountLimit: initial?.reworkCountLimit != null ? String(initial.reworkCountLimit) : '',
   });
 
   // 技术下拉（可空：流程可暂不挂技术）；取数放 useEffect，不在 render 阶段发起副作用
@@ -1240,6 +1353,9 @@ function FlowMasterModal({
         options: (['MAIN', 'SUB'] as const).map((k) => ({ value: k, labelKey: `mds.flow.flowKind.${k}` })),
       },
       { kind: 'text' as const, key: 'remark' as const, labelKey: 'mds.common.remark' },
+      { kind: 'text' as const, key: 'stageCode' as const, labelKey: 'mds.flow.field.stageCode', mono: true },
+      { kind: 'text' as const, key: 'reworkOfFamily' as const, labelKey: 'mds.flow.field.reworkOfFamily', mono: true },
+      { kind: 'number' as const, key: 'reworkCountLimit' as const, labelKey: 'mds.flow.field.reworkCountLimit' },
     ],
     [techs],
   );
@@ -1257,6 +1373,9 @@ function FlowMasterModal({
         techCode: form.techCode || null,
         flowKind: form.flowKind,
         remark: form.remark || null,
+        stageCode: form.stageCode.trim() || null,
+        reworkOfFamily: form.reworkOfFamily.trim() || null,
+        reworkCountLimit: form.reworkCountLimit === '' ? null : Number(form.reworkCountLimit),
       };
       const flow = initial
         ? await api.updateFlow(initial.id, payload)
@@ -1331,6 +1450,10 @@ function NodeFormModal({
     qtimeMin: d.qtimeMin ?? '',
     qtimeMax: d.qtimeMax ?? '',
     reworkLimit: d.reworkLimit ?? '',
+    npwLimit: d.npwLimit ?? '',
+    reticleRef: d.reticleRef ?? '',
+    contamLevel: d.contamLevel ?? '',
+    contamForbidden: d.contamForbidden ?? '',
     holdPoint: d.holdPoint ?? false,
     holdReason: d.holdReason ?? '',
     flowRef: d.flowRef ?? '',
@@ -1452,6 +1575,11 @@ function NodeFormModal({
       { kind: 'number' as const, key: 'qtimeMin' as const, labelKey: 'mds.flow.field.qtimeMin', unit: 'min' },
       { kind: 'number' as const, key: 'qtimeMax' as const, labelKey: 'mds.flow.field.qtimeMax', unit: 'min' },
       { kind: 'number' as const, key: 'reworkLimit' as const, labelKey: 'mds.flow.field.reworkLimit', min: 0 },
+      // ---- 覆盖项（V22 ICM / V23；空=继承工序默认；仅业务加工节点）
+      { kind: 'number' as const, key: 'npwLimit' as const, labelKey: 'mds.flow.field.npwLimit', min: 1, hidden: structural || isDecision || isSubflow },
+      { kind: 'text' as const, key: 'reticleRef' as const, labelKey: 'mds.flow.field.reticleRef', mono: true, hidden: structural || isDecision || isSubflow },
+      { kind: 'text' as const, key: 'contamLevel' as const, labelKey: 'mds.flow.field.contamLevel', mono: true, hidden: structural || isDecision || isSubflow },
+      { kind: 'text' as const, key: 'contamForbidden' as const, labelKey: 'mds.flow.field.contamForbidden', mono: true, hidden: structural || isDecision || isSubflow },
       // ---- Hold 点
       { kind: 'switch' as const, key: 'holdPoint' as const, labelKey: 'mds.flow.field.holdPoint' },
       { kind: 'text' as const, key: 'holdReason' as const, labelKey: 'mds.flow.field.holdReason' },
@@ -1542,6 +1670,14 @@ function NodeFormModal({
         return;
       }
     }
+    // NPW 投片上限前端预检（后端仍有同口径守门）：正整数
+    if (form.npwLimit !== '') {
+      const npw = Number(form.npwLimit);
+      if (!Number.isInteger(npw) || npw <= 0) {
+        setErr(t('mds.flow.field.npwLimit') + ': ' + t('mds.common.positiveInt'));
+        return;
+      }
+    }
     onDone({
       stepCode: code,
       stepName: form.stepName.trim() || undefined,
@@ -1556,6 +1692,10 @@ function NodeFormModal({
       qtimeMin: form.qtimeMin === '' ? undefined : String(form.qtimeMin),
       qtimeMax: form.qtimeMax === '' ? undefined : String(form.qtimeMax),
       reworkLimit: form.reworkLimit === '' ? undefined : String(form.reworkLimit),
+      npwLimit: structural || isDecision || isSubflow || form.npwLimit === '' ? undefined : String(Number(form.npwLimit)),
+      reticleRef: structural || isDecision || isSubflow ? undefined : form.reticleRef.trim() || undefined,
+      contamLevel: structural || isDecision || isSubflow ? undefined : form.contamLevel.trim() || undefined,
+      contamForbidden: structural || isDecision || isSubflow ? undefined : form.contamForbidden.trim() || undefined,
       holdPoint: form.holdPoint || undefined,
       holdReason: form.holdPoint ? form.holdReason.trim() || undefined : undefined,
       inspectPlan: isInspect ? form.inspectPlan.trim() || undefined : undefined,
@@ -1589,6 +1729,7 @@ function NodeFormModal({
                 if (!p.equipType && op.equipType) next.equipType = op.equipType;
                 if (!p.capabilityCode && op.capabilityCode) next.capabilityCode = op.capabilityCode;
                 if (!p.edcPlanCode && op.edcPlanCode) next.edcPlanCode = op.edcPlanCode;
+                if (!p.reticleRef && op.reticleRef) next.reticleRef = op.reticleRef;
                 if (p.qtimeMin === '' && op.qtimeMin != null) next.qtimeMin = String(op.qtimeMin);
                 if (p.qtimeMax === '' && op.qtimeMax != null) next.qtimeMax = String(op.qtimeMax);
                 if (p.reworkLimit === '' && op.reworkLimit != null) next.reworkLimit = String(op.reworkLimit);
@@ -1714,6 +1855,52 @@ function EdgeFormModal({
 }
 
 /**
+ * 变更历史弹窗（V24，P3-2）：流程域动作级事件（生命周期/画布/指派/参数/导入），
+ * GET /flows/{id}/events 时间倒序（最多 200 条）。只读视图。
+ */
+function HistoryModal({ flowId, onClose }: { flowId: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const res = useResource(({ signal }) => api.listFlowEvents(flowId, signal));
+  const rows = res.data ?? [];
+  const columns = useMemo<Array<DataTableColumn<FlowEventView>>>(
+    () => [
+      {
+        key: 'eventTime',
+        titleKey: 'mds.flow.history.col.time',
+        width: 150,
+        mono: true,
+        render: (r) => (r.eventTime ?? '').replace('T', ' ').slice(0, 19),
+      },
+      { key: 'action', titleKey: 'mds.flow.history.col.action', width: 110, mono: true },
+      { key: 'entityType', titleKey: 'mds.flow.history.col.entity', width: 80, mono: true },
+      { key: 'actor', titleKey: 'mds.flow.history.col.actor', width: 110 },
+      {
+        key: 'detail',
+        titleKey: 'mds.flow.history.col.detail',
+        render: (r) => (r.detail ? (
+          <span className="mono dim" style={{ fontSize: 11.5, wordBreak: 'break-all' }}>{r.detail}</span>
+        ) : (
+          <span className="dim">—</span>
+        )),
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    ],
+    [t],
+  );
+  return (
+    <CimModal open onClose={onClose} titleKey="mds.flow.history" width={760}>
+      <DataTable<FlowEventView>
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        loading={res.loading}
+        emptyTitleKey="mds.flow.history.empty"
+      />
+    </CimModal>
+  );
+}
+
+/**
  * 跨站 Q-time 约束编辑器（V14；flow 级，序列化为画布 XML 的 <qtime> 元素）。
  * from/to 用节点下拉（stepCode 展示）；maxMinutes 分钟数；action HOLD/SCRAP。
  * 后端守门同口径：引用真实/非自站/maxMinutes>0/白名单/同对站唯一/from 主线可达 to。
@@ -1815,6 +2002,12 @@ function QtimeModal({
               <option value="HOLD">HOLD</option>
               <option value="SCRAP">SCRAP</option>
             </select>
+            <input
+              className="flow-qtime-input"
+              placeholder={t('mds.flow.qtime.alarmCode')}
+              value={r.alarmCode ?? ''}
+              onChange={(e) => patchRow(idx, { alarmCode: e.target.value || undefined })}
+            />
             <CimButton size="small" danger onClick={() => setRows((rs) => rs.filter((_, i) => i !== idx))}>
               ×
             </CimButton>
@@ -1823,13 +2016,96 @@ function QtimeModal({
         <CimButton
           size="small"
           disabled={!nodes.length}
-          onClick={() => setRows((rs) => [...rs, { from: '', to: '', maxMinutes: '', action: 'HOLD' }])}
-        >
+          onClick={() => setRows((rs) => [...rs, { from: '', to: '', maxMinutes: '', action: 'HOLD' }])}        >
           {t('mds.flow.qtime.add')}
         </CimButton>
         <span className="flow-qtime-hint">{t('mds.flow.qtime.hint')}</span>
         {err ? <p className="cim-field-error form-err">{err}</p> : null}
       </div>
+    </CimModal>
+  );
+}
+
+/**
+ * 直线流程生成弹窗（P2 generateDesign）：勾选 ACTIVE 工序（勾选顺序 = 画布顺序），
+ * 后端按序生成 START → N×PROCESS → END 直线画布并全量保存（覆盖现有画布）。
+ */
+function GenerateDesignModal({
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onSubmit: (operationCodes: string[]) => void;
+}) {
+  const { t } = useTranslation();
+  const opsRes = useResource(({ signal }) => api.listOperations(undefined, signal));
+  const ops = useMemo(() => (opsRes.data ?? []).filter((o) => o.status === 'ACTIVE'), [opsRes.data]);
+  const [filter, setFilter] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+
+  const shown = ops.filter((o) =>
+    !filter || o.opCode.toLowerCase().includes(filter.toLowerCase())
+      || (o.opName ?? '').toLowerCase().includes(filter.toLowerCase()));
+
+  const toggle = (code: string, on: boolean) =>
+    setPicked((p) => (on ? (p.includes(code) ? p : [...p, code]) : p.filter((c) => c !== code)));
+
+  const up = (idx: number) =>
+    setPicked((p) => (idx <= 0 ? p : [...p.slice(0, idx - 1), p[idx], p[idx - 1], ...p.slice(idx + 1)]));
+  const down = (idx: number) =>
+    setPicked((p) => (idx >= p.length - 1 ? p : [...p.slice(0, idx), p[idx + 1], p[idx], ...p.slice(idx + 2)]));
+
+  const submit = () => {
+    if (!picked.length) return;
+    onSubmit(picked);
+  };
+
+  return (
+    <CimModal
+      open
+      onClose={onClose}
+      titleKey="mds.flow.generateTitle"
+      onOk={submit}
+      okKey="mds.common.save"
+      cancelKey="mds.common.cancel"
+      width={640}
+    >
+      <p className="dim">{t('mds.flow.generateHint')}</p>
+      <input
+        className="flow-qtime-input"
+        style={{ width: '100%', margin: '8px 0' }}
+        placeholder={t('mds.flow.generateFilter')}
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <div className="icm-detail" style={{ maxHeight: 300, overflowY: 'auto' }}>
+        {shown.map((o) => (
+          <label key={o.opCode} className="op-detail-head" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0' }}>
+            <CimCheckbox
+              checked={picked.includes(o.opCode)}
+              onChange={(next) => toggle(o.opCode, next)}
+            />
+            <span className="mono">{o.opCode}</span>
+            <span className="dim">{o.opName}</span>
+            {o.equipType ? <span className="dim">· {o.equipType}</span> : null}
+          </label>
+        ))}
+        {!shown.length && <p className="dim">{t('mds.flow.generateNoOps')}</p>}
+      </div>
+      {picked.length > 0 && (
+        <p className="mono" style={{ marginTop: 8 }}>
+          {picked.map((c, i) => (
+            <span key={c} style={{ marginRight: 6 }}>
+              {i + 1}. {c}
+              <button type="button" className="flow-qtime-arrow" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => up(i)}>↑</button>
+              <button type="button" className="flow-qtime-arrow" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => down(i)}>↓</button>
+            </span>
+          ))}
+        </p>
+      )}
+      {busy && <p className="dim">{t('mds.common.saving') || '…'}</p>}
     </CimModal>
   );
 }

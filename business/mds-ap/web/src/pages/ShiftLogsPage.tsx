@@ -17,6 +17,7 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import type { ShiftLogPayload, ShiftLogView, ShiftUserOption } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 交接班记录（ShiftLogsPage，V17）——责任文书：交班提交 → 接班签收 → 锁定只读。
@@ -126,6 +127,7 @@ export default function ShiftLogsPage() {
 
   return (
     <Page>
+      <GuideBar />
       <Panel
         title={t('mds.shiftLog.panelTitle')}
         sub={t('mds.shiftLog.panelSub')}

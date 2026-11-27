@@ -327,6 +327,7 @@ export default function StateModelPage() {
             {/* 块三：转换矩阵（勾选=建行、取消=删行） */}
             <Panel
               titleKey="mds.stateModel.matrixTitle"
+              titleValues={{ name: active.modelName }}
               sub={t('mds.stateModel.matrixMeta', {
                 count: transitions.length,
                 total: Math.max(0, active.states.length * (active.states.length - 1)),

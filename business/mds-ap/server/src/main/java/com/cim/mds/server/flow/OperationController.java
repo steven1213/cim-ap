@@ -112,4 +112,21 @@ public class OperationController {
             @PathVariable String id, @RequestParam String newOpCode) {
         return Result.ok(service.copy(id, newOpCode));
     }
+
+    // ---------------- 可变参数（V29：Wafer Recipe 层落点，仅 UNFROZEN 可维护） ----------------
+
+    /** 工序可变参数列表。 */
+    @PreAuthorize("hasAuthority('" + MdsPermissions.OPERATION_VIEW + "')")
+    @GetMapping("/operations/{id}/variable-params")
+    public Result<List<OperationAdminService.VarParamView>> listVarParams(@PathVariable String id) {
+        return Result.ok(service.listVarParams(id));
+    }
+
+    /** 可变参数整单替换（仅 UNFROZEN；param_key 引用参数定义；与主字段同口径走复制改版）。 */
+    @PreAuthorize("hasAuthority('" + MdsPermissions.OPERATION_UPDATE + "')")
+    @PutMapping("/operations/{id}/variable-params")
+    public Result<List<OperationAdminService.VarParamView>> saveVarParams(
+            @PathVariable String id, @RequestBody List<OperationAdminService.VarParamReq> items) {
+        return Result.ok(service.saveVarParams(id, items));
+    }
 }

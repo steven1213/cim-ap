@@ -36,11 +36,19 @@ public class EquipmentController {
     @GetMapping("/equipments")
     public Result<List<EquipmentAdminService.EquipmentView>> equipments(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String typeCode,
+            @RequestParam(required = false) String classCode,
+            @RequestParam(required = false) String ownerUser,
             @RequestParam(required = false, defaultValue = "all") String view) {
         boolean processOnly = "process".equals(view);
         boolean amhsOnly = "amhs".equals(view);
-        return Result.ok(service.list(keyword, typeCode, processOnly, amhsOnly));
+        return Result.ok(service.list(keyword, classCode, ownerUser, processOnly, amhsOnly));
+    }
+
+    /** 单机台详情（主从页右侧详情块直查）。 */
+    @PreAuthorize("hasAuthority('mds:equipment:view')")
+    @GetMapping("/equipments/{id}")
+    public Result<EquipmentAdminService.EquipmentView> get(@PathVariable String id) {
+        return Result.ok(service.get(id));
     }
 
     /** 能力 → 可加工设备解析（V21，AMAT 口径）：Step.capabilityCode 反查挂该能力的设备清单。 */

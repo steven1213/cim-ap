@@ -136,11 +136,54 @@ class FlowDomainTest {
         return body;
     }
 
-    /** 冻结 + 激活（图校验在 freeze/activate 内做前置）。 */
+    /**
+     * 冻结 + 激活（V22 ICM 新语义）：activate 前置 validate_state=VALID（硬闸），
+     * 因此先给全部业务节点补候选池指派（ASSIGN_REQUIRED=ERROR）→ 跑校验落库 VALID
+     * → freeze → activate。
+     */
     private void freezeAndActivate(String id) throws Exception {
+        ensureAssigns(id);
+        mvc.perform(post("/api/v1/mds/flows/" + id + "/validate")).andExpect(status().isOk());
         mvc.perform(post("/api/v1/mds/flows/" + id + "/freeze")).andExpect(status().isOk());
         mvc.perform(post("/api/v1/mds/flows/" + id + "/activate")).andExpect(status().isOk());
     }
+
+    /** 给流程的全部业务节点补一条 STEP 级指派（真幂等：组只建一次；已有同参行先查后跳）。 */
+    private void ensureAssigns(String id) throws Exception {
+        if (!groupReady) {
+            mvc.perform(post("/api/v1/mds/tool-groups")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(Map.of(
+                                    "groupCode", "TG-FLOW-IT", "groupName", "流程测试组",
+                                    "classCode", "ET-ETCH", "enabled", true))))
+                    .andExpect(status().isOk());
+            groupReady = true;
+        }
+        String detail = getJson("/api/v1/mds/flows/" + id);
+        var steps = om.readTree(detail).path("data").path("steps");
+        for (var step : steps) {
+            String type = step.path("stepType").asText();
+            if (!"PROCESS".equals(type) && !"INSPECT".equals(type) && !"REWORK".equals(type)) {
+                continue;
+            }
+            String nodeId = step.path("nodeId").asText();
+            // 幂等：copy 会搬运 STEP 级 assign，重复 POST 会被 uk 挡（2004）——先查已有行
+            String existing = getJson("/api/v1/mds/flows/" + id + "/steps/" + nodeId + "/assigns");
+            boolean present = om.readTree(existing).path("data").findValues("assignRef")
+                    .stream().anyMatch(v -> "TG-FLOW-IT".equals(v.asText()));
+            if (present) {
+                continue;
+            }
+            mvc.perform(post("/api/v1/mds/flows/" + id + "/steps/" + nodeId + "/assigns")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(om.writeValueAsString(Map.of(
+                                    "assignType", "GROUP", "assignRef", "TG-FLOW-IT",
+                                    "recipeRule", "GENERATE", "priority", 100))))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    private static boolean groupReady = false;
 
     // ---------------------------------------------------------------- cases
 
@@ -239,8 +282,9 @@ class FlowDomainTest {
         mvc.perform(post("/api/v1/mds/flows/" + flowId + "/freeze"))
                 .andExpect(status().isBadRequest());
 
-        // 恢复合法画布 → 校验通过 → 冻结 → 激活
+        // 恢复合法画布 → 补指派（V22 ASSIGN_REQUIRED=ERROR）→ 校验通过 → 冻结 → 激活
         saveCanvasOk(flowId, GOOD_XML);
+        ensureAssigns(flowId);
         mvc.perform(post("/api/v1/mds/flows/" + flowId + "/validate"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.valid").value(true));
@@ -333,15 +377,28 @@ class FlowDomainTest {
         assertThat(problems).contains("环路");
 
         // 正向：先激活普通流程 D，再让 E 引用 D → 校验通过可激活
+        // （E 画布须含 ≥1 业务节点：FLOW_NODE_REQUIRED=ERROR——SUBFLOW 壳流程不可激活）
         String[] d = createFlowAuto();
         saveCanvasOk(d[0], GOOD_XML);
         freezeAndActivate(d[0]);
         String[] e = createFlowAuto();
-        var tree = om.readTree(saveCanvasOk(e[0], SUBFLOW_XML.formatted(d[1]))).path("data");
+        String eXml = SUBFLOW_XML.formatted(d[1])
+                .replace("<node id=\"s3\" stepCode=\"END\" stepType=\"END\" x=\"340\" y=\"200\"/>",
+                        "<node id=\"s2b\" stepCode=\"OPE100\" stepName=\"后段测试\" stepType=\"PROCESS\""
+                                + " x=\"260\" y=\"200\"/>\n"
+                                + "                <node id=\"s3\" stepCode=\"END\" stepType=\"END\" x=\"340\" y=\"200\"/>")
+                .replace("<edge id=\"se2\" from=\"s2\" to=\"s3\" edgeType=\"MAIN\"/>",
+                        "<edge id=\"se2b\" from=\"s2\" to=\"s2b\" edgeType=\"MAIN\"/>\n"
+                                + "                <edge id=\"se3\" from=\"s2b\" to=\"s3\" edgeType=\"MAIN\"/>");
+        var tree = om.readTree(saveCanvasOk(e[0], eXml)).path("data");
         assertThat(tree.path("steps").get(1).path("flowRef").asText()).isEqualTo(d[1]);
-        mvc.perform(post("/api/v1/mds/flows/" + e[0] + "/validate"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.valid").value(true));
+        ensureAssigns(e[0]);
+        String vBody = mvc.perform(post("/api/v1/mds/flows/" + e[0] + "/validate"))
+                .andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString(StandardCharsets.UTF_8);
+        assertThat(om.readTree(vBody).path("data").path("valid").asBoolean())
+                .as("E validate problems: %s", om.readTree(vBody).path("data").path("problems").toString())
+                .isTrue();
         freezeAndActivate(e[0]);
 
         // 引用未激活流程 → 冻结守门拒绝（g 引用未激活的 f）

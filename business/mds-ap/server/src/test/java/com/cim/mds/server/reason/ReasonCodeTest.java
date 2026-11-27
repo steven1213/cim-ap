@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 原因码（V16）集成测试：类型/码 CRUD 守门 + 树路径维护（挪树重算/防环）
- * + WIP 事件快照不变性（主数据演进不回写历史）+ 启停与删除守门。
+ * + 主数据演进 + 启停与删除守门。
  *
  * <p>认证关闭直通；独立 H2 库名（各测类隔离）。业务码断言按 {@code $.code}
  * （BizCode→HTTP：2000→400、2001→404、2003→409、2004→400）。</p>
@@ -108,19 +108,6 @@ class ReasonCodeTest {
         m.put("parentId", parentId);
         m.put("enabled", true);
         MvcResult result = mvc.perform(post("/api/v1/mds/reason-codes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(om.writeValueAsString(m)))
-                .andReturn();
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-    }
-
-    private String createEvent(String lotId, String eventType, String reasonId) throws Exception {
-        Map<String, Object> m = new HashMap<>();
-        m.put("lotId", lotId);
-        m.put("eventType", eventType);
-        m.put("reasonId", reasonId);
-        m.put("operator", "OP01");
-        MvcResult result = mvc.perform(post("/api/v1/mds/wip-reason-events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(m)))
                 .andReturn();
@@ -229,15 +216,7 @@ class ReasonCodeTest {
 
     @Test
     @Order(4)
-    void eventSnapshotImmutableAfterMasterDataEvolution() throws Exception {
-        // Hold 事件：快照固化当时的 码/类型/路径/部门/短名
-        String created = createEvent("LOT-A001", holdTypeKey, grandchildId);
-        assertThat(created).contains("\"code\":0")
-                .contains("\"reasonCodeSnapshot\":\"HLD-001-MECH-BRG\"")
-                .contains("\"reasonTypeSnapshot\":\"HOLD\"")
-                .contains("\"reasonPathSnapshot\":\"/HLD-900/HLD-001/HLD-001-MECH/HLD-001-MECH-BRG/\"")
-                .contains("\"owningDeptSnapshot\":\"EQP\"");
-
+    void masterDataEvolution() throws Exception {
         // 主数据演进：改短名 + 挪部门 + 停用 + 挪树（父改回根下）
         Map<String, Object> evolve = new HashMap<>();
         evolve.put("shortName", "轴承磨损·新文案");
@@ -250,43 +229,16 @@ class ReasonCodeTest {
                 .andExpect(status().isOk()).andReturn();
         // 挪树后码自己的当前路径已是新值
         assertThat(evolveResult.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("\"nodePath\":\"/HLD-900/HLD-001/HLD-001-MECH-BRG/\"");
-
-        // 历史事件不受影响：快照仍是事件发生时刻的路径/部门/短名
-        String events = body("/api/v1/mds/wip-reason-events?lotId=LOT-A001");
-        assertThat(events)
-                .contains("\"reasonCodeSnapshot\":\"HLD-001-MECH-BRG\"")
-                .contains("\"reasonPathSnapshot\":\"/HLD-900/HLD-001/HLD-001-MECH/HLD-001-MECH-BRG/\"")
-                .contains("\"owningDeptSnapshot\":\"EQP\"")
-                .contains("\"reasonNameSnapshot\":\"轴承磨损\"");
+                .contains("\"nodePath\":\"/HLD-900/HLD-001/HLD-001-MECH-BRG/\"")
+                .contains("\"owningDept\":\"PE\"");
     }
 
     @Test
     @Order(5)
-    void eventGuardsAndEnabledFilter() throws Exception {
-        // 停用码不可用于新事务 → 2004
-        assertThat(createEvent("LOT-B001", holdTypeKey, grandchildId)).contains("\"code\":2004");
-        // 语义域不匹配（RELEASE 事件选 HOLD 码）→ 400
-        String list = body("/api/v1/mds/reason-codes?typeKey=HOLD");
-        String enabledHoldId = findIdByCode(list, "HLD-900");
-        assertThat(createEvent("LOT-B001", "RELEASE", enabledHoldId)).contains("\"code\":2000");
-        // 下拉口径：停用码不出现
-        String enabled = body("/api/v1/mds/reason-codes/enabled?typeKey=HOLD");
-        assertThat(enabled).contains("HLD-900").doesNotContain("HLD-001-MECH-BRG");
-        // 未知事务类型 → 404
-        assertThat(createEvent("LOT-B001", "NO_TYPE", enabledHoldId)).contains("\"code\":2001");
-    }
-
-    @Test
-    @Order(6)
     void deleteGuards() throws Exception {
         // 有子节点不可删 → 2004
         MvcResult childDel = mvc.perform(delete("/api/v1/mds/reason-codes/" + rootId)).andReturn();
         assertThat(childDel.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .contains("\"code\":2004");
-        // 被 WIP 事件引用不可删 → 2004
-        MvcResult eventDel = mvc.perform(delete("/api/v1/mds/reason-codes/" + grandchildId)).andReturn();
-        assertThat(eventDel.getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .contains("\"code\":2004");
         // 类型下仍有码不可删 → 2004
         String holdTypeId = getTypeKey(holdTypeKey);
@@ -297,10 +249,7 @@ class ReasonCodeTest {
         String releaseTypeId = getTypeKey("RELEASE");
         mvc.perform(delete("/api/v1/mds/reason-code-types/" + releaseTypeId)).andExpect(status().isOk());
         assertThat(body("/api/v1/mds/reason-code-types")).doesNotContain("RELEASE");
-        // 叶子码（无子无事件）可删：HLD-001-MECH-BRG 有事件、HLD-001-MECH 有子——
-        // 先给 HLD-001-MECH 换父（挂到根下、绕开删除顺序），再删最末叶子不可行——
-        // 直接验证：HLD-001-MECH-BRG 软删被拒后，改删 RELEASE 下曾建失败的码不存在，
-        // 用 HLD-001-MECH 挪走子级后删自身验证软删通路
+        // 叶子码（无子）可删：挪走子级后删自身验证软删通路
         Map<String, Object> reattach = new HashMap<>();
         reattach.put("shortName", "机械故障");
         reattach.put("owningDept", "EQP");
@@ -311,7 +260,7 @@ class ReasonCodeTest {
                         .content(om.writeValueAsString(reattach)))
                 .andExpect(status().isOk());
         // 现在链条是 /HLD-900/HLD-001/{HLD-001-MECH, HLD-001-MECH-BRG}，都无子节点；
-        // HLD-001-MECH-BRG 仍有事件 → 删 HLD-001-MECH（无子无事件）应成功
+        // 删 HLD-001-MECH（无子）应成功
         mvc.perform(delete("/api/v1/mds/reason-codes/" + childId)).andExpect(status().isOk());
         assertThat(body("/api/v1/mds/reason-codes")).doesNotContain("HLD-001-MECH\"");
     }

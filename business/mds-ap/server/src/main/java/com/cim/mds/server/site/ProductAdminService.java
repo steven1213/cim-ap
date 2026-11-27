@@ -16,16 +16,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 产品（Product）管理——产品管理域主数据。
  *
- * <p>权限 {@code mds:product:*}（控制器层把关）。行业通用口径：
- * product_type 只认 PROD/NPW；tech_code 须引用已存在的制程技术；
- * product_code 全局唯一建后不可改。</p>
+ * <p>权限 {@code mds:product:*}（控制器层把关）。行业通用口径（2026-11-25 定稿）：
+ * usage_type 5 值（PRODUCTION/ENGINEERING/EXPERIMENT/TEST/NPW），NPW 须带 npw_type
+ * 二级细分；tech_code 须引用已存在的制程技术；product_code 全局唯一建后不可改。</p>
  */
 @Service
 @RequiredArgsConstructor
 public class ProductAdminService {
 
-    /** 行业通用产品类型（SiView：量产产品 / 陪片）。 */
-    private static final Set<String> VALID_TYPES = Set.of("PROD", "NPW");
+    /** 产品用途类型（5 值，锚 SEMI E10/E79 产品片 vs 非产品片口径；2026-11-25 定稿）。 */
+    private static final Set<String> USAGE_TYPES = Set.of("PRODUCTION", "ENGINEERING", "EXPERIMENT", "TEST", "NPW");
+
+    /** NPW 二级细分（SEMI M8/M38 应用类锚：MONITOR/DUMMY/SEASON/LITHO/GENERIC）。 */
+    private static final Set<String> NPW_TYPES = Set.of("MONITOR", "DUMMY", "SEASON", "LITHO", "GENERIC");
 
     /** 数据字典码（V7 种子）：产品分组 / 晶圆类型。 */
     public static final String DICT_PRODUCT_GROUP = "mds.product_group";
@@ -39,13 +42,13 @@ public class ProductAdminService {
     // ------------------------------------------------------------------ 视图 / 请求
 
     public record ProductView(String id, String productCode, String productName, String techCode,
-                              String productType, String productGroup, String waferType,
+                              String usageType, String npwType, String productGroup, String waferType,
                               String owner, String remark, Boolean enabled, String description,
                               Boolean occupied, String occupiedBy) {
     }
 
     public record ProductReq(String productCode, String productName, String techCode,
-                             String productType, String productGroup, String waferType,
+                             String usageType, String npwType, String productGroup, String waferType,
                              String owner, String remark, Boolean enabled, String description) {
     }
 
@@ -121,12 +124,27 @@ public class ProductAdminService {
 
     /** 分类/引用字段（create 与 update 共用同一套校验）。 */
     private void applyOptional(CimProduct entity, ProductReq req) {
-        String type = req.productType() == null || req.productType().isBlank()
-                ? "PROD" : req.productType().trim();
-        if (!VALID_TYPES.contains(type)) {
-            throw new BizException(BizCode.PARAM_INVALID, "productType 只支持 PROD/NPW: " + type);
+        String usage = req.usageType() == null || req.usageType().isBlank()
+                ? "PRODUCTION" : req.usageType().trim();
+        if (!USAGE_TYPES.contains(usage)) {
+            throw new BizException(BizCode.PARAM_INVALID,
+                    "usageType 只支持 PRODUCTION/ENGINEERING/EXPERIMENT/TEST/NPW: " + usage);
         }
-        entity.setProductType(type);
+        // NPW 二级细分守门：NPW 必填且在词表内；非 NPW 必须为空
+        String npw = blankToNull(req.npwType());
+        if ("NPW".equals(usage)) {
+            if (npw == null) {
+                throw new BizException(BizCode.PARAM_INVALID, "NPW 产品必须指定 npwType");
+            }
+            if (!NPW_TYPES.contains(npw)) {
+                throw new BizException(BizCode.PARAM_INVALID,
+                        "npwType 只支持 MONITOR/DUMMY/SEASON/LITHO/GENERIC: " + npw);
+            }
+        } else if (npw != null) {
+            throw new BizException(BizCode.PARAM_INVALID, "仅 NPW 产品可指定 npwType");
+        }
+        entity.setUsageType(usage);
+        entity.setNpwType(npw);
         // tech_code 引用守门：填了就必须是库内有效制程技术
         String techCode = blankToNull(req.techCode());
         if (techCode != null && technologyRepository.findByTechCodeAndDeletedFalse(techCode).isEmpty()) {
@@ -155,7 +173,7 @@ public class ProductAdminService {
 
     private static ProductView toView(CimProduct p) {
         return new ProductView(p.getId(), p.getProductCode(), p.getProductName(), p.getTechCode(),
-                p.getProductType(), p.getProductGroup(), p.getWaferType(), p.getOwner(),
+                p.getUsageType(), p.getNpwType(), p.getProductGroup(), p.getWaferType(), p.getOwner(),
                 p.getRemark(), p.getEnabled(), p.getDescription(), p.getOccupied(), p.getOccupiedBy());
     }
 

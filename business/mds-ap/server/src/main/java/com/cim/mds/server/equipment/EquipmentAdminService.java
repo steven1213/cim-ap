@@ -25,13 +25,21 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * 设备（Equipment）管理——实例主数据 CRUD + 能力关联维护。
+ * 机台（Equipment）管理——实例主数据 CRUD + 能力关联维护（v2，2026-11-24 定稿）。
  *
- * <p>一张表按类型 kind 分页视图（设备页=kind≠MATERIAL、搬运设备页=MATERIAL——
+ * <p>一张表按机型大类 kind 分页视图（设备页=kind≠MATERIAL、搬运设备页=MATERIAL——
  * 行业 Process Tool / Non-Process Tool 两分法）。位置校验：MATERIAL 绑 FAB/AREA/BAY
- * （OHT 挂线区、Stocker 挂 Bay）；其余 kind 绑 STAGE（工艺/量测/测试机台绑机台位）；
- * 位置记录必须真实存在。stateCode 是状态快照
- * （mds.equip_state 字典，E10 六态口径；流转归 EAP 运行时域，此处只存当前值）。</p>
+ * （OHT 挂线区、Stocker 挂 Bay）；其余 kind 绑 STAGE；位置记录必须真实存在。</p>
+ *
+ * <p>v2 新增：</p>
+ * <ul>
+ *   <li>owner_user（责任人）、control_mode（SEMI E30 通信控制模式）、
+ *       production_mode（生产/工程模式）——三列正交，运行控制块并列维护。</li>
+ *   <li>资产四件套 vendor/model_no/serial_no/asset_no + install_date（PhysicalAsset）。</li>
+ *   <li>实例约束 wafer_sizes/carrier_types/batch/standard_wph——create 时为空的字段
+ *       从机型模板默认值<b>回填</b>（req 值优先，空则模板），落库后与模板解耦。</li>
+ *   <li>删除级联清理机台组成员关联（成员表物理删）。</li>
+ * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -43,11 +51,19 @@ public class EquipmentAdminService {
     /** 设备状态快照字典（E10 六态）。 */
     public static final String DICT_EQUIP_STATE = "mds.equip_state";
 
+    /** 通信控制模式字典（SEMI E30 口径）。 */
+    public static final String DICT_EQUIP_CONTROL_MODE = "mds.equip_control_mode";
+
+    /** 生产/工程模式字典。 */
+    public static final String DICT_EQUIP_PRODUCTION_MODE = "mds.equip_production_mode";
+
     private final CimEquipmentRepository equipmentRepository;
-    private final CimEquipmentTypeRepository typeRepository;
+    private final CimEquipmentClassRepository classRepository;
     private final CimEquipmentCapabilityRepository eqpCapRepository;
     private final CimCapabilityRepository capabilityRepository;
     private final CimEquipmentUnitRepository unitRepository;
+    private final CimToolGroupMemberRepository toolGroupMemberRepository;
+    private final CimEquipmentAttrRepository attrRepository;
     private final SysDictService dictService;
     private final CimFabRepository fabRepository;
     private final CimAreaRepository areaRepository;
@@ -59,36 +75,57 @@ public class EquipmentAdminService {
     // ------------------------------------------------------------------ 视图 / 请求
 
     public record EquipmentView(String id, String equipmentCode, String equipmentName,
-                                String typeCode, String typeName, String typeKind,
-                                String locationType, String locationId, String stateCode,
+                                String classCode, String className, String kindCode,
+                                String locationType, String locationId,
+                                String ownerUser, String controlMode, String productionMode,
+                                String vendor, String modelNo, String serialNo, String assetNo,
+                                java.time.LocalDate installDate,
+                                String waferSizes, String carrierTypes,
+                                Integer batchMin, Integer batchMax,
+                                java.math.BigDecimal standardWph,
+                                String stateCode,
                                 String remark, Boolean enabled, String description,
                                 Boolean occupied, String occupiedBy) {
     }
 
-    public record EquipmentReq(String equipmentCode, String equipmentName, String typeCode,
-                               String locationType, String locationId, String stateCode,
+    public record EquipmentReq(String equipmentCode, String equipmentName, String classCode,
+                               String locationType, String locationId,
+                               String ownerUser, String controlMode, String productionMode,
+                               String vendor, String modelNo, String serialNo, String assetNo,
+                               java.time.LocalDate installDate,
+                               String waferSizes, String carrierTypes,
+                               Integer batchMin, Integer batchMax,
+                               java.math.BigDecimal standardWph,
+                               String stateCode,
                                String remark, Boolean enabled, String description) {
     }
 
     // ------------------------------------------------------------------ 查询
 
     @Transactional(readOnly = true)
-    public List<EquipmentView> list(String keyword, String typeCode,
+    public List<EquipmentView> list(String keyword, String classCode, String ownerUser,
                                     boolean processOnly, boolean amhsOnly) {
-        Map<String, CimEquipmentType> types = typeRepository.findAll().stream()
+        Map<String, CimEquipmentClass> classes = classRepository.findAll().stream()
                 .filter(t -> !Boolean.TRUE.equals(t.getDeleted()))
-                .collect(Collectors.toMap(CimEquipmentType::getTypeCode, Function.identity()));
-        return equipmentRepository.search(blankToNull(keyword), blankToNull(typeCode),
-                        processOnly, amhsOnly).stream()
-                .map(e -> toView(e, types.get(e.getTypeCode())))
+                .collect(Collectors.toMap(CimEquipmentClass::getClassCode, Function.identity()));
+        return equipmentRepository.search(blankToNull(keyword), blankToNull(classCode),
+                        blankToNull(ownerUser), processOnly, amhsOnly).stream()
+                .map(e -> toView(e, classes.get(e.getClassCode())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public EquipmentView get(String id) {
+        CimEquipment e = requireEquipment(id);
+        CimEquipmentClass cls = classRepository.findByClassCodeAndDeletedFalse(e.getClassCode()).orElse(null);
+        return toView(e, cls);
     }
 
     // ------------------------------------------------------------------ 写
 
     /**
      * 能力 → 可加工设备解析（V21，AMAT 口径）：经 cim_equipment_capability 反查
-     * 挂有该能力码的设备清单（Equipment 级，2026-11-18 定稿）。
+     * 挂有该能力码的机台清单（Equipment 级，2026-11-18 定稿）。
      * 路线画布/派工侧用 Step.capabilityCode 调用本端点得到「可用于加工的设备」。
      */
     @Transactional(readOnly = true)
@@ -99,33 +136,39 @@ public class EquipmentAdminService {
         if (capabilityRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).isEmpty()) {
             throw new BizException(BizCode.DATA_NOT_FOUND, "设备能力不存在: " + capabilityCode);
         }
-        Map<String, CimEquipmentType> types = typeRepository.findAll().stream()
+        Map<String, CimEquipmentClass> classes = classRepository.findAll().stream()
                 .filter(t -> !Boolean.TRUE.equals(t.getDeleted()))
-                .collect(Collectors.toMap(CimEquipmentType::getTypeCode, Function.identity()));
+                .collect(Collectors.toMap(CimEquipmentClass::getClassCode, Function.identity()));
         return eqpCapRepository.findByCapabilityCodeAndDeletedFalse(capabilityCode).stream()
                 .map(rel -> equipmentRepository.findById(rel.getEquipmentId())
                         .filter(e -> !Boolean.TRUE.equals(e.getDeleted())))
                 .flatMap(java.util.Optional::stream)
-                .map(e -> toView(e, types.get(e.getTypeCode())))
+                .map(e -> toView(e, classes.get(e.getClassCode())))
                 .toList();
     }
 
+    /**
+     * 新建机台：约束字段（片径/载具/batch/产能）req 为空时从机型模板默认值回填——
+     * 「派生实例」动线的后端落地；req 显式给值则覆盖模板。
+     */
     @Transactional
     public EquipmentView create(EquipmentReq req) {
         requireText(req.equipmentName(), "equipmentName");
-        CimEquipmentType type = requireTypeByCode(req.typeCode());
-        validateLocation(type, req.locationType(), req.locationId());
-        // 命名规则守门：ctx 带全位置链 + kind/type（EQUIPMENT 变量白名单最全）
+        CimEquipmentClass cls = requireClassByCode(req.classCode());
+        validateLocation(cls, req.locationType(), req.locationId());
+        // 命名规则守门：ctx 带全位置链 + kind/class（EQUIPMENT 变量白名单最全）
         String code = namingRuleService.apply(NamingRuleAdminService.OBJ_EQUIPMENT,
-                req.equipmentCode(), namingCtx(type, req));
+                req.equipmentCode(), namingCtx(cls, req));
         if (equipmentRepository.existsByEquipmentCodeAndDeletedFalse(code)) {
             throw new BizException(BizCode.DATA_DUPLICATE, "设备编码已存在: " + code);
         }
         CimEquipment entity = new CimEquipment();
         entity.setEquipmentCode(code);
-        apply(entity, req);
+        apply(entity, req, cls);
+        entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
+        entity.setProductionMode(requireProductionMode(req.productionMode()));
         entity.setStateCode(requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode"));
-        return toView(equipmentRepository.save(entity), type);
+        return toView(equipmentRepository.save(entity), cls);
     }
 
     @Transactional
@@ -134,31 +177,46 @@ public class EquipmentAdminService {
         requireText(req.equipmentName(), "equipmentName");
         assertNotLockedByOther(entity);
         // equipmentCode 全局唯一主标识：建后不可改
-        CimEquipmentType type = requireTypeByCode(req.typeCode());
-        validateLocation(type, req.locationType(), req.locationId());
+        CimEquipmentClass cls = requireClassByCode(req.classCode());
+        validateLocation(cls, req.locationType(), req.locationId());
         String newState = requireDictItem(DICT_EQUIP_STATE, req.stateCode(), "stateCode");
         // 状态转换守门（E30 口径）：仅在状态实际变化时校验（新建无旧态不校验）
         stateModelService.validateTransition(StateModelAdminService.MODEL_EQUIPMENT,
                 entity.getStateCode(), newState);
         entity.setEquipmentName(req.equipmentName().trim());
-        entity.setTypeCode(req.typeCode());
+        entity.setClassCode(req.classCode());
         entity.setLocationType(req.locationType());
         entity.setLocationId(req.locationId());
+        entity.setOwnerUser(blankToNull(req.ownerUser()));
+        entity.setControlMode(requireDictItem(DICT_EQUIP_CONTROL_MODE, req.controlMode(), "controlMode"));
+        entity.setProductionMode(requireProductionMode(req.productionMode()));
+        entity.setVendor(blankToNull(req.vendor()));
+        entity.setModelNo(blankToNull(req.modelNo()));
+        entity.setSerialNo(blankToNull(req.serialNo()));
+        entity.setAssetNo(blankToNull(req.assetNo()));
+        entity.setInstallDate(req.installDate());
+        entity.setWaferSizes(normalizeCsvStatic(req.waferSizes(), 64));
+        entity.setCarrierTypes(normalizeCsvStatic(req.carrierTypes(), 128));
+        entity.setBatchMin(req.batchMin());
+        entity.setBatchMax(req.batchMax());
+        entity.setStandardWph(req.standardWph());
         entity.setStateCode(newState);
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setEnabled(req.enabled() == null || req.enabled());
         clearLock(entity);
-        return toView(equipmentRepository.save(entity), type);
+        return toView(equipmentRepository.save(entity), cls);
     }
 
     @Transactional
     public void delete(String id) {
         CimEquipment entity = requireEquipment(id);
         assertNotLockedByOther(entity);
-        // 子单元随设备物理级联（软删会撞 uk_cim_equipment_unit）；能力关联同口径
+        // 子单元随设备物理级联（软删会撞 uk_cim_equipment_unit）；能力关联/组成员/自定义属性同口径
         unitRepository.deleteByEquipmentId(id);
         eqpCapRepository.deleteByEquipmentId(id);
+        toolGroupMemberRepository.deleteByEquipmentId(id);
+        attrRepository.findByEquipmentIdAndDeletedFalse(id).forEach(attrRepository::delete);
         entity.setDeleted(Boolean.TRUE);
         equipmentRepository.save(entity);
     }
@@ -210,20 +268,28 @@ public class EquipmentAdminService {
         return requireEquipment(id);
     }
 
-    private CimEquipmentType requireTypeByCode(String typeCode) {
-        requireText(typeCode, "typeCode");
-        return typeRepository.findByTypeCodeAndDeletedFalse(typeCode.trim())
-                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "设备类型不存在: " + typeCode));
+    private CimEquipmentClass requireClassByCode(String classCode) {
+        requireText(classCode, "classCode");
+        return classRepository.findByClassCodeAndDeletedFalse(classCode.trim())
+                .orElseThrow(() -> new BizException(BizCode.DATA_NOT_FOUND, "机型不存在: " + classCode));
+    }
+
+    /** 生产/工程模式：空 → 默认 PRODUCTION；非空须在字典内。 */
+    private String requireProductionMode(String value) {
+        if (value == null || value.isBlank()) {
+            return "PRODUCTION";
+        }
+        return requireDictItem(DICT_EQUIP_PRODUCTION_MODE, value, "productionMode");
     }
 
     /**
-     * 命名规则上下文：位置链码（按 locationId 上溯到 site）+ kind/type
-     * （EQUIPMENT 变量白名单 {site}{fab}{area}{bay}{stage}{kind}{type}{seq}）。
+     * 命名规则上下文：位置链码（按 locationId 上溯到 site）+ kind/class
+     * （EQUIPMENT 变量白名单 {site}{fab}{area}{bay}{stage}{kind}{type}{seq}，type 段取机型编码）。
      */
-    private Map<String, String> namingCtx(CimEquipmentType type, EquipmentReq req) {
+    private Map<String, String> namingCtx(CimEquipmentClass cls, EquipmentReq req) {
         Map<String, String> ctx = new java.util.HashMap<>();
-        ctx.put("kind", type.getKindCode());
-        ctx.put("type", type.getTypeCode());
+        ctx.put("kind", cls.getKindCode());
+        ctx.put("type", cls.getClassCode());
         if (req.locationId() != null && !req.locationId().isBlank()) {
             switch (req.locationType()) {
                 case "FAB" -> fabRepository.findById(req.locationId())
@@ -256,21 +322,21 @@ public class EquipmentAdminService {
     }
 
     /** 位置校验：类型合法 + kind 规则（MATERIAL→FAB/AREA/BAY，其余→STAGE）+ 记录真实存在。 */
-    private void validateLocation(CimEquipmentType type, String locationType, String locationId) {
+    private void validateLocation(CimEquipmentClass cls, String locationType, String locationId) {
         requireText(locationType, "locationType");
         requireText(locationId, "locationId");
         if (!LOCATION_TYPES.contains(locationType)) {
             throw new BizException(BizCode.PARAM_INVALID,
                     "locationType 必须是 " + LOCATION_TYPES + " 之一: " + locationType);
         }
-        boolean material = "MATERIAL".equals(type.getKindCode());
+        boolean material = "MATERIAL".equals(cls.getKindCode());
         if (material && "STAGE".equals(locationType)) {
             throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "搬运/仓储设备（" + type.getTypeCode() + "，MATERIAL 类）不能绑定位机台位(STAGE)，请选 FAB/AREA/BAY");
+                    "搬运/仓储设备（" + cls.getClassCode() + "，MATERIAL 类）不能绑定位机台位(STAGE)，请选 FAB/AREA/BAY");
         }
         if (!material && !"STAGE".equals(locationType)) {
             throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "非搬运设备（" + type.getKindCode() + " 类）必须绑定位机台位(STAGE)");
+                    "非搬运设备（" + cls.getKindCode() + " 类）必须绑定位机台位(STAGE)");
         }
         boolean exists = switch (locationType) {
             case "FAB" -> fabRepository.findById(locationId).filter(f -> !Boolean.TRUE.equals(f.getDeleted())).isPresent();
@@ -285,14 +351,31 @@ public class EquipmentAdminService {
         }
     }
 
-    private static void apply(CimEquipment entity, EquipmentReq req) {
+    /**
+     * create 字段搬运：约束字段 req 为空从模板默认回填（派生语义）。
+     * update 的字段覆盖在 update() 里显式展开（含 controlMode/productionMode 字典校验）。
+     */
+    private static void apply(CimEquipment entity, EquipmentReq req, CimEquipmentClass cls) {
         entity.setEquipmentCode(entity.getEquipmentCode() == null
                 ? req.equipmentCode().trim() : entity.getEquipmentCode());
         entity.setEquipmentName(req.equipmentName().trim());
-        entity.setTypeCode(req.typeCode());
+        entity.setClassCode(req.classCode());
         entity.setLocationType(req.locationType());
         entity.setLocationId(req.locationId());
-        // stateCode 在 create 里走 requireDictItem（字典校验依赖实例方法，不能进静态 apply）
+        entity.setOwnerUser(blankToNull(req.ownerUser()));
+        entity.setWaferSizes(firstNonBlank(normalizeCsvStatic(req.waferSizes(), 64),
+                cls.getDefaultWaferSizes()));
+        entity.setCarrierTypes(firstNonBlank(normalizeCsvStatic(req.carrierTypes(), 128),
+                cls.getDefaultCarrierTypes()));
+        entity.setBatchMin(req.batchMin() != null ? req.batchMin() : cls.getDefaultBatchMin());
+        entity.setBatchMax(req.batchMax() != null ? req.batchMax() : cls.getDefaultBatchMax());
+        entity.setStandardWph(req.standardWph() != null ? req.standardWph() : cls.getDefaultStandardWph());
+        entity.setVendor(blankToNull(req.vendor()));
+        entity.setModelNo(blankToNull(req.modelNo()));
+        entity.setSerialNo(blankToNull(req.serialNo()));
+        entity.setAssetNo(blankToNull(req.assetNo()));
+        entity.setInstallDate(req.installDate());
+        // stateCode/controlMode/productionMode 在 create 里走实例方法（字典校验）
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setEnabled(req.enabled() == null || req.enabled());
@@ -312,14 +395,38 @@ public class EquipmentAdminService {
         return v;
     }
 
-    private static EquipmentView toView(CimEquipment e, CimEquipmentType type) {
+    private static EquipmentView toView(CimEquipment e, CimEquipmentClass cls) {
         return new EquipmentView(e.getId(), e.getEquipmentCode(), e.getEquipmentName(),
-                e.getTypeCode(),
-                type == null ? null : type.getTypeName(),
-                type == null ? null : type.getKindCode(),
-                e.getLocationType(), e.getLocationId(), e.getStateCode(),
+                e.getClassCode(),
+                cls == null ? null : cls.getClassName(),
+                cls == null ? null : cls.getKindCode(),
+                e.getLocationType(), e.getLocationId(),
+                e.getOwnerUser(), e.getControlMode(), e.getProductionMode(),
+                e.getVendor(), e.getModelNo(), e.getSerialNo(), e.getAssetNo(),
+                e.getInstallDate(),
+                e.getWaferSizes(), e.getCarrierTypes(), e.getBatchMin(), e.getBatchMax(),
+                e.getStandardWph(),
+                e.getStateCode(),
                 e.getRemark(), e.getEnabled(), e.getDescription(),
                 e.getOccupied(), e.getOccupiedBy());
+    }
+
+    private static String normalizeCsvStatic(String raw, int maxLen) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String csv = String.join(",", java.util.Arrays.stream(raw.split("[,，]"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList());
+        if (csv.length() > maxLen) {
+            throw new BizException(BizCode.PARAM_INVALID, "字段过长（≤" + maxLen + " 字符）: " + csv);
+        }
+        return csv;
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        return a != null && !a.isBlank() ? a : b;
     }
 
     private static void assertNotLockedByOther(EditLockDefData entity) {

@@ -40,10 +40,14 @@ public class EditLockSupport {
             Map.entry("stage", "cim_stage"),
             Map.entry("technology", "cim_technology"),
             Map.entry("product", "cim_product"),
-            Map.entry("equipmentType", "cim_equipment_type"),
+            Map.entry("equipmentClass", "cim_equipment_class"),
             Map.entry("equipment", "cim_equipment"),
+            Map.entry("toolGroup", "cim_tool_group"),
             Map.entry("capability", "cim_capability"),
-            Map.entry("stockerBank", "cim_stocker_bank"));
+            Map.entry("stockerBank", "cim_stocker_bank"),
+            Map.entry("edcSet", "cim_edc_param_set"),
+            Map.entry("edcReportTpl", "cim_edc_report_tpl"),
+            Map.entry("edcPlan", "cim_edc_plan"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();

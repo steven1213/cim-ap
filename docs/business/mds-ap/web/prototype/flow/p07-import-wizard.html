@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P07 Excel 三段导入向导</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  select { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; display:flex; align-items:center; gap:10px; }
+  .steps { display:flex; gap:8px; padding:14px; flex-wrap:wrap; align-items:center; }
+  .st { border:1.5px dashed var(--line); border-radius:7px; padding:6px 14px; font-size:12.5px; color:var(--muted); text-align:center; line-height:1.5; }
+  .st.on { border:1.5px solid var(--p); color:var(--p); background:#eef2ff; font-weight:650; }
+  .ar { color:var(--muted); font-size:11px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:6px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr.err td { background:#fef2f2; }
+  tr.dup td { background:#fffbeb; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .e { background:#fee2e2; color:#b91c1c; } .w { background:#fef3c7; color:#b45309; } .ok { background:#dcfce7; color:#15803d; }
+  .sum { display:flex; gap:14px; padding:10px 14px; font-size:12.5px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+  .drop { border:1.5px dashed #93a5c8; border-radius:8px; padding:26px; text-align:center; color:#64748b; margin:14px; background:#f8fafc; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>Excel 导入 · 节点参数</b>
+  <span style="flex:1"></span>
+  <button class="btn">⬇ 下载模板（按当前流程自动生成）</button>
+</div>
+<div class="panel">
+  <div class="steps">
+    <div class="st on">① 选目标<br><span style="font-size:11px">流程 + 参数范围</span></div><span class="ar">→</span>
+    <div class="st on">② 上传预览<br><span style="font-size:11px">逐行校验 / 冲突提示</span></div><span class="ar">→</span>
+    <div class="st">③ 确认提交<br><span style="font-size:11px">按范围先删后插</span></div>
+  </div>
+</div>
+<div class="panel">
+  <h3>① 选目标</h3>
+  <div class="sum">
+    <span>流程：<b>FLOW-A31-CMP-V3</b>（UNFROZEN · 编辑锁 zhang.s）</span>
+    <span>导入范围：<select><option>全部参数（机台/光罩/污染/KV）</option><option>仅机台与 Recipe</option><option>仅 KV</option></select></span>
+    <span>冲突策略：<select><option>覆盖（先删后插所选范围）</option><option>跳过已有</option></select></span>
+  </div>
+</div>
+<div class="panel">
+  <h3>② 上传预览（step-params.xlsx · 128 行）</h3>
+  <div class="drop">拖拽文件到此处，或 <span style="color:var(--p)">点击选择</span> —— 仅在 ① 选定目标后启用（模板列头由目标流程的节点清单生成）</div>
+  <div class="sum">
+    <span class="tag ok">可导入 125</span>
+    <span class="tag w">警告 1（将按覆盖处理）</span>
+    <span class="tag e">错误 2（阻断提交，须修正后重传）</span>
+  </div>
+  <table>
+    <tr><th>行</th><th>step_code</th><th>参数类型</th><th>attr_key/槽位</th><th>值</th><th>校验</th></tr>
+    <tr><td>1</td><td>DEP-OX-100</td><td>MACHINE</td><td>1</td><td>EQG-DEP-OX / EXACT_MATCH</td><td><span class="tag ok">✓ 组存在</span></td></tr>
+    <tr><td>2</td><td>LTH-CR-200</td><td>MACHINE</td><td>2</td><td>EQP-LTH-02 / CH-A,CH-B</td><td><span class="tag ok">✓</span></td></tr>
+    <tr><td>3</td><td>INS-TX-400</td><td>ATTR</td><td>dc.usl</td><td>1.25</td><td><span class="tag ok">✓ 定义存在·NUMBER</span></td></tr>
+    <tr class="dup"><td>4</td><td>DEP-OX-100</td><td>MACHINE</td><td>1</td><td>EQP-DEP-03</td><td><span class="tag w">槽位 1 重复，将覆盖上一行</span></td></tr>
+    <tr class="err"><td>5</td><td>LTH-CR-200</td><td>RETICLE</td><td>1</td><td>RTL-UNK-01</td><td><span class="tag e">光罩不存在（reticle_code 无匹配）</span></td></tr>
+    <tr class="err"><td>6</td><td>DEV-350</td><td>ATTR</td><td>dc.unknown</td><td>0.8</td><td><span class="tag e">attr_key 未在参数定义注册（P04）</span></td></tr>
+  </table>
+  <div class="note">错误行可下载 <b>仅错误行修正模板</b>（回填原列），修正后重新上传只校验错误行。</div>
+</div>
+<div class="panel">
+  <h3>③ 确认提交</h3>
+  <div class="sum">
+    <span>将删除所选范围现有参数 <b>117</b> 条，插入 <b>125</b> 条（事务内先删后插）</span>
+    <span>流程状态：<span class="tag w">须 UNFROZEN（否则 2004）</span></span>
+    <span style="flex:1"></span>
+    <button class="btn" disabled title="存在 ERROR 行">提交导入（ERROR 阻断）</button>
+  </div>
+  <div class="note"><b>对标依据：</b>参考项目 ImportFsdMachine/Reticle/DcStep 等向导即此三段式；我们统一为<b>一个向导 + 范围选择</b>，不再每种参数一个向导。<a href="index.html">← 返回索引</a> · <a href="p03-step-param.html">→ P03</a></div>
+</div>
+</body>
+</html>

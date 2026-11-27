@@ -46,9 +46,13 @@ public class LocationLockController {
             Map.entry("stage", MdsPermissions.STAGE_UPDATE),
             Map.entry("technology", MdsPermissions.TECH_UPDATE),
             Map.entry("product", MdsPermissions.PRODUCT_UPDATE),
-            Map.entry("equipmentType", MdsPermissions.EQP_TYPE_UPDATE),
+            Map.entry("equipmentClass", MdsPermissions.EQC_UPDATE),
             Map.entry("equipment", MdsPermissions.EQUIPMENT_UPDATE),
-            Map.entry("capability", MdsPermissions.CAPABILITY_UPDATE));
+            Map.entry("toolGroup", MdsPermissions.TOOL_GROUP_UPDATE),
+            Map.entry("capability", MdsPermissions.CAPABILITY_UPDATE),
+            Map.entry("edcSet", MdsPermissions.EDC_SET_UPDATE),
+            Map.entry("edcReportTpl", MdsPermissions.EDC_TPL_UPDATE),
+            Map.entry("edcPlan", MdsPermissions.EDC_PLAN_UPDATE));
 
     /** GET /locations/{type}/{id}/lock —— 锁状态（前端渲染「被谁编辑中」徽标）。 */
     @GetMapping("/{type}/{id}/lock")
@@ -65,8 +69,7 @@ public class LocationLockController {
         String user = EditLockSupport.currentUser();
         EditLockSupport.ClaimResult result = lockSupport.claim(type, id, user);
         if (!result.claimed()) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "该记录正在被 " + result.occupiedBy() + " 编辑，暂不能修改");
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED, "mds.biz.editlock.occupied", result.occupiedBy());
         }
         return Result.ok(result);
     }
@@ -83,7 +86,7 @@ public class LocationLockController {
 
     private static void requireType(String type) {
         if (!EditLockSupport.TYPES.contains(type)) {
-            throw new BizException(BizCode.PARAM_INVALID, "未知位置层类型: " + type);
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.editlock.unknownType", type);
         }
     }
 
@@ -97,7 +100,7 @@ public class LocationLockController {
         boolean granted = auth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals(need));
         if (!granted) {
-            throw new BizException(BizCode.ACCESS_DENIED, "无操作权限: " + need);
+            throw BizException.of(BizCode.ACCESS_DENIED, "mds.biz.editlock.noPerm", need);
         }
     }
 }

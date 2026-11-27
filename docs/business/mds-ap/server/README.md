@@ -45,11 +45,13 @@ MDS 首项落地的业务域是**位置主数据（Site / Fab / Area / Bay / Sub
 | D5 | code 唯一与编码 | 同租户全局唯一（遵循 T2.5 软删唯一）；推荐分层点分码 |
 | D6 | 机台-位置关系 | 设备由 MDS 主数据管理；搬迁轨迹复用 `@History(SNAPSHOT)` |
 
-## 3.1 工艺路线主数据（Route / Step / Flow）设计（已拍板）
+## 3.1 工艺路线主数据（Route / Step / Flow）设计（已拍板，⚠️ 设计文档已被取代）
 
-MDS 第三块核心主数据——工艺路线（Route）、工序（Step/Operation）、工序流（Flow/连接），与位置、设备、配方四向闭环。详细设计见：
+MDS 第三块核心主数据——工艺路线（Route）、工序（Step/Operation）、工序流（Flow/连接），与位置、设备、配方四向闭环。
 
-👉 **[工艺路线主数据详细设计](route-design.md)**
+> ⚠️ 旧版 `route-design.md`（2026-09 蓝图期）已清理：其 `mds_route/mds_flow/mds_route_operation` 表名与实际落库不符。
+> **实际实现基线**：`cim_flow`（V12-V15，family_code+version_no 四态）+ `cim_operation`（V20）；
+> **当前设计权威**：[flow-modeling/00-overview.md](flow-modeling/00-overview.md)（对标重构 + ICM 继承式约束模型定稿）。
 
 基于 SEMI E94/E87/E40 与 fab MES 实践，已拍板核心决策：
 
@@ -147,11 +149,13 @@ MDS 的**编码治理层**——统一管理位置 / 设备 / 载具 / 配方 / 
 | NR5 | 强制唯一 | `enforce_unique` 默认 true，生成后校验租户内唯一（契合 T2.5 软删唯一）；存量 code 不回溯破坏 |
 | NR6 | 规则生命周期 | 规则本身 `DRAFT→ACTIVE→DEPRECATED`+`revision`；改 pattern 升版本，存量实体 code 不变（与 route/product 同源） |
 
-## 3.7 工艺流（Process Flow，Route 的工艺展开层）设计（已拍板）
+## 3.7 工艺流（Process Flow，Route 的工艺展开层）设计（⚠️ 设计文档已被取代）
 
-MDS 在「工艺路线（Route，逻辑层）」之上补充**工艺流（Process Flow，工艺展开层）**——把每个 Route Operation 展开为具体的 Process Flow Step（物理配方 + PPID + 设备组 + 工艺参数规范）。同时提供**流程对比**能力（版本 diff / 多方案横评 / 覆盖校验 / 跨产品对比）。详细设计见：
+MDS 在「工艺路线（Route，逻辑层）」之上补充**工艺流（Process Flow，工艺展开层）**——把每个 Route Operation 展开为具体的 Process Flow Step（物理配方 + PPID + 设备组 + 工艺参数规范）。同时提供**流程对比**能力（版本 diff / 多方案横评 / 覆盖校验 / 跨产品对比）。
 
-👉 **[工艺流（Process Flow）详细设计](process-flow-design.md)**
+> ⚠️ 旧版 `process-flow-design.md`（2026-09 蓝图期）已清理：其 `mds_process_flow_step/_param/_recipe/_compare` 等表从未落库，
+> 实际实现为 `cim_flow_step/cim_flow_qtime/cim_flow_rule`（V12-V15）。
+> **当前设计权威**：[flow-modeling/00-overview.md](flow-modeling/00-overview.md)（对标重构 + ICM 定稿，含流程对比/产品绑定/校验生效闸的现行方案）。下方 PF1-PF6 拍板结论保留作历史决策记录，其中涉及表名的条目以 flow-modeling/20-our-design.md 为准。
 
 基于 SEMI E94/E40 + Camstar/西门子 MES 双层模型 + fab 工程实践，已拍板核心决策：
 
@@ -302,7 +306,7 @@ MDS 的**第二条横切治理层**——与 [命名/编码规则](naming-rule-d
 
 | 章节 | 内容 | 状态 |
 | --- | --- | --- |
-| 业务域与实体 | MDS 主数据模型、与平台通用数据模型（§9）的衔接 | ✅ **40 篇设计文档**，覆盖 **7 块核心主数据**（位置/设备/工艺路线/产品/载具/配方/仓库）+ **工艺流展开层与流程对比**（[process-flow-design.md](process-flow-design.md)）+ 全部扩展域（§3.9 / §3.10 逐域列出，**权威清单见 [00-blueprint §1.1](00-blueprint.md)**：共 27 个业务主数据域 + 2 个基础参考数据域）+ **横切治理**（[编码](naming-rule-design.md) / [约束](constraint-design.md) / [变更](change-mgmt-design.md) / [元治理](md-governance-design.md)）+ **横切规范**（[表达式 DSL](expression-dsl-design.md) / [参数字典](param-def-design.md) / [实时态契约](realtime-contract-design.md)）+ **集成**（[分发订阅](md-distribution-design.md) / [设备接口](equipment-interface-design.md) / [API](api-design.md)）；**总纲见 [00-blueprint.md](00-blueprint.md)** |
+| 业务域与实体 | MDS 主数据模型、与平台通用数据模型（§9）的衔接 | ✅ **38 篇设计文档**，覆盖 **7 块核心主数据**（位置/设备/工艺路线/产品/载具/配方/仓库）+ **工艺流展开层与流程对比**（现行方案见 [flow-modeling/00-overview.md](flow-modeling/00-overview.md)，旧版两篇蓝图文档已清理）+ 全部扩展域（§3.9 / §3.10 逐域列出，**权威清单见 [00-blueprint §1.1](00-blueprint.md)**：共 27 个业务主数据域 + 2 个基础参考数据域）+ **横切治理**（[编码](naming-rule-design.md) / [约束](constraint-design.md) / [变更](change-mgmt-design.md) / [元治理](md-governance-design.md)）+ **横切规范**（[表达式 DSL](expression-dsl-design.md) / [参数字典](param-def-design.md) / [实时态契约](realtime-contract-design.md)）+ **集成**（[分发订阅](md-distribution-design.md) / [设备接口](equipment-interface-design.md) / [API](api-design.md)）；**总纲见 [00-blueprint.md](00-blueprint.md)** |
 | 认证与准入对接 | 验签、JWKS 拉取、`apps` claim 校验 | ✅ 见 §1/§2 |
 | 内部 RBAC | 菜单 / 按钮 / 数据权限（平台 §21.1） | 待 M6 |
 | API 设计 | 模块接口、版本策略 | ✅ 见 [api-design.md](api-design.md)（双通道、12 个解析接口、MES 消费接口清单、版本与契约测试） |

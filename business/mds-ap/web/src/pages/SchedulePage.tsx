@@ -16,6 +16,7 @@ import { MDS_PERMS } from '@/lib/permCodes';
 import { useHasPermission } from '@/lib/usePermission';
 import type { ShiftAssignmentView, ShiftUserOption, ShiftView } from '@/types';
 import { SHIFT_COLORS } from './ShiftDefsPage';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 排班安排（SchedulePage，V17）——周视图：7 列（周一至周日）× 人员行。
@@ -113,6 +114,7 @@ export default function SchedulePage() {
 
   return (
     <Page>
+      <GuideBar />
       <Panel
         title={t('mds.schedule.panelTitle')}
         sub={t('mds.schedule.weekRange', {

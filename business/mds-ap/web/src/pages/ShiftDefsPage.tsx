@@ -19,6 +19,7 @@ import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useHasPermission } from '@/lib/usePermission';
 import type { ControlSwitchView, ShiftPatternView, ShiftView } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 班次与班制（ShiftDefsPage，V17/V18）——排班域的定义类主数据维护。
@@ -242,6 +243,7 @@ export default function ShiftDefsPage() {
 
   return (
     <Page>
+      <GuideBar />
       <div className="shift-control-bar">
         <span className="shift-control-title">{t('mds.shift.control.title')}</span>
         {switches.map((sw) => (

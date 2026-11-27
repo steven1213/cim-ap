@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P06 产品绑定流程</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  input,select { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .wrap { display:flex; gap:12px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:1.8; }
+  .side { flex:1; min-width:360px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr.sel { background:#eef2ff; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .active { background:#dcfce7; color:#15803d; } .pending { background:#fef3c7; color:#b45309; } .hist { background:#f1f5f9; color:#64748b; }
+  .warn { background:#fef2f2; border:1px solid #fca5a5; color:#991b1b; border-radius:6px; padding:8px 12px; font-size:12.5px; margin:10px 14px; line-height:1.7; }
+  .kv { padding:12px 14px; }
+  .kv .row { display:flex; margin-bottom:9px; align-items:flex-start; } .kv label { width:96px; color:#64748b; font-size:12.5px; flex-shrink:0; padding-top:4px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+  .tl { padding:4px 14px 10px; font-size:12px; color:#475569; line-height:2; }
+  .tl b { color:#1e293b; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>产品绑定流程</b>
+  <input placeholder="搜索 产品/流程">
+  <select><option>全部技术</option><option>TECH-035</option></select>
+  <span style="flex:1"></span>
+  <button class="btn p">＋ 新建绑定</button>
+  <button class="btn">切换版本</button>
+  <button class="btn">解除绑定</button>
+</div>
+<div class="wrap">
+  <div class="panel">
+    <h3>cim_product_flow · 产品 × 流程族 × 版本（对标 ProductSpec 核心语义）</h3>
+    <table>
+      <tr><th></th><th>产品</th><th>技术</th><th>流程族</th><th>绑定版本</th><th>版本状态</th><th>生效边界</th><th>生效条件满足?</th><th>绑定时间/人</th></tr>
+      <tr class="sel"><td><input type="checkbox"></td><td>PRD-A31-64M</td><td>TECH-035</td><td>FLOW-A31-CMP</td><td><b>V2</b></td><td><span class="tag active">ACTIVE</span></td><td>新投批</td><td>✓</td><td>11-01 · zhang.s</td></tr>
+      <tr><td><input type="checkbox"></td><td>PRD-A31-64M</td><td>TECH-035</td><td>FLOW-A31-CMP</td><td><span class="tag pending">待生效 V3</span></td><td>FROZEN(VALID)</td><td>新投批</td><td>✗ V3 未 ACTIVE</td><td>11-25 · li.q（预绑定）</td></tr>
+      <tr><td><input type="checkbox"></td><td>PRD-B22-128S</td><td>TECH-035</td><td>FLOW-LITHO-B2</td><td><b>V5</b></td><td><span class="tag active">ACTIVE</span></td><td>新投批</td><td>✓</td><td>10-12 · wang.m</td></tr>
+      <tr><td><input type="checkbox"></td><td>PRD-B22-128S</td><td>TECH-035</td><td>FLOW-REWORK-INS</td><td><b>V1</b></td><td><span class="tag active">ACTIVE</span></td><td>返工路径</td><td>✓</td><td>10-12 · wang.m</td></tr>
+    </table>
+    <div class="tl"><b>绑定历史（PRD-A31-64M × FLOW-A31-CMP）：</b>
+      09-20 建 V1 · 10-05 切 V2（zhang.s，备注「CMP 返工上限收紧」）· <b>11-25 预绑 V3（li.q，等 V3 生效）</b></div>
+  </div>
+  <div class="panel side">
+    <h3>选中：PRD-A31-64M × FLOW-A31-CMP（迁移到 V3？）</h3>
+    <div class="warn">⚠ <b>影响面提示</b>：V3 与当前 V2 有 <b>6 处差异</b>（新增 2 节点 / 删除 1 / 变更 3），其中 <b>INS-TX-400 需机台指派、DEV-350 需补 Q-time</b>。<a href="p05-flow-compare.html">→ 查看完整对比（P05）</a></div>
+    <div class="kv">
+      <div class="row"><label>切换方式</label><div class="v">预绑定：V3 ACTIVE 后自动切换（或手动确认切换）</div></div>
+      <div class="row"><label>生效边界</label><div class="v"><b>新投批</b>：已投 Lot 维持 V2 走完（lot_run_flow 不迁移）；不追溯在制品</div></div>
+      <div class="row"><label>唯一性</label><div class="v">uk(product × flow_family × version)；同产品同族同时只允许一条「绑定中」</div></div>
+      <div class="row"><label>守门</label><div class="v">绑定版本必须 ACTIVE 或（FROZEN+VALID 才允许预绑定）；2004 拒绝其余状态</div></div>
+      <div class="row"><label>6/8/12 寸</label><div class="v">绑定在产品级，wafer_size 不影响模型；若同产品跨厂区多主流程，未来用「绑定分组」扩展（P3）</div></div>
+    </div>
+    <div class="note"><b>与 ProductSpec 的取舍：</b>参考项目把绑定藏在 ProductSpec 的主流程字段里；我们显式建 cim_product_flow 关系表——可追溯绑定历史、支持预绑定、差异提示可挂 P05 对比结果。<br><a href="index.html">← 返回索引</a></div>
+  </div>
+</div>
+</body>
+</html>

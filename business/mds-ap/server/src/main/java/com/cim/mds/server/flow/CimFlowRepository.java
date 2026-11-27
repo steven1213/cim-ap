@@ -23,6 +23,9 @@ public interface CimFlowRepository extends JpaRepository<CimFlow, String> {
     /** 族内当前 ACTIVE 版本（单 Active 约束：同族最多一条）。 */
     Optional<CimFlow> findByFamilyCodeAndDeletedFalseAndStatus(String familyCode, String status);
 
+    /** 族内指定版本（EDC 方案绑定校验用）。 */
+    Optional<CimFlow> findByFamilyCodeAndVersionNoAndDeletedFalse(String familyCode, Integer versionNo);
+
     /** 列表 + 关键字（编码/名称/技术编码模糊，{@code kw} 可空）。 */
     @Query("""
             select f from CimFlow f

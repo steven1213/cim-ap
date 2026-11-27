@@ -93,7 +93,8 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.stage.delete", "topology", "mds.nav.topology.action.stage.delete",
                 MdsPermissions.STAGE_DELETE, 150));
 
-        // —— 产品管理（Technology 先行；Product / Route 预留）——
+        // —— 产品管理（菜单 order = 用户操作动线序：建产品 → 定义字典 → 建工序 → 建流程 → 配参数 → 绑产品；
+        //    辅助页（规则/导入/对比/总览）置尾。前端 GuideBar 步骤索引与此前 7 步主链一致）——
         m.add(dir("grp.product", "mds.nav.group.product", 30));
         m.add(menu("technology", "grp.product", "/technologies", "TechnologyPage",
                 "mds.nav.technology", "sliders", MdsPermissions.TECH_VIEW, 10));
@@ -113,7 +114,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.PRODUCT_DELETE, 30));
         // —— 制造流程（Route 口径：XML 画布为源 + 拖拽编辑 + 图校验发布）——
         m.add(menu("flows", "grp.product", "/flows", "FlowPage",
-                "mds.nav.flows", "tree", MdsPermissions.FLOW_VIEW, 30));
+                "mds.nav.flows", "tree", MdsPermissions.FLOW_VIEW, 35));
         m.add(button("btn.flow.create", "flows", "mds.nav.flows.action.create",
                 MdsPermissions.FLOW_CREATE, 10));
         m.add(button("btn.flow.save", "flows", "mds.nav.flows.action.save",
@@ -133,42 +134,93 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.FLOW_UPDATE, 30));
         // —— 工序库（V20：P-T-R-O 四层建模 O 层；Operation 独立主数据，跨路线复用）——
         m.add(menu("operations", "grp.product", "/operations", "OperationsPage",
-                "mds.nav.operations", "layers", MdsPermissions.OPERATION_VIEW, 35));
+                "mds.nav.operations", "layers", MdsPermissions.OPERATION_VIEW, 30));
         m.add(button("btn.operation.create", "operations", "mds.nav.operations.action.create",
                 MdsPermissions.OPERATION_CREATE, 10));
         m.add(button("btn.operation.update", "operations", "mds.nav.operations.action.update",
                 MdsPermissions.OPERATION_UPDATE, 20));
         m.add(button("btn.operation.delete", "operations", "mds.nav.operations.action.delete",
                 MdsPermissions.OPERATION_DELETE, 30));
-        // —— 设备管理（Type—Instance—Capability，ISA-95 设备对象模型）——
-        // 一张设备表按类型 kind 分页视图：transportEquipments=AMHS 台账（MATERIAL），equipments=其余（工艺/量测/测试…）
+        // —— ICM 继承式约束模型（V22，2026-11-25 定稿：ContextChain 三级 + 统一指派 + KV + 校验闸）——
+        m.add(menu("stepParams", "grp.product", "/step-params", "StepParamPage",
+                "mds.nav.stepParams", "sliders", MdsPermissions.STEP_ASSIGN_VIEW, 36));
+        m.add(menu("paramDefs", "grp.product", "/param-defs", "ParamDefPage",
+                "mds.nav.paramDefs", "list", MdsPermissions.PARAM_DEF_VIEW, 25));
+        m.add(menu("flowCompare", "grp.product", "/flow-compare", "FlowComparePage",
+                "mds.nav.flowCompare", "columns", MdsPermissions.FLOW_VIEW, 42));
+        // —— 产品↔流程绑定（动线第 7 步：流程建模/激活之后才可绑，FROZEN+VALID 可预绑）——
+        m.add(menu("productFlows", "grp.product", "/product-bindings", "ProductFlowPage",
+                "mds.nav.productFlows", "link", MdsPermissions.PRODUCT_FLOW_VIEW, 38));
+        m.add(menu("flowImport", "grp.product", "/flow-import", "FlowImportPage",
+                "mds.nav.flowImport", "upload", MdsPermissions.FLOW_VIEW, 41));
+        // —— 流程总览（P3-4：MainProcessFlowOverAll 等价，前端实时推导不落库）——
+        m.add(menu("flowOverview", "grp.product", "/flow-overview", "FlowOverviewPage",
+                "mds.nav.flowOverview", "eye", MdsPermissions.FLOW_VIEW, 43));
+        // —— 配方解算（V29：解算契约执行页；可变参数维护在工序库详情）——
+        m.add(menu("recipeResolve", "grp.product", "/recipe-resolve", "RecipeResolvePage",
+                "mds.nav.recipeResolve", "robot", MdsPermissions.RECIPE_RESOLVE, 45));
+        // —— EDC 工程数采（V28：采集契约静态元数据；动线 = 参数定义(产品管理组) →
+        //     参数集 → 设备接口映射 → EDC 方案；运行时采集与判定归 MES/SPC/FDC）——
+        m.add(dir("grp.edc", "mds.nav.group.edc", 32));
+        m.add(menu("edcParamSets", "grp.edc", "/edc/param-sets", "EdcParamSetPage",
+                "mds.nav.edcParamSets", "boxes", MdsPermissions.EDC_SET_VIEW, 10));
+        m.add(menu("edcReportTpls", "grp.edc", "/edc/report-tpls", "EdcReportTplPage",
+                "mds.nav.edcReportTpls", "file", MdsPermissions.EDC_TPL_VIEW, 15));
+        m.add(menu("edcEquipMaps", "grp.edc", "/edc/equip-maps", "EdcEquipMapPage",
+                "mds.nav.edcEquipMaps", "link", MdsPermissions.EDC_MAP_VIEW, 20));
+        m.add(menu("edcPlans", "grp.edc", "/edc/plans", "EdcPlanPage",
+                "mds.nav.edcPlans", "sliders", MdsPermissions.EDC_PLAN_VIEW, 30));
+        m.add(button("btn.edcSet.create", "edcParamSets", "mds.nav.edcParamSets.action.create",
+                MdsPermissions.EDC_SET_CREATE, 10));
+        m.add(button("btn.edcSet.import", "edcParamSets", "mds.nav.edcParamSets.action.import",
+                MdsPermissions.EDC_SET_UPDATE, 20));
+        m.add(button("btn.edcTpl.create", "edcReportTpls", "mds.nav.edcReportTpls.action.create",
+                MdsPermissions.EDC_TPL_CREATE, 10));
+        m.add(button("btn.edcTpl.import", "edcReportTpls", "mds.nav.edcReportTpls.action.import",
+                MdsPermissions.EDC_TPL_UPDATE, 20));
+        m.add(button("btn.edcMap.create", "edcEquipMaps", "mds.nav.edcEquipMaps.action.create",
+                MdsPermissions.EDC_MAP_CREATE, 10));
+        m.add(button("btn.edcMap.import", "edcEquipMaps", "mds.nav.edcEquipMaps.action.import",
+                MdsPermissions.EDC_MAP_UPDATE, 20));
+        m.add(button("btn.edcPlan.create", "edcPlans", "mds.nav.edcPlans.action.create",
+                MdsPermissions.EDC_PLAN_CREATE, 10));
+        m.add(button("btn.edcPlan.import", "edcPlans", "mds.nav.edcPlans.action.import",
+                MdsPermissions.EDC_PLAN_UPDATE, 20));
+        // —— 设备管理（v2，2026-11-24：Class—Instance—Capability，ISA-95 设备对象模型）——
+        // 三页合一：机台台账 /equipments 覆盖加工与搬运设备（按机型大类筛选）；
+        // 动线：机型模板先行 → 派生实例 → 机台组=派工候选池（Work Center）→ 能力 → 存储区
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
-        m.add(menu("transportEquipments", "grp.equipment", "/transport-equipments", "TransportEquipmentsPage",
-                "mds.nav.transportEquipments", "monitor", MdsPermissions.EQUIPMENT_VIEW, 10));
-        m.add(menu("equipments", "grp.equipment", "/equipments", "EquipmentsPage",
+        m.add(menu("equipmentClasses", "grp.equipment", "/equipment-classes", "EquipmentClassPage",
+                "mds.nav.equipmentClasses", "sliders", MdsPermissions.EQC_VIEW, 10));
+        m.add(menu("equipments", "grp.equipment", "/equipments", "EquipmentPage",
                 "mds.nav.equipments", "monitor", MdsPermissions.EQUIPMENT_VIEW, 20));
-        m.add(menu("equipmentTypes", "grp.equipment", "/equipment-types", "EquipmentTypePage",
-                "mds.nav.equipmentTypes", "sliders", MdsPermissions.EQP_TYPE_VIEW, 30));
+        // 搬运设备 = 机台台账的 AMHS 视图（kind=MATERIAL：OHT/OHS/Stocker/OHB/NTB），薄 wrapper 固化筛选
+        m.add(menu("transportEquipments", "grp.equipment", "/transport-equipments", "TransportEquipmentsPage",
+                "mds.nav.transportEquipments", "monitor", MdsPermissions.EQUIPMENT_VIEW, 21));
+        m.add(menu("toolGroups", "grp.equipment", "/tool-groups", "ToolGroupPage",
+                "mds.nav.toolGroups", "boxes", MdsPermissions.TOOL_GROUP_VIEW, 30));
         m.add(menu("capabilities", "grp.equipment", "/capabilities", "CapabilityPage",
                 "mds.nav.capabilities", "shield", MdsPermissions.CAPABILITY_VIEW, 40));
-        m.add(button("btn.transportEquipment.create", "transportEquipments", "mds.nav.transportEquipments.action.create",
+        m.add(button("btn.equipment.create", "equipments", "mds.nav.equipments.action.create",
                 MdsPermissions.EQUIPMENT_CREATE, 10));
-        m.add(button("btn.transportEquipment.update", "transportEquipments", "mds.nav.transportEquipments.action.update",
+        m.add(button("btn.equipment.update", "equipments", "mds.nav.equipments.action.update",
                 MdsPermissions.EQUIPMENT_UPDATE, 20));
-        m.add(button("btn.transportEquipment.delete", "transportEquipments", "mds.nav.transportEquipments.action.delete",
+        m.add(button("btn.equipment.delete", "equipments", "mds.nav.equipments.action.delete",
                 MdsPermissions.EQUIPMENT_DELETE, 30));
-        m.add(button("btn.equipment2.create", "equipments", "mds.nav.equipments.action.create",
-                MdsPermissions.EQUIPMENT_CREATE, 10));
-        m.add(button("btn.equipment2.update", "equipments", "mds.nav.equipments.action.update",
-                MdsPermissions.EQUIPMENT_UPDATE, 20));
-        m.add(button("btn.equipment2.delete", "equipments", "mds.nav.equipments.action.delete",
-                MdsPermissions.EQUIPMENT_DELETE, 30));
-        m.add(button("btn.equipmentType.create", "equipmentTypes", "mds.nav.equipmentTypes.action.create",
-                MdsPermissions.EQP_TYPE_CREATE, 10));
-        m.add(button("btn.equipmentType.update", "equipmentTypes", "mds.nav.equipmentTypes.action.update",
-                MdsPermissions.EQP_TYPE_UPDATE, 20));
-        m.add(button("btn.equipmentType.delete", "equipmentTypes", "mds.nav.equipmentTypes.action.delete",
-                MdsPermissions.EQP_TYPE_DELETE, 30));
+        m.add(button("btn.equipmentClass.create", "equipmentClasses", "mds.nav.equipmentClasses.action.create",
+                MdsPermissions.EQC_CREATE, 10));
+        m.add(button("btn.equipmentClass.update", "equipmentClasses", "mds.nav.equipmentClasses.action.update",
+                MdsPermissions.EQC_UPDATE, 20));
+        m.add(button("btn.equipmentClass.delete", "equipmentClasses", "mds.nav.equipmentClasses.action.delete",
+                MdsPermissions.EQC_DELETE, 30));
+        m.add(button("btn.equipmentClass.derive", "equipmentClasses", "mds.nav.equipmentClasses.action.derive",
+                MdsPermissions.EQUIPMENT_CREATE, 40));
+        m.add(button("btn.toolGroup.create", "toolGroups", "mds.nav.toolGroups.action.create",
+                MdsPermissions.TOOL_GROUP_CREATE, 10));
+        m.add(button("btn.toolGroup.update", "toolGroups", "mds.nav.toolGroups.action.update",
+                MdsPermissions.TOOL_GROUP_UPDATE, 20));
+        m.add(button("btn.toolGroup.delete", "toolGroups", "mds.nav.toolGroups.action.delete",
+                MdsPermissions.TOOL_GROUP_DELETE, 30));
         m.add(button("btn.capability.create", "capabilities", "mds.nav.capabilities.action.create",
                 MdsPermissions.CAPABILITY_CREATE, 10));
         m.add(button("btn.capability.update", "capabilities", "mds.nav.capabilities.action.update",
@@ -260,10 +312,6 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.REASON_UPDATE, 20));
         m.add(button("btn.reason.delete", "reasonCodes", "mds.nav.reasonCodes.action.delete",
                 MdsPermissions.REASON_DELETE, 30));
-        m.add(menu("wipEvents", "grp.system", "/wip-events", "WipEventPage",
-                "mds.nav.wipEvents", "inbox", MdsPermissions.REASON_VIEW, 50));
-        m.add(button("btn.wipEvent.create", "wipEvents", "mds.nav.wipEvents.action.create",
-                MdsPermissions.REASON_UPDATE, 10));
 
         // —— 菜单管理（sys_menu 在线维护 + 角色授权联动；平台权限码，端点来自 cim-system）——
         m.add(menu("menuAdmin", "grp.system", "/menus", "MenusAdminPage",
@@ -373,16 +421,68 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.FLOW_CREATE, "制造流程新建/复制"));
         p.add(new PermDef(MdsPermissions.FLOW_UPDATE, "制造流程维护/发布"));
         p.add(new PermDef(MdsPermissions.FLOW_DELETE, "制造流程删除"));
+        p.add(new PermDef(MdsPermissions.FLOW_VALIDATE, "流程参数校验（质检单独授权特例）"));
+        // ICM 统一指派（ContextChain 三 scope 一张表，三层分开授权）
+        p.add(new PermDef(MdsPermissions.OP_ASSIGN_VIEW, "工序默认指派查看"));
+        p.add(new PermDef(MdsPermissions.OP_ASSIGN_CREATE, "工序默认指派新增"));
+        p.add(new PermDef(MdsPermissions.OP_ASSIGN_UPDATE, "工序默认指派编辑"));
+        p.add(new PermDef(MdsPermissions.OP_ASSIGN_DELETE, "工序默认指派删除"));
+        p.add(new PermDef(MdsPermissions.FLOW_ASSIGN_VIEW, "流程级指派查看"));
+        p.add(new PermDef(MdsPermissions.FLOW_ASSIGN_CREATE, "流程级指派新增"));
+        p.add(new PermDef(MdsPermissions.FLOW_ASSIGN_UPDATE, "流程级指派编辑"));
+        p.add(new PermDef(MdsPermissions.FLOW_ASSIGN_DELETE, "流程级指派删除"));
+        p.add(new PermDef(MdsPermissions.STEP_ASSIGN_VIEW, "节点覆盖指派查看"));
+        p.add(new PermDef(MdsPermissions.STEP_ASSIGN_CREATE, "节点覆盖指派新增"));
+        p.add(new PermDef(MdsPermissions.STEP_ASSIGN_UPDATE, "节点覆盖指派编辑"));
+        p.add(new PermDef(MdsPermissions.STEP_ASSIGN_DELETE, "节点覆盖指派删除"));
+        // KV 约束参数（context 三层）
+        p.add(new PermDef(MdsPermissions.OP_ATTR_VIEW, "工序 KV 参数查看"));
+        p.add(new PermDef(MdsPermissions.OP_ATTR_UPDATE, "工序 KV 参数维护"));
+        p.add(new PermDef(MdsPermissions.FLOW_ATTR_VIEW, "流程 KV 参数查看"));
+        p.add(new PermDef(MdsPermissions.FLOW_ATTR_UPDATE, "流程 KV 参数维护"));
+        p.add(new PermDef(MdsPermissions.STEP_ATTR_VIEW, "节点 KV 参数查看"));
+        p.add(new PermDef(MdsPermissions.STEP_ATTR_UPDATE, "节点 KV 参数维护"));
+        // 参数定义字典 / 产品绑定
+        p.add(new PermDef(MdsPermissions.PARAM_DEF_VIEW, "参数定义查看"));
+        p.add(new PermDef(MdsPermissions.PARAM_DEF_CREATE, "参数定义新建"));
+        p.add(new PermDef(MdsPermissions.PARAM_DEF_UPDATE, "参数定义编辑"));
+        p.add(new PermDef(MdsPermissions.PARAM_DEF_DELETE, "参数定义删除"));
+        // EDC
+        p.add(new PermDef(MdsPermissions.EDC_SET_VIEW, "EDC 参数集查看"));
+        p.add(new PermDef(MdsPermissions.EDC_SET_CREATE, "EDC 参数集新建"));
+        p.add(new PermDef(MdsPermissions.EDC_SET_UPDATE, "EDC 参数集编辑"));
+        p.add(new PermDef(MdsPermissions.EDC_SET_DELETE, "EDC 参数集删除"));
+        p.add(new PermDef(MdsPermissions.EDC_TPL_VIEW, "EDC 报告模板查看"));
+        p.add(new PermDef(MdsPermissions.EDC_TPL_CREATE, "EDC 报告模板新建"));
+        p.add(new PermDef(MdsPermissions.EDC_TPL_UPDATE, "EDC 报告模板编辑"));
+        p.add(new PermDef(MdsPermissions.EDC_TPL_DELETE, "EDC 报告模板删除"));
+        p.add(new PermDef(MdsPermissions.EDC_MAP_VIEW, "EDC 设备映射查看"));
+        p.add(new PermDef(MdsPermissions.EDC_MAP_CREATE, "EDC 设备映射新建"));
+        p.add(new PermDef(MdsPermissions.EDC_MAP_UPDATE, "EDC 设备映射编辑"));
+        p.add(new PermDef(MdsPermissions.EDC_MAP_DELETE, "EDC 设备映射删除"));
+        p.add(new PermDef(MdsPermissions.EDC_PLAN_VIEW, "EDC 方案查看"));
+        p.add(new PermDef(MdsPermissions.EDC_PLAN_CREATE, "EDC 方案新建"));
+        p.add(new PermDef(MdsPermissions.EDC_PLAN_UPDATE, "EDC 方案编辑/生命周期"));
+        p.add(new PermDef(MdsPermissions.EDC_PLAN_DELETE, "EDC 方案删除"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_FLOW_VIEW, "产品绑定查看"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_FLOW_CREATE, "产品绑定/换版"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_FLOW_UPDATE, "产品覆盖维护"));
+        p.add(new PermDef(MdsPermissions.PRODUCT_FLOW_DELETE, "产品解绑"));
         // 工序库（产品管理域，P-T-R-O 四层 O 层）
         p.add(new PermDef(MdsPermissions.OPERATION_VIEW, "工序库查看"));
         p.add(new PermDef(MdsPermissions.OPERATION_CREATE, "工序新建/复制"));
         p.add(new PermDef(MdsPermissions.OPERATION_UPDATE, "工序维护/生命周期"));
         p.add(new PermDef(MdsPermissions.OPERATION_DELETE, "工序删除"));
-        // EquipmentType（设备管理域）
-        p.add(new PermDef(MdsPermissions.EQP_TYPE_VIEW, "设备类型查看"));
-        p.add(new PermDef(MdsPermissions.EQP_TYPE_CREATE, "设备类型新建"));
-        p.add(new PermDef(MdsPermissions.EQP_TYPE_UPDATE, "设备类型编辑"));
-        p.add(new PermDef(MdsPermissions.EQP_TYPE_DELETE, "设备类型删除"));
+        // EquipmentClass（设备管理域，v2 取代 EquipmentType）
+        p.add(new PermDef(MdsPermissions.EQC_VIEW, "机型模板查看"));
+        p.add(new PermDef(MdsPermissions.EQC_CREATE, "机型模板新建"));
+        p.add(new PermDef(MdsPermissions.EQC_UPDATE, "机型模板编辑"));
+        p.add(new PermDef(MdsPermissions.EQC_DELETE, "机型模板删除"));
+        // ToolGroup（设备管理域，ISA-95 Work Center）
+        p.add(new PermDef(MdsPermissions.TOOL_GROUP_VIEW, "机台组查看"));
+        p.add(new PermDef(MdsPermissions.TOOL_GROUP_CREATE, "机台组新建"));
+        p.add(new PermDef(MdsPermissions.TOOL_GROUP_UPDATE, "机台组编辑/成员维护"));
+        p.add(new PermDef(MdsPermissions.TOOL_GROUP_DELETE, "机台组删除"));
         // Equipment（设备管理域）
         p.add(new PermDef(MdsPermissions.EQUIPMENT_VIEW, "设备查看"));
         p.add(new PermDef(MdsPermissions.EQUIPMENT_CREATE, "设备新建"));
@@ -413,6 +513,8 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.REASON_CREATE, "原因码新建"));
         p.add(new PermDef(MdsPermissions.REASON_UPDATE, "原因码维护"));
         p.add(new PermDef(MdsPermissions.REASON_DELETE, "原因码删除"));
+        // 配方解算（V29）
+        p.add(new PermDef(MdsPermissions.RECIPE_RESOLVE, "配方解算执行"));
         // 数据字典（平台域，码源 cim-system PermissionCodes）
         p.add(new PermDef(PermissionCodes.DICT_LIST, "数据字典查看"));
         p.add(new PermDef(PermissionCodes.DICT_SAVE, "数据字典维护"));
@@ -472,7 +574,8 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.TECH_VIEW, MdsPermissions.TECH_CREATE, MdsPermissions.TECH_UPDATE,
                 MdsPermissions.PRODUCT_VIEW, MdsPermissions.PRODUCT_CREATE, MdsPermissions.PRODUCT_UPDATE,
                 MdsPermissions.FLOW_VIEW, MdsPermissions.FLOW_CREATE, MdsPermissions.FLOW_UPDATE,
-                MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQP_TYPE_CREATE, MdsPermissions.EQP_TYPE_UPDATE,
+                MdsPermissions.EQC_VIEW, MdsPermissions.EQC_CREATE, MdsPermissions.EQC_UPDATE,
+                MdsPermissions.TOOL_GROUP_VIEW, MdsPermissions.TOOL_GROUP_CREATE, MdsPermissions.TOOL_GROUP_UPDATE,
                 MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.EQUIPMENT_CREATE, MdsPermissions.EQUIPMENT_UPDATE,
                 MdsPermissions.CAPABILITY_VIEW, MdsPermissions.CAPABILITY_CREATE, MdsPermissions.CAPABILITY_UPDATE,
                 MdsPermissions.BANK_VIEW, MdsPermissions.BANK_CREATE, MdsPermissions.BANK_UPDATE,
@@ -485,7 +588,8 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.SITE_VIEW, MdsPermissions.FAB_VIEW, MdsPermissions.AREA_VIEW,
                 MdsPermissions.BAY_VIEW, MdsPermissions.STAGE_VIEW, MdsPermissions.TECH_VIEW,
                 MdsPermissions.PRODUCT_VIEW, MdsPermissions.FLOW_VIEW,
-                MdsPermissions.EQP_TYPE_VIEW, MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
+                MdsPermissions.EQC_VIEW, MdsPermissions.TOOL_GROUP_VIEW,
+                MdsPermissions.EQUIPMENT_VIEW, MdsPermissions.CAPABILITY_VIEW,
                 MdsPermissions.BANK_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
                 MdsPermissions.REASON_VIEW,
@@ -516,6 +620,19 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.dashboard", "概览", "Overview"));
         t.add(new TextDef("mds.nav.group.site", "场地主数据", "Site master data"));
         t.add(new TextDef("mds.nav.topology", "位置拓扑", "Locations"));
+        t.add(new TextDef("mds.nav.group.edc", "数采管理", "Data collection"));
+        t.add(new TextDef("mds.nav.edcParamSets", "参数集", "Parameter sets"));
+        t.add(new TextDef("mds.nav.edcReportTpls", "报告模板", "Report templates"));
+        t.add(new TextDef("mds.nav.edcEquipMaps", "设备接口映射", "Equipment mappings"));
+        t.add(new TextDef("mds.nav.edcPlans", "EDC 方案", "EDC plans"));
+        t.add(new TextDef("mds.nav.edcParamSets.action.create", "参数集·新建", "Parameter set · create"));
+        t.add(new TextDef("mds.nav.edcParamSets.action.import", "参数集·导入", "Parameter set · import"));
+        t.add(new TextDef("mds.nav.edcReportTpls.action.create", "报告模板·新建", "Report template · create"));
+        t.add(new TextDef("mds.nav.edcReportTpls.action.import", "报告模板·导入", "Report template · import"));
+        t.add(new TextDef("mds.nav.edcEquipMaps.action.create", "设备映射·新建", "Equipment mapping · create"));
+        t.add(new TextDef("mds.nav.edcEquipMaps.action.import", "设备映射·导入", "Equipment mapping · import"));
+        t.add(new TextDef("mds.nav.edcPlans.action.create", "EDC 方案·新建", "EDC plan · create"));
+        t.add(new TextDef("mds.nav.edcPlans.action.import", "EDC 方案·导入", "EDC plan · import"));
         // —— 按钮动作（授权界面回显用；单菜单五层，显式命名）——
         t.add(new TextDef("mds.nav.topology.action.site.create", "厂区·新建", "Site · create"));
         t.add(new TextDef("mds.nav.topology.action.site.update", "厂区·编辑", "Site · update"));
@@ -564,6 +681,7 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.flows.action.publish", "制造流程·发布", "Flow · publish"));
         t.add(new TextDef("mds.nav.flows.action.delete", "制造流程·删除", "Flow · delete"));
         t.add(new TextDef("mds.nav.flowRules", "流程规则", "Flow rules"));
+        t.add(new TextDef("mds.nav.recipeResolve", "配方解算", "Recipe resolution"));
         t.add(new TextDef("mds.nav.flowRules.action.create", "流程规则·新建", "Flow rule · create"));
         t.add(new TextDef("mds.nav.flowRules.action.save", "流程规则·维护", "Flow rule · save"));
         t.add(new TextDef("mds.nav.flowRules.action.delete", "流程规则·删除", "Flow rule · delete"));
@@ -573,18 +691,20 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.operations.action.delete", "工序·删除", "Operation · delete"));
         // —— 设备管理 ——
         t.add(new TextDef("mds.nav.group.equipment", "设备管理", "Equipment"));
+        t.add(new TextDef("mds.nav.equipments", "机台台账", "Equipment"));
         t.add(new TextDef("mds.nav.transportEquipments", "搬运设备", "Transport equipment"));
-        t.add(new TextDef("mds.nav.transportEquipments.action.create", "搬运设备·新建", "Transport equipment · create"));
-        t.add(new TextDef("mds.nav.transportEquipments.action.update", "搬运设备·编辑", "Transport equipment · update"));
-        t.add(new TextDef("mds.nav.transportEquipments.action.delete", "搬运设备·删除", "Transport equipment · delete"));
-        t.add(new TextDef("mds.nav.equipments", "设备", "Equipment"));
-        t.add(new TextDef("mds.nav.equipments.action.create", "设备·新建", "Equipment · create"));
-        t.add(new TextDef("mds.nav.equipments.action.update", "设备·编辑", "Equipment · update"));
-        t.add(new TextDef("mds.nav.equipments.action.delete", "设备·删除", "Equipment · delete"));
-        t.add(new TextDef("mds.nav.equipmentTypes", "设备类型", "Equipment types"));
-        t.add(new TextDef("mds.nav.equipmentTypes.action.create", "设备类型·新建", "Equipment type · create"));
-        t.add(new TextDef("mds.nav.equipmentTypes.action.update", "设备类型·编辑", "Equipment type · update"));
-        t.add(new TextDef("mds.nav.equipmentTypes.action.delete", "设备类型·删除", "Equipment type · delete"));
+        t.add(new TextDef("mds.nav.equipments.action.create", "机台·新建", "Equipment · create"));
+        t.add(new TextDef("mds.nav.equipments.action.update", "机台·编辑", "Equipment · update"));
+        t.add(new TextDef("mds.nav.equipments.action.delete", "机台·删除", "Equipment · delete"));
+        t.add(new TextDef("mds.nav.equipmentClasses", "机型模板", "Equipment classes"));
+        t.add(new TextDef("mds.nav.equipmentClasses.action.create", "机型·新建", "Equipment class · create"));
+        t.add(new TextDef("mds.nav.equipmentClasses.action.update", "机型·编辑", "Equipment class · update"));
+        t.add(new TextDef("mds.nav.equipmentClasses.action.delete", "机型·删除", "Equipment class · delete"));
+        t.add(new TextDef("mds.nav.equipmentClasses.action.derive", "机型·派生机台", "Equipment class · derive equipment"));
+        t.add(new TextDef("mds.nav.toolGroups", "机台组", "Tool groups"));
+        t.add(new TextDef("mds.nav.toolGroups.action.create", "机台组·新建", "Tool group · create"));
+        t.add(new TextDef("mds.nav.toolGroups.action.update", "机台组·编辑", "Tool group · update"));
+        t.add(new TextDef("mds.nav.toolGroups.action.delete", "机台组·删除", "Tool group · delete"));
         t.add(new TextDef("mds.nav.capabilities", "设备能力", "Capabilities"));
         t.add(new TextDef("mds.nav.capabilities.action.create", "设备能力·新建", "Capability · create"));
         t.add(new TextDef("mds.nav.capabilities.action.update", "设备能力·编辑", "Capability · update"));
@@ -606,8 +726,6 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.reasonCodes.action.create", "原因码·新建", "Reason code · create"));
         t.add(new TextDef("mds.nav.reasonCodes.action.save", "原因码·维护", "Reason code · save"));
         t.add(new TextDef("mds.nav.reasonCodes.action.delete", "原因码·删除", "Reason code · delete"));
-        t.add(new TextDef("mds.nav.wipEvents", "WIP 事件", "WIP events"));
-        t.add(new TextDef("mds.nav.wipEvents.action.create", "WIP 事件·新建", "WIP event · create"));
         t.add(new TextDef("mds.nav.menus", "菜单管理", "Menus"));
         t.add(new TextDef("mds.nav.menus.action.save", "菜单·维护", "Menu · save"));
         t.add(new TextDef("mds.nav.menus.action.delete", "菜单·删除", "Menu · delete"));

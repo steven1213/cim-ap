@@ -270,21 +270,21 @@ class NamingRuleDomainTest {
         assertThat(om.readTree(mvc.perform(post("/api/v1/mds/products")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(om.writeValueAsString(Map.of(
-                                        "productName", "P-A", "techCode", techA, "productType", "PROD"))))
+                                        "productName", "P-A", "techCode", techA, "usageType", "PRODUCTION"))))
                         .andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .path("data").path("productCode").asText()).isEqualTo(techA + "001");
         assertThat(om.readTree(mvc.perform(post("/api/v1/mds/products")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(om.writeValueAsString(Map.of(
-                                        "productName", "P-B", "techCode", techA, "productType", "PROD"))))
+                                        "productName", "P-B", "techCode", techA, "usageType", "PRODUCTION"))))
                         .andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .path("data").path("productCode").asText()).isEqualTo(techA + "002");
         assertThat(om.readTree(mvc.perform(post("/api/v1/mds/products")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(om.writeValueAsString(Map.of(
-                                        "productName", "P-C", "techCode", techB, "productType", "PROD"))))
+                                        "productName", "P-C", "techCode", techB, "usageType", "PRODUCTION"))))
                         .andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8))
                 .path("data").path("productCode").asText()).isEqualTo(techB + "001");

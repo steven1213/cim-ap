@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P02 流程设计画布 + 节点参数面板（核心 · ICM ContextChain）</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border-bottom:1px solid var(--line); padding:8px 14px; }
+  .top b { font-size:14.5px; } .top .tag { padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:4px 11px; font-size:12.5px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .unfrozen { background:#f1f5f9; color:#475569; } .notvalid { background:#f1f5f9; color:#64748b; }
+  .icm { background:#eef2ff; border-bottom:1px solid #c7d2fe; color:#3730a3; font-size:12px; padding:6px 14px; line-height:1.7; }
+  .icm b { color:#1e3a8a; }
+  .layout { display:flex; height:calc(100vh - 106px); }
+  .palette { width:158px; background:#fff; border-right:1px solid var(--line); padding:10px; overflow:auto; }
+  .palette h4 { font-size:11.5px; color:var(--muted); margin:10px 0 6px; }
+  .pn { border:1px solid var(--line); border-left:3px solid var(--p); border-radius:6px; padding:5px 8px; font-size:12px; margin-bottom:6px; cursor:grab; background:#f8fafc; }
+  .pn.start { border-left-color:#15803d; } .pn.end { border-left-color:#b91c1c; } .pn.dec { border-left-color:#d97706; } .pn.sub { border-left-color:#7c3aed; }
+  .canvas { flex:1; position:relative; background:linear-gradient(90deg,#eef1f6 1px,transparent 1px) 0 0/24px 24px,linear-gradient(#eef1f6 1px,transparent 1px) 0 0/24px 24px,#fbfcfe; }
+  .fn { position:absolute; background:#fff; border:1.5px solid var(--p); border-radius:8px; padding:7px 11px; font-size:11.5px; min-width:126px; box-shadow:0 2px 6px rgba(79,110,247,.1); }
+  .fn b { display:block; font-size:12px; } .fn span { color:var(--muted); font-size:10.5px; }
+  .dot { position:absolute; top:-5px; right:-5px; width:10px; height:10px; border-radius:50%; background:#22c55e; border:2px solid #fff; }
+  .fn.sel { border-width:2.5px; background:#eef2ff; } .fn.missing .dot { background:#ef4444; } .fn.partial .dot { background:#f59e0b; }
+  .fn .inr { position:absolute; bottom:-7px; left:8px; font-size:9.5px; background:#f1f5f9; border:1px solid var(--line); color:#64748b; border-radius:4px; padding:0 5px; }
+  .mm { position:absolute; right:12px; bottom:12px; width:140px; height:88px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:6px; font-size:10px; color:var(--muted); }
+  .props { width:410px; background:#fff; border-left:1px solid var(--line); display:flex; flex-direction:column; }
+  .ph { padding:9px 14px; border-bottom:1px solid var(--line); } .ph b { font-size:13.5px; } .ph span { font-size:11.5px; color:var(--muted); margin-left:6px; }
+  .legend { display:flex; gap:10px; padding:7px 14px; font-size:11px; border-bottom:1px dashed var(--line); background:#f8fafc; }
+  .lg-i { color:#64748b; } .lg-o { color:#1d4ed8; font-weight:650; } .lg-m { color:#b91c1c; font-weight:650; }
+  .tabs { display:flex; border-bottom:1px solid var(--line); padding:0 6px; }
+  .tab { padding:8px 10px; font-size:12.5px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; user-select:none; }
+  .tab.on { color:var(--p); border-bottom-color:var(--p); font-weight:650; }
+  .tab .n { background:#fee2e2; color:#b91c1c; border-radius:8px; padding:0 5px; font-size:10.5px; margin-left:3px; }
+  .pg { padding:12px 14px; overflow:auto; flex:1; }
+  .pg.hide { display:none; }
+  .fld { margin-bottom:9px; } .fld label { display:block; font-size:11.5px; color:#475569; margin-bottom:3px; }
+  .fld input,.fld select { width:100%; border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:12.5px; }
+  .fld input.inh { background:#f8fafc; color:#64748b; border-style:dashed; }
+  .r2 { display:flex; gap:8px; } .r2 .fld { flex:1; }
+  .inh { display:inline-block; background:#f1f5f9; color:#64748b; border-radius:4px; font-size:10.5px; padding:0 5px; margin-left:5px; }
+  .ovr { display:inline-block; background:#eff6ff; color:#1d4ed8; border-radius:4px; font-size:10.5px; padding:0 5px; margin-left:5px; }
+  table.mt { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:6px; }
+  .mt th { background:#f8fafc; padding:4px 6px; text-align:left; border-bottom:1px solid var(--line); font-weight:650; }
+  .mt td { padding:4px 6px; border-bottom:1px solid #f1f5f9; }
+  .mt tr.inhr td { color:#64748b; background:#fafbfc; font-style:italic; }
+  .mt select,.mt input { width:100%; min-width:70px; border:1px solid var(--line); border-radius:5px; padding:3px 5px; font-size:12px; }
+  .mtx { text-align:center; color:var(--muted); cursor:pointer; width:26px; }
+  .add { border:1px dashed var(--line); color:var(--muted); text-align:center; border-radius:6px; padding:6px; font-size:12px; cursor:pointer; margin-bottom:12px; }
+  .badge { font-size:10.5px; border-radius:4px; padding:1px 6px; }
+  .b-gen { background:#eff6ff; color:#1d4ed8; } .b-exact { background:#fef3c7; color:#b45309; } .b-fixed { background:#f1f5f9; color:#475569; }
+  .warn { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; border-radius:6px; padding:6px 10px; font-size:11.5px; margin-bottom:9px; line-height:1.6; }
+  .pf { border-top:1px solid var(--line); padding:9px 14px; display:flex; gap:8px; }
+  .lockinfo { font-size:11px; color:#64748b; margin-top:6px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>流程设计 · FLOW-LITHO-B2-V5</b>
+  <span class="tag unfrozen">UNFROZEN 可编辑</span><span class="tag notvalid">NOT_VALID（未校验）</span>
+  <span style="flex:1"></span>
+  <button class="btn">◀ 返回列表</button><button class="btn">Excel 导入参数</button><button class="btn">保存</button><button class="btn p">保存并校验</button><button class="btn">冻结</button>
+</div>
+<div class="icm"><b>ICM ContextChain：</b>解析取最特异层 <b>STEP 节点覆盖 &gt; FLOW 流程覆盖 &gt; OPERATION 工序默认</b>，每个值标注来源。本流程 <b>31 个字段继承</b>、<b>6 处覆盖</b>、<b>1 处缺失</b>——新建流程拖入工序节点即带默认值，只需覆盖差异项；本流程另有 1 条 FLOW 级指派整条生效。</div>
+<div class="layout">
+  <div class="palette">
+    <h4>节点（拖入画布）</h4>
+    <div class="pn start">▶ Start</div><div class="pn">⚙ Operation</div><div class="pn dec">◆ IfElse / Switch</div><div class="pn sub">⧉ SubFlow</div><div class="pn">✂ SPLIT / MERGE</div><div class="pn end">■ End</div>
+    <h4>选中节点</h4>
+    <div style="font-size:11.5px;color:#475569;line-height:1.8">STEP-030 光刻显影<br><span style="color:var(--muted)">OP-LITHO-DEV · STG-LITHO<br>继承 11 · 覆盖 3 · <b style="color:#b91c1c">缺失 1</b></span></div>
+    <h4>来源图例（ContextChain）</h4>
+    <div style="font-size:11px;color:var(--muted);line-height:1.8"><span class="lg-o">蓝标 = 节点覆盖（STEP）</span><br><span style="color:#0e7490">青标 = 流程覆盖（FLOW）</span><br><span class="lg-i">灰字虚线 = 工序默认（OPERATION）</span><br><span class="lg-m">红 = 缺失（校验 ERROR）</span><br>🟢 齐 / 🟠 WARN / 🔴 ERROR</div>
+  </div>
+  <div class="canvas">
+    <svg style="position:absolute;inset:0" width="100%" height="100%">
+      <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#94a3b8"/></marker></defs>
+      <line x1="146" y1="96" x2="234" y2="96" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="372" y1="96" x2="460" y2="96" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="698" y1="96" x2="786" y2="96" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar)"/>
+    </svg>
+    <div class="fn" style="left:30px;top:76px"><b>▶ START</b><span>投片入口</span></div>
+    <div class="fn" style="left:234px;top:76px"><b>STEP-010 清洗</b><span>OP-CLEAN</span><div class="inr">全继承</div><div class="dot"></div></div>
+    <div class="fn" style="left:460px;top:76px"><b>STEP-020 涂胶</b><span>OP-LITHO-COAT</span><div class="inr">覆盖 1</div><div class="dot"></div></div>
+    <div class="fn sel partial" style="left:698px;top:70px"><b>STEP-030 光刻显影</b><span>OP-LITHO-DEV</span><div class="inr" style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5">覆盖 3 · 缺 1</div><div class="dot" title="Recipe EXACT_MATCH 缺键"></div></div>
+    <div class="fn" style="left:786px;top:76px"><b>STEP-040 量测</b><span>OP-METRO-CD</span><div class="inr">全继承</div><div class="dot"></div></div>
+    <div class="mm">Minimap · 底部小条=节点继承概览，点击打开参数面板</div>
+  </div>
+  <div class="props">
+    <div class="ph"><b>STEP-030 光刻显影</b><span>OP-LITHO-DEV · 生效值 = 沿 ContextChain 取最特异层</span></div>
+    <div class="legend"><span class="lg-o">■ 节点覆盖</span><span style="color:#0e7490">■ 流程覆盖</span><span class="lg-i">■ 工序默认</span><span class="lg-m">■ 缺失</span><span style="margin-left:auto;color:#64748b">生效值 = 沿链取最特异层</span></div>
+    <div class="tabs" id="tabs">
+      <div class="tab" data-t="t0">基本</div>
+      <div class="tab on" data-t="t1">执行指派 <span class="n">1</span></div>
+      <div class="tab" data-t="t2">光罩 / 污染</div>
+      <div class="tab" data-t="t3">其他参数</div>
+    </div>
+    <div class="pg" id="t0">
+      <div class="r2"><div class="fld"><label>步骤编码</label><input value="STEP-030" disabled></div><div class="fld"><label>步骤序号</label><input value="30"></div></div>
+      <div class="r2"><div class="fld"><label>批模式 <span class="inh">继承: BATCH</span></label><input class="inh" value="（未覆盖 · 工序默认 BATCH）" readonly></div><div class="fld"><label>批上限 <span class="ovr">覆盖</span></label><input value="6" style="border-color:#93c5fd;background:#eff6ff"></div></div>
+      <div class="r2"><div class="fld"><label>Hold 点 <span class="inh">继承: 否</span></label><input class="inh" value="（未覆盖）" readonly></div><div class="fld"><label>量测计划 <span class="inh">继承: INS-CD-01</span></label><input class="inh" value="（未覆盖）" readonly></div></div>
+      <div class="fld"><label>抽样率 % <span class="inh">继承: 25</span></label><input class="inh" value="（未覆盖）" readonly></div>
+      <div class="lockinfo">来源标注：灰字=工序默认、青字=流程覆盖、蓝框=本节点覆盖（只读显示生效值）；点击「覆盖此字段」变为可编辑；恢复 NULL 即回落上一层（节点→流程→工序）。</div>
+    </div>
+    <div class="pg" id="t1">
+      <div class="warn">⚠ 校验：EXACT_MATCH 缺键 <b>resin</b>（param_def group=RECIPE_MATCH）。补齐后本节点转绿。</div>
+      <div style="font-size:11.5px;color:#64748b;margin-bottom:5px"><b>工序默认指派</b>（cim_equip_assign · scope=OPERATION · 本节点继承生效）：</div>
+      <table class="mt">
+        <tr><th>类型</th><th>目标</th><th>腔</th><th>Recipe</th><th></th></tr>
+        <tr class="inhr"><td>组</td><td>EQG-LITHO-NS</td><td>任意</td><td><span class="badge b-fixed">FIXED</span> RCP-LIT-DEV</td><td style="font-size:10.5px">继承</td></tr>
+      </table>
+      <div style="font-size:11.5px;color:#0e7490;margin:8px 0 5px"><b>流程级覆盖指派</b>（scope=FLOW · 整条流程生效 · STEP 有配时被其覆盖）：</div>
+      <table class="mt">
+        <tr><th>类型</th><th>目标</th><th>腔</th><th>Recipe</th><th></th></tr>
+        <tr><td>组</td><td style="color:#0e7490">EQG-LITHO-FAB1</td><td>任意</td><td style="font-size:10.5px">跟随指派行</td><td style="font-size:10.5px;color:#0e7490">本节点被 STEP 覆盖</td></tr>
+      </table>
+      <div style="font-size:11.5px;color:#475569;margin:8px 0 5px"><b>节点覆盖指派</b>（scope=STEP · 最特异层）：</div>
+      <table class="mt">
+        <tr><th>类型</th><th>目标</th><th>腔</th><th>Recipe</th><th>优先</th><th></th></tr>
+        <tr>
+          <td><select><option selected>组</option><option>机</option><option>机型</option></select></td>
+          <td><select><option>EQG-LIT-SCN-A</option></select></td>
+          <td><select><option>任意</option><option>CH-1</option></select></td>
+          <td><span class="badge b-exact">EXACT_MATCH</span></td>
+          <td><input value="100"></td><td class="mtx">✕</td>
+        </tr>
+      </table>
+      <div class="add">＋ 添加覆盖指派（组/机/机型三级；多行=候选池按 priority）</div>
+      <div class="r2">
+        <div class="fld"><label>EXACT_MATCH 规则（JSON）<span class="ovr">覆盖</span></label><input value='{ "layer":"L03", "tech":"035" }'></div>
+        <div class="fld"><label>&nbsp;</label><button class="btn" style="width:100%">⚙ 规则设置…</button></div>
+      </div>
+      <div class="lockinfo">数据落 <b>cim_equip_assign</b>（统一表三 scope=OPERATION/FLOW/STEP）：工序页与画布面板共用同一编辑组件与守门。指派解析顺序：节点行 &gt; 流程行 &gt; 工序行；EXACT_MATCH 键集由 param_def 定义。</div>
+    </div>
+    <div class="pg hide" id="t2">
+      <div class="fld"><label>光罩引用 <span class="inh">继承: RET-L03-AR24</span></label><input class="inh" value="（未覆盖 · LITHO 类工序默认）" readonly></div>
+      <div class="fld"><label>覆盖光罩（CSV 可多罩）<span class="ovr">覆盖</span></label><input value="RET-L03-AR24-B" style="border-color:#93c5fd;background:#eff6ff"></div>
+      <div class="fld"><label>进站污染级 <span class="inh">继承: 3</span></label><input class="inh" value="（未覆盖）" readonly></div>
+      <div class="fld"><label>禁止进入级（CSV）<span class="inh">继承: 1,2</span></label><input class="inh" value="（未覆盖）" readonly></div>
+      <div class="lockinfo">覆盖列落 cim_flow_step（reticle_ref/contam_level/contam_forbidden，NULL=继承）；校验：禁止级不含自身、LITHO 类节点解析后光罩必非空。</div>
+    </div>
+    <div class="pg hide" id="t3">
+      <div class="fld"><label>DC 规格引用 <span class="inh">继承: DC-STD</span></label><input class="inh" value="（未覆盖）" readonly></div>
+      <div class="fld"><label>DC 规格引用（覆盖）<span class="ovr">覆盖</span></label><input value="DC-CD-CRITICAL" style="border-color:#93c5fd;background:#eff6ff"></div>
+      <div class="fld"><label>Pilot 试投数量上限</label><input placeholder="未设置（param_def.required=false）"></div>
+      <div class="fld"><label>SPC 控制图</label><input placeholder="未设置"></div>
+      <div class="lockinfo">本 Tab 控件由 cim_param_def 动态渲染；值落 cim_constraint_attr（KV），inherited=TRUE 的键显示工序/字典默认。</div>
+    </div>
+    <div class="pf">
+      <button class="btn p" style="flex:1">保存本节点参数</button>
+      <button class="btn" title="清空全部覆盖列/行，还原为继承">还原工序默认</button>
+    </div>
+  </div>
+</div>
+<script>
+document.getElementById('tabs').addEventListener('click', function(e){
+  var t = e.target.closest('.tab'); if (!t) return;
+  document.querySelectorAll('#tabs .tab').forEach(function(x){ x.classList.remove('on'); });
+  t.classList.add('on');
+  ['t0','t1','t2','t3'].forEach(function(id){ document.getElementById(id).classList.toggle('hide', id !== t.dataset.t); });
+});
+</script>
+</body>
+</html>

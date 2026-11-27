@@ -37,9 +37,15 @@ public class CimProduct extends EditLockDefData {
     @Column(name = "tech_code", length = 64)
     private String techCode;
 
-    /** 产品类型：PROD=量产产品 / NPW=陪片（行业通用枚举）。 */
-    @Column(name = "product_type", length = 16, nullable = false)
-    private String productType = "PROD";
+    /** 产品用途类型（5 值枚举，锚 SEMI E10/E79 产品片 vs 非产品片口径）：
+     * PRODUCTION=量产 / ENGINEERING=工程 / EXPERIMENT=实验 / TEST=测试验证 / NPW=非产品陪跑。 */
+    @Column(name = "usage_type", length = 16, nullable = false)
+    private String usageType = "PRODUCTION";
+
+    /** NPW 二级细分（仅 usageType=NPW 时必填，服务层守门；其余用途必须为空）：
+     * MONITOR=控挡 / DUMMY=填充 / SEASON=暖机 / LITHO=光刻域辅材（SEMI M38 Lithography） / GENERIC=兜底。 */
+    @Column(name = "npw_type", length = 16)
+    private String npwType;
 
     /** 产品分组码（轻实现：varchar，分组管理需求出现再升级实体）。 */
     @Column(name = "product_group", length = 64)

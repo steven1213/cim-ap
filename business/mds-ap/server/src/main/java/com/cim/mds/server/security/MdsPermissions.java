@@ -61,11 +61,17 @@ public final class MdsPermissions {
     public static final String PRODUCT_UPDATE = "mds:product:update";
     public static final String PRODUCT_DELETE = "mds:product:delete";
 
-    // ---------------- 设备类型（EquipmentType，设备管理域） ----------------
-    public static final String EQP_TYPE_VIEW = "mds:equipmentType:view";
-    public static final String EQP_TYPE_CREATE = "mds:equipmentType:create";
-    public static final String EQP_TYPE_UPDATE = "mds:equipmentType:update";
-    public static final String EQP_TYPE_DELETE = "mds:equipmentType:delete";
+    // ---------------- 机型模板（EquipmentClass，设备管理域；v2 取代 EquipmentType） ----------------
+    public static final String EQC_VIEW = "mds:equipmentClass:view";
+    public static final String EQC_CREATE = "mds:equipmentClass:create";
+    public static final String EQC_UPDATE = "mds:equipmentClass:update";
+    public static final String EQC_DELETE = "mds:equipmentClass:delete";
+
+    // ---------------- 机台组（ToolGroup，设备管理域；ISA-95 Work Center 派工候选池） ----------------
+    public static final String TOOL_GROUP_VIEW = "mds:toolGroup:view";
+    public static final String TOOL_GROUP_CREATE = "mds:toolGroup:create";
+    public static final String TOOL_GROUP_UPDATE = "mds:toolGroup:update";
+    public static final String TOOL_GROUP_DELETE = "mds:toolGroup:delete";
 
     // ---------------- 设备（Equipment，设备管理域） ----------------
     public static final String EQUIPMENT_VIEW = "mds:equipment:view";
@@ -102,6 +108,65 @@ public final class MdsPermissions {
     public static final String FLOW_CREATE = "mds:flow:create";
     public static final String FLOW_UPDATE = "mds:flow:update";
     public static final String FLOW_DELETE = "mds:flow:delete";
+    /** 校验特例第五码：质检角色只需「跑校验+看报告」不需改流程，单独授权（ICM V22）。 */
+    public static final String FLOW_VALIDATE = "mds:flow:validate";
+
+    // ---------------- 统一指派（ICM V22：ContextChain 三 scope 一张表，三层分开授权） ----------------
+    public static final String OP_ASSIGN_VIEW = "mds:opAssign:view";
+    public static final String OP_ASSIGN_CREATE = "mds:opAssign:create";
+    public static final String OP_ASSIGN_UPDATE = "mds:opAssign:update";
+    public static final String OP_ASSIGN_DELETE = "mds:opAssign:delete";
+
+    public static final String FLOW_ASSIGN_VIEW = "mds:flowAssign:view";
+    public static final String FLOW_ASSIGN_CREATE = "mds:flowAssign:create";
+    public static final String FLOW_ASSIGN_UPDATE = "mds:flowAssign:update";
+    public static final String FLOW_ASSIGN_DELETE = "mds:flowAssign:delete";
+
+    public static final String STEP_ASSIGN_VIEW = "mds:stepAssign:view";
+    public static final String STEP_ASSIGN_CREATE = "mds:stepAssign:create";
+    public static final String STEP_ASSIGN_UPDATE = "mds:stepAssign:update";
+    public static final String STEP_ASSIGN_DELETE = "mds:stepAssign:delete";
+
+    // ---------------- KV 约束参数（ICM V22：context 三层一组码） ----------------
+    public static final String OP_ATTR_VIEW = "mds:opAttr:view";
+    public static final String OP_ATTR_UPDATE = "mds:opAttr:update";
+
+    public static final String FLOW_ATTR_VIEW = "mds:flowAttr:view";
+    public static final String FLOW_ATTR_UPDATE = "mds:flowAttr:update";
+
+    public static final String STEP_ATTR_VIEW = "mds:stepAttr:view";
+    public static final String STEP_ATTR_UPDATE = "mds:stepAttr:update";
+
+    // ---------------- 参数定义字典（ICM V22） ----------------
+    public static final String PARAM_DEF_VIEW = "mds:paramDef:view";
+    public static final String PARAM_DEF_CREATE = "mds:paramDef:create";
+    public static final String PARAM_DEF_UPDATE = "mds:paramDef:update";
+    public static final String PARAM_DEF_DELETE = "mds:paramDef:delete";
+
+    // ---------------- EDC 工程数采（V28） ----------------
+    public static final String EDC_SET_VIEW = "mds:edcSet:view";
+    public static final String EDC_SET_CREATE = "mds:edcSet:create";
+    public static final String EDC_SET_UPDATE = "mds:edcSet:update";
+    public static final String EDC_SET_DELETE = "mds:edcSet:delete";
+    public static final String EDC_TPL_VIEW = "mds:edcTpl:view";
+    public static final String EDC_TPL_CREATE = "mds:edcTpl:create";
+    public static final String EDC_TPL_UPDATE = "mds:edcTpl:update";
+    public static final String EDC_TPL_DELETE = "mds:edcTpl:delete";
+    public static final String EDC_MAP_VIEW = "mds:edcMap:view";
+    public static final String EDC_MAP_CREATE = "mds:edcMap:create";
+    public static final String EDC_MAP_UPDATE = "mds:edcMap:update";
+    public static final String EDC_MAP_DELETE = "mds:edcMap:delete";
+    public static final String EDC_PLAN_VIEW = "mds:edcPlan:view";
+    public static final String EDC_PLAN_CREATE = "mds:edcPlan:create";
+    public static final String EDC_PLAN_UPDATE = "mds:edcPlan:update";
+    public static final String EDC_PLAN_DELETE = "mds:edcPlan:delete";
+
+    // ---------------- 产品↔流程绑定（ICM V22） ----------------
+    public static final String PRODUCT_FLOW_VIEW = "mds:productFlow:view";
+    public static final String PRODUCT_FLOW_CREATE = "mds:productFlow:create";
+    /** V25 L3：产品级覆盖维护（列型覆盖 / 产品指派 / 产品 KV）。 */
+    public static final String PRODUCT_FLOW_UPDATE = "mds:productFlow:update";
+    public static final String PRODUCT_FLOW_DELETE = "mds:productFlow:delete";
 
     // ---------------- 工序库（Operation，产品管理域，P-T-R-O 四层建模 O 层：V20） ----------------
     public static final String OPERATION_VIEW = "mds:operation:view";
@@ -114,6 +179,9 @@ public final class MdsPermissions {
     public static final String REASON_CREATE = "mds:reason:create";
     public static final String REASON_UPDATE = "mds:reason:update";
     public static final String REASON_DELETE = "mds:reason:delete";
+
+    // ---------------- 配方解算（V29：解算契约执行；可变参数维护挂 mds:operation:*） ----------------
+    public static final String RECIPE_RESOLVE = "mds:recipe:resolve";
 
     // ---------------- 平台管理域（菜单维护页用；端点来自 cim-system，码值与 PermissionCodes 对齐） ----------------
     public static final String SYS_MENU_LIST = PermissionCodes.MENU_LIST;
@@ -180,10 +248,14 @@ public final class MdsPermissions {
         codes.add(PRODUCT_CREATE);
         codes.add(PRODUCT_UPDATE);
         codes.add(PRODUCT_DELETE);
-        codes.add(EQP_TYPE_VIEW);
-        codes.add(EQP_TYPE_CREATE);
-        codes.add(EQP_TYPE_UPDATE);
-        codes.add(EQP_TYPE_DELETE);
+        codes.add(EQC_VIEW);
+        codes.add(EQC_CREATE);
+        codes.add(EQC_UPDATE);
+        codes.add(EQC_DELETE);
+        codes.add(TOOL_GROUP_VIEW);
+        codes.add(TOOL_GROUP_CREATE);
+        codes.add(TOOL_GROUP_UPDATE);
+        codes.add(TOOL_GROUP_DELETE);
         codes.add(EQUIPMENT_VIEW);
         codes.add(EQUIPMENT_CREATE);
         codes.add(EQUIPMENT_UPDATE);
@@ -208,6 +280,48 @@ public final class MdsPermissions {
         codes.add(FLOW_CREATE);
         codes.add(FLOW_UPDATE);
         codes.add(FLOW_DELETE);
+        codes.add(FLOW_VALIDATE);
+        codes.add(OP_ASSIGN_VIEW);
+        codes.add(OP_ASSIGN_CREATE);
+        codes.add(OP_ASSIGN_UPDATE);
+        codes.add(OP_ASSIGN_DELETE);
+        codes.add(FLOW_ASSIGN_VIEW);
+        codes.add(FLOW_ASSIGN_CREATE);
+        codes.add(FLOW_ASSIGN_UPDATE);
+        codes.add(FLOW_ASSIGN_DELETE);
+        codes.add(STEP_ASSIGN_VIEW);
+        codes.add(STEP_ASSIGN_CREATE);
+        codes.add(STEP_ASSIGN_UPDATE);
+        codes.add(STEP_ASSIGN_DELETE);
+        codes.add(OP_ATTR_VIEW);
+        codes.add(OP_ATTR_UPDATE);
+        codes.add(FLOW_ATTR_VIEW);
+        codes.add(FLOW_ATTR_UPDATE);
+        codes.add(STEP_ATTR_VIEW);
+        codes.add(STEP_ATTR_UPDATE);
+        codes.add(PARAM_DEF_VIEW);
+        codes.add(PARAM_DEF_CREATE);
+        codes.add(PARAM_DEF_UPDATE);
+        codes.add(PARAM_DEF_DELETE);
+        codes.add(EDC_SET_VIEW);
+        codes.add(EDC_SET_CREATE);
+        codes.add(EDC_SET_UPDATE);
+        codes.add(EDC_SET_DELETE);
+        codes.add(EDC_TPL_VIEW);
+        codes.add(EDC_TPL_CREATE);
+        codes.add(EDC_TPL_UPDATE);
+        codes.add(EDC_TPL_DELETE);
+        codes.add(EDC_MAP_VIEW);
+        codes.add(EDC_MAP_CREATE);
+        codes.add(EDC_MAP_UPDATE);
+        codes.add(EDC_MAP_DELETE);
+        codes.add(EDC_PLAN_VIEW);
+        codes.add(EDC_PLAN_CREATE);
+        codes.add(EDC_PLAN_UPDATE);
+        codes.add(EDC_PLAN_DELETE);
+        codes.add(PRODUCT_FLOW_VIEW);
+        codes.add(PRODUCT_FLOW_CREATE);
+        codes.add(PRODUCT_FLOW_DELETE);
         codes.add(OPERATION_VIEW);
         codes.add(OPERATION_CREATE);
         codes.add(OPERATION_UPDATE);
@@ -216,6 +330,7 @@ public final class MdsPermissions {
         codes.add(REASON_CREATE);
         codes.add(REASON_UPDATE);
         codes.add(REASON_DELETE);
+        codes.add(RECIPE_RESOLVE);
         codes.add(SHIFT_VIEW);
         codes.add(SHIFT_CREATE);
         codes.add(SHIFT_UPDATE);

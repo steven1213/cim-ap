@@ -19,6 +19,7 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import type { ShiftSwapPayload, ShiftSwapView, ShiftUserOption } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 换班申请（ShiftSwapsPage，V19）——员工自助换班/代班动线。
@@ -196,6 +197,7 @@ export default function ShiftSwapsPage() {
 
   return (
     <Page>
+      <GuideBar />
       <div className="shift-swap-filter">
         {STATUS_FILTERS.map((s) => (
           <CimCheckTag

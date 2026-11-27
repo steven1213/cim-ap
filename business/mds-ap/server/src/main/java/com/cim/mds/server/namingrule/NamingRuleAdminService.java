@@ -55,6 +55,7 @@ public class NamingRuleAdminService {
     public static final String OBJ_STAGE = "STAGE";
     public static final String OBJ_AREA_GROUP = "AREA_GROUP";
     public static final String OBJ_EQUIPMENT_TYPE = "EQUIPMENT_TYPE";
+    public static final String OBJ_TOOL_GROUP = "TOOL_GROUP";
     public static final String OBJ_EQUIPMENT = "EQUIPMENT";
     public static final String OBJ_EQUIPMENT_UNIT = "EQUIPMENT_UNIT";
     public static final String OBJ_STOCKER_BANK = "STOCKER_BANK";

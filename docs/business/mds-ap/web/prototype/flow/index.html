@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>工艺流程建模 · 原型索引（9 屏）</title>
+<style>
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:28px; }
+  h1 { font-size:20px; margin-bottom:6px; }
+  .sub { color:#64748b; font-size:13px; margin-bottom:22px; line-height:1.7; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  a.card { display:block; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px; text-decoration:none; color:#1e293b; }
+  a.card:hover { border-color:#4f6ef7; box-shadow:0 4px 14px rgba(79,110,247,.12); }
+  .num { display:inline-block; background:#eef2ff; color:#4f6ef7; border-radius:6px; padding:2px 9px; font-size:12px; font-weight:650; margin-bottom:8px; }
+  a.card b { font-size:15px; display:block; margin-bottom:6px; }
+  a.card span { font-size:12.5px; color:#64748b; line-height:1.7; }
+  .tag { font-size:11px; border-radius:4px; padding:1px 6px; margin-left:6px; vertical-align:2px; }
+  .core { background:#fee2e2; color:#b91c1c; } .p2 { background:#f1f5f9; color:#64748b; }
+  .doc { margin-top:22px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px; font-size:13px; line-height:2; }
+  .doc a { color:#4f6ef7; text-decoration:none; }
+</style>
+</head>
+<body>
+<h1>工艺流程 / 产品规格 / 节点参数原型 —— ICM 继承式约束模型</h1>
+<div class="sub">不用 FSD 体系（已拍板）· 行业对标收敛出「工序级复用 + 节点级差异」 → 自有方案 ICM + ContextChain（用户拍板用上 Context）：OPERATION 工序默认 → FLOW 流程覆盖 → STEP 节点覆盖（P3 加 PRODUCT）· 解析取最特异层并标注来源 · 设计文档见 docs/business/mds-ap/server/flow-modeling/（00 总览 · 20 定稿设计 · 60 行业调研）</div>
+<div class="grid">
+  <a class="card" href="p01-flow-list.html"><span class="num">P01</span><b>流程建模列表</b><span>版本族/版本/站点分组/参数校验徽标 · 详情含「流程参数」Tab（L1 级指派/KV）+「刷新工序引用」· 编辑锁占用/释放 · 校验-生效硬前置 · 复制新版本</span></a>
+  <a class="card" href="p02-flow-canvas.html"><span class="num">P02 <span class="tag core">核心</span></span><b>画布 + 参数面板（ContextChain）</b><span>来源四级标注：节点覆盖蓝/流程覆盖青/工序默认灰/缺失红 · 统一指派表三 scope（工序/流程/节点）· 一键还原=清除本层回落上一层</span></a>
+  <a class="card" href="p03-step-param.html"><span class="num">P03</span><b>节点参数批量维护</b><span>生效值=沿 ContextChain 取最特异层 · 来源列标明层级 · 零覆盖即齐备 · Excel 导入导出入口</span></a>
+  <a class="card" href="p04-param-def.html"><span class="num">P04</span><b>参数定义字典</b><span>attr_key 定义 / 分组 / 值类型 / 必填 / 引用守门（长尾 KV 的注册处）</span></a>
+  <a class="card" href="p05-flow-compare.html"><span class="num">P05</span><b>流程对比</b><span>按解析生效值 diff（继承变化也可见）· 步骤/属性/参数三段结果 · 双画布对照定位</span></a>
+  <a class="card" href="p06-product-bind.html"><span class="num">P06</span><b>产品绑定流程</b><span>产品×流程族×版本 · 同族唯一 ACTIVE · 预绑定 · 影响面提示 · 绑定历史</span></a>
+  <a class="card" href="p07-import-wizard.html"><span class="num">P07 <span class="tag p2">P2</span></span><b>Excel 三段导入向导</b><span>选目标 → 上传预览逐行校验 → 提交先删后插 · 模板自动生成</span></a>
+  <a class="card" href="p08-validation.html"><span class="num">P08</span><b>校验报告</b><span>validate_result 分组展示（按解析值校验）· 错误定位到节点 · 规则表驱动可启停</span></a>
+</div>
+<div class="doc">
+  <b>设计文档集：</b>
+  <a href="../../../../server/flow-modeling/00-overview.md">00 总览与拍板项</a> ·
+  <a href="../../../../server/flow-modeling/10-ref-analysis.md">10 参考项目深度梳理</a> ·
+  <a href="../../../../server/flow-modeling/20-our-design.md">20 我们的设计（ER/DDL/API/校验）</a> ·
+  <a href="../../../../server/flow-modeling/50-roadmap.md">50 分期计划</a>
+  <br>原型为静态示意：数据为示例，交互（Tab 切换/弹窗开关）可点击体验。
+</div>
+</body>
+</html>

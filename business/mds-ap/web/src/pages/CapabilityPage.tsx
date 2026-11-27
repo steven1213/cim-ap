@@ -16,6 +16,7 @@ import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useMasterDetail, type DetailMode } from '@/lib/useMasterDetail';
 import type { Capability } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 设备能力（CapabilityPage，动线改版）——能力字典。
@@ -157,6 +158,7 @@ export default function CapabilityPage() {
 
   return (
     <Page>
+      <GuideBar />
       <div className="op-layout">
         <DataTable<Capability>
           titleKey="mds.capability.listTitle"

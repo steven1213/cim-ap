@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P05 流程对比</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  select,input { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; display:flex; gap:8px; align-items:center; }
+  h3 span { flex:1; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; font-size:12.5px; vertical-align:top; }
+  tr:hover td { background:#f8fafc; cursor:pointer; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; white-space:nowrap; }
+  .add { background:#dcfce7; color:#15803d; } .del { background:#fee2e2; color:#b91c1c; } .chg { background:#fef3c7; color:#b45309; } .same { background:#f1f5f9; color:#64748b; }
+  .canvas { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+  .cv { padding:18px 14px 22px; border-right:1px solid var(--line); position:relative; min-height:250px; }
+  .cv:last-child { border-right:none; }
+  .cv h4 { font-size:12.5px; color:#475569; margin-bottom:14px; }
+  .node { display:inline-block; border:1.5px solid #cbd5e1; border-radius:8px; padding:7px 12px; font-size:12px; background:#fff; margin:0 8px 14px 0; line-height:1.5; }
+  .node b { display:block; font-size:12.5px; }
+  .node small { color:#94a3b8; }
+  .node.hl-add { border-color:#22c55e; background:#f0fdf4; box-shadow:0 0 0 3px rgba(34,197,94,.15); }
+  .node.hl-del { border-color:#ef4444; background:#fef2f2; box-shadow:0 0 0 3px rgba(239,68,68,.15); }
+  .node.hl-chg { border-color:#f59e0b; background:#fffbeb; box-shadow:0 0 0 3px rgba(245,158,11,.15); }
+  .arrow { color:var(--muted); margin-right:8px; font-size:12px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+  code { background:#f1f5f9; border-radius:4px; padding:0 4px; font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>流程对比</b>
+  <select><option>FLOW-A31-CMP 族…</option></select>
+  <select><option>基准：V2（DISABLED）</option></select>
+  <span style="color:#94a3b8">⇄</span>
+  <select><option>目标：V3（FROZEN）</option></select>
+  <span style="flex:1"></span>
+  <button class="btn p">开始对比</button>
+</div>
+<div class="panel">
+  <h3>① 差异汇总<span>compare 按 step_code 对齐（同族跨版本 / 跨族横评）</span>
+    <span style="flex:none"><span class="tag add">新增 2</span> <span class="tag del">删除 1</span> <span class="tag chg">变更 3</span> <span class="tag same">相同 6</span></span></h3>
+  <table>
+    <tr><th>#</th><th>step_code</th><th>差异</th><th>明细</th><th>影响面</th></tr>
+    <tr><td>1</td><td><b>DEV-350</b></td><td><span class="tag add">新增</span></td><td>新增显影工序节点（DEV），默认承接 DEV-300 之后的顺序 35</td><td>投批后多一道显影；Q-time 需补</td></tr>
+    <tr><td>2</td><td><b>INS-TX-400</b></td><td><span class="tag add">新增</span></td><td>新增量测节点 + 机台指派 3 台</td><td>—</td></tr>
+    <tr><td>3</td><td>LTH-CR-200</td><td><span class="tag chg">变更</span></td><td>机台指派：EQP-LTH-01 → <b>EQG-LITHO-NS（组）</b>；Recipe：RCP-LTH-CR-STD 不变</td><td>派工范围扩大到组内 6 台</td></tr>
+    <tr><td>4</td><td>DEP-OX-100</td><td><span class="tag chg">变更</span></td><td>KV <code>dc.usl</code> 3.2 → <b>3.5</b></td><td>规格放宽，需 MES 侧确认</td></tr>
+    <tr><td>5</td><td>CMP-100</td><td><span class="tag chg">变更</span></td><td>返工上限 3 → <b>2</b></td><td>收敛</td></tr>
+    <tr><td>6</td><td><b>CLN-050</b></td><td><span class="tag del">删除</span></td><td>清洗节点及其机台指派 2 条一并移除（参数不迁移）</td><td>前段并入 DEP-OX-100</td></tr>
+  </table>
+  <div class="note">点击行 → 双画布联动高亮定位对应节点；变更行同时展开参数级 diff（子表逐行）。</div>
+</div>
+<div class="panel">
+  <h3>② 双画布对照（点击差异行联动高亮）</h3>
+  <div class="canvas">
+    <div class="cv">
+      <h4>基准 V2 · 12 节点</h4>
+      <span class="node"><b>CLN-050</b><small>清洗</small></span>
+      <span class="node"><b>DEP-OX-100</b><small>3.2μm · 2台</small></span>
+      <span class="node hl-chg"><b>LTH-CR-200</b><small>EQP-LTH-01 · 独机</small></span>
+      <span class="arrow">→</span>
+      <span class="node"><b>DEV-300</b><small>显影</small></span>
+    </div>
+    <div class="cv">
+      <h4>目标 V3 · 12 节点（差 +2 / −1）</h4>
+      <span class="node hl-del"><b>CLN-050</b><small>已删除</small></span>
+      <span class="node hl-chg"><b>DEP-OX-100</b><small><b>3.5</b>μm · 2台</small></span>
+      <span class="node hl-chg"><b>LTH-CR-200</b><small><b>EQG-LITHO-NS</b> · 组</small></span>
+      <span class="arrow">→</span>
+      <span class="node"><b>DEV-300</b><small>显影</small></span>
+      <span class="node hl-add"><b>DEV-350</b><small>新显影</small></span>
+      <span class="arrow">→</span>
+      <span class="node hl-add"><b>INS-TX-400</b><small>新量测 · 3台</small></span>
+    </div>
+  </div>
+  <div class="note"><b>实现口径：</b>GET /flows/compare?leftFamily&leftVersion&rightFamily&rightVersion（同族跨版本 + 跨族方案横评统一入口）返回 {summary, stepDiffs[], paramDiffs[]}；stepDiffs 按 step_code 求并集对齐，同 code 比对字段级（operation/sequence/覆盖列）+ 指派行级（cim_equip_assign 按 scope 三层行集 diff）+ KV 行级（attr）+ flow 级（Q-time/规则）四段；字段级 diff 按 ContextResolver 解析值比对（继承/流程级变化也可见）；画布用 P02 同一 X6 渲染器只读模式。</div>
+</div>
+<div class="note" style="background:#fff;border:1px solid var(--line);border-radius:8px"><b>动线：</b>列表/P01 选版本 → 流程对比 → 选目标版本 → 三段结果审阅 → 联动定位 → （如需修订）回 P02 编辑。<a href="index.html">← 返回索引</a></div>
+</body>
+</html>

@@ -91,4 +91,54 @@ public class CimFlow extends BaseDefData {
     /** 备注。 */
     @Column(name = "remark", length = 512)
     private String remark;
+
+    // ---------------- 生效闸 + 分组轴 + 标注（V22 ICM） ----------------
+
+    /** 参数校验态（V22）：NOT_VALID 未校验 / VALID（0 ERROR）/ INVALID（≥1 ERROR）；activate 硬前置。 */
+    public static final String VS_NOT_VALID = "NOT_VALID";
+    public static final String VS_VALID = "VALID";
+    public static final String VS_INVALID = "INVALID";
+
+    /** 参数校验态（activate 校验 VALID，2004 拒绝；表驱动规则明细见 cim_flow_validate_result）。 */
+    @Column(name = "validate_state", length = 16, nullable = false)
+    private String validateState = VS_NOT_VALID;
+
+    /** 最近校验时间。 */
+    @Column(name = "validate_time")
+    private java.time.LocalDateTime validateTime;
+
+    /** 最近校验人。 */
+    @Column(name = "validate_user", length = 64)
+    private String validateUser;
+
+    /** 校验摘要（如「1 ERROR / 2 WARN」；明细在 validate_result 表）。 */
+    @Column(name = "validate_msg", length = 1024)
+    private String validateMsg;
+
+    /** 站点分组轴（逻辑引用 cim_stage.stage_code；P2 填数据，拍板项 G）。 */
+    @Column(name = "stage_code", length = 64)
+    private String stageCode;
+
+    /** 返工流程标注：空 = 正常流程；非空 = 「XX 族流程的返工流程」（跳转时机归 MES，MDS 只管定义与筛选）。 */
+    @Column(name = "rework_of_family", length = 64)
+    private String reworkOfFamily;
+
+    /** 返工流程整体计数上限（V23；rework_of_family 非空时生效；step.rework_limit 是单站口径，
+     *  本列是整条返工流程允许循环次数，超限处置归 MES）。 */
+    @Column(name = "rework_count_limit")
+    private Integer reworkCountLimit;
+
+    // ---------------- 编辑锁三列（V22；画布 XML 整份回传覆盖是并发最高危点） ----------------
+
+    /** 编辑锁（人 vs 人互斥；saveCanvas/覆盖数据编辑/refresh-operations 前判锁，同 EditLockSupport 模式）。 */
+    @Column(name = "is_occupied", nullable = false)
+    private Boolean isOccupied = Boolean.FALSE;
+
+    /** 占用人。 */
+    @Column(name = "occupied_by", length = 64)
+    private String occupiedBy;
+
+    /** 占用时间。 */
+    @Column(name = "occupied_at")
+    private java.time.LocalDateTime occupiedAt;
 }

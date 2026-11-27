@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P04 参数定义字典</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  input,select { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .wrap { display:flex; gap:12px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:1.7; }
+  .side { flex:1; min-width:340px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr.sel { background:#eef2ff; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .sys { background:#e0e7ff; color:#4338ca; } .usr { background:#f1f5f9; color:#475569; }
+  .req { background:#fee2e2; color:#b91c1c; } .opt { background:#f1f5f9; color:#64748b; }
+  .kv { padding:12px 14px; }
+  .kv .row { display:flex; margin-bottom:9px; } .kv label { width:96px; color:#64748b; font-size:12.5px; flex-shrink:0; padding-top:4px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>参数定义字典</b>
+  <input placeholder="搜索 attr_key / 名称">
+  <select><option>全部分组</option><option>DC 规格限</option><option>Pilot 试跑</option><option>工艺通用</option></select>
+  <select><option>全部值类型</option><option>NUMBER</option><option>ENUM</option><option>TEXT</option></select>
+  <span style="flex:1"></span>
+  <button class="btn p">＋ 新建参数</button>
+  <button class="btn">编辑</button>
+  <button class="btn" disabled title="被 cim_constraint_attr 引用，拒删(2004)">删除</button>
+</div>
+<div class="wrap">
+  <div class="panel">
+    <h3>cim_param_def · 参数定义（对标 FodModeler 的显式化替代）</h3>
+    <table>
+      <tr><th></th><th>attr_key</th><th>名称</th><th>分组</th><th>值类型</th><th>值域/单位</th><th>必填</th><th>默认值</th><th>来源</th><th>引用数</th></tr>
+      <tr class="sel"><td><input type="checkbox"></td><td>dc.usl</td><td>DC 规格上限</td><td>DC 规格限</td><td>NUMBER</td><td>μm</td><td><span class="tag req">必填</span></td><td>—</td><td><span class="tag sys">内置</span></td><td>41</td></tr>
+      <tr><td><input type="checkbox"></td><td>dc.lsl</td><td>DC 规格下限</td><td>DC 规格限</td><td>NUMBER</td><td>μm</td><td><span class="tag req">必填</span></td><td>—</td><td><span class="tag sys">内置</span></td><td>41</td></tr>
+      <tr><td><input type="checkbox"></td><td>dc.target</td><td>DC 目标值</td><td>DC 规格限</td><td>NUMBER</td><td>μm</td><td><span class="tag opt">可选</span></td><td>—</td><td><span class="tag sys">内置</span></td><td>12</td></tr>
+      <tr><td><input type="checkbox"></td><td>pilot.count_limit</td><td>Pilot 批次上限</td><td>Pilot 试跑</td><td>NUMBER</td><td>个</td><td><span class="tag opt">可选</span></td><td>1</td><td><span class="tag sys">内置</span></td><td>6</td></tr>
+      <tr><td><input type="checkbox"></td><td>process.pressure</td><td>工艺腔压力</td><td>工艺通用</td><td>NUMBER</td><td>Torr</td><td><span class="tag opt">可选</span></td><td>—</td><td><span class="tag usr">自建</span></td><td>9</td></tr>
+      <tr><td><input type="checkbox"></td><td>process.tune_note</td><td>调机备注</td><td>工艺通用</td><td>TEXT</td><td>≤200 字</td><td><span class="tag opt">可选</span></td><td>—</td><td><span class="tag usr">自建</span></td><td>0</td></tr>
+    </table>
+    <div class="note"><b>引用数</b>=cim_constraint_attr 中 attr_key 出现次数；&gt;0 时删除被拒（2004，与机型 tech_code 守门同口径）。</div>
+  </div>
+  <div class="panel side">
+    <h3>选中：dc.usl（详情 / 编辑）</h3>
+    <div class="kv">
+      <div class="row"><label>attr_key</label><div class="v">dc.usl（创建后不可改，同 product_code）</div></div>
+      <div class="row"><label>显示名</label><div class="v">DC 规格上限</div></div>
+      <div class="row"><label>分组</label><div class="v">DC 规格限</div></div>
+      <div class="row"><label>值类型</label><div class="v">NUMBER</div></div>
+      <div class="row"><label>单位</label><div class="v">μm</div></div>
+      <div class="row"><label>必填</label><div class="v"><span class="tag req">必填</span>（校验报告据此判缺参 ERROR）</div></div>
+      <div class="row"><label>枚举值域</label><div class="v">—（ENUM 时编辑，VALUE_MODE 参考数据字典做法）</div></div>
+      <div class="row"><label>排序</label><div class="v">10</div></div>
+      <div class="row"><label>描述</label><div class="v" style="color:#64748b">量测类工序的规格上限；P3 产品级覆盖时作为默认层。</div></div>
+    </div>
+    <div class="note"><b>定位说明：</b>参考项目 FodModeler 是 FOD 框架内部表（前端不可见其全貌）；我们把「参数定义」显式化为一等公民字典，P04 只维护定义，值全部在 P03 的「其他参数 KV」/分类型子表中，两层解耦。<br><a href="index.html">← 返回索引</a> · <a href="p03-step-param.html">← 节点参数维护（P03）</a></div>
+  </div>
+</div>
+</body>
+</html>

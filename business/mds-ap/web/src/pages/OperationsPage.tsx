@@ -16,7 +16,8 @@ import {
 } from '@cim/ui';
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
-import type { OperationView } from '@/types';
+import type { OperationVarParam, OperationView } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 工序库（OperationsPage，V20 / 动线改版）——P-T-R-O 四层建模的 O 层管理页。
@@ -39,6 +40,15 @@ import type { OperationView } from '@/types';
 
 type DetailMode = 'view' | 'edit' | 'create' | 'copy';
 
+/** 可变参数编辑行（视图模型；保存时映射为 OperationVarParamPayload）。 */
+interface VarParamRow {
+  paramKey: string;
+  defaultValue: string;
+  minValue: string;
+  maxValue: string;
+  overrideLevel: string;
+}
+
 interface OpFormState {
   opCode: string;
   opName: string;
@@ -58,6 +68,22 @@ interface OpFormState {
   inspectPlan: string;
   samplingRate: string;
   remark: string;
+  /** 可变参数（V29；进编辑态时从后端拉入，随主表单一起保存）。 */
+  varParams: VarParamRow[];
+}
+
+const emptyVarRow = (): VarParamRow => ({
+  paramKey: '', defaultValue: '', minValue: '', maxValue: '', overrideLevel: 'NONE',
+});
+
+function varRowsFrom(rows: OperationVarParam[] | undefined | null): VarParamRow[] {
+  return (rows ?? []).map((r) => ({
+    paramKey: r.paramKey,
+    defaultValue: r.defaultValue ?? '',
+    minValue: r.minValue ?? '',
+    maxValue: r.maxValue ?? '',
+    overrideLevel: r.overrideLevel ?? 'NONE',
+  }));
 }
 
 function formFrom(row: OperationView | null): OpFormState {
@@ -80,6 +106,7 @@ function formFrom(row: OperationView | null): OpFormState {
     inspectPlan: row?.inspectPlan ?? '',
     samplingRate: row?.samplingRate != null ? String(row.samplingRate) : '',
     remark: row?.remark ?? '',
+    varParams: [],
   };
 }
 
@@ -108,11 +135,22 @@ export default function OperationsPage() {
 
   // 下拉数据源（详情表单用；页面级加载一次）
   const techsRes = useResource(({ signal }) => api.listTechnologies(undefined, signal));
-  const equipTypesRes = useResource(({ signal }) => api.listEquipmentTypes(undefined, signal));
+  const equipClassRes = useResource(({ signal }) => api.listEquipmentClasses(undefined, signal));
   const capsRes = useResource(({ signal }) => api.listCapabilities(undefined, signal));
+  // 可变参数候选键（参数定义字典，仅启用项）
+  const paramDefsRes = useResource(({ signal }) => api.listParamDefs(signal));
 
   const selected = useMemo(() => ops.find((r) => r.id === selectedId) ?? null, [ops, selectedId]);
   const dirty = mode === 'edit' || mode === 'create' ? JSON.stringify(form) !== initialRef.current : false;
+
+  // 查看态可变参数（任意状态可读；编辑态走 form.varParams）
+  const varParamsRes = useResource(
+    ({ signal }) =>
+      mode === 'view' && selected
+        ? api.listOperationVarParams(selected.id, signal)
+        : Promise.resolve([] as OperationVarParam[]),
+    { deps: [mode, selected?.id] },
+  );
 
   // 查看态表单跟随选中行（防止切行后详情残留上一行的表单值）
   useEffect(() => {
@@ -123,6 +161,17 @@ export default function OperationsPage() {
   const set = (patch: Partial<OpFormState>) => setForm((f) => ({ ...f, ...patch }));
   const numOrNull = (v: string) => (v.trim() === '' ? null : Number(v));
 
+  // ---- 可变参数行编辑（edit 态） ----
+  const setVarRow = (idx: number, patch: Partial<VarParamRow>) =>
+    setForm((f) => ({
+      ...f,
+      varParams: f.varParams.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    }));
+  const addVarRow = () =>
+    setForm((f) => ({ ...f, varParams: [...f.varParams, emptyVarRow()] }));
+  const removeVarRow = (idx: number) =>
+    setForm((f) => ({ ...f, varParams: f.varParams.filter((_, i) => i !== idx) }));
+
   // ---- 模式切换 ----
   const enterCreate = () => {
     setForm(formFrom(null));
@@ -130,11 +179,17 @@ export default function OperationsPage() {
     setErr('');
     setMode('create');
   };
-  const enterEdit = (row: OperationView) => {
-    setForm(formFrom(row));
-    initialRef.current = JSON.stringify(form);
+  const enterEdit = async (row: OperationView) => {
     setErr('');
     setMode('edit');
+    const base = formFrom(row);
+    try {
+      base.varParams = varRowsFrom(await api.listOperationVarParams(row.id));
+    } catch {
+      base.varParams = []; // 拉取失败不阻塞编辑；保存时后端守门兜底
+    }
+    setForm(base);
+    initialRef.current = JSON.stringify(base);
   };
   const enterCopy = () => {
     setCopyCode('');
@@ -168,6 +223,18 @@ export default function OperationsPage() {
       setErr(t('mds.operation.errNameRequired'));
       return;
     }
+    // 可变参数预校验（与后端 saveVarParams 守门同口径）
+    const blankRow = form.varParams.find((r) => !r.paramKey.trim());
+    if (blankRow) {
+      setErr(t('mds.operation.errVarParamKey'));
+      return;
+    }
+    const keys = form.varParams.map((r) => r.paramKey.trim());
+    const dupKey = keys.find((k, i) => keys.indexOf(k) !== i);
+    if (dupKey) {
+      setErr(t('mds.operation.errVarParamDup', { key: dupKey }));
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -194,6 +261,20 @@ export default function OperationsPage() {
         mode === 'create'
           ? await api.createOperation(payload)
           : await api.updateOperation(selected!.id, payload);
+      // 可变参数随主表单联保（仅编辑态；整单替换语义）
+      if (mode === 'edit') {
+        await api.saveOperationVarParams(
+          selected!.id,
+          form.varParams.map((r, i) => ({
+            paramKey: r.paramKey.trim(),
+            defaultValue: r.defaultValue || null,
+            minValue: r.minValue || null,
+            maxValue: r.maxValue || null,
+            overrideLevel: r.overrideLevel || 'NONE',
+            sortNo: i,
+          })),
+        );
+      }
       toast.success(t('mds.common.saved'));
       opsRes.refresh();
       setSelectedId(ret.id);
@@ -342,7 +423,7 @@ export default function OperationsPage() {
     <>
       {selected.status === 'UNFROZEN' && (
         <Can perm={MDS_PERMS.operation.update}>
-          <CimButton type="primary" size="small" onClick={() => enterEdit(selected)}>
+          <CimButton type="primary" size="small" onClick={() => void enterEdit(selected)}>
             {t('mds.common.edit')}
           </CimButton>
         </Can>
@@ -422,7 +503,7 @@ export default function OperationsPage() {
         key: 'equipType',
         labelKey: 'mds.operation.field.equipType',
         allowClear: true,
-        options: (equipTypesRes.data ?? []).map((eq) => ({ value: eq.typeCode, label: eq.typeName ?? eq.typeCode })),
+        options: (equipClassRes.data ?? []).map((eq) => ({ value: eq.classCode, label: eq.className ?? eq.classCode })),
       },
       {
         kind: 'select',
@@ -460,10 +541,11 @@ export default function OperationsPage() {
         : []),
       { kind: 'textarea', key: 'remark', labelKey: 'mds.operation.field.remark' },
     ];
-  }, [t, mode, form.holdPoint, form.opType, techsRes.data, equipTypesRes.data, capsRes.data]);
+  }, [t, mode, form.holdPoint, form.opType, techsRes.data, equipClassRes.data, capsRes.data]);
 
   return (
     <Page>
+      <GuideBar />
       <div className="op-layout">
         <DataTable<OperationView>
           titleKey="mds.operation.listTitle"
@@ -568,13 +650,110 @@ export default function OperationsPage() {
               {mode === 'copy' ? (
                 <p className="dim">{t('mds.operation.copyHint')}</p>
               ) : (
-                <FormGrid
-                  fields={fields}
-                  value={form}
-                  disabled={mode === 'view'}
-                  onChange={(patch: Record<string, unknown>) => set(patch as Partial<OpFormState>)}
-                  columns={2}
-                />
+                <>
+                  <FormGrid
+                    fields={fields}
+                    value={form}
+                    disabled={mode === 'view'}
+                    onChange={(patch: Record<string, unknown>) => set(patch as Partial<OpFormState>)}
+                    columns={2}
+                  />
+
+                  {/* —— 可变参数（V29：Wafer/Lot 级覆盖声明；create 先建后维护）—— */}
+                  <h4 style={{ marginTop: 16 }}>{t('mds.operation.varParamTitle')}</h4>
+                  {mode === 'create' ? (
+                    <p className="dim">{t('mds.operation.varParam.createHint')}</p>
+                  ) : (
+                    <>
+                      <p className="dim">{t('mds.operation.varParamHint')}</p>
+                      <table className="icm-table">
+                        <thead>
+                          <tr>
+                            <th>{t('mds.operation.field.paramKey')}</th>
+                            <th>{t('mds.operation.field.paramDefault')}</th>
+                            <th>{t('mds.operation.field.paramMin')}</th>
+                            <th>{t('mds.operation.field.paramMax')}</th>
+                            <th>{t('mds.operation.field.overrideLevel')}</th>
+                            {mode === 'edit' && <th />}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mode === 'edit'
+                            ? form.varParams.map((r, idx) => (
+                                <tr key={idx}>
+                                  <td>
+                                    <select
+                                      className="op-search"
+                                      style={{ width: 180 }}
+                                      value={r.paramKey}
+                                      onChange={(e) => setVarRow(idx, { paramKey: e.target.value })}
+                                    >
+                                      <option value="">{t('mds.recipeResolve.selectParamHint')}</option>
+                                      {(paramDefsRes.data ?? [])
+                                        .filter((d) => d.enabled)
+                                        .map((d) => (
+                                          <option key={d.attrKey} value={d.attrKey}>{d.attrKey}</option>
+                                        ))}
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <input className="op-search" style={{ width: 90 }} value={r.defaultValue}
+                                      onChange={(e) => setVarRow(idx, { defaultValue: e.target.value })} />
+                                  </td>
+                                  <td>
+                                    <input className="op-search" style={{ width: 80 }} value={r.minValue}
+                                      onChange={(e) => setVarRow(idx, { minValue: e.target.value })} />
+                                  </td>
+                                  <td>
+                                    <input className="op-search" style={{ width: 80 }} value={r.maxValue}
+                                      onChange={(e) => setVarRow(idx, { maxValue: e.target.value })} />
+                                  </td>
+                                  <td>
+                                    <select
+                                      className="op-search"
+                                      style={{ width: 110 }}
+                                      value={r.overrideLevel}
+                                      onChange={(e) => setVarRow(idx, { overrideLevel: e.target.value })}
+                                    >
+                                      {['NONE', 'LOT', 'WAFER', 'SLOT'].map((lv) => (
+                                        <option key={lv} value={lv}>{t(`mds.operation.varLevel.${lv}`)}</option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <CimButton size="small" danger onClick={() => removeVarRow(idx)}>
+                                      {t('mds.operation.varParam.remove')}
+                                    </CimButton>
+                                  </td>
+                                </tr>
+                              ))
+                            : varRowsFrom(varParamsRes.data).map((r) => (
+                                <tr key={r.paramKey}>
+                                  <td className="mono">{r.paramKey}</td>
+                                  <td>{r.defaultValue || <span className="dim">—</span>}</td>
+                                  <td>{r.minValue || <span className="dim">—</span>}</td>
+                                  <td>{r.maxValue || <span className="dim">—</span>}</td>
+                                  <td>{t(`mds.operation.varLevel.${r.overrideLevel}`)}</td>
+                                </tr>
+                              ))}
+                          {mode === 'edit' && !form.varParams.length && (
+                            <tr><td colSpan={6} className="dim">{t('mds.operation.varParamHint')}</td></tr>
+                          )}
+                          {mode === 'view' && !varRowsFrom(varParamsRes.data).length && (
+                            <tr><td colSpan={5} className="dim">{t('mds.operation.varParamHint')}</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                      {mode === 'edit' && (
+                        <div style={{ marginTop: 8 }}>
+                          <CimButton size="small" onClick={addVarRow}>
+                            {t('mds.operation.varParam.create')}
+                          </CimButton>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}

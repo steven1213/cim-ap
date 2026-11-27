@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P08 校验报告</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .invalid { background:#fee2e2; color:#b91c1c; } .valid { background:#dcfce7; color:#15803d; } .notvalid { background:#f1f5f9; color:#64748b; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; display:flex; align-items:center; gap:10px; }
+  h3 span { flex:1; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr:hover td { background:#f8fafc; cursor:pointer; }
+  .err { background:#fee2e2; color:#b91c1c; } .warn { background:#fef3c7; color:#b45309; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+  .rule { border-bottom:1px solid #f1f5f9; padding:8px 14px; display:flex; gap:10px; align-items:center; font-size:12.5px; }
+  .rule b { width:260px; flex-shrink:0; }
+  .sw { position:relative; width:34px; height:18px; border-radius:9px; background:#cbd5e1; flex-shrink:0; cursor:pointer; }
+  .sw.on { background:var(--p); }
+  .sw::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; }
+  .sw.on::after { left:18px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>校验报告</b>
+  <span>FLOW-A31-CMP-V3</span>
+  <span class="tag invalid">INVALID</span>
+  <span style="color:#64748b">校验时间 11-25 08:41 · zhang.s</span>
+  <span style="flex:1"></span>
+  <button class="btn p">↻ 重新校验</button>
+  <button class="btn">导出报告</button>
+</div>
+<div class="panel">
+  <h3>结果清单（按规则分组 · 点击行定位到节点）<span style="flex:none"><span class="tag err">ERROR 1</span> <span class="tag warn">WARN 2</span></span></h3>
+  <table>
+    <tr><th>级别</th><th>规则</th><th>节点</th><th>说明</th><th>修复入口</th></tr>
+    <tr><td><span class="tag err">ERROR</span></td><td>MACHINE_EXACT_MATCH</td><td>LTH-CR-200</td><td>机台指派行 1 为 EXACT_MATCH 但未配置腔位规则 JSON</td><td><a href="p03-step-param.html">P03 → 节点 LTH-CR-200</a></td></tr>
+    <tr><td><span class="tag warn">WARN</span></td><td>REQUIRED_ATTR_MISSING</td><td>DEV-350</td><td>必填参数 dc.usl 未配置（参数定义标记必填）</td><td><a href="p03-step-param.html">P03 → KV</a></td></tr>
+    <tr><td><span class="tag warn">WARN</span></td><td>QTIME_COVER</td><td>DEV-350</td><td>节点无 Q-time 覆盖（同族其他版本均有），建议确认</td><td>P02 → Q-time 面板</td></tr>
+  </table>
+  <div class="note"><b>分级语义：</b>ERROR 任何一个 → validate_state=INVALID，生效被拒（2004）；WARN 仅提示不影响。报告存 cim_flow.validate_result（JSON），重新校验整体覆盖（REQUIRES_NEW 事务，校验失败不污染主事务）。</div>
+</div>
+<div class="panel">
+  <h3>校验规则表（表驱动 · 可启停）<span style="flex:none;font-size:12px;color:#64748b">cim_validation_rule · 权限 mds:flow:validate</span></h3>
+  <div class="rule"><span class="sw on"></span><b>STEP_HAS_MACHINE</b><span>MAIN 类型节点必须有 ≥1 条机台指派</span><span style="margin-left:auto"><span class="tag" style="background:#fee2e2;color:#b91c1c">ERROR</span></span></div>
+  <div class="rule"><span class="sw on"></span><b>MACHINE_EXACT_MATCH</b><span>EXACT_MATCH 指派必须含完整槽位→腔位 JSON</span><span style="margin-left:auto"><span class="tag" style="background:#fee2e2;color:#b91c1c">ERROR</span></span></div>
+  <div class="rule"><span class="sw on"></span><b>REQUIRED_ATTR_MISSING</b><span>cim_param_def.is_required=是 的 attr_key 必须有值</span><span style="margin-left:auto"><span class="tag" style="background:#fee2e2;color:#b91c1c">ERROR</span></span></div>
+  <div class="rule"><span class="sw on"></span><b>REF_INTEGRITY</b><span>group_code/equipment_code/reticle_code/attr_key 必须真实存在且 enabled</span><span style="margin-left:auto"><span class="tag" style="background:#fee2e2;color:#b91c1c">ERROR</span></span></div>
+  <div class="rule"><span class="sw on"></span><b>EDGE_CONNECTIVITY</b><span>START 可达全部 MAIN/END（复用 validateGraph 规则 8）</span><span style="margin-left:auto"><span class="tag" style="background:#fee2e2;color:#b91c1c">ERROR</span></span></div>
+  <div class="rule"><span class="sw on"></span><b>QTIME_COVER</b><span>节点是否有 Q-time 覆盖（对标 FsdQtime 全覆盖口径）</span><span style="margin-left:auto"><span class="tag" style="background:#fef3c7;color:#b45309">WARN</span></span></div>
+  <div class="rule"><span class="sw"></span><b>WPH_GAP</b><span>节点 standard_wph 缺失提示（产能核对）</span><span style="margin-left:auto"><span class="tag" style="background:#fef3c7;color:#b45309">WARN</span></span></div>
+  <div class="note"><b>对标依据：</b>FsdValidationProvider 是代码内规则清单（不可配）；我们表驱动化——规则可启停、级别可调，且逐条给出「修复入口」深链（错误定位到节点是生效放行的核心体验）。<br><a href="index.html">← 返回索引</a> · <a href="p01-flow-list.html">← P01（校验徽标从这里点入）</a></div>
+</div>
+</body>
+</html>

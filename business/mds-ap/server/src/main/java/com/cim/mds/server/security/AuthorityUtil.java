@@ -39,7 +39,7 @@ public final class AuthorityUtil {
     /** 断言持有权限码；不满足抛 {@code ACCESS_DENIED}(403)。无认证上下文（测试）放行。 */
     public static void require(String authority) {
         if (!has(authority)) {
-            throw new BizException(BizCode.ACCESS_DENIED, "无操作权限: " + authority);
+            throw BizException.of(BizCode.ACCESS_DENIED, "mds.biz.editlock.noPerm", authority);
         }
     }
 }

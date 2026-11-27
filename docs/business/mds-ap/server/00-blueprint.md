@@ -16,7 +16,7 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | **L0 基础参考数据** | 单位（UOM）、码表/枚举字典、**工艺参数字典** | 全网（几乎所有域都引用） | [uom-dict-design](uom-dict-design.md)、[param-def-design](param-def-design.md) |
 | **L1 空间与组织** | 位置（Site→SubBay）、组织单元、班次与日历、供应商 | 广（设备/文档/审批引用） | [location-design](location-design.md)、[org-personnel-design](org-personnel-design.md) |
 | **L2 资产主数据** | 设备（含模块/端口/能力/接口点表）、**载具**、**光罩**、**测试资产**、**工装夹具**、仓库 | 广（工艺与执行都引用） | [equipment-design](equipment-design.md)、[carrier-design](carrier-design.md)、[reticle-design](reticle-design.md)、[test-asset-design](test-asset-design.md)、[tooling-design](tooling-design.md)、[bank-design](bank-design.md) |
-| **L3 工艺定义** | 产品、工艺路线（Route/Operation/Flow）、**层 Layer**、工艺流（Process Flow + 参数窗口）、配方（Logic/Physical/PPID） | 极广（改一处影响全产线） | [product-design](product-design.md)、[route-design](route-design.md)、[layer-design](layer-design.md)、[process-flow-design](process-flow-design.md)、[recipe-design](recipe-design.md) |
+| **L3 工艺定义** | 产品、工艺路线（Route/Operation/Flow）、**层 Layer**、工艺流（Process Flow + 参数窗口）、配方（Logic/Physical/PPID） | 极广（改一处影响全产线） | [product-design](product-design.md)、[flow-modeling/00-overview](flow-modeling/00-overview.md)（Route/Flow 现行设计，旧两篇已清理）、[layer-design](layer-design.md)、[recipe-design](recipe-design.md) |
 | **L4 物料与产出** | 物料/耗材、**产品 BOM**、**批次类型与策略** | 中（投料与成本） | [material-design](material-design.md)、[product-bom-design](product-bom-design.md)、[lot-type-design](lot-type-design.md) |
 | **L5 运维与质量字典** | PM/校准（含**计量标准器溯源**）、原因码/缺陷码/Bin/处置规则、采样与 SPC/OCAP、**洁净度与环境监控**、**厂务 Utility**、**APC/FDC 模型**、**EHS 与安全** | 中（判定与处置口径） | [pm-calibration-design](pm-calibration-design.md)、[reason-defect-design](reason-defect-design.md)、[sampling-spc-design](sampling-spc-design.md)、[cleanliness-env-design](cleanliness-env-design.md)、[facility-utility-design](facility-utility-design.md)、[apc-fdc-design](apc-fdc-design.md)、[ehs-safety-design](ehs-safety-design.md) |
 
@@ -241,7 +241,7 @@ MDS 的主数据不是平铺的，而是**五层**结构。分层决定了引用
 | L0 基础参考 | [uom-dict-design](uom-dict-design.md)、[param-def-design](param-def-design.md) |
 | L1 空间与组织 | [location-design](location-design.md)、[org-personnel-design](org-personnel-design.md)、[operating-profile-design](operating-profile-design.md) |
 | L2 资产 | [equipment-design](equipment-design.md)、[carrier-design](carrier-design.md)、[reticle-design](reticle-design.md)、[test-asset-design](test-asset-design.md)、[tooling-design](tooling-design.md)、[bank-design](bank-design.md) |
-| L3 工艺定义 | [product-design](product-design.md)、[route-design](route-design.md)、[layer-design](layer-design.md)、[process-flow-design](process-flow-design.md)、[recipe-design](recipe-design.md) |
+| L3 工艺定义 | [product-design](product-design.md)、[flow-modeling/00-overview](flow-modeling/00-overview.md)（Route/Flow 现行设计，旧两篇已清理）、[layer-design](layer-design.md)、[recipe-design](recipe-design.md) |
 | L4 物料与产出 | [material-design](material-design.md)、[product-bom-design](product-bom-design.md)、[lot-type-design](lot-type-design.md) |
 | L5 运维与质量 | [pm-calibration-design](pm-calibration-design.md)、[reason-defect-design](reason-defect-design.md)、[sampling-spc-design](sampling-spc-design.md)、[cleanliness-env-design](cleanliness-env-design.md)、[facility-utility-design](facility-utility-design.md)、[apc-fdc-design](apc-fdc-design.md)、[ehs-safety-design](ehs-safety-design.md) |
 | 横切治理 | [naming-rule-design](naming-rule-design.md)、[constraint-design](constraint-design.md)、[expression-dsl-design](expression-dsl-design.md)、[change-mgmt-design](change-mgmt-design.md)、[md-governance-design](md-governance-design.md) |

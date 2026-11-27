@@ -19,8 +19,10 @@ import type {
   DictPayload,
   Equipment,
   EquipmentPayload,
-  EquipmentType,
-  EquipmentTypePayload,
+  EquipmentClass,
+  EquipmentClassPayload,
+  ToolGroup,
+  ToolGroupPayload,
   EquipmentUnit,
   EquipmentUnitPayload,
   Fab,
@@ -290,33 +292,38 @@ export function deleteDictItem(dictId: string, id: string): Promise<void> {
   );
 }
 
-// ---------- 设备域（设备类型 / 设备 / 能力） ----------
+// ---------- 设备域（机型模板 / 机台 / 机台组 / 能力，v2） ----------
 
-export function listEquipmentTypes(keyword?: string, signal?: AbortSignal): Promise<EquipmentType[]> {
-  return http.get<EquipmentType[]>(`${BASE}/equipment-types`, { keyword }, { signal });
+export function listEquipmentClasses(keyword?: string, signal?: AbortSignal): Promise<EquipmentClass[]> {
+  return http.get<EquipmentClass[]>(`${BASE}/equipment-classes`, { keyword }, { signal });
 }
 
-export function createEquipmentType(payload: EquipmentTypePayload): Promise<EquipmentType> {
-  return http.post<EquipmentType>(`${BASE}/equipment-types`, payload);
+export function createEquipmentClass(payload: EquipmentClassPayload): Promise<EquipmentClass> {
+  return http.post<EquipmentClass>(`${BASE}/equipment-classes`, payload);
 }
 
-export function updateEquipmentType(
+export function updateEquipmentClass(
   id: string,
-  payload: Partial<EquipmentTypePayload>,
-): Promise<EquipmentType> {
-  return http.put<EquipmentType>(`${BASE}/equipment-types/${encodeURIComponent(id)}`, payload);
+  payload: Partial<EquipmentClassPayload>,
+): Promise<EquipmentClass> {
+  return http.put<EquipmentClass>(`${BASE}/equipment-classes/${encodeURIComponent(id)}`, payload);
 }
 
-export function deleteEquipmentType(id: string): Promise<void> {
-  return http.del<void>(`${BASE}/equipment-types/${encodeURIComponent(id)}`);
+export function deleteEquipmentClass(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/equipment-classes/${encodeURIComponent(id)}`);
 }
 
-/** 设备列表。view=process|amhs：两个页面共用一套 CRUD，按类型 category 过滤视图。 */
+/** 机台列表。view=process|amhs 保留（详情面板按 kind 分块）；ownerUser 供责任人动线过滤。 */
 export function listEquipments(
-  params?: { keyword?: string; typeCode?: string; view?: 'process' | 'amhs' },
+  params?: { keyword?: string; classCode?: string; ownerUser?: string; view?: 'process' | 'amhs' },
   signal?: AbortSignal,
 ): Promise<Equipment[]> {
   return http.get<Equipment[]>(`${BASE}/equipments`, params, { signal });
+}
+
+/** 单机台详情（主从页右侧详情块直查）。 */
+export function getEquipment(id: string, signal?: AbortSignal): Promise<Equipment> {
+  return http.get<Equipment>(`${BASE}/equipments/${encodeURIComponent(id)}`, undefined, { signal });
 }
 
 export function createEquipment(payload: EquipmentPayload): Promise<Equipment> {
@@ -329,6 +336,38 @@ export function updateEquipment(id: string, payload: Partial<EquipmentPayload>):
 
 export function deleteEquipment(id: string): Promise<void> {
   return http.del<void>(`${BASE}/equipments/${encodeURIComponent(id)}`);
+}
+
+/** 机台组（ISA-95 Work Center）。 */
+export function listToolGroups(
+  params?: { keyword?: string; classCode?: string },
+  signal?: AbortSignal,
+): Promise<ToolGroup[]> {
+  return http.get<ToolGroup[]>(`${BASE}/tool-groups`, params, { signal });
+}
+
+export function createToolGroup(payload: ToolGroupPayload): Promise<ToolGroup> {
+  return http.post<ToolGroup>(`${BASE}/tool-groups`, payload);
+}
+
+export function updateToolGroup(id: string, payload: Partial<ToolGroupPayload>): Promise<ToolGroup> {
+  return http.put<ToolGroup>(`${BASE}/tool-groups/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteToolGroup(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/tool-groups/${encodeURIComponent(id)}`);
+}
+
+export function addToolGroupMember(groupId: string, equipmentId: string): Promise<ToolGroup> {
+  return http.post<ToolGroup>(
+    `${BASE}/tool-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(equipmentId)}`,
+  );
+}
+
+export function removeToolGroupMember(groupId: string, equipmentId: string): Promise<ToolGroup> {
+  return http.del<ToolGroup>(
+    `${BASE}/tool-groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(equipmentId)}`,
+  );
 }
 
 /** 设备已关联的能力码集合。 */
@@ -574,10 +613,14 @@ export type LocationType =
   | 'stage'
   | 'technology'
   | 'product'
-  | 'equipmentType'
+  | 'equipmentClass'
   | 'equipment'
+  | 'toolGroup'
   | 'capability'
-  | 'stockerBank';
+  | 'stockerBank'
+  | 'edcSet'
+  | 'edcReportTpl'
+  | 'edcPlan';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {
@@ -603,11 +646,16 @@ export function lockState(type: LocationType, id: string, signal?: AbortSignal):
 import type {
   FlowView,
   FlowDetail,
+  FlowEventView,
   FlowPayload,
   FlowCanvasPayload,
   FlowValidationResult,
   OperationView,
   OperationPayload,
+  OperationVarParam,
+  OperationVarParamPayload,
+  RecipeResolveRequest,
+  RecipeResolveView,
 } from '@/types';
 
 export function listFlows(keyword?: string, signal?: AbortSignal): Promise<FlowView[]> {
@@ -616,6 +664,11 @@ export function listFlows(keyword?: string, signal?: AbortSignal): Promise<FlowV
 
 export function getFlow(id: string, signal?: AbortSignal): Promise<FlowDetail> {
   return http.get<FlowDetail>(`${BASE}/flows/${id}`, undefined, { signal });
+}
+
+/** 变更历史（V24，P3-2）：流程域动作级事件，时间倒序，最多 200 条。 */
+export function listFlowEvents(id: string, signal?: AbortSignal): Promise<FlowEventView[]> {
+  return http.get<FlowEventView[]>(`${BASE}/flows/${id}/events`, undefined, { signal });
 }
 
 export function createFlow(payload: FlowPayload): Promise<FlowView> {
@@ -678,6 +731,23 @@ export function disableOperation(id: string): Promise<OperationView> {
 export function copyOperation(id: string, newOpCode: string): Promise<OperationView> {
   return http.post<OperationView>(
     `${BASE}/operations/${id}/copy?newOpCode=${encodeURIComponent(newOpCode)}`, {});
+}
+
+/** 工序可变参数列表（V29；任意状态可读）。 */
+export function listOperationVarParams(id: string, signal?: AbortSignal): Promise<OperationVarParam[]> {
+  return http.get<OperationVarParam[]>(
+    `${BASE}/operations/${id}/variable-params`, undefined, { signal });
+}
+
+/** 工序可变参数整单替换（仅 UNFROZEN；paramKey 须引用启用的参数定义）。 */
+export function saveOperationVarParams(
+  id: string, rows: OperationVarParamPayload[]): Promise<OperationVarParam[]> {
+  return http.put<OperationVarParam[]>(`${BASE}/operations/${id}/variable-params`, rows);
+}
+
+/** 配方解算契约（V29）：快照 / BLOCKED（HTTP 200 + resolved=false + reason）。 */
+export function resolveRecipe(payload: RecipeResolveRequest): Promise<RecipeResolveView> {
+  return http.post<RecipeResolveView>(`${BASE}/recipe/resolve`, payload);
 }
 
 /** 画布保存：整份 XML 回传，服务端解析重建解析产物表。 */
@@ -760,8 +830,6 @@ import type {
   ReasonCodeView,
   ReasonCodeCreatePayload,
   ReasonCodeUpdatePayload,
-  WipReasonEventView,
-  WipReasonEventPayload,
 } from '@/types';
 
 /** 类型清单（含挂靠码计数）。 */
@@ -797,14 +865,6 @@ export function listReasonCodes(
   return http.get<ReasonCodeView[]>(`${BASE}/reason-codes`, params, { signal });
 }
 
-/** WIP 下拉口径：type 匹配 + 启用。 */
-export function listEnabledReasonCodes(
-  typeKey: string,
-  signal?: AbortSignal,
-): Promise<ReasonCodeView[]> {
-  return http.get<ReasonCodeView[]>(`${BASE}/reason-codes/enabled`, { typeKey }, { signal });
-}
-
 export function createReasonCode(payload: ReasonCodeCreatePayload): Promise<ReasonCodeView> {
   return http.post<ReasonCodeView>(`${BASE}/reason-codes`, payload);
 }
@@ -817,22 +877,9 @@ export function updateReasonCode(
   return http.put<ReasonCodeView>(`${BASE}/reason-codes/${encodeURIComponent(id)}`, payload);
 }
 
-/** 删除码（软删；有子节点或被事件引用时后端拒绝）。 */
+/** 删除码（软删；有子节点时后端拒绝）。 */
 export function deleteReasonCode(id: string): Promise<void> {
   return http.del<void>(`${BASE}/reason-codes/${encodeURIComponent(id)}`);
-}
-
-/** WIP 事件履历（lotId 可选过滤；按发生时间倒序）。 */
-export function listWipReasonEvents(
-  lotId?: string,
-  signal?: AbortSignal,
-): Promise<WipReasonEventView[]> {
-  return http.get<WipReasonEventView[]>(`${BASE}/wip-reason-events`, { lotId }, { signal });
-}
-
-/** 创建事件（快照五件套同事务落库）。 */
-export function createWipReasonEvent(payload: WipReasonEventPayload): Promise<WipReasonEventView> {
-  return http.post<WipReasonEventView>(`${BASE}/wip-reason-events`, payload);
 }
 
 // ============================================================ 班组排班（V17）
@@ -972,4 +1019,646 @@ export function rejectShiftSwap(id: string, reason?: string): Promise<ShiftSwapV
 /** 发起人取消（PENDING → CANCELLED）。 */
 export function cancelShiftSwap(id: string): Promise<ShiftSwapView> {
   return http.post<ShiftSwapView>(`${BASE}/shift-swaps/${id}/cancel`, {});
+}
+
+// ============================================================ ICM 继承式约束模型（V22）
+
+/** 统一指派行（scope=OPERATION/FLOW/STEP 三层一张表）。 */
+export interface EquipAssign {
+  id: string;
+  scopeType: 'OPERATION' | 'FLOW' | 'STEP' | 'PRODUCT';
+  operationCode: string;
+  flowId: string;
+  stepId: string; // scope=STEP 时 = cim_flow_step.node_id；scope=PRODUCT 非空 = 细化到站
+  productCode?: string; // scope=PRODUCT（V25 L3）
+  familyCode?: string; // scope=PRODUCT（V25 L3）
+  assignType: 'GROUP' | 'EQUIP' | 'CLASS';
+  assignRef: string;
+  chamberRule: string | null;
+  recipeRef: string | null;
+  recipeRule: 'FIXED' | 'GENERATE' | 'EXACT_MATCH';
+  recipeMatch: string | null;
+  priority: number;
+  enabled: boolean;
+  remark: string | null;
+}
+
+/** 指派请求体（上下文键由端点路径决定）。 */
+export interface AssignPayload {
+  assignType: string;
+  assignRef: string;
+  chamberRule?: string | null;
+  recipeRef?: string | null;
+  recipeRule?: string;
+  recipeMatch?: string | null;
+  priority?: number;
+  enabled?: boolean;
+  remark?: string | null;
+}
+
+/** 参数定义字典行。 */
+export interface ParamDef {
+  id: string;
+  attrKey: string;
+  attrName: string;
+  groupCode: string;
+  valueType: 'STRING' | 'INT' | 'DECIMAL' | 'BOOLEAN' | 'ENUM' | 'JSON';
+  enumDict: string | null;
+  unit?: string | null;
+  required: boolean;
+  scopes: string; // CSV: OPERATION,FLOW,STEP
+  sortNo: number;
+  enabled: boolean;
+}
+
+export interface ParamDefPayload {
+  attrKey?: string;
+  attrName: string;
+  groupCode: string;
+  valueType: string;
+  enumDict?: string | null;
+  unit?: string | null;
+  required?: boolean;
+  scopes?: string[];
+  sortNo?: number;
+  enabled?: boolean;
+}
+
+/** KV 生效值（带来源层级）。 */
+export interface AttrEffective {
+  attrKey: string;
+  value: string | null;
+  source: 'STEP_OVERRIDE' | 'FLOW_OVERRIDE' | 'OPERATION_DEFAULT' | 'MISSING';
+}
+
+/** 单字段生效值（来源四级标注）。 */
+export interface Effective<T> {
+  value: T | null;
+  source: 'STEP_OVERRIDE' | 'FLOW_OVERRIDE' | 'OPERATION_DEFAULT' | 'MISSING';
+}
+
+/** 节点生效值（ContextResolver 解析结果）。 */
+export interface NodeEffective {
+  nodeId: string;
+  stepCode: string;
+  stepName: string | null;
+  stepType: string;
+  operationCode: string | null;
+  opStatus: string | null;
+  opRefStale: boolean;
+  recipeRef: Effective<string>;
+  equipType: Effective<string>;
+  qtimeMin: Effective<number>;
+  qtimeMax: Effective<number>;
+  reworkLimit: Effective<number>;
+  batchMode: Effective<string>;
+  batchSize: Effective<number>;
+  holdPoint: Effective<boolean>;
+  holdReason: Effective<string>;
+  inspectPlan: Effective<string>;
+  samplingRate: Effective<string>;
+  reticleRef: Effective<string>;
+  contamLevel: Effective<string>;
+  contamForbidden: Effective<string>;
+  capabilityCode: Effective<string>;
+  edcPlanCode: Effective<string>;
+  npwLimit: Effective<number>;
+  poolSource: string;
+  pool: EquipAssign[];
+  attrs: Record<string, AttrEffective>;
+}
+
+/** 工序引用刷新 diff。 */
+export interface OpRefreshDiff {
+  nodeId: string;
+  stepCode: string;
+  oldOpCode: string;
+  newOpCode: string;
+  changed: boolean;
+}
+
+/** 列表页轻量聚合。 */
+export interface StepFlags {
+  flowId: string;
+  businessCount: number;
+  unassignedCount: number;
+}
+
+/** 产品绑定行。 */
+export interface ProductFlowBinding {
+  id: string;
+  productCode: string;
+  flowFamilyCode: string;
+  flowVersionNo: number;
+  bindState: 'ACTIVE' | 'HISTORY';
+  activeTime: string | null;
+  activeUser: string | null;
+  // ---- V25 L3 列型覆盖（NULL = 继承） ----
+  reticleRef?: string | null;
+  contamLevel?: string | null;
+  contamForbidden?: string | null;
+  npwLimit?: number | null;
+}
+
+// ---- 统一指派（三 scope） ----
+
+export function listOpAssigns(opCode: string, signal?: AbortSignal): Promise<EquipAssign[]> {
+  return http.get<EquipAssign[]>(`${BASE}/operations/${encodeURIComponent(opCode)}/assigns`, {}, { signal });
+}
+export function createOpAssign(opCode: string, payload: AssignPayload): Promise<EquipAssign> {
+  return http.post<EquipAssign>(`${BASE}/operations/${encodeURIComponent(opCode)}/assigns`, payload);
+}
+export function listFlowAssigns(flowId: string, signal?: AbortSignal): Promise<EquipAssign[]> {
+  return http.get<EquipAssign[]>(`${BASE}/flows/${encodeURIComponent(flowId)}/assigns`, {}, { signal });
+}
+export function createFlowAssign(flowId: string, payload: AssignPayload): Promise<EquipAssign> {
+  return http.post<EquipAssign>(`${BASE}/flows/${encodeURIComponent(flowId)}/assigns`, payload);
+}
+export function listStepAssigns(flowId: string, nodeId: string, signal?: AbortSignal): Promise<EquipAssign[]> {
+  return http.get<EquipAssign[]>(`${BASE}/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(nodeId)}/assigns`, {}, { signal });
+}
+export function createStepAssign(flowId: string, nodeId: string, payload: AssignPayload): Promise<EquipAssign> {
+  return http.post<EquipAssign>(`${BASE}/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(nodeId)}/assigns`, payload);
+}
+export function updateAssign(id: string, payload: AssignPayload): Promise<EquipAssign> {
+  return http.put<EquipAssign>(`${BASE}/assigns/${encodeURIComponent(id)}`, payload);
+}
+export function deleteAssign(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/assigns/${encodeURIComponent(id)}`);
+}
+
+// ---- KV 约束参数（context 三层，PUT=全量快照） ----
+
+export function listOpAttrs(opCode: string, signal?: AbortSignal): Promise<Record<string, string>> {
+  return http.get<Record<string, string>>(`${BASE}/operations/${encodeURIComponent(opCode)}/attrs`, {}, { signal });
+}
+export function putOpAttrs(opCode: string, values: Record<string, string>): Promise<Record<string, string>> {
+  return http.put<Record<string, string>>(`${BASE}/operations/${encodeURIComponent(opCode)}/attrs`, { values });
+}
+export function listFlowAttrs(flowId: string, signal?: AbortSignal): Promise<Record<string, string>> {
+  return http.get<Record<string, string>>(`${BASE}/flows/${encodeURIComponent(flowId)}/attrs`, {}, { signal });
+}
+export function putFlowAttrs(flowId: string, values: Record<string, string>): Promise<Record<string, string>> {
+  return http.put<Record<string, string>>(`${BASE}/flows/${encodeURIComponent(flowId)}/attrs`, { values });
+}
+export function listStepAttrs(flowId: string, nodeId: string, signal?: AbortSignal): Promise<Record<string, string>> {
+  return http.get<Record<string, string>>(`${BASE}/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(nodeId)}/attrs`, {}, { signal });
+}
+export function putStepAttrs(flowId: string, nodeId: string, values: Record<string, string>): Promise<Record<string, string>> {
+  return http.put<Record<string, string>>(`${BASE}/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(nodeId)}/attrs`, { values });
+}
+
+// ---- 参数定义字典 ----
+
+export function listParamDefs(signal?: AbortSignal): Promise<ParamDef[]> {
+  return http.get<ParamDef[]>(`${BASE}/param-defs`, {}, { signal });
+}
+export function createParamDef(payload: ParamDefPayload): Promise<ParamDef> {
+  return http.post<ParamDef>(`${BASE}/param-defs`, payload);
+}
+export function updateParamDef(id: string, payload: ParamDefPayload): Promise<ParamDef> {
+  return http.put<ParamDef>(`${BASE}/param-defs/${encodeURIComponent(id)}`, payload);
+}
+export function deleteParamDef(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/param-defs/${encodeURIComponent(id)}`);
+}
+
+// ---- 产品↔流程绑定 ----
+
+export function listProductFlows(productCode?: string, signal?: AbortSignal): Promise<ProductFlowBinding[]> {
+  return http.get<ProductFlowBinding[]>(`${BASE}/product-flows`, { productCode }, { signal });
+}
+export function bindProductFlow(productCode: string, flowFamilyCode: string, flowVersionNo: number): Promise<ProductFlowBinding> {
+  return http.post<ProductFlowBinding>(`${BASE}/product-flows`, { productCode, flowFamilyCode, flowVersionNo });
+}
+
+/** V25 L3：列型覆盖更新（空值 = 清除覆盖回落继承）。 */
+export function updateProductBindingOverrides(
+  id: string,
+  req: { reticleRef?: string; contamLevel?: string; contamForbidden?: string; npwLimit?: number },
+): Promise<ProductFlowBinding> {
+  return http.put<ProductFlowBinding>(`${BASE}/product-flows/${encodeURIComponent(id)}`, req);
+}
+
+/** V25 L3：产品级指派（PRODUCT scope）。 */
+export function listProductAssigns(bindingId: string, signal?: AbortSignal): Promise<EquipAssign[]> {
+  return http.get<EquipAssign[]>(`${BASE}/product-flows/${encodeURIComponent(bindingId)}/assigns`, {}, { signal });
+}
+export function createProductAssign(bindingId: string, nodeId: string, payload: AssignPayload): Promise<EquipAssign> {
+  return http.post<EquipAssign>(
+    `${BASE}/product-flows/${encodeURIComponent(bindingId)}/assigns${nodeId ? `?nodeId=${encodeURIComponent(nodeId)}` : ''}`,
+    payload,
+  );
+}
+
+/** V25 L3：产品级 KV 快照。 */
+export function listProductAttrs(bindingId: string, signal?: AbortSignal): Promise<Record<string, string>> {
+  return http.get<Record<string, string>>(`${BASE}/product-flows/${encodeURIComponent(bindingId)}/attrs`, {}, { signal });
+}
+export function putProductAttrs(bindingId: string, values: Record<string, string>): Promise<Record<string, string>> {
+  return http.put<Record<string, string>>(`${BASE}/product-flows/${encodeURIComponent(bindingId)}/attrs`, { values });
+}
+export function unbindProductFlow(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/product-flows/${encodeURIComponent(id)}`);
+}
+
+// ---- ICM 解析 / 校验 / 生命周期增强 ----
+
+export function getEffective(flowId: string, product?: string, signal?: AbortSignal): Promise<NodeEffective[]> {
+  return http.get<NodeEffective[]>(
+    `${BASE}/flows/${encodeURIComponent(flowId)}/effective`,
+    product ? { product } : {},
+    { signal },
+  );
+}
+export function getStepEffective(flowId: string, nodeId: string, signal?: AbortSignal): Promise<NodeEffective> {
+  return http.get<NodeEffective>(`${BASE}/flows/${encodeURIComponent(flowId)}/steps/${encodeURIComponent(nodeId)}/effective`, {}, { signal });
+}
+export function refreshOperations(flowId: string, stepIds?: string[]): Promise<OpRefreshDiff[]> {
+  return http.post<OpRefreshDiff[]>(`${BASE}/flows/${encodeURIComponent(flowId)}/refresh-operations`, stepIds ?? []);
+}
+export function stepFlags(flowIds: string[], signal?: AbortSignal): Promise<StepFlags[]> {
+  return http.get<StepFlags[]>(`${BASE}/flows/step-flags`, { flowIds: flowIds.join(',') }, { signal });
+}
+export function lockFlow(id: string): Promise<unknown> {
+  return http.post(`${BASE}/flows/${encodeURIComponent(id)}/lock`, {});
+}
+export function unlockFlow(id: string): Promise<unknown> {
+  return http.post(`${BASE}/flows/${encodeURIComponent(id)}/unlock`, {});
+}
+
+// ---- P2：直线流程生成 / 三段式 Excel 导入 ----
+
+/** 直线流程生成：按工序列生成 START→N×PROCESS→END 画布并保存，返回重建后的详情。 */
+export function generateDesign(flowId: string, operationCodes: string[]): Promise<FlowDetail> {
+  return http.post<FlowDetail>(`${BASE}/flows/${encodeURIComponent(flowId)}/generate-design`, { operationCodes });
+}
+
+/** 导入预览（dryRun）：各段行数 + 错误清单。 */
+export interface FlowImportPreview {
+  flowRows: number;
+  stepRows: number;
+  assignRows: number;
+  attrRows: number;
+  errors: { sheet: string; row: number; message: string }[];
+}
+
+/** 导入提交结果：各段计数。 */
+export interface FlowImportResult {
+  flowsCreated: number;
+  flowsUpdated: number;
+  stepsImported: number;
+  assignsImported: number;
+  attrsImported: number;
+}
+
+/** 下载导入模板（base64 xlsx → Blob）。 */
+export async function downloadImportTemplate(): Promise<void> {
+  const r = await http.get<string>(`${BASE}/flows/import-template`, {});
+  const bin = atob(r);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'flow-import-template.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 本地 xlsx 文件 → base64。 */
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const s = String(reader.result ?? '');
+      resolve(s.slice(s.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(new Error(String(reader.error?.message ?? '读取文件失败')));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** 导入（dryRun=true 校验预览；false 提交落库）。 */
+export async function importFlows(dataBase64: string, dryRun: boolean): Promise<FlowImportPreview | FlowImportResult> {
+  return http.post<FlowImportPreview | FlowImportResult>(`${BASE}/flows/import`, { dataBase64, dryRun });
+}
+
+// ============================================================ EDC 工程数采（V28）
+// 采集契约静态元数据：参数集 / 设备接口映射（SVID/CEID）/ 方案（版本化四态）。
+// 运行时采集执行与判定归 MES/SPC/FDC 运行域。
+
+/** EDC 参数（引用参数定义字典的轻量摘要）。 */
+export interface EdcParamLite {
+  attrKey: string;
+  attrName: string | null;
+  valueType: string | null;
+  unit: string | null;
+}
+
+/** EDC 参数集。 */
+export interface EdcParamSet {
+  id: string;
+  setCode: string;
+  setName: string;
+  opCode?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+  occupied?: boolean;
+  occupiedBy?: string | null;
+}
+
+/** EDC 参数集详情（含成员）。 */
+export interface EdcParamSetDetail extends EdcParamSet {
+  items: Array<{
+    id: string;
+    attrKey: string;
+    sortNo: number;
+    param: EdcParamLite | null;
+  }>;
+}
+
+export interface EdcParamSetPayload {
+  setCode?: string;
+  setName: string;
+  opCode?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+/** EDC 报告模板（GEM 报告结构显式化：SVID→参数列表）。 */
+export interface EdcReportTpl {
+  id: string;
+  tplCode: string;
+  tplName: string;
+  enabled?: boolean;
+  description?: string | null;
+  occupied?: boolean;
+  occupiedBy?: string | null;
+}
+
+/** EDC 报告模板详情（含 SVID 成员）。 */
+export interface EdcReportTplDetail extends EdcReportTpl {
+  items: Array<{
+    id: string;
+    svid: number;
+    attrKey: string;
+    sortNo: number;
+    param: EdcParamLite | null;
+  }>;
+}
+
+export interface EdcReportTplPayload {
+  tplCode?: string;
+  tplName: string;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+export type EdcTplItemPayload = { svid: number; attrKey: string; sortNo?: number };
+
+/** EDC 设备接口映射行（机台 × CEID → 报告模板）。 */
+export interface EdcEquipMap {
+  id: string;
+  equipmentCode: string;
+  ceid: number;
+  tplId: string;
+  tplCode?: string | null;
+  tplName?: string | null;
+  sourceChannel: string;
+  description?: string | null;
+}
+
+export interface EdcEquipMapPayload {
+  equipmentCode: string;
+  ceid: number;
+  tplId: string;
+  sourceChannel?: string;
+  description?: string | null;
+}
+
+/** EDC 方案行。 */
+export interface EdcPlan {
+  id: string;
+  planCode: string;
+  versionNo: number;
+  status: 'UNFROZEN' | 'FROZEN' | 'ACTIVE' | 'DISABLED';
+  productCode?: string | null;
+  flowFamilyCode: string;
+  flowVersionNo: number;
+  opCode: string;
+  setCode?: string | null;
+  description?: string | null;
+  activatedAt?: string | null;
+  activatedBy?: string | null;
+  occupied?: boolean;
+  occupiedBy?: string | null;
+}
+
+/** EDC 方案明细行（采集项 × Measurement Spec 合一）。 */
+export interface EdcPlanItem {
+  id: string;
+  attrKey: string;
+  collectMode: string;
+  sampleRule: string;
+  intervalMinutes?: number | null;
+  required: boolean;
+  target?: number | null;
+  lsl?: number | null;
+  usl?: number | null;
+  oocAction: string;
+  sortNo: number;
+  param: EdcParamLite | null;
+}
+
+export interface EdcPlanDetail extends EdcPlan {
+  items: EdcPlanItem[];
+}
+
+export interface EdcPlanPayload {
+  planCode?: string;
+  versionNo?: number;
+  productCode?: string | null;
+  flowFamilyCode: string;
+  flowVersionNo?: number;
+  opCode: string;
+  setCode?: string | null;
+  description?: string | null;
+}
+
+export type EdcPlanItemPayload = Partial<Omit<EdcPlanItem, 'id' | 'param'>> & { attrKey: string };
+
+export type EdcSetItemPayload = { attrKey: string; sortNo?: number };
+
+export interface EdcImportReport {
+  kind: string;
+  total: number;
+  success: number;
+  failed: number;
+  failures: Array<{ row: number; message: string }>;
+}
+
+// ---------- 参数集 ----------
+
+export function listEdcParamSets(signal?: AbortSignal): Promise<EdcParamSet[]> {
+  return http.get<EdcParamSet[]>(`${BASE}/edc/param-sets`, {}, { signal });
+}
+
+export function getEdcParamSet(id: string, signal?: AbortSignal): Promise<EdcParamSetDetail> {
+  return http.get<EdcParamSetDetail>(`${BASE}/edc/param-sets/${encodeURIComponent(id)}`, undefined, { signal });
+}
+
+export function createEdcParamSet(payload: EdcParamSetPayload): Promise<EdcParamSet> {
+  return http.post<EdcParamSet>(`${BASE}/edc/param-sets`, payload);
+}
+
+export function updateEdcParamSet(id: string, payload: EdcParamSetPayload): Promise<EdcParamSet> {
+  return http.put<EdcParamSet>(`${BASE}/edc/param-sets/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEdcParamSet(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/edc/param-sets/${encodeURIComponent(id)}`);
+}
+
+export function saveEdcParamSetItems(
+  id: string,
+  items: EdcSetItemPayload[],
+): Promise<EdcParamSetDetail> {
+  return http.put<EdcParamSetDetail>(`${BASE}/edc/param-sets/${encodeURIComponent(id)}/items`, items);
+}
+
+// ---------- 报告模板 ----------
+
+export function listEdcReportTpls(signal?: AbortSignal): Promise<EdcReportTpl[]> {
+  return http.get<EdcReportTpl[]>(`${BASE}/edc/report-tpls`, {}, { signal });
+}
+
+export function getEdcReportTpl(id: string, signal?: AbortSignal): Promise<EdcReportTplDetail> {
+  return http.get<EdcReportTplDetail>(`${BASE}/edc/report-tpls/${encodeURIComponent(id)}`, undefined, { signal });
+}
+
+export function createEdcReportTpl(payload: EdcReportTplPayload): Promise<EdcReportTpl> {
+  return http.post<EdcReportTpl>(`${BASE}/edc/report-tpls`, payload);
+}
+
+export function updateEdcReportTpl(id: string, payload: EdcReportTplPayload): Promise<EdcReportTpl> {
+  return http.put<EdcReportTpl>(`${BASE}/edc/report-tpls/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEdcReportTpl(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/edc/report-tpls/${encodeURIComponent(id)}`);
+}
+
+export function saveEdcReportTplItems(
+  id: string,
+  items: EdcTplItemPayload[],
+): Promise<EdcReportTplDetail> {
+  return http.put<EdcReportTplDetail>(`${BASE}/edc/report-tpls/${encodeURIComponent(id)}/items`, items);
+}
+
+// ---------- 设备接口映射 ----------
+
+export function listEdcEquipMaps(
+  equipmentCode?: string,
+  signal?: AbortSignal,
+): Promise<EdcEquipMap[]> {
+  return http.get<EdcEquipMap[]>(
+    `${BASE}/edc/equip-maps`,
+    equipmentCode ? { equipmentCode } : {},
+    { signal },
+  );
+}
+
+export function createEdcEquipMap(payload: EdcEquipMapPayload): Promise<EdcEquipMap> {
+  return http.post<EdcEquipMap>(`${BASE}/edc/equip-maps`, payload);
+}
+
+export function updateEdcEquipMap(id: string, payload: EdcEquipMapPayload): Promise<EdcEquipMap> {
+  return http.put<EdcEquipMap>(`${BASE}/edc/equip-maps/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEdcEquipMap(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/edc/equip-maps/${encodeURIComponent(id)}`);
+}
+
+// ---------- 方案 ----------
+
+export function listEdcPlans(signal?: AbortSignal): Promise<EdcPlan[]> {
+  return http.get<EdcPlan[]>(`${BASE}/edc/plans`, {}, { signal });
+}
+
+export function getEdcPlan(id: string, signal?: AbortSignal): Promise<EdcPlanDetail> {
+  return http.get<EdcPlanDetail>(`${BASE}/edc/plans/${encodeURIComponent(id)}`, undefined, { signal });
+}
+
+export function createEdcPlan(payload: EdcPlanPayload): Promise<EdcPlan> {
+  return http.post<EdcPlan>(`${BASE}/edc/plans`, payload);
+}
+
+export function updateEdcPlan(id: string, payload: EdcPlanPayload): Promise<EdcPlan> {
+  return http.put<EdcPlan>(`${BASE}/edc/plans/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteEdcPlan(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/edc/plans/${encodeURIComponent(id)}`);
+}
+
+export function saveEdcPlanItems(
+  id: string,
+  items: EdcPlanItemPayload[],
+): Promise<EdcPlanDetail> {
+  return http.put<EdcPlanDetail>(`${BASE}/edc/plans/${encodeURIComponent(id)}/items`, items);
+}
+
+export function applyEdcPlanSet(id: string, setCode: string): Promise<EdcPlanDetail> {
+  return http.post<EdcPlanDetail>(
+    `${BASE}/edc/plans/${encodeURIComponent(id)}/apply-set?setCode=${encodeURIComponent(setCode)}`,
+    {},
+  );
+}
+
+function planAction(id: string, action: string): Promise<EdcPlan> {
+  return http.post<EdcPlan>(`${BASE}/edc/plans/${encodeURIComponent(id)}/${action}`, {});
+}
+
+export function freezeEdcPlan(id: string): Promise<EdcPlan> {
+  return planAction(id, 'freeze');
+}
+
+export function unfreezeEdcPlan(id: string): Promise<EdcPlan> {
+  return planAction(id, 'unfreeze');
+}
+
+export function activateEdcPlan(id: string): Promise<EdcPlan> {
+  return planAction(id, 'activate');
+}
+
+export function disableEdcPlan(id: string): Promise<EdcPlan> {
+  return planAction(id, 'disable');
+}
+
+// ---------- 模板与导入 ----------
+
+/** 下载 EDC 模板（base64 xlsx → Blob，kind=PARAM_DEF/PARAM_SET_ITEM/PLAN_ITEM/EQUIP_MAP）。 */
+export async function downloadEdcTemplate(kind: string, filename: string): Promise<void> {
+  const r = await http.get<string>(`${BASE}/edc/import-template`, { kind });
+  const bin = atob(r);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function importEdcExcel(
+  kind: string,
+  dataBase64: string,
+  targetId?: string | null,
+): Promise<EdcImportReport> {
+  return http.post<EdcImportReport>(`${BASE}/edc/import`, { kind, dataBase64, targetId: targetId ?? null });
 }

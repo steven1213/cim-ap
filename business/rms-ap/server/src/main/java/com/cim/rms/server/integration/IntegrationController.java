@@ -58,6 +58,17 @@ public class IntegrationController {
         return Result.ok(service.runCheck(req));
     }
 
+    /**
+     * IF-M2 PPID 解析（MES/MDS → RMS）：deviceCode+recipeCode → PPID/腔体/生效版本/hash/资格。
+     * 服务间密钥 {@code X-Integration-Key} 守门（见 {@code IntegrationApiKeyFilter}）。
+     */
+    @GetMapping("/recipe-ppid")
+    public Result<IntegrationService.PpidResolveView> resolvePpid(
+            @RequestParam String deviceCode, @RequestParam String recipeCode) {
+        return Result.ok(service.resolvePpid(
+                new IntegrationService.PpidResolveReq(deviceCode, recipeCode)));
+    }
+
     // ---------- Hold ----------
 
     @PreAuthorize("hasAuthority('rms:integration:view')")

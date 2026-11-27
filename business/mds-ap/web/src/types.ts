@@ -189,13 +189,20 @@ export interface TechnologyPayload {
   enabled?: boolean;
 }
 
-/** 产品（Product）：产品管理域主数据（tech_code 逻辑引用制程技术；类型 PROD=量产/NPW=陪片）。 */
+/** 产品用途类型（V26 定稿，锚 SEMI E10/E79 产品片 vs 非产品片口径）。 */
+export type ProductUsage = 'PRODUCTION' | 'ENGINEERING' | 'EXPERIMENT' | 'TEST' | 'NPW';
+
+/** NPW 二级细分（锚 SEMI M8/M38 应用类）。 */
+export type ProductNpwType = 'MONITOR' | 'DUMMY' | 'SEASON' | 'LITHO' | 'GENERIC';
+
+/** 产品（Product）：产品管理域主数据（tech_code 逻辑引用制程技术；usageType 5 值用途类型）。 */
 export interface Product {
   id: string;
   productCode: string;
   productName: string;
   techCode: string | null;
-  productType: 'PROD' | 'NPW';
+  usageType: ProductUsage;
+  npwType: ProductNpwType | null;
   productGroup: string | null;
   waferType: string | null;
   owner: string | null;
@@ -209,7 +216,8 @@ export interface ProductPayload {
   productCode: string;
   productName: string;
   techCode?: string | null;
-  productType?: 'PROD' | 'NPW';
+  usageType?: ProductUsage;
+  npwType?: ProductNpwType | null;
   productGroup?: string | null;
   waferType?: string | null;
   owner?: string | null;
@@ -230,13 +238,18 @@ export type EqKind =
   | 'TOOL'
   | 'OTHER';
 
-/** 设备类型（EquipmentType）：ISA-95 Kind→Type—Instance 的「类」，挂大类+细类。 */
-export interface EquipmentType {
+/** 机型模板（EquipmentClass，v2）：ISA-95 Class—Instance 的「类」，带默认约束。 */
+export interface EquipmentClass {
   id: string;
-  typeCode: string;
-  typeName: string;
+  classCode: string;
+  className: string;
   kindCode: EqKind;
   equipClassCode: string | null;
+  defaultWaferSizes: string | null;
+  defaultCarrierTypes: string | null;
+  defaultBatchMin: number | null;
+  defaultBatchMax: number | null;
+  defaultStandardWph: number | null;
   remark: string | null;
   enabled: boolean;
   description: string | null;
@@ -244,26 +257,68 @@ export interface EquipmentType {
   occupiedBy: string | null;
 }
 
-export interface EquipmentTypePayload {
-  typeCode: string;
-  typeName: string;
+export interface EquipmentClassPayload {
+  classCode: string;
+  className: string;
   kindCode: EqKind;
   equipClassCode?: string | null;
+  defaultWaferSizes?: string | null;
+  defaultCarrierTypes?: string | null;
+  defaultBatchMin?: number | null;
+  defaultBatchMax?: number | null;
+  defaultStandardWph?: number | null;
   remark?: string | null;
   enabled?: boolean;
   description?: string | null;
 }
 
-/** 设备（Equipment）：实例主数据（一张表，按类型 kind 分页视图）。 */
+/** 机台组（ToolGroup，v2）：ISA-95 Work Center 派工候选池，成员守门同机型。 */
+export interface ToolGroup {
+  id: string;
+  groupCode: string;
+  groupName: string;
+  classCode: string;
+  className: string | null;
+  memberEquipmentCodes: string[];
+  remark: string | null;
+  enabled: boolean;
+  description: string | null;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ToolGroupPayload {
+  groupCode: string;
+  groupName: string;
+  classCode: string;
+  remark?: string | null;
+  enabled?: boolean;
+  description?: string | null;
+}
+
+/** 机台（Equipment，v2）：实例主数据，约束字段从模板派生可覆盖。 */
 export interface Equipment {
   id: string;
   equipmentCode: string;
   equipmentName: string;
-  typeCode: string;
-  typeName: string | null;
-  typeKind: string | null;
+  classCode: string;
+  className: string | null;
+  kindCode: string | null;
   locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
   locationId: string;
+  ownerUser: string | null;
+  controlMode: string | null;
+  productionMode: string;
+  vendor: string | null;
+  modelNo: string | null;
+  serialNo: string | null;
+  assetNo: string | null;
+  installDate: string | null;
+  waferSizes: string | null;
+  carrierTypes: string | null;
+  batchMin: number | null;
+  batchMax: number | null;
+  standardWph: number | null;
   stateCode: string | null;
   remark: string | null;
   enabled: boolean;
@@ -275,16 +330,29 @@ export interface Equipment {
 export interface EquipmentPayload {
   equipmentCode: string;
   equipmentName: string;
-  typeCode: string;
+  classCode: string;
   locationType: 'FAB' | 'AREA' | 'BAY' | 'STAGE';
   locationId: string;
+  ownerUser?: string | null;
+  controlMode?: string | null;
+  productionMode?: string | null;
+  vendor?: string | null;
+  modelNo?: string | null;
+  serialNo?: string | null;
+  assetNo?: string | null;
+  installDate?: string | null;
+  waferSizes?: string | null;
+  carrierTypes?: string | null;
+  batchMin?: number | null;
+  batchMax?: number | null;
+  standardWph?: number | null;
   stateCode?: string | null;
   remark?: string | null;
   enabled?: boolean;
   description?: string | null;
 }
 
-/** 设备子单元（EquipmentUnit）：设备结构树节点（SEMI E120 口径）。 */
+/** 设备子单元（EquipmentUnit）：设备结构树节点（SEMI E120 口径；v2 端口属性增强）。 */
 export interface EquipmentUnit {
   id: string;
   equipmentId: string;
@@ -295,6 +363,9 @@ export interface EquipmentUnit {
   stateCode: string | null;
   portNo: number | null;
   capacity: number | null;
+  carrierCategory: string | null;
+  loadPurpose: string | null;
+  contaminationLevel: string | null;
   enabled: boolean;
   description: string | null;
 }
@@ -307,6 +378,9 @@ export interface EquipmentUnitPayload {
   stateCode?: string | null;
   portNo?: number | null;
   capacity?: number | null;
+  carrierCategory?: string | null;
+  loadPurpose?: string | null;
+  contaminationLevel?: string | null;
   enabled?: boolean;
   description?: string | null;
 }
@@ -602,6 +676,88 @@ export interface OperationPayload {
   description?: string | null;
 }
 
+/** 工序可变参数成员（V29：Wafer/Lot 级运行时覆盖；挂工序版本行，仅 UNFROZEN 可维护）。 */
+export interface OperationVarParam {
+  id: string;
+  paramKey: string;
+  defaultValue?: string | null;
+  minValue?: string | null;
+  maxValue?: string | null;
+  /** NONE 不可覆盖 / LOT 批次级 / WAFER 单片级 / SLOT 槽位级。 */
+  overrideLevel: string;
+  sortNo?: number | null;
+}
+
+/** 工序可变参数整单替换请求（id 由路径给出）。 */
+export interface OperationVarParamPayload {
+  paramKey: string;
+  defaultValue?: string | null;
+  minValue?: string | null;
+  maxValue?: string | null;
+  overrideLevel?: string | null;
+  sortNo?: number | null;
+}
+
+/** 配方解算：单条运行时覆盖（键值须命中工序声明的可变参数）。 */
+export interface RecipeResolveOverride {
+  paramKey: string;
+  value: string;
+}
+
+/** 配方解算请求（flowId+nodeId+equipmentCode 必填；productCode 走产品轴 ContextChain）。 */
+export interface RecipeResolveRequest {
+  productCode?: string | null;
+  flowId: string;
+  nodeId: string;
+  equipmentCode: string;
+  overrides?: RecipeResolveOverride[] | null;
+}
+
+/** 配方解算：可变参数最终取值（source=DEFAULT 默认 / OVERRIDE 覆盖）。 */
+export interface RecipeResolveVarValue {
+  paramKey: string;
+  value: string;
+  source: string;
+  minValue?: string | null;
+  maxValue?: string | null;
+  overrideLevel: string;
+}
+
+/**
+ * 配方解算快照（V29 解算契约）。resolved=false 时仅 reason/reasonDetail/入参回显有值；
+ * reason 机器可读码（AMBIGUOUS_POOL / RECIPE_NOT_AUTHORIZED / PPID_MAPPING_INACTIVE 等）。
+ */
+export interface RecipeResolveView {
+  resolved: boolean;
+  reason?: string | null;
+  reasonDetail?: string | null;
+  productCode?: string | null;
+  flowId: string;
+  flowCode?: string | null;
+  familyCode?: string | null;
+  flowVersionNo?: number | null;
+  flowStatus?: string | null;
+  nodeId: string;
+  stepCode?: string | null;
+  operationCode?: string | null;
+  logicalRecipeRef?: string | null;
+  logicalSource?: string | null;
+  equipmentCode: string;
+  assignRowId?: string | null;
+  assignScope?: string | null;
+  assignPriority?: number | null;
+  recipeRule?: string | null;
+  ppid?: string | null;
+  ppidSource?: string | null;
+  chamberCode?: string | null;
+  rmsVersionNo?: number | null;
+  rmsVersionStatus?: string | null;
+  bodyHash?: string | null;
+  variableParams?: RecipeResolveVarValue[] | null;
+  resolvedAt?: string | null;
+}
+
+
 
 /**
  * 流程版本生命周期（V14）：UNFROZEN 未冻结（草稿，可编辑）/ FROZEN 已冻结（待激活）/
@@ -626,6 +782,21 @@ export interface FlowView {
   familyCode?: string | null;
   /** 族内版本号（1..n）。 */
   versionNo?: number | null;
+  // ---- V22 ICM：生效闸 / 分组轴 / 标注 / 编辑锁 ----
+  /** 参数校验态（activate 硬前置）。 */
+  validateState?: 'NOT_VALID' | 'VALID' | 'INVALID' | null;
+  /** 校验摘要（如「1 ERROR / 2 WARN」）。 */
+  validateMsg?: string | null;
+  validateTime?: string | null;
+  /** 站点分组轴（P2 填数据）。 */
+  stageCode?: string | null;
+  /** 返工流程标注（空 = 正常流程）。 */
+  reworkOfFamily?: string | null;
+  /** 返工流程整体计数上限（V23；reworkOfFamily 非空时生效）。 */
+  reworkCountLimit?: number | null;
+  /** 编辑锁（人 vs 人；画布 XML 整份回传覆盖的并发保护）。 */
+  isOccupied?: boolean | null;
+  occupiedBy?: string | null;
 }
 
 /** 解析产物节点视图（stepNo = XML 原顺序；nodeId = 边引用锚点）。 */
@@ -636,6 +807,8 @@ export interface FlowStepView {
   stepName?: string | null;
   stepType: string;
   stepNo: number;
+  /** 引用工序编码（START/END/DECISION 为空）。 */
+  operationCode?: string | null;
   recipeRef?: string | null;
   equipType?: string | null;
   /** 能力需求覆写（V21；可空 = 继承所引工序默认能力）。 */
@@ -657,6 +830,12 @@ export interface FlowStepView {
   inspectPlan?: string | null;
   /** 抽样率（INSPECT，V14；百分比 0-100）。 */
   samplingRate?: number | null;
+  // ---- V22 ICM 覆盖列（NULL = 继承工序默认） ----
+  reticleRef?: string | null;
+  contamLevel?: string | null;
+  contamForbidden?: string | null;
+  /** NPW 投片上限（片数，V23；可空 = 不限）。 */
+  npwLimit?: number | null;
 }
 
 /** 解析产物边视图（from/to = XML 节点 id）。 */
@@ -668,13 +847,15 @@ export interface FlowEdgeView {
   conditionExpr?: string | null;
 }
 
-/** 跨站 Q-time 约束（V14；from/to = XML 节点 id）。 */
+/** 跨站 Q-time 约束（V14；from/to = XML 节点 id；alarmCode V23）。 */
 export interface FlowQtimeView {
   id: string;
   fromNodeId: string;
   toNodeId: string;
   maxMinutes: number;
   action: 'HOLD' | 'SCRAP';
+  /** 超限联动告警码（V23；可空 = 不告警）。 */
+  alarmCode?: string | null;
 }
 
 /** 流程详情（主档含 XML + 全部解析产物；画布页一次拉全）。 */
@@ -685,6 +866,18 @@ export interface FlowDetail {
   qtimes?: FlowQtimeView[];
 }
 
+/** 流程域事件历史行（V24，P3-2；动作级事件，detail=变更摘要 JSON）。 */
+export interface FlowEventView {
+  id: string;
+  flowId: string;
+  flowCode: string;
+  entityType: string;
+  action: string;
+  actor?: string | null;
+  detail?: string | null;
+  eventTime: string;
+}
+
 /** 主档新建/更新请求（flowCode 服务端走 NamingRule 占号）。 */
 export interface FlowPayload {
   flowName: string;
@@ -692,6 +885,12 @@ export interface FlowPayload {
   remark?: string | null;
   description?: string | null;
   flowKind?: 'MAIN' | 'SUB' | null;
+  /** 站点分组轴（拍板项 G，P2 填数据）。 */
+  stageCode?: string | null;
+  /** 返工流程标注（空 = 正常流程）。 */
+  reworkOfFamily?: string | null;
+  /** 返工流程整体计数上限（V23）。 */
+  reworkCountLimit?: number | null;
 }
 
 /** 画布保存请求：整份 XML 回传（单一事实源口径）。 */
@@ -829,36 +1028,6 @@ export interface ReasonCodeUpdatePayload {
   sortNo?: number | null;
   description?: string | null;
   enabled?: boolean | null;
-}
-
-/** WIP 原因事件视图（展示全部走快照字段，不随主数据演进变化）。 */
-export interface WipReasonEventView {
-  id: string;
-  lotId: string;
-  waferId?: string | null;
-  operationCode?: string | null;
-  equipmentCode?: string | null;
-  eventType: string;
-  reasonId: string;
-  occurredAt: string;
-  operator?: string | null;
-  reasonCodeSnapshot: string;
-  reasonTypeSnapshot: string;
-  reasonPathSnapshot: string;
-  owningDeptSnapshot?: string | null;
-  reasonNameSnapshot?: string | null;
-}
-
-/** WIP 事件创建请求（occurredAt 空 = 当前时刻）。 */
-export interface WipReasonEventPayload {
-  lotId: string;
-  waferId?: string | null;
-  operationCode?: string | null;
-  equipmentCode?: string | null;
-  eventType: string;
-  reasonId: string;
-  occurredAt?: string | null;
-  operator?: string | null;
 }
 
 // ============================================================ 班组排班（V17）

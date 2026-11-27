@@ -53,4 +53,8 @@ public class CimFlowQtime extends BaseDefData {
     /** 超限动作：HOLD / SCRAP。 */
     @Column(name = "action", length = 16, nullable = false)
     private String action;
+
+    /** 超限联动告警码（V23；逻辑引用告警定义，MVP 不守门存在性；可空=不告警）。 */
+    @Column(name = "alarm_code", length = 64)
+    private String alarmCode;
 }

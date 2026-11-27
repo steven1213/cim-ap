@@ -68,7 +68,7 @@ CREATE INDEX idx_cim_bank_rule_to ON cim_bank_transfer_rule (to_bank_id);
 
 -- ---------------------------------------------------------------- 演示种子（二号 Stocker，跨库规则演示用）
 INSERT INTO cim_equipment (id, version, deleted, create_time, create_user,
-                           equipment_code, equipment_name, type_code,
+                           equipment_code, equipment_name, class_code,
                            location_type, location_id,
                            is_enabled, is_occupied)
 VALUES ('seed-eqp-06', 0, FALSE, CURRENT_TIMESTAMP, 'seed',

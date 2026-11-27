@@ -91,6 +91,10 @@ public class RmsSecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/i18n/**")
                         .permitAll()
+                        // IF-M2 PPID 解析：服务间密钥守门（IntegrationApiKeyFilter），不走 JWT
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/rms/integration/recipe-ppid")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((request, response, ex) ->
                         response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized")))

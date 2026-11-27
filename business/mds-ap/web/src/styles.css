@@ -1206,3 +1206,428 @@ table.naming-seg-table th {
 .op-copy-bar .op-search {
   width: 220px;
 }
+
+/* 机台组成员块（ToolGroupPage 详情）：同机型成员 chip + 就地移出 */
+.toolgroup-members {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cim-border, #e5e7eb);
+}
+.toolgroup-members-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.toolgroup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.toolgroup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 10px;
+  border: 1px solid var(--cim-border, #e5e7eb);
+  border-radius: 12px;
+  font-size: 12px;
+}
+.toolgroup-chip-x {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  color: inherit;
+}
+.toolgroup-chip-x:hover {
+  color: var(--cim-danger, #d4537e);
+}
+.toolgroup-adder {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---------------- ICM 继承式约束模型（V22）：节点参数页 / 来源四级标注 / 对比 ---------------- */
+.icm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.icm-layout > .cim-datatable > .panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.icm-detail {
+  overflow: auto;
+  min-height: 0;
+}
+.icm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.icm-table th {
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--cim-border, #e2e8f0);
+  color: var(--cim-text-secondary, #64748b);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.icm-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--cim-border-weak, #eef2f7);
+  vertical-align: middle;
+}
+.icm-src-step {
+  color: #2563eb; /* 节点覆盖=蓝 */
+  font-size: 12px;
+  white-space: nowrap;
+}
+.icm-src-flow {
+  color: #0d9488; /* 流程覆盖=青 */
+  font-size: 12px;
+  white-space: nowrap;
+}
+.icm-src-op {
+  color: var(--cim-text-secondary, #64748b); /* 工序默认=灰 */
+  font-size: 12px;
+  white-space: nowrap;
+}
+.icm-src-missing {
+  color: #dc2626; /* 缺失=红 */
+  font-size: 12px;
+  white-space: nowrap;
+}
+.icm-warn {
+  color: #d97706;
+  font-size: 12.5px;
+  margin: 4px 0;
+}
+.icm-req {
+  color: #dc2626;
+  margin-left: 2px;
+}
+.icm-diff-l {
+  color: #2563eb;
+  font-weight: 500;
+}
+.icm-diff-r {
+  color: #d97706;
+  font-weight: 500;
+}
+.flow-compare-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---- 流程三段式导入向导（P2/P07） ---- */
+.import-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.import-step {
+  border-left: 3px solid var(--cim-border, #d0d7de);
+  padding: 6px 12px;
+  opacity: 0.6;
+}
+
+.import-step.active {
+  border-left-color: var(--cim-primary, #2563eb);
+  opacity: 1;
+}
+
+.import-step h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.import-step p {
+  margin: 2px 0;
+}
+
+/* ---- 流程总览（FlowOverviewPage，P3-4） ---- */
+.flow-overview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.flow-overview-head {
+  flex-shrink: 0;
+}
+
+.ov-stats {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.ov-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cim-text-secondary, #64748b);
+}
+
+.ov-stat b {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cim-text, #1f2937);
+}
+
+.ov-stat.icm-warn b {
+  color: #d97706;
+}
+
+.ov-marks {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ov-tag-main,
+.ov-tag-bypass {
+  font-style: normal;
+  font-size: 11.5px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.ov-tag-main {
+  color: var(--cim-primary, #2563eb);
+  background: var(--primary-soft, rgba(37, 99, 235, 0.1));
+}
+
+.ov-tag-bypass {
+  color: var(--cim-text-secondary, #64748b);
+  background: var(--primary-soft, rgba(100, 116, 139, 0.12));
+}
+
+/* ---- 产品级覆盖弹窗（ProductFlowPage，P3-1） ---- */
+.ov-section {
+  margin: 14px 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cim-text, #1f2937);
+  border-left: 3px solid var(--cim-primary, #2563eb);
+  padding-left: 8px;
+}
+
+/* ---- 产品绑定页（产品主视角主从页）：右面板纵向布局，绑定清单区吃满剩余高度并滚动 ---- */
+.pf-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pf-detail-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.pf-bind-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---- 流程绑定直观展示：绑定键 mono 主行 + 流程名 dim 副行；产品详情绑定卡片 ---- */
+.pf-bind-key {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  font-weight: 600;
+}
+.pf-bind-name {
+  display: block;
+  font-size: 12px;
+}
+.pf-bind-section {
+  margin-top: 12px;
+  padding-top: 4px;
+}
+.pf-bind-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+/* ============================================================
+   产品管理操作动线步骤索引（GuideBar，7 步主链）
+   当前页高亮；已过步淡显可回跳；未到步可点击预览。颜色全走平台令牌。
+   ============================================================ */
+.guide-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.guide-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.guide-step .guide-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+}
+
+.guide-step.is-done {
+  color: var(--text-2);
+}
+
+.guide-step.is-done .guide-no {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.guide-step.is-current {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.guide-step.is-current .guide-no {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.guide-step:not(.is-current):hover {
+  color: var(--primary);
+}
+
+.guide-step + .guide-step::before {
+  content: '→';
+  margin-right: 2px;
+  color: var(--muted);
+}
+
+/* ============================================================
+   EDC 工程数采（V28）：导入弹窗 / 方案明细维护块
+   ============================================================ */
+.edc-import-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.edc-import-report {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.edc-import-report p {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.edc-import-fails {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.edc-import-fails th,
+.edc-import-fails td {
+  border-top: 1px solid var(--line);
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.edc-import-fails th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.edc-plan-items-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.edc-plan-items-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.edc-item-adder {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* 报告模板成员编辑行：SVID 数字框 + 参数下拉 + 删除 */
+.edc-tpl-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.edc-tpl-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.edc-tpl-row .edc-tpl-svid {
+  width: 110px;
+  flex: none;
+}
+
+.edc-tpl-row select {
+  flex: 1;
+}
+

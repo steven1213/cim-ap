@@ -18,8 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 原因码（V16）API——主数据 {@code /api/v1/mds/reason-code-types|reason-codes}
- * + WIP 事件示例 {@code /api/v1/mds/wip-reason-events}。
+ * 原因码（V16）API——主数据 {@code /api/v1/mds/reason-code-types|reason-codes}。
  */
 @RestController
 @RequestMapping("/api/v1/mds")
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReasonCodeController {
 
     private final ReasonCodeAdminService adminService;
-    private final WipReasonEventService eventService;
 
     // ---------------------------------------------------------------- 类型
 
@@ -70,14 +68,6 @@ public class ReasonCodeController {
         return Result.ok(adminService.listCodes(typeKey, keyword));
     }
 
-    /** WIP 下拉口径：type 匹配 + 启用。 */
-    @PreAuthorize("hasAuthority('" + MdsPermissions.REASON_VIEW + "')")
-    @GetMapping("/reason-codes/enabled")
-    public Result<List<ReasonCodeAdminService.ReasonView>> listEnabled(
-            @RequestParam String typeKey) {
-        return Result.ok(adminService.listEnabledByType(typeKey));
-    }
-
     @PreAuthorize("hasAuthority('" + MdsPermissions.REASON_CREATE + "')")
     @PostMapping("/reason-codes")
     public Result<ReasonCodeAdminService.ReasonView> createCode(
@@ -97,23 +87,5 @@ public class ReasonCodeController {
     public Result<Void> deleteCode(@PathVariable String id) {
         adminService.deleteCode(id);
         return Result.ok(null);
-    }
-
-    // ---------------------------------------------------------------- WIP 事件（示例域）
-
-    /** 事件履历（lotId 可选过滤；按发生时间倒序）。 */
-    @PreAuthorize("hasAuthority('" + MdsPermissions.REASON_VIEW + "')")
-    @GetMapping("/wip-reason-events")
-    public Result<List<WipReasonEventService.EventView>> listEvents(
-            @RequestParam(required = false) String lotId) {
-        return Result.ok(eventService.list(lotId));
-    }
-
-    /** 创建事件（快照五件套同事务落库）。 */
-    @PreAuthorize("hasAuthority('" + MdsPermissions.REASON_UPDATE + "')")
-    @PostMapping("/wip-reason-events")
-    public Result<WipReasonEventService.EventView> createEvent(
-            @RequestBody WipReasonEventService.EventCreateReq req) {
-        return Result.ok(eventService.create(req));
     }
 }

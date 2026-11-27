@@ -17,6 +17,7 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import type { BankTransferRule, Equipment, StockerBank } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 存储区 Bank（StockerBank）——Stocker 内逻辑存储分区 + Bank 间转运规则。
@@ -283,6 +284,7 @@ export default function BankPage() {
 
   return (
     <Page>
+      <GuideBar />
       <div className="bank-toolbar">
         <select
           className="topo-group-filter"

@@ -23,14 +23,14 @@ import com.cim.spring.support.web.BizCode;
  *           operationCode="OP-LITHO-DEV" recipeRef="" equipType="LITHO" qtimeMin="" qtimeMax="" reworkLimit=""
  *           flowRef="" batchMode="BATCH" batchSize="12" holdPoint="true" holdReason=""
  *           inspectPlan="EDC-01" samplingRate="25"
- *           capabilityCode="CAP-LITHO-01" edcPlanCode="" x="120" y="80">
+ *           capabilityCode="CAP-LITHO-01" edcPlanCode="" npwLimit="12" x="120" y="80">
  *       <bin code="GOOD" name="良品" type="PASS"/>
  *     </node>
  *   </nodes>
  *   <edges>
  *     <edge id="e1" from="n1" to="n2" edgeType="MAIN" condition=""/>
  *   </edges>
- *   <qtime from="n1" to="n2" maxMinutes="120" action="HOLD"/>
+ *   <qtime from="n1" to="n2" maxMinutes="120" action="HOLD" alarmCode="ALM-QT-01"/>
  * </canvas>
  * }</pre>
  *
@@ -48,7 +48,7 @@ public final class CanvasXmlSupport {
     public static final String ROOT = "canvas";
     public static final String VERSION = "1";
 
-    /** 解析出的画布节点（XML 原顺序）。 */
+    /** 解析出的画布节点（XML 原顺序）。V22 增 ICM 覆盖属性：reticleRef/contamLevel/contamForbidden。 */
     public record CanvasNode(String id, String stepCode, String stepName, String stepType,
                              String operationCode,
                              String recipeRef, String equipType, String qtimeMin,
@@ -56,7 +56,9 @@ public final class CanvasXmlSupport {
                              String flowRef, String batchMode, String batchSize,
                              boolean holdPoint, String holdReason,
                              String inspectPlan, String samplingRate,
-                             String capabilityCode, String edcPlanCode) {
+                             String capabilityCode, String edcPlanCode,
+                             String reticleRef, String contamLevel, String contamForbidden,
+                             String npwLimit) {
     }
 
     /** 解析出的画布边（XML 原顺序）。 */
@@ -67,8 +69,8 @@ public final class CanvasXmlSupport {
     public record CanvasBin(String nodeId, String binCode, String binName, String binType, int sortNo) {
     }
 
-    /** 解析出的跨站 Q-time 约束（XML 里 <canvas> 下的 <qtime> 子元素，原顺序；V14）。 */
-    public record CanvasQtime(String from, String to, String maxMinutes, String action) {
+    /** 解析出的跨站 Q-time 约束（XML 里 <canvas> 下的 <qtime> 子元素，原顺序；V14；alarmCode V23）。 */
+    public record CanvasQtime(String from, String to, String maxMinutes, String action, String alarmCode) {
     }
 
     /** 解析结果（保持 XML 原顺序）。 */
@@ -114,7 +116,9 @@ public final class CanvasXmlSupport {
                     opt(el, "flowRef"), opt(el, "batchMode"), opt(el, "batchSize"),
                     Boolean.parseBoolean(el.getAttribute("holdPoint")), opt(el, "holdReason"),
                     opt(el, "inspectPlan"), opt(el, "samplingRate"),
-                    opt(el, "capabilityCode"), opt(el, "edcPlanCode")));
+                    opt(el, "capabilityCode"), opt(el, "edcPlanCode"),
+                    opt(el, "reticleRef"), opt(el, "contamLevel"), opt(el, "contamForbidden"),
+                    opt(el, "npwLimit")));
             // DECISION 节点的 <bin> 子元素（词表；V13）
             NodeList binEls = el.getElementsByTagName("bin");
             for (int j = 0; j < binEls.getLength(); j++) {
@@ -138,7 +142,8 @@ public final class CanvasXmlSupport {
         for (int i = 0; i < qtimeEls.getLength(); i++) {
             Element el = (Element) qtimeEls.item(i);
             qtimes.add(new CanvasQtime(attr(el, "from", i, "qtime"), attr(el, "to", i, "qtime"),
-                    attr(el, "maxMinutes", i, "qtime"), attr(el, "action", i, "qtime")));
+                    attr(el, "maxMinutes", i, "qtime"), attr(el, "action", i, "qtime"),
+                    opt(el, "alarmCode")));
         }
         return new CanvasDoc(nodes, edges, bins, qtimes);
     }

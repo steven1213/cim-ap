@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P03 节点参数批量维护（ICM 生效值视图）</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  input,select { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .ok { background:#dcfce7; color:#15803d; } .miss { background:#fee2e2; color:#b91c1c; } .part { background:#fef3c7; color:#b45309; }
+  .inh { background:#f1f5f9; color:#64748b; } .ovr { background:#eff6ff; color:#1d4ed8; }
+  .col { display:flex; flex-direction:column; gap:12px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; display:flex; align-items:center; gap:8px; }
+  h3 span { flex:1; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr.sel { background:#eef2ff; }
+  td.inh2 { color:#64748b; font-style:italic; }
+  .tabs { display:flex; gap:2px; padding:8px 12px 0; border-bottom:1px solid var(--line); }
+  .tab { padding:6px 14px; border:1px solid transparent; border-bottom:none; border-radius:7px 7px 0 0; cursor:pointer; font-size:12.5px; color:#64748b; }
+  .tab.on { background:#fff; border-color:var(--line); color:var(--p); font-weight:650; }
+  .tab .n { background:#fee2e2; color:#b91c1c; border-radius:8px; padding:0 6px; font-size:11px; margin-left:4px; }
+  .grid3 { display:grid; grid-template-columns:1.15fr 1.25fr 1fr; gap:0; }
+  .grid3 > div { border-right:1px solid var(--line); min-height:330px; }
+  .grid3 > div:last-child { border-right:none; }
+  .kv { padding:12px 14px; }
+  .kv .row { display:flex; margin-bottom:9px; align-items:flex-start; } .kv label { width:96px; color:#64748b; font-size:12.5px; flex-shrink:0; padding-top:4px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+  .warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; border-radius:6px; padding:6px 10px; font-size:12px; margin:10px 14px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>节点参数批量维护</b>
+  <span class="tag ok">FLOW-A31-CMP-V3 · FROZEN 只读（示意切 UNFROZEN 可编辑）</span>
+  <span style="flex:1"></span>
+  <button class="btn">⬇ 导出 Excel（导出<b>生效值</b>+来源列）</button>
+  <button class="btn">⬆ Excel 导入 <a href="p07-import-wizard.html" style="color:#fff">(P07)</a></button>
+  <button class="btn p">保存参数</button>
+</div>
+<div class="col">
+  <div class="panel">
+    <h3>① 节点列表<span>「缺参」= 解析后（覆盖∪工序默认）仍缺失的必填项</span></h3>
+    <table>
+      <tr><th></th><th>顺序</th><th>step_code</th><th>工序列</th><th>类型</th><th>指派</th><th>光罩</th><th>污染</th><th>KV</th><th>覆盖数</th><th>参数齐备</th></tr>
+      <tr><td><input type="checkbox"></td><td>10</td><td>DEP-OX-100</td><td>DEP</td><td>MAIN</td><td class="inh2">继承 2 行</td><td class="inh2">继承</td><td class="inh2">继承</td><td class="inh2">继承 3</td><td>0</td><td><span class="tag ok">✓ 零覆盖即齐备</span></td></tr>
+      <tr class="sel"><td><input type="checkbox" checked></td><td>20</td><td>LTH-CR-200</td><td>LITHO</td><td>MAIN</td><td>继承 1 行 + 覆盖 1 行</td><td><span class="tag ovr">覆盖</span></td><td class="inh2">继承</td><td>覆盖 2</td><td>4</td><td><span class="tag miss">✗ 缺腔位规则</span></td></tr>
+      <tr><td><input type="checkbox"></td><td>30</td><td>DEV-300</td><td>DEV</td><td>MAIN</td><td class="inh2">继承 2 行</td><td>—</td><td>覆盖 1</td><td class="inh2">继承 1</td><td>1</td><td><span class="tag part">部分</span></td></tr>
+      <tr><td><input type="checkbox"></td><td>40</td><td>INS-TX-400</td><td>INS</td><td>MAIN</td><td>覆盖 3 行</td><td>—</td><td class="inh2">继承</td><td>覆盖 5</td><td>8</td><td><span class="tag ok">✓</span></td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h3>② 节点 LTH-CR-200 参数<span>生效值 = 沿 ContextChain 取最特异层（来源列标注：节点覆盖/流程覆盖/工序默认）</span></h3>
+    <div class="tabs">
+      <div class="tab on">执行指派 <span class="n">1</span></div>
+      <div class="tab">光罩 / 污染</div>
+      <div class="tab">其他参数 KV</div>
+    </div>
+    <div class="grid3">
+      <div>
+        <table>
+          <tr><th>来源（ContextChain）</th><th>类型</th><th>目标</th><th>腔</th><th>优先</th></tr>
+          <tr class="inh2"><td>工序默认</td><td>组</td><td>EQG-LITHO-NS</td><td>任意</td><td>200</td></tr>
+          <tr class="sel"><td><span class="tag ovr">节点覆盖</span></td><td>组</td><td>EQG-LIT-SCN-A</td><td><span style="color:#b91c1c">未填</span></td><td>100</td></tr>
+        </table>
+        <div class="note"><b>操作：</b>＋ 添加覆盖指派（本节点=STEP 层）· 编辑/删除仅限覆盖行；流程覆盖行（青）在「流程参数」入口整条维护；工序默认行（灰）去工序页改。指派类型=组/机/机型（来源 cim_tool_group / cim_equipment / cim_equipment_class，按工序 equip_class 预筛）。</div>
+      </div>
+      <div>
+        <div class="kv">
+          <div class="row"><label>腔位规则 JSON</label><textarea rows="3">{"EXACT_MATCH":{"slots":{"1":["CH-A","CH-B"]}}}</textarea></div>
+          <div class="row"><label>Recipe 规则</label><div style="flex:1"><span class="tag ovr">覆盖</span> EXACT_MATCH / 键缺 <b style="color:#b91c1c">resin</b></div></div>
+          <div class="row"><label>工序默认 Recipe</label><div class="v" style="color:#64748b;font-style:italic">FIXED · RCP-LIT-DEV（未覆盖时生效）</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="kv">
+          <div class="row"><label>引用校验</label><div class="v"><span class="tag miss">EXACT_MATCH 未含 slot 1 腔位</span></div></div>
+          <div class="row"><label>保存时机</label><div class="v">仅写覆盖行/覆盖列（UNFROZEN 才允许，否则 2004）；继承行不动</div></div>
+          <div class="row"><label>批量还原</label><div class="v">勾选节点 →「还原工序默认」批量清空覆盖</div></div>
+        </div>
+        <div class="warn">⚠ 校验提示即时展示但不拦截保存（最终以 P08 校验报告为准，生效前必须 VALID）。</div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="background:#fff;border:1px solid var(--line);border-radius:8px"><b>ICM 动线（对标 FsdModeler 双区升级）：</b>选流程 → 选节点 → 看生效值与来源 → 只改覆盖项 → 保存；「参数齐备」=ContextResolver 解析后必填全满足（覆盖∪工序默认）；全节点齐备才可能 VALID。数据：<b>cim_equip_assign</b>（scope=OPERATION/FLOW/STEP 三层统一表）+ cim_flow_step 覆盖列 + cim_constraint_attr。<a href="index.html">← 返回索引</a> · <a href="p04-param-def.html">→ 参数定义字典（P04）</a></div>
+</div>
+</body>
+</html>

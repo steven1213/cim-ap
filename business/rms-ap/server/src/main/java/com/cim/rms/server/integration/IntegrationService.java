@@ -59,6 +59,8 @@ public class IntegrationService {
     private final ParamSpecService specService;
     private final GoldenService goldenService;
     private final ToolRecipeMapService toolRecipeMapService;
+    private final ToolRecipeMapRepository toolRecipeMapRepository;
+    private final com.cim.rms.server.device.DeviceChamberRepository deviceChamberRepository;
     private final RmsHoldRepository holdRepository;
     private final RmsAlarmRepository alarmRepository;
     private final IntegrationIdempotencyService idempotency;
@@ -378,6 +380,85 @@ public class IntegrationService {
         }
         audit.success("RUN_CHECK", device.getCode(), "Run 校验通过 " + recipe.getCode() + " v" + active.getVersionNo());
         return new RunCheckResult("QUALIFIED", recipe.getCode(), active.getVersionNo(), null, now());
+    }
+
+    // ==================== IF-M2 PPID 解析（MES/MDS → RMS） ====================
+
+    /**
+     * IF-M2 EC 层翻译：**只读、幂等天然成立（无副作用），不走幂等表**。
+     *
+     * <p>配方解算契约（docs/business/mds-ap/server/recipe-resolve-design.md §3）：
+     * 设备（code ≡ MDS equipment_code）→ 配方（code = MDS logical recipeRef）→ 生效版本
+     * （body_hash = Checksum 熔断锚点）→ tool_recipe_map（机台精确行优先、机型通用行兜底）
+     * → 资格矩阵。任何一环不满足都以机器可读 {@code status} 返回（HTTP 200），
+     * 调用方按 status 决定熔断原因。</p>
+     */
+    @Transactional(readOnly = true)
+    public PpidResolveView resolvePpid(PpidResolveReq req) {
+        Device device = deviceRepository.findByCodeAndDeletedFalse(req.deviceCode()).orElse(null);
+        if (device == null) {
+            return blocked(req, "DEVICE_NOT_FOUND");
+        }
+        if (device.getStatus() != com.cim.rms.server.device.DeviceStatus.ENABLED) {
+            return blocked(req, "DEVICE_DISABLED");
+        }
+        Recipe recipe = recipeRepository.findByCodeAndDeletedFalse(req.recipeCode()).orElse(null);
+        if (recipe == null) {
+            return blocked(req, "RECIPE_NOT_FOUND");
+        }
+        RecipeVersion active = activeVersion(recipe);
+        if (active == null) {
+            return blocked(req, "NO_ACTIVE_VERSION");
+        }
+        // 机台精确行优先，机型通用行兜底（device_id 空 = 按机型映射，V9 口径）
+        List<ToolRecipeMap> maps = toolRecipeMapRepository.findByRecipeIdAndDeletedFalse(recipe.getId())
+                .stream().filter(ToolRecipeMap::isActive).toList();
+        ToolRecipeMap hit = maps.stream()
+                .filter(m -> device.getId().equals(m.getDeviceId()))
+                .findFirst()
+                .orElseGet(() -> maps.stream()
+                        .filter(m -> m.getDeviceId() == null
+                                && device.getDeviceTypeId() != null
+                                && device.getDeviceTypeId().equals(m.getDeviceTypeId()))
+                        .findFirst()
+                        .orElse(null));
+        if (hit == null) {
+            return blocked(req, "MAPPING_INACTIVE");
+        }
+        QualificationService.QualCheck qc = qualificationService.check(
+                recipe.getId(), device.getId(), active.getId());
+        if (!"QUALIFIED".equals(qc.result())) {
+            PpidResolveView v = new PpidResolveView("NOT_QUALIFIED", device.getCode(), recipe.getCode(),
+                    hit.getPpidOnTool(), chamberCode(hit.getChamberId()), active.getVersionNo(),
+                    active.getStatus().name(), active.getBodyHash(), qc.reason(), Instant.now());
+            return v;
+        }
+        return new PpidResolveView("RESOLVED", device.getCode(), recipe.getCode(), hit.getPpidOnTool(),
+                chamberCode(hit.getChamberId()), active.getVersionNo(), active.getStatus().name(),
+                active.getBodyHash(), null, Instant.now());
+    }
+
+    private PpidResolveView blocked(PpidResolveReq req, String status) {
+        return new PpidResolveView(status, req.deviceCode(), req.recipeCode(),
+                null, null, null, null, null, null, Instant.now());
+    }
+
+    private String chamberCode(String chamberId) {
+        if (chamberId == null || chamberId.isBlank()) {
+            return null;
+        }
+        return deviceChamberRepository.findById(chamberId)
+                .filter(c -> !Boolean.TRUE.equals(c.getDeleted()))
+                .map(com.cim.rms.server.device.DeviceChamber::getCode)
+                .orElse(null);
+    }
+
+    public record PpidResolveReq(String deviceCode, String recipeCode) {
+    }
+
+    public record PpidResolveView(String status, String deviceCode, String recipeCode, String ppid,
+                                  String chamberCode, Integer versionNo, String versionStatus,
+                                  String bodyHash, String reason, Instant checkedAt) {
     }
 
     // ==================== 批量操作（W9，Req 缺口 #2） ====================

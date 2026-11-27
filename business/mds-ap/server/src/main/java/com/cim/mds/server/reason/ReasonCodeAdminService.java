@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>治理纪律</b>：{@code reasonCode} 全局唯一、建后不可改（命名规则
  * REASON_CODE 守门，无规则时手填直通）；{@code typeKey} 建后不可改（语义归属
  * 唯一，跨域挪用应新建码而非改旧码）；不物理删除；{@code enabled=false} 只影响
- * 未来下拉可见性。删除守门：有子节点或有 WIP 事件引用的码不可删。</p>
+ * 未来下拉可见性。删除守门：有子节点的码不可删。</p>
  *
  * <p><b>树口径</b>：树即码——{@code parent_id} 自关联 + {@code node_path} 物化路径
  * 长在码上，每码必挂树。挪树（改父节点）时整棵子树重算路径与层级；环（把自己挂到
@@ -33,7 +33,6 @@ public class ReasonCodeAdminService {
 
     private final CimReasonCodeTypeRepository typeRepository;
     private final CimReasonCodeRepository codeRepository;
-    private final CimWipReasonEventRepository eventRepository;
     private final NamingRuleAdminService namingRuleService;
 
     // ---------------------------------------------------------------- 视图 / 请求
@@ -206,29 +205,8 @@ public class ReasonCodeAdminService {
             throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
                     "存在子节点，请先移除或删除子级: " + reason.getReasonCode());
         }
-        if (eventRepository.existsByReasonIdAndDeletedFalse(reason.getId())) {
-            throw new BizException(BizCode.OPERATION_NOT_ALLOWED,
-                    "原因码已被 WIP 事件引用，不可删除（可停用）: " + reason.getReasonCode());
-        }
         reason.setDeleted(true);
         codeRepository.save(reason);
-    }
-
-    /** WIP 下拉口径：type 匹配 + enabled（停用码不进新事务）。 */
-    @Transactional(readOnly = true)
-    public List<ReasonView> listEnabledByType(String typeKey) {
-        requireTypeByKey(typeKey);
-        Map<String, String> codeById = new HashMap<>();
-        List<CimReasonCode> codes = codeRepository
-                .findByTypeKeyAndDeletedFalseOrderByNodePathAsc(typeKey);
-        for (CimReasonCode c : codes) {
-            codeById.put(c.getId(), c.getReasonCode());
-        }
-        return codeRepository
-                .findByTypeKeyAndEnabledTrueAndDeletedFalseOrderBySortNoAscNodePathAsc(typeKey)
-                .stream()
-                .map(c -> toView(c, codeById))
-                .toList();
     }
 
     // ---------------------------------------------------------------- 内部

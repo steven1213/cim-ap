@@ -159,8 +159,8 @@
 | T10-3 | **Pellicle（光罩保护膜）**：`mds_reticle` 增 `pellicle_type` / `pellicle_transmittance` / `pellicle_install_date` / `pellicle_life_policy_id`；复用 `usage_policy` 增加 pellicle 阈值维度 | 🟠 P1 | ⏸ | [reticle-design 附录 B](reticle-design.md) |
 | T10-4 | **晶圆图规格与 Zone**：新增 `mds_wafer_map_spec`（die grid / `edge_exclusion_mm` / notch 方向 / E142）+ `mds_wafer_zone`（RADIAL / RECT）；**实际 map 归 MES/YMS，MDS 只存口径** | 🟠 P1 | ⏸ | [reason-defect-design 附录 A](reason-defect-design.md) |
 | T10-5 | **`recipe_class` 权威码表**：`RECIPE_CLASS`（`PROCESS`/`METROLOGY`/`CLEAN`/`CALIBRATION`/`SETUP`/`MAINTENANCE`/`OTHER`），三处 `recipe_class` 统一为码表引用（建议与 T9-1 同批） | 🟡 P2 | ⏸ | [recipe-design 附录 B](recipe-design.md) |
-| T10-6 | **`map_spec_id` 挂载点**：产品默认 + 工序级覆盖 | 🟡 P2 | ⏸ | [product-design](product-design.md) / [route-design](route-design.md) |
-| T10-7 | **匹配度量与 tool matching 分工**：匹配实测值（均值/方差/极差）归分析系统；跨设备匹配用 `mds_equipment_group`（派工组）而非 chamber match | 🟡 P2 | ⏸ | [equipment-design](equipment-design.md) / [process-flow-design](process-flow-design.md) |
+| T10-6 | **`map_spec_id` 挂载点**：产品默认 + 工序级覆盖 | 🟡 P2 | ⏸ | [product-design](product-design.md) / [flow-modeling/20-our-design](flow-modeling/20-our-design.md) |
+| T10-7 | **匹配度量与 tool matching 分工**：匹配实测值（均值/方差/极差）归分析系统；跨设备匹配用 `mds_equipment_group`（派工组）而非 chamber match | 🟡 P2 | ⏸ | [equipment-design](equipment-design.md) / [flow-modeling/20-our-design](flow-modeling/20-our-design.md) |
 | T10-8 | **封装形式（Package Type）**：新增 `mds_package_type`（`family`/`pin_count`/`ball_pitch`/尺寸/可靠性等级）+ `mds_product.package_type_code`（可空）；FT 派工按封装筛 handler / load board / socket | 🟠 P1 | ⏸ | [product-design 附录 A](product-design.md) |
 | T10-9 | **批容量（Batch Size）**：`mds_equipment_capability` 增 `BATCH_SIZE` / `BATCH_SIZE_MIN`（与 `process_mode=BATCH` 配套）；组批校验「装载量 ≤ 载具容量 ≤ 设备批容量」 | 🟠 P1 | ⏸ | [equipment-design 附录 C](equipment-design.md) |
 

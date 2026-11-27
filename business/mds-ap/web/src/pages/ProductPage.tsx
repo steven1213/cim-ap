@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { useResource } from '@cim/data';
 import {
   Can,
   CimButton,
@@ -16,23 +18,25 @@ import {
 import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useMasterDetail, type DetailMode } from '@/lib/useMasterDetail';
-import type { Product } from '@/types';
+import type { FlowView, Product, ProductNpwType, ProductUsage } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 产品（ProductPage，动线改版）——产品管理域第二个页面（SiView：Technology → Product → Route）。
  *
  * <p>布局为「左列表 + 右详情」主从结构（{@link useMasterDetail} 统一动线）：高频动线
  * （搜索 → 点选 → 就地编辑 → 保存）零弹窗；新建/批量删除在列表工具栏；编辑/删除贴详情头。
- * 编辑先抢锁（type=product）、保存同事务清锁、取消显式释放。行业通用口径：类型
- * PROD=量产/NPW=陪片；tech_code 逻辑引用制程技术（下拉选择，引用守门在后端）；
- * productCode 建后不可改（MES 按 code 引用）。</p>
+ * 编辑先抢锁（type=product）、保存同事务清锁、取消显式释放。行业通用口径（V26 定稿）：
+ * usageType 5 值（量产/工程/实验/测试验证/NPW），NPW 必选二级细分；tech_code 逻辑引用
+ * 制程技术（下拉选择，引用守门在后端）；productCode 建后不可改（MES 按 code 引用）。</p>
  */
 
 interface ProductFormState {
   productCode: string;
   productName: string;
   techCode: string;
-  productType: 'PROD' | 'NPW';
+  usageType: ProductUsage;
+  npwType: ProductNpwType | '';
   productGroup: string;
   waferType: string;
   owner: string;
@@ -45,7 +49,8 @@ function formFrom(row: Product | null): ProductFormState {
     productCode: row?.productCode ?? '',
     productName: row?.productName ?? '',
     techCode: row?.techCode ?? '',
-    productType: (row?.productType ?? 'PROD') as ProductFormState['productType'],
+    usageType: row?.usageType ?? 'PRODUCTION',
+    npwType: row?.npwType ?? '',
     productGroup: row?.productGroup ?? '',
     waferType: row?.waferType ?? '',
     owner: row?.owner ?? '',
@@ -78,6 +83,30 @@ export default function ProductPage() {
     isDirty: () => modeRef.current !== 'view' && JSON.stringify(form) !== initialJsonRef.current,
   });
   modeRef.current = md.mode;
+
+  // 绑定状态（ACTIVE 流程列 + 「绑定流程」跳转）：全量绑定一次加载，产品码映射
+  const navigate = useNavigate();
+  const bindsRes = useResource(({ signal }) => api.listProductFlows(undefined, signal));
+  const flowsRes = useResource(({ signal }) => api.listFlows(undefined, signal));
+  const activeByProduct = useMemo(() => {
+    const m = new Map<string, api.ProductFlowBinding>();
+    (bindsRes.data ?? []).forEach((b) => {
+      if (b.bindState === 'ACTIVE') m.set(b.productCode, b);
+    });
+    return m;
+  }, [bindsRes.data]);
+  // 族+版本 → 具体流程（取流程名，绑定信息直观展示）
+  const flowByVersion = useMemo(() => {
+    const m = new Map<string, FlowView>();
+    (flowsRes.data ?? []).forEach((f) => {
+      m.set(`${f.familyCode ?? f.flowCode}#${f.versionNo ?? 1}`, f);
+    });
+    return m;
+  }, [flowsRes.data]);
+  const selectedActiveBind = md.selected ? activeByProduct.get(md.selected.productCode) ?? null : null;
+  const selectedActiveFlow = selectedActiveBind
+    ? flowByVersion.get(`${selectedActiveBind.flowFamilyCode}#${selectedActiveBind.flowVersionNo}`) ?? null
+    : null;
 
   // 详情表单下拉数据源（页面级加载一次）
   const [techs, setTechs] = useState<Awaited<ReturnType<typeof api.listTechnologies>>>([]);
@@ -120,7 +149,8 @@ export default function ProductPage() {
       const payload = {
         productName: form.productName.trim(),
         techCode: form.techCode || null,
-        productType: form.productType,
+        usageType: form.usageType,
+        npwType: form.usageType === 'NPW' ? form.npwType || null : null,
         productGroup: form.productGroup || null,
         waferType: form.waferType || null,
         owner: form.owner || null,
@@ -146,13 +176,29 @@ export default function ProductPage() {
       { key: 'productCode', titleKey: 'mds.product.code', width: 150, mono: true },
       { key: 'productName', titleKey: 'mds.product.name', width: 180, ellipsis: true, render: (r) => <span className="flow-name-main">{r.productName}</span> },
       {
-        key: 'productType',
-        titleKey: 'mds.product.type',
-        width: 80,
-        render: (r) => t(r.productType === 'NPW' ? 'mds.product.typeNpw' : 'mds.product.typeProd'),
+        key: 'usageType',
+        titleKey: 'mds.product.usageType',
+        width: 120,
+        render: (r) =>
+          r.usageType === 'NPW' && r.npwType
+            ? `${t(`mds.product.usage.${r.usageType}`)} · ${t(`mds.product.npw.${r.npwType}`)}`
+            : t(`mds.product.usage.${r.usageType}`),
       },
       { key: 'productGroup', titleKey: 'mds.product.group', width: 110, render: (r) => groupDict.labelOf(r.productGroup) },
       { key: 'techCode', titleKey: 'mds.product.tech', width: 100, mono: true, render: (r) => r.techCode ?? '—' },
+      {
+        key: 'activeFlow',
+        titleKey: 'mds.productFlow.col.activeFlow',
+        width: 150,
+        render: (r) => {
+          const b = activeByProduct.get(r.productCode);
+          return b ? (
+            <span className="op-ref-yes">{b.flowFamilyCode} V{b.flowVersionNo}</span>
+          ) : (
+            <span className="dim">{t('mds.productFlow.notBound')}</span>
+          );
+        },
+      },
       { key: 'waferType', titleKey: 'mds.product.waferType', width: 100, render: (r) => waferDict.labelOf(r.waferType) },
       {
         key: 'enabled',
@@ -167,7 +213,7 @@ export default function ProductPage() {
       { key: 'owner', titleKey: 'mds.product.owner', width: 90, render: (r) => r.owner ?? '—' },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, groupDict, waferDict],
+    [t, groupDict, waferDict, activeByProduct],
   );
 
   // 详情头动作（对象级，贴详情头）
@@ -176,6 +222,14 @@ export default function ProductPage() {
       <Can perm={MDS_PERMS.product.update}>
         <CimButton type="primary" size="small" onClick={() => void openEdit(md.selected!)}>
           {t('mds.common.edit')}
+        </CimButton>
+      </Can>
+      <Can perm={MDS_PERMS.productFlow.view}>
+        <CimButton
+          size="small"
+          onClick={() => navigate(`/product-bindings?product=${encodeURIComponent(md.selected!.productCode)}`)}
+        >
+          {t('mds.product.bindFlow')}
         </CimButton>
       </Can>
       <Can perm={MDS_PERMS.product.delete}>
@@ -197,13 +251,27 @@ export default function ProductPage() {
       { kind: 'text', key: 'productName', labelKey: 'mds.product.name', required: true },
       {
         kind: 'select',
-        key: 'productType',
-        labelKey: 'mds.product.type',
-        options: [
-          { value: 'PROD', label: t('mds.product.typeProd') },
-          { value: 'NPW', label: t('mds.product.typeNpw') },
-        ],
+        key: 'usageType',
+        labelKey: 'mds.product.usageType',
+        options: (['PRODUCTION', 'ENGINEERING', 'EXPERIMENT', 'TEST', 'NPW'] as ProductUsage[]).map((v) => ({
+          value: v,
+          label: t(`mds.product.usage.${v}`),
+        })),
       },
+      ...(form.usageType === 'NPW'
+        ? [
+            {
+              kind: 'select' as const,
+              key: 'npwType' as const,
+              labelKey: 'mds.product.npwType',
+              required: true,
+              options: (['MONITOR', 'DUMMY', 'SEASON', 'LITHO', 'GENERIC'] as ProductNpwType[]).map((v) => ({
+                value: v,
+                label: t(`mds.product.npw.${v}`),
+              })),
+            },
+          ]
+        : []),
       {
         kind: 'select',
         key: 'techCode',
@@ -219,11 +287,12 @@ export default function ProductPage() {
       { kind: 'textarea', key: 'remark', labelKey: 'mds.common.remark', span: 2 },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [md.mode, techOptions, t],
+    [md.mode, techOptions, t, form.usageType],
   );
 
   return (
     <Page>
+      <GuideBar />
       <div className="op-layout">
         <DataTable<Product>
           titleKey="mds.product.listTitle"
@@ -299,9 +368,39 @@ export default function ProductPage() {
                 fields={fields}
                 value={form}
                 disabled={md.mode === 'view'}
-                onChange={(patch: Record<string, unknown>) => setForm((f) => ({ ...f, ...(patch as Partial<ProductFormState>) }))}
+                onChange={(patch: Record<string, unknown>) =>
+                  setForm((f) => {
+                    const next = { ...f, ...(patch as Partial<ProductFormState>) };
+                    // 切离 NPW 时清空二级细分（服务端守门：非 NPW 必须为空）
+                    if (patch.usageType && patch.usageType !== 'NPW') next.npwType = '';
+                    return next;
+                  })
+                }
                 columns={2}
               />
+
+              {md.mode === 'view' && (
+                <div className="pf-bind-section">
+                  <h4 className="ov-section">{t('mds.product.flowSection')}</h4>
+                  {selectedActiveBind ? (
+                    <div className="pf-bind-card">
+                      <span className="pf-bind-key">
+                        {selectedActiveBind.flowFamilyCode} V{selectedActiveBind.flowVersionNo}
+                      </span>
+                      {selectedActiveFlow && <span className="dim">{selectedActiveFlow.flowName}</span>}
+                      <span className="flow-status flow-status-active">
+                        {t('mds.productFlow.state.ACTIVE')}
+                      </span>
+                      <span className="dim">
+                        {selectedActiveBind.activeTime?.replace('T', ' ').slice(0, 16) ?? '—'}
+                        {selectedActiveBind.activeUser ? ` · ${selectedActiveBind.activeUser}` : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="dim">{t('mds.product.noActiveBind')}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </Panel>

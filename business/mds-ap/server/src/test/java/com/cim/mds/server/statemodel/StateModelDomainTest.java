@@ -161,14 +161,14 @@ class StateModelDomainTest {
         // 建设备（SBY 起步）→ 合法转换 SBY→PRD → 非法跨跳 PRD→ENG 拒绝（OPERATION_NOT_ALLOWED→400）
         equipmentId = create("/api/v1/mds/equipments", Map.of(
                 "equipmentCode", "EQP-ST-001", "equipmentName", "状态守门测试机",
-                "typeCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
+                "classCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
                 "stateCode", "SBY"));
 
         mvc.perform(put("/api/v1/mds/equipments/" + equipmentId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of(
                                 "equipmentCode", "EQP-ST-001", "equipmentName", "状态守门测试机",
-                                "typeCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
+                                "classCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
                                 "stateCode", "PRD"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.stateCode").value("PRD"));
@@ -177,7 +177,7 @@ class StateModelDomainTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of(
                                 "equipmentCode", "EQP-ST-001", "equipmentName", "状态守门测试机",
-                                "typeCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
+                                "classCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
                                 "stateCode", "ENG"))))
                 .andExpect(status().isBadRequest());
 
@@ -186,7 +186,7 @@ class StateModelDomainTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(Map.of(
                                 "equipmentCode", "EQP-ST-001", "equipmentName", "状态守门测试机·改",
-                                "typeCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
+                                "classCode", "ET-LITHO", "locationType", "STAGE", "locationId", "seed-stage-03",
                                 "stateCode", "PRD"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.equipmentName").value("状态守门测试机·改"));

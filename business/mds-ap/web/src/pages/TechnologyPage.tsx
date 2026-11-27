@@ -16,6 +16,7 @@ import * as api from '@/lib/mdsApi';
 import { MDS_PERMS } from '@/lib/permCodes';
 import { useMasterDetail, type DetailMode } from '@/lib/useMasterDetail';
 import type { Technology } from '@/types';
+import GuideBar from '@/components/GuideBar';
 
 /**
  * 制程技术（TechnologyPage，动线改版）——产品管理域第一个页面（技术节点分类，全局唯一编码）。
@@ -163,6 +164,7 @@ export default function TechnologyPage() {
 
   return (
     <Page>
+      <GuideBar />
       <div className="op-layout">
         <DataTable<Technology>
           titleKey="mds.tech.listTitle"

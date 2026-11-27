@@ -63,7 +63,7 @@ public class MdsDictSeedService {
                     new ItemDef("FACILITY", "厂务/公用工程", 60),
                     new ItemDef("TOOL", "工装/治具", 70),
                     new ItemDef("OTHER", "其他", 90))),
-            // 设备细类：大类的二级分类（值域与 EquipmentTypeAdminService.KIND_CLASSES 守门一致；
+            // 设备细类：大类的二级分类（值域与 EquipmentClassAdminService.KIND_CLASSES 守门一致；
             // MATERIAL 组含本项目 AMHS 核心子系统 OHS/OHB/NTB）
             new DictDef("mds.equip_class", "设备细类", List.of(
                     new ItemDef("ETCH", "刻蚀机（工艺）", 10),
@@ -120,6 +120,16 @@ public class MdsDictSeedService {
                     new ItemDef("SDT", "计划停机（Scheduled Down）", 40),
                     new ItemDef("UDT", "非计划停机（Unscheduled Down）", 50),
                     new ItemDef("NST", "未排程（Non-Scheduled）", 60))),
+            // 通信控制模式（v2，SEMI E30 口径）：主数据声明——EAP 能否下发指令的契约态
+            new DictDef("mds.equip_control_mode", "通信控制模式", List.of(
+                    new ItemDef("ONLINE_REMOTE", "在线远程（EAP 可下发）", 10),
+                    new ItemDef("ONLINE_LOCAL", "在线本地（EAP 监视，操作员控）", 20),
+                    new ItemDef("LOCAL", "本地（未联网）", 30),
+                    new ItemDef("OFFLINE", "离线", 40))),
+            // 生产/工程模式（v2）：工程机台收试做批，派工侧排除
+            new DictDef("mds.equip_production_mode", "生产模式", List.of(
+                    new ItemDef("PRODUCTION", "生产", 10),
+                    new ItemDef("ENGINEERING", "工程（试做）", 20))),
             new DictDef("mds.unit_state", "子单元状态", List.of(
                     new ItemDef("READY_TO_LOAD", "可放载具（E87）", 10),
                     new ItemDef("READY_TO_UNLOAD", "可取载具（E87）", 20),

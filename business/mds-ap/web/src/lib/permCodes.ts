@@ -54,11 +54,19 @@ export const MDS_PERMS = {
     save: 'sys:dict:save',
     delete: 'sys:dict:remove',
   },
-  equipmentType: {
-    view: 'mds:equipmentType:view',
-    create: 'mds:equipmentType:create',
-    update: 'mds:equipmentType:update',
-    delete: 'mds:equipmentType:delete',
+  // 机型模板（v2 取代 equipmentType；ISA-95 EquipmentClass 口径，带默认约束）
+  equipmentClass: {
+    view: 'mds:equipmentClass:view',
+    create: 'mds:equipmentClass:create',
+    update: 'mds:equipmentClass:update',
+    delete: 'mds:equipmentClass:delete',
+  },
+  // 机台组（v2 新增；ISA-95 Work Center 派工候选池，成员守门同机型）
+  toolGroup: {
+    view: 'mds:toolGroup:view',
+    create: 'mds:toolGroup:create',
+    update: 'mds:toolGroup:update',
+    delete: 'mds:toolGroup:delete',
   },
   equipment: {
     view: 'mds:equipment:view',
@@ -98,6 +106,68 @@ export const MDS_PERMS = {
     create: 'mds:flow:create',
     update: 'mds:flow:update',
     delete: 'mds:flow:delete',
+    validate: 'mds:flow:validate',
+  },
+  // ICM 统一指派（V22：ContextChain 三 scope 一张表，三层分开授权）
+  opAssign: {
+    view: 'mds:opAssign:view',
+    create: 'mds:opAssign:create',
+    update: 'mds:opAssign:update',
+    delete: 'mds:opAssign:delete',
+  },
+  flowAssign: {
+    view: 'mds:flowAssign:view',
+    create: 'mds:flowAssign:create',
+    update: 'mds:flowAssign:update',
+    delete: 'mds:flowAssign:delete',
+  },
+  stepAssign: {
+    view: 'mds:stepAssign:view',
+    create: 'mds:stepAssign:create',
+    update: 'mds:stepAssign:update',
+    delete: 'mds:stepAssign:delete',
+  },
+  // KV 约束参数（context 三层）
+  opAttr: { view: 'mds:opAttr:view', update: 'mds:opAttr:update' },
+  flowAttr: { view: 'mds:flowAttr:view', update: 'mds:flowAttr:update' },
+  stepAttr: { view: 'mds:stepAttr:view', update: 'mds:stepAttr:update' },
+  // 参数定义字典 / 产品绑定
+  paramDef: {
+    view: 'mds:paramDef:view',
+    create: 'mds:paramDef:create',
+    update: 'mds:paramDef:update',
+    delete: 'mds:paramDef:delete',
+  },
+  // EDC 工程数采（V28：参数集 / 设备接口映射 / 方案）
+  edcSet: {
+    view: 'mds:edcSet:view',
+    create: 'mds:edcSet:create',
+    update: 'mds:edcSet:update',
+    delete: 'mds:edcSet:delete',
+  },
+  edcTpl: {
+    view: 'mds:edcTpl:view',
+    create: 'mds:edcTpl:create',
+    update: 'mds:edcTpl:update',
+    delete: 'mds:edcTpl:delete',
+  },
+  edcMap: {
+    view: 'mds:edcMap:view',
+    create: 'mds:edcMap:create',
+    update: 'mds:edcMap:update',
+    delete: 'mds:edcMap:delete',
+  },
+  edcPlan: {
+    view: 'mds:edcPlan:view',
+    create: 'mds:edcPlan:create',
+    update: 'mds:edcPlan:update',
+    delete: 'mds:edcPlan:delete',
+  },
+  productFlow: {
+    view: 'mds:productFlow:view',
+    create: 'mds:productFlow:create',
+    update: 'mds:productFlow:update',
+    delete: 'mds:productFlow:delete',
   },
   // 工序库：P-T-R-O 四层建模 O 层（Operation 独立主数据，跨路线复用；V20）
   operation: {
@@ -106,7 +176,11 @@ export const MDS_PERMS = {
     update: 'mds:operation:update',
     delete: 'mds:operation:delete',
   },
-  // 原因码：WIP 事件归因主数据（树即码 + 事件快照治理）
+  // 配方解算契约（V29）：POST /recipe/resolve 执行权（工序可变参数维护复用 operation.update）
+  recipeResolve: {
+    resolve: 'mds:recipe:resolve',
+  },
+  // 原因码：WIP 事件归因主数据（树即码；消费方 MES 运行域按事件引用）
   reason: {
     view: 'mds:reason:view',
     create: 'mds:reason:create',

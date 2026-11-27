@@ -2,6 +2,7 @@ package com.cim.mds.server.site;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -29,7 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 产品（Product）集成测试：创建（含 tech 引用守门）/ 全局编码重复拒绝 /
- * 非法 productType 拒绝 / 编辑锁生命周期（抢锁→保存清锁）/ 删除。
+ * 非法 usageType 拒绝 / NPW 细分守门（缺 npwType、非 NPW 带 npwType、NPW 创建成功）/
+ * 编辑锁生命周期（抢锁→保存清锁）/ 删除。
  *
  * <p>权限 {@code mds:product:*}，认证关闭直通；锁 type=product（V6 起入白名单）。
  * 注意：Flyway 种子进测试库，断言用独特关键字、不依赖库内总量。</p>
@@ -82,18 +84,36 @@ class ProductAdminTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(2001));
 
-        // 非法 productType → PARAM_INVALID(2000)
+        // 非法 usageType → PARAM_INVALID(2000)
         mvc.perform(post("/api/v1/mds/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"productCode":"PROD-X","productName":"X","productType":"BOND"}
+                                {"productCode":"PROD-X","productName":"X","usageType":"BOND"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2000));
+
+        // NPW 必须带 npwType → PARAM_INVALID(2000)
+        mvc.perform(post("/api/v1/mds/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productCode":"NPW-X","productName":"缺细分","usageType":"NPW"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2000));
+
+        // 非 NPW 带了 npwType → PARAM_INVALID(2000)
+        mvc.perform(post("/api/v1/mds/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productCode":"PROD-Y","productName":"多余细分","usageType":"PRODUCTION","npwType":"DUMMY"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(2000));
 
         productId = create("""
                 {"productCode":"PROD-TEST-01","productName":"集成测试产品",
-                 "techCode":"TECH-01","productType":"PROD","productGroup":"CIS",
+                 "techCode":"TECH-01","usageType":"PRODUCTION","productGroup":"CIS",
                  "waferType":"EPI","owner":"tester","enabled":true}
                 """);
         assertThat(productId).isNotBlank();
@@ -111,9 +131,27 @@ class ProductAdminTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].techCode").value("TECH-01"))
-                .andExpect(jsonPath("$.data[0].productType").value("PROD"))
+                .andExpect(jsonPath("$.data[0].usageType").value("PRODUCTION"))
+                .andExpect(jsonPath("$.data[0].npwType").value(Matchers.nullValue()))
                 .andExpect(jsonPath("$.data[0].productGroup").value("CIS"))
                 .andExpect(jsonPath("$.data[0].waferType").value("EPI"));
+    }
+
+    @Test
+    @Order(15)
+    void npwProductRequiresSubtypeAndSaves() throws Exception {
+        // NPW + 合法细分 → 创建成功，npwType 落库（V26 定稿口径）
+        String npwId = create("""
+                {"productCode":"NPW-TEST-01","productName":"控挡片",
+                 "usageType":"NPW","npwType":"MONITOR","enabled":true}
+                """);
+        assertThat(npwId).isNotBlank();
+        mvc.perform(get("/api/v1/mds/products").param("keyword", "NPW-TEST-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].usageType").value("NPW"))
+                .andExpect(jsonPath("$.data[0].npwType").value("MONITOR"));
+        mvc.perform(delete("/api/v1/mds/products/" + npwId)).andExpect(status().isOk());
     }
 
     @Test

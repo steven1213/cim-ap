@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>P01 流程建模列表</title>
+<style>
+  :root { --p:#4f6ef7; --line:#e2e8f0; --muted:#94a3b8; }
+  * { box-sizing:border-box; margin:0; font-family:"Microsoft YaHei",system-ui,sans-serif; }
+  body { background:#f5f7fa; color:#1e293b; padding:16px; font-size:13px; }
+  .top { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:12px; flex-wrap:wrap; }
+  .top b { font-size:15px; margin-right:8px; }
+  .btn { border:1px solid var(--line); background:#fff; border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .btn.p { background:var(--p); border-color:var(--p); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  input,select { border:1px solid var(--line); border-radius:6px; padding:5px 8px; font-size:13px; }
+  .wrap { display:flex; gap:12px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:1.6; }
+  .side { flex:1; min-width:330px; }
+  h3 { font-size:13px; padding:9px 12px; border-bottom:1px solid var(--line); background:#f8fafc; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); font-weight:650; white-space:nowrap; font-size:12.5px; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; white-space:nowrap; font-size:12.5px; }
+  tr.sel { background:#eef2ff; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11.5px; }
+  .unfrozen { background:#f1f5f9; color:#475569; } .frozen { background:#fef3c7; color:#b45309; }
+  .active { background:#dcfce7; color:#15803d; } .disabled { background:#fee2e2; color:#b91c1c; }
+  .valid { background:#dcfce7; color:#15803d; } .invalid { background:#fee2e2; color:#b91c1c; } .notvalid { background:#f1f5f9; color:#64748b; }
+  .kv { padding:12px 14px; }
+  .kv .row { display:flex; margin-bottom:9px; } .kv label { width:96px; color:#64748b; font-size:12.5px; flex-shrink:0; }
+  .kv .v { color:#1e293b; }
+  .pipe { display:flex; align-items:center; gap:6px; padding:12px 14px; border-bottom:1px dashed var(--line); flex-wrap:wrap; }
+  .st { border:1.5px dashed var(--line); border-radius:7px; padding:5px 10px; font-size:12px; color:var(--muted); text-align:center; line-height:1.5; }
+  .st.on { border:1.5px solid var(--p); color:var(--p); background:#eef2ff; font-weight:650; }
+  .ar { color:var(--muted); font-size:11px; }
+  .note { font-size:12px; color:#64748b; line-height:1.8; padding:10px 14px; } .note b { color:#334155; }
+  a { color:var(--p); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>工艺流程</b>
+  <input placeholder="搜索 编码/名称">
+  <select><option>全部技术</option><option>TECH-035</option></select>
+  <select><option>全部状态</option></select>
+  <select><option>全部站点分组</option><option>STG-LITHO</option></select>
+  <span style="flex:1"></span>
+  <button class="btn p">＋ 新建</button>
+  <button class="btn">复制新版本</button>
+  <button class="btn">流程对比</button>
+  <button class="btn" title="任意状态可跑；UNFROZEN 编辑期建议先校验再冻结">✅ 参数校验</button>
+  <button class="btn" title="占用后他人不可保存画布/改覆盖数据；UNFROZEN 且未锁定才可用">🔒 锁定编辑</button>
+  <button class="btn" title="仅锁定人本人可释放">🔓 释放</button>
+  <button class="btn">冻结</button>
+  <button class="btn p" disabled title="validate_state 必须为 VALID">▶ 生效</button>
+  <button class="btn">停用</button>
+  <button class="btn">删除</button>
+</div>
+<div class="wrap">
+  <div class="panel">
+    <h3>流程列表（版本族视图）</h3>
+    <table>
+      <tr><th></th><th>流程编码</th><th>名称</th><th>版本族</th><th>版本</th><th>技术</th><th>站点</th><th>状态</th><th>参数校验</th><th>节点/缺参</th><th>锁定</th><th>更新人/时间</th></tr>
+      <tr class="sel"><td><input type="checkbox" checked></td><td>FLOW-A31-CMP-V3</td><td>A31 平坦化主流程</td><td>FLOW-A31-CMP</td><td>V3</td><td>TECH-035</td><td>STG-CMP</td><td><span class="tag frozen">FROZEN</span></td><td><span class="tag invalid">INVALID</span></td><td>12 / <b style="color:#b91c1c">1</b></td><td>—</td><td>zhang.s · 11-25 08:41</td></tr>
+      <tr><td><input type="checkbox"></td><td>FLOW-A31-CMP-V2</td><td>A31 平坦化主流程</td><td>FLOW-A31-CMP</td><td>V2</td><td>TECH-035</td><td>STG-CMP</td><td><span class="tag disabled">DISABLED</span></td><td><span class="tag valid">VALID</span></td><td>12 / 0</td><td>—</td><td>zhang.s · 11-18 14:02</td></tr>
+      <tr><td><input type="checkbox"></td><td>FLOW-LITHO-B2-V5</td><td>B2 光刻主流程</td><td>FLOW-LITHO-B2</td><td>V5</td><td>TECH-035</td><td>STG-LITHO</td><td><span class="tag active">ACTIVE</span></td><td><span class="tag valid">VALID</span></td><td>28 / 0</td><td>—</td><td>li.q · 11-20 09:15</td></tr>
+      <tr><td><input type="checkbox"></td><td>FLOW-REWORK-INS-V1</td><td>量测失败返工</td><td>FLOW-REWORK-INS</td><td>V1</td><td>TECH-035</td><td>—</td><td><span class="tag unfrozen">UNFROZEN</span></td><td><span class="tag notvalid">NOT_VALID</span></td><td>4 / 2</td><td><span style="color:#b45309">🔒 zhang.s 编辑中</span></td><td>zhang.s · 11-25 09:02</td></tr>
+    </table>
+    <div class="note"><b>行操作：</b>双击行进画布（UNFROZEN 未锁定）；「节点/缺参」列显示启用 Operation 节点数与缺机台指派数（来自 GET /flows/{id}/step-flags）。</div>
+  </div>
+  <div class="panel side">
+    <h3>选中：FLOW-A31-CMP-V3（详情）</h3>
+    <div class="pipe">
+      <div class="st on">UNFROZEN<br><span style="font-size:10px">画布/参数可编辑</span></div><span class="ar">freeze→</span>
+      <div class="st">FROZEN<br><span style="font-size:10px">全只读·可校验</span></div><span class="ar">VALID+activate→</span>
+      <div class="st">ACTIVE<br><span style="font-size:10px">产品可绑定</span></div><span class="ar">disable→</span>
+      <div class="st">DISABLED</div>
+    </div>
+    <div class="kv">
+      <div class="row"><label>参数校验</label><div class="v"><span class="tag invalid">INVALID</span> <a href="p08-validation.html">查看报告（1 ERROR / 2 WARN）</a></div></div>
+      <div class="row"><label>校验时间</label><div class="v">11-25 08:41 · zhang.s</div></div>
+      <div class="row"><label>复制来源</label><div class="v">FLOW-A31-CMP-V2（copy 搬运参数 118 条 / 缺参 1 节点）</div></div>
+      <div class="row"><label>产品绑定</label><div class="v">PRD-A31-64M → 本族 V2（<a href="p06-product-bind.html">迁移提示</a>）</div></div>
+      <div class="row"><label>编辑锁</label><div class="v">未锁定 · <a href="#">锁定编辑</a>（占用后他人不可保存/改覆盖数据）</div></div>
+      <div class="row"><label>审计</label><div class="v" style="font-size:12px;color:#64748b">copy @11-24 16:00 · freeze @11-25 08:39 · validate @11-25 08:41</div></div>
+    </div>
+    <div class="note"><b>状态机铁律：</b>① UNFROZEN 才可编辑画布与参数（且须先锁定编辑）② 校验任意状态可跑，UNFROZEN 编辑期边改边校 ③ 生效硬校验 validate_state=VALID（2004 拒绝）④ 生效自动降级同族旧 ACTIVE ⑤ 复制需 UNFROZEN/FROZEN，按 step_code 映射搬运参数（rule 不自动复制）⑥ 停用前若有 ACTIVE 产品绑定则 2004 拒绝。<br><a href="p02-flow-canvas.html">→ 进画布编辑（P02）</a> · <a href="p05-flow-compare.html">→ 流程对比（P05）</a></div>
+  </div>
+</div>
+</body>
+</html>

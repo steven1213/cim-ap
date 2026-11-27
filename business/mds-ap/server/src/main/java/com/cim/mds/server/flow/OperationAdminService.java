@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.cim.mds.server.equipment.CimCapabilityRepository;
-import com.cim.mds.server.equipment.CimEquipmentTypeRepository;
+import com.cim.mds.server.equipment.CimEquipmentClassRepository;
 import com.cim.mds.server.site.CimTechnologyRepository;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
@@ -46,8 +46,10 @@ public class OperationAdminService {
     private final CimOperationRepository operationRepository;
     private final CimFlowStepRepository stepRepository;
     private final CimTechnologyRepository technologyRepository;
-    private final CimEquipmentTypeRepository equipmentTypeRepository;
+    private final CimEquipmentClassRepository equipmentClassRepository;
     private final CimCapabilityRepository capabilityRepository;
+    private final CimOperationVariableParamRepository varParamRepository;
+    private final CimParamDefRepository paramDefRepository;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -334,7 +336,7 @@ public class OperationAdminService {
         if (!StringUtils.hasText(equipType)) {
             return null;
         }
-        if (equipmentTypeRepository.findByTypeCodeAndDeletedFalse(equipType).isEmpty()) {
+        if (equipmentClassRepository.findByClassCodeAndDeletedFalse(equipType).isEmpty()) {
             throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.operation.equipTypeNotFound", equipType);
         }
         return equipType;
@@ -428,5 +430,75 @@ public class OperationAdminService {
                 o.getNpwPlan(), o.getChamberSelect(),
                 o.getRemark(), o.getDescription(),
                 stepRepository.existsByOperationCodeAndDeletedFalse(o.getOpCode()));
+    }
+
+    // ------------------------------------------------------------------ 可变参数（V29：Wafer Recipe 层落点）
+
+    /** 可变参数视图（min/max 为 MDS 防呆快照；范围真值锚点在 RMS param_spec）。 */
+    public record VarParamView(String id, String paramKey, String defaultValue,
+                               String minValue, String maxValue, String overrideLevel, Integer sortNo) {
+    }
+
+    /** 可变参数整单替换请求（opId 由路径给出；paramKey 引用 cim_param_def 且须启用）。 */
+    public record VarParamReq(String paramKey, String defaultValue,
+                              String minValue, String maxValue, String overrideLevel, Integer sortNo) {
+    }
+
+    /** 工序可变参数列表（任意状态可读；解算端点也用它）。 */
+    @Transactional(readOnly = true)
+    public List<VarParamView> listVarParams(String opId) {
+        requireOperation(opId);
+        return varParamRepository.findByOpIdAndDeletedFalseOrderBySortNoAscParamKeyAsc(opId).stream()
+                .map(p -> new VarParamView(p.getId(), p.getParamKey(), p.getDefaultValue(),
+                        p.getMinValue(), p.getMaxValue(), p.getOverrideLevel(), p.getSortNo()))
+                .toList();
+    }
+
+    /**
+     * 可变参数整单替换（replace-all，镜像 EDC tpl items）。
+     * 守门：仅 UNFROZEN 版本可维护（冻结/生效走复制新版，与主字段同口径）；
+     * param_key 必须在参数定义注册且启用；同单内不允许重复键。
+     */
+    @Transactional
+    public List<VarParamView> saveVarParams(String opId, List<VarParamReq> items) {
+        CimOperation op = requireOperation(opId);
+        requireDraft(op);
+        Set<String> seen = new java.util.HashSet<>();
+        List<CimOperationVariableParam> fresh = new java.util.ArrayList<>();
+        int autoSort = 0;
+        for (VarParamReq r : items == null ? List.<VarParamReq>of() : items) {
+            if (!StringUtils.hasText(r.paramKey())) {
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.common.fieldRequired", "paramKey");
+            }
+            String key = r.paramKey().trim();
+            CimParamDef def = paramDefRepository.findByAttrKeyAndDeletedFalse(key).orElse(null);
+            if (def == null || !Boolean.TRUE.equals(def.getEnabled())) {
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.paramNotDefined", key);
+            }
+            String level = r.overrideLevel() == null ? CimOperationVariableParam.LEVEL_NONE
+                    : r.overrideLevel().trim();
+            if (!Set.of(CimOperationVariableParam.LEVEL_NONE, CimOperationVariableParam.LEVEL_LOT,
+                    CimOperationVariableParam.LEVEL_WAFER, CimOperationVariableParam.LEVEL_SLOT)
+                    .contains(level)) {
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.overrideLevelInvalid", level);
+            }
+            if (!seen.add(key)) {
+                throw BizException.of(BizCode.OPERATION_NOT_ALLOWED, "mds.biz.operation.paramDuplicate", key);
+            }
+            CimOperationVariableParam p = new CimOperationVariableParam();
+            p.setOpId(opId);
+            p.setParamKey(key);
+            p.setDefaultValue(blankToNull(r.defaultValue()));
+            p.setMinValue(blankToNull(r.minValue()));
+            p.setMaxValue(blankToNull(r.maxValue()));
+            p.setOverrideLevel(level);
+            p.setSortNo(r.sortNo() == null ? autoSort : r.sortNo());
+            fresh.add(p);
+            autoSort++;
+        }
+        varParamRepository.deleteByOpId(opId);
+        varParamRepository.flush();
+        varParamRepository.saveAll(fresh);
+        return listVarParams(opId);
     }
 }

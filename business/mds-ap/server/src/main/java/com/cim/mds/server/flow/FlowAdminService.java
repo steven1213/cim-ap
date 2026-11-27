@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.cim.mds.server.equipment.CimEquipmentTypeRepository;
+import com.cim.mds.server.equipment.CimEquipmentClassRepository;
 import com.cim.mds.server.flow.CanvasXmlSupport.CanvasBin;
 import com.cim.mds.server.flow.CanvasXmlSupport.CanvasDoc;
 import com.cim.mds.server.flow.CanvasXmlSupport.CanvasEdge;
@@ -85,10 +85,21 @@ public class FlowAdminService {
     private final CimFlowBinRepository binRepository;
     private final CimFlowQtimeRepository qtimeRepository;
     private final CimTechnologyRepository technologyRepository;
-    private final CimEquipmentTypeRepository equipmentTypeRepository;
+    private final CimEquipmentClassRepository equipmentClassRepository;
     private final com.cim.mds.server.equipment.CimCapabilityRepository capabilityRepository;
     private final CimOperationRepository operationRepository;
     private final NamingRuleAdminService namingRuleService;
+    // ICM（V22）：约束校验 / 指派 / KV / 绑定 / 校验明细
+    private final FlowValidateService flowValidateService;
+    private final CimFlowValidateResultRepository validateResultRepository;
+    private final CimEquipAssignRepository assignRepository;
+    private final CimConstraintAttrRepository attrRepository;
+    private final CimParamDefRepository paramDefRepository;
+    private final CimProductFlowRepository productFlowRepository;
+    // 事件历史（V24，P3-2）：动作级事件统一写入口
+    private final FlowEventService flowEventService;
+    // 实时通知（P3-3）：validate ERROR / 绑定变更 → 编辑锁占用者
+    private final FlowNotifyService flowNotifyService;
 
     // ------------------------------------------------------------------ 视图 / 请求
 
@@ -96,18 +107,24 @@ public class FlowAdminService {
     public record FlowView(String id, String flowCode, String flowName, String techCode,
                            String status, String flowXml, String remark, String description,
                            String flowKind, int stepCount,
-                           String familyCode, Integer versionNo) {
+                           String familyCode, Integer versionNo,
+                           String validateState, String validateMsg, String validateTime,
+                           String stageCode, String reworkOfFamily, Integer reworkCountLimit,
+                           Boolean isOccupied, String occupiedBy) {
     }
 
     /** 解析产物节点视图（stepNo = XML 原顺序； nodeId = 边引用锚点；operationCode = 引用工序库，V20；
-     *  capabilityCode/edcPlanCode = 能力需求/EDC Plan 覆写（V21，可空 = 继承工序默认）。 */
+     *  capabilityCode/edcPlanCode = 能力需求/EDC Plan 覆写（V21，可空 = 继承工序默认）；
+     *  reticleRef/contamLevel/contamForb（V22 ICM 覆盖列，NULL=继承）。 */
     public record StepView(String id, String nodeId, String stepCode, String stepName,
                            String stepType, String operationCode, Integer stepNo, String recipeRef, String equipType,
                            Integer qtimeMin, Integer qtimeMax, Integer reworkLimit,
                            String flowRef, String batchMode, Integer batchSize,
                            Boolean holdPoint, String holdReason,
-                           String inspectPlan, BigDecimal samplingRate,
-                           String capabilityCode, String edcPlanCode) {
+                           String inspectPlan, java.math.BigDecimal samplingRate,
+                           String capabilityCode, String edcPlanCode,
+                           String reticleRef, String contamLevel, String contamForbidden,
+                           Integer npwLimit) {
     }
 
     /** 解析产物边视图（from/to = XML 节点 id）。 */
@@ -115,9 +132,9 @@ public class FlowAdminService {
                            String edgeType, String conditionExpr) {
     }
 
-    /** 跨站 Q-time 视图（from/to = XML 节点 id）。 */
+    /** 跨站 Q-time 视图（from/to = XML 节点 id；alarmCode V23）。 */
     public record QtimeView(String id, String fromNodeId, String toNodeId,
-                            Integer maxMinutes, String action) {
+                            Integer maxMinutes, String action, String alarmCode) {
     }
 
     /** 流程详情（主档含 XML + 全部解析产物；画布页一次拉全）。 */
@@ -128,9 +145,12 @@ public class FlowAdminService {
     /**
      * 主档新建/更新请求。flowCode 可空：有启用规则留空自动占号、手填走正则守门；
      * 无启用规则时必须手填（与产品域语义一致）。flowKind MAIN/SUB（可空默认 MAIN）。
+     * stageCode/reworkOfFamily/reworkCountLimit = 站点分组轴 / 返工流程标注 / 返工计数上限
+     * （V23 主档编辑入口，拍板项 G「P2 填数据」）。
      */
     public record FlowReq(String flowCode, String flowName, String techCode,
-                          String remark, String description, String flowKind) {
+                          String remark, String description, String flowKind,
+                          String stageCode, String reworkOfFamily, Integer reworkCountLimit) {
     }
 
     /** 画布保存请求：整份 XML 回传（单一事实源口径）。 */
@@ -181,10 +201,16 @@ public class FlowAdminService {
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setFlowKind(requireFlowKind(req.flowKind()));
+        entity.setStageCode(blankToNull(req.stageCode()));
+        entity.setReworkOfFamily(blankToNull(req.reworkOfFamily()));
+        entity.setReworkCountLimit(req.reworkCountLimit());
         entity.setStatus(CimFlow.STATUS_UNFROZEN);
         entity.setFamilyCode(code); // 新建 = 自成版本族
         entity.setVersionNo(1);
-        return toView(flowRepository.save(entity), 0);
+        CimFlow saved = flowRepository.save(entity);
+        flowEventService.record(saved.getId(), saved.getFlowCode(), FlowEventService.T_FLOW,
+                "CREATE", FlowEventService.summary("flowName", saved.getFlowName(), "techCode", saved.getTechCode()));
+        return toView(saved, 0);
     }
 
     /** 主档更新（只吃名称/技术/备注/种类；flowCode 与画布不在这里动）。 */
@@ -192,12 +218,19 @@ public class FlowAdminService {
     public FlowView update(String id, FlowReq req) {
         CimFlow entity = requireFlow(id);
         requireDraft(entity);
+        requireNotLockedByOther(entity);
         requireText(req.flowName(), "flowName");
         entity.setFlowName(req.flowName().trim());
         entity.setTechCode(requireTech(req.techCode()));
         entity.setRemark(req.remark());
         entity.setDescription(req.description());
         entity.setFlowKind(requireFlowKind(req.flowKind()));
+        entity.setStageCode(blankToNull(req.stageCode()));
+        entity.setReworkOfFamily(blankToNull(req.reworkOfFamily()));
+        entity.setReworkCountLimit(req.reworkCountLimit());
+        flowEventService.record(id, entity.getFlowCode(), FlowEventService.T_FLOW,
+                "UPDATE", FlowEventService.summary("flowName", entity.getFlowName(),
+                        "stageCode", entity.getStageCode(), "reworkOfFamily", entity.getReworkOfFamily()));
         return toView(flowRepository.save(entity), countSteps(id));
     }
 
@@ -214,7 +247,230 @@ public class FlowAdminService {
         stepRepository.findByFlowIdAndDeletedFalseOrderByStepNoAsc(id).forEach(stepRepository::delete);
         binRepository.findByFlowIdAndDeletedFalse(id).forEach(binRepository::delete);
         qtimeRepository.findByFlowIdAndDeletedFalse(id).forEach(qtimeRepository::delete);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "DELETE",
+                FlowEventService.summary("status", flow.getStatus()));
         flowRepository.delete(flow);
+    }
+
+    // ------------------------------------------------------------------ ICM（V22）：编辑锁 / 工序刷新 / 解析
+
+    /** 编辑锁判定：被他人占用即拒绝（锁管「人 vs 人」，四态管「版本生命周期」，两层独立）。 */
+    private static void requireNotLockedByOther(CimFlow flow) {
+        if (Boolean.TRUE.equals(flow.getIsOccupied())
+                && flow.getOccupiedBy() != null
+                && !flow.getOccupiedBy().equals(com.cim.mds.server.site.EditLockSupport.currentUser())) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.lockedByOther", flow.getOccupiedBy());
+        }
+    }
+
+    /** 锁定编辑（UNFROZEN 且未锁；占用后他人不可保存画布/改覆盖数据）。 */
+    @Transactional
+    public FlowView lock(String id) {
+        CimFlow flow = requireFlow(id);
+        requireDraft(flow);
+        if (Boolean.TRUE.equals(flow.getIsOccupied())
+                && !flow.getOccupiedBy().equals(com.cim.mds.server.site.EditLockSupport.currentUser())) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.lockedByOther", flow.getOccupiedBy());
+        }
+        flow.setIsOccupied(Boolean.TRUE);
+        flow.setOccupiedBy(com.cim.mds.server.site.EditLockSupport.currentUser());
+        flow.setOccupiedAt(java.time.LocalDateTime.now());
+        return toView(flowRepository.save(flow), countSteps(id));
+    }
+
+    /** 释放编辑锁（仅锁定人本人）。 */
+    @Transactional
+    public FlowView unlock(String id) {
+        CimFlow flow = requireFlow(id);
+        if (Boolean.TRUE.equals(flow.getIsOccupied())
+                && !flow.getOccupiedBy().equals(com.cim.mds.server.site.EditLockSupport.currentUser())) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.unlockByOther", flow.getOccupiedBy());
+        }
+        flow.setIsOccupied(Boolean.FALSE);
+        flow.setOccupiedBy(null);
+        flow.setOccupiedAt(null);
+        return toView(flowRepository.save(flow), countSteps(id));
+    }
+
+    /** 刷新工序引用 diff（逐节点新旧 op_code）。 */
+    public record OpRefreshDiff(String nodeId, String stepCode, String oldOpCode,
+                                String newOpCode, boolean changed) {
+    }
+
+    /**
+     * 「刷新工序引用」（仅 UNFROZEN + 未锁）：按 op_family_code 将各节点指到族内最新
+     * ACTIVE 版本（WIP 稳定性 = 引用钉版本行，「跟随」由本显式动作承担）。请求体
+     * stepIds 可空 = 全部节点。返回逐节点 diff。
+     */
+    @Transactional
+    public List<OpRefreshDiff> refreshOperations(String id, List<String> stepIds) {
+        CimFlow flow = requireFlow(id);
+        requireDraft(flow);
+        requireNotLockedByOther(flow);
+        List<CimFlowStep> steps = stepRepository.findByFlowIdAndDeletedFalseOrderByStepNoAsc(id);
+        List<OpRefreshDiff> diffs = new ArrayList<>();
+        for (CimFlowStep s : steps) {
+            if (stepIds != null && !stepIds.isEmpty() && !stepIds.contains(s.getNodeId())) {
+                continue;
+            }
+            if (s.getOperationCode() == null || s.getOperationCode().isBlank()) {
+                continue;
+            }
+            CimOperation current = operationRepository
+                    .findByOpCodeAndDeletedFalse(s.getOperationCode()).orElse(null);
+            if (current == null || current.getOpFamilyCode() == null) {
+                continue;
+            }
+            CimOperation latest = operationRepository
+                    .findByOpFamilyCodeAndDeletedFalseAndStatus(
+                            current.getOpFamilyCode(), CimOperation.STATUS_ACTIVE)
+                    .filter(op -> !op.getOpCode().equals(current.getOpCode()))
+                    .orElse(null);
+            if (latest != null) {
+                s.setOperationCode(latest.getOpCode());
+                stepRepository.save(s);
+                diffs.add(new OpRefreshDiff(s.getNodeId(), s.getStepCode(),
+                        current.getOpCode(), latest.getOpCode(), true));
+            } else {
+                diffs.add(new OpRefreshDiff(s.getNodeId(), s.getStepCode(),
+                        current.getOpCode(), current.getOpCode(), false));
+            }
+        }
+        if (!diffs.isEmpty()) {
+            flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_STEP, "REFRESH_OP",
+                    FlowEventService.summary("changed", diffs.stream().filter(OpRefreshDiff::changed).count(),
+                            "scanned", diffs.size()));
+        }
+        return diffs;
+    }
+
+    /** 列表页轻量聚合：每流程启用业务节点数 + 缺指派节点数（避免列表页逐行调 effective）。 */
+    public record StepFlags(String flowId, int businessCount, int unassignedCount) {
+    }
+
+    /** 批量 step-flags（flowIds 逗号分隔；多流程一次算完——批量解析防 N+1）。 */
+    @Transactional(readOnly = true)
+    public List<StepFlags> stepFlags(List<String> flowIds) {
+        List<StepFlags> out = new ArrayList<>();
+        for (String flowId : flowIds) {
+            List<CimFlowStep> steps = stepRepository
+                    .findByFlowIdAndDeletedFalseOrderByStepNoAsc(flowId);
+            List<ContextResolver.NodeEffective> nodes = resolveEffective(flowId, steps);
+            int business = 0;
+            int unassigned = 0;
+            for (ContextResolver.NodeEffective n : nodes) {
+                boolean isBusiness = CimFlowStep.TYPE_PROCESS.equals(n.stepType())
+                        || CimFlowStep.TYPE_INSPECT.equals(n.stepType())
+                        || CimFlowStep.TYPE_REWORK.equals(n.stepType());
+                if (isBusiness) {
+                    business++;
+                    if (n.pool().isEmpty()) {
+                        unassigned++;
+                    }
+                }
+            }
+            out.add(new StepFlags(flowId, business, unassigned));
+        }
+        return out;
+    }
+
+    /** 单节点生效值（ICM 关键端点；预留 product 上下文 P3）。 */
+    @Transactional(readOnly = true)
+    public ContextResolver.NodeEffective effective(String flowId, String nodeId) {
+        requireFlow(flowId);
+        List<CimFlowStep> steps = stepRepository
+                .findByFlowIdAndDeletedFalseOrderByStepNoAsc(flowId);
+        List<ContextResolver.NodeEffective> all = resolveEffective(flowId, steps);
+        return all.stream().filter(n -> n.nodeId().equals(nodeId)).findFirst()
+                .orElseThrow(() -> BizException.of(BizCode.DATA_NOT_FOUND,
+                        "mds.biz.assign.stepNotFound", nodeId));
+    }
+
+    /** 批量生效值（画布渲染/对比/Excel 共用，防逐节点 N+1）。 */
+    @Transactional(readOnly = true)
+    public List<ContextResolver.NodeEffective> effectiveAll(String flowId) {
+        return effectiveAll(flowId, null);
+    }
+
+    /**
+     * 批量生效值·按产品轴（V25 L3）：productCode 非空时启用 PRODUCT 层（绑定行列型覆盖 +
+     * scope=PRODUCT 指派/KV），解析序 PRODUCT &gt; STEP &gt; FLOW &gt; OPERATION；
+     * productCode 空 = 主数据口径（validate 同款，不带产品轴）。
+     */
+    @Transactional(readOnly = true)
+    public List<ContextResolver.NodeEffective> effectiveAll(String flowId, String productCode) {
+        requireFlow(flowId);
+        List<CimFlowStep> steps = stepRepository
+                .findByFlowIdAndDeletedFalseOrderByStepNoAsc(flowId);
+        return resolveEffective(flowId, steps, productCode);
+    }
+
+    /** 组装 ResolveCtx 并解析（校验/flags/effective 共用；纯解析部分在 ContextResolver）。 */
+    private List<ContextResolver.NodeEffective> resolveEffective(String flowId, List<CimFlowStep> steps) {
+        return resolveEffective(flowId, steps, null);
+    }
+
+    private List<ContextResolver.NodeEffective> resolveEffective(String flowId, List<CimFlowStep> steps,
+                                                                 String productCode) {
+        CimFlow flow = flowRepository.findById(flowId).orElseThrow();
+        Set<String> opCodes = new HashSet<>();
+        steps.forEach(s -> {
+            if (s.getOperationCode() != null && !s.getOperationCode().isBlank()) {
+                opCodes.add(s.getOperationCode());
+            }
+        });
+        Map<String, CimOperation> operations = new HashMap<>();
+        for (String code : opCodes) {
+            operationRepository.findByOpCodeAndDeletedFalse(code).ifPresent(op -> operations.put(code, op));
+        }
+        Set<String> families = new HashSet<>();
+        operations.values().forEach(op -> {
+            if (op.getOpFamilyCode() != null) {
+                families.add(op.getOpFamilyCode());
+            }
+        });
+        for (String family : families) {
+            operationRepository.findByOpFamilyCodeAndDeletedFalseAndStatus(
+                    family, CimOperation.STATUS_ACTIVE).ifPresent(op -> operations.put(op.getOpCode(), op));
+        }
+        List<CimEquipAssign> assigns = new ArrayList<>();
+        assigns.addAll(assignRepository.findByScopeTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_FLOW, flowId));
+        assigns.addAll(assignRepository.findByScopeTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_STEP, flowId));
+        for (String code : opCodes) {
+            assigns.addAll(assignRepository.findByScopeTypeAndOperationCodeAndDeletedFalse(
+                    CimEquipAssign.SCOPE_OPERATION, code));
+        }
+        List<CimConstraintAttr> attrs = new ArrayList<>();
+        attrs.addAll(attrRepository.findByContextTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_FLOW, flowId));
+        attrs.addAll(attrRepository.findByContextTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_STEP, flowId));
+        for (String code : opCodes) {
+            attrs.addAll(attrRepository.findByContextTypeAndOperationCodeAndDeletedFalse(
+                    CimEquipAssign.SCOPE_OPERATION, code));
+        }
+        Map<String, CimParamDef> defs = new HashMap<>();
+        paramDefRepository.findByDeletedFalseOrderBySortNoAsc().forEach(d -> defs.put(d.getAttrKey(), d));
+        // V25 L3：产品轴（productCode 非空时挂绑定行 + PRODUCT 指派/KV）
+        CimProductFlow binding = null;
+        List<CimEquipAssign> productAssigns = List.of();
+        List<CimConstraintAttr> productAttrs = List.of();
+        if (productCode != null && !productCode.isBlank()) {
+            String family = flow.getFamilyCode() == null ? flow.getFlowCode() : flow.getFamilyCode();
+            binding = productFlowRepository.findByProductCodeAndFlowFamilyCodeAndBindStateAndDeletedFalse(
+                    productCode.trim(), family, CimProductFlow.BIND_ACTIVE).orElse(null);
+            productAssigns = assignRepository.findByScopeTypeAndProductCodeAndFamilyCodeAndDeletedFalse(
+                    CimEquipAssign.SCOPE_PRODUCT, productCode.trim(), family);
+            productAttrs = attrRepository.findByContextTypeAndProductCodeAndFamilyCodeAndDeletedFalse(
+                    CimEquipAssign.SCOPE_PRODUCT, productCode.trim(), family);
+        }
+        return ContextResolver.resolveAll(new ContextResolver.ResolveCtx(
+                flow, steps, operations, assigns, attrs, defs, binding, productAssigns, productAttrs));
     }
 
     // ------------------------------------------------------------------ 画布保存（XML 单一事实源）
@@ -228,6 +484,7 @@ public class FlowAdminService {
     public FlowDetail saveXml(String id, CanvasReq req) {
         CimFlow flow = requireFlow(id);
         requireDraft(flow);
+        requireNotLockedByOther(flow); // ICM V22：编辑锁（人 vs 人）——画布 XML 整份回传覆盖是并发最高危点
         String xml = req == null ? null : req.xml();
         CanvasDoc doc = CanvasXmlSupport.parse(xml);
         List<CanvasNode> nodes = doc.nodes();
@@ -275,7 +532,7 @@ public class FlowAdminService {
                 }
             }
             if (n.equipType() != null
-                    && equipmentTypeRepository.findByTypeCodeAndDeletedFalse(n.equipType()).isEmpty()) {
+                    && equipmentClassRepository.findByClassCodeAndDeletedFalse(n.equipType()).isEmpty()) {
                 throw BizException.of(BizCode.DATA_NOT_FOUND, "mds.biz.flow.equipTypeNotFound", n.equipType());
             }
             // V21：能力需求非空才校验存在（AMAT 口径——经设备能力关联匹配可加工设备）
@@ -308,6 +565,14 @@ public class FlowAdminService {
                 if (bs != null && bs <= 0) {
                     throw BizException.of(BizCode.PARAM_INVALID,
                             "mds.biz.flow.batchSizePositive", n.stepCode(), bs);
+                }
+            }
+            // NPW 投片上限（V23）：可空 = 不限；非空须 >0
+            if (n.npwLimit() != null) {
+                Integer npw = parseNullableInt(n.npwLimit(), "npwLimit", n.stepCode());
+                if (npw != null && npw <= 0) {
+                    throw BizException.of(BizCode.PARAM_INVALID,
+                            "mds.biz.flow.npwLimitPositive", n.stepCode(), npw);
                 }
             }
             // bin 词表语法：binType 白名单 + 节点内 code 唯一
@@ -466,6 +731,10 @@ public class FlowAdminService {
             entity.setHoldReason(n.holdReason());
             entity.setInspectPlan(n.inspectPlan());
             entity.setSamplingRate(parseNullableDecimal(n.samplingRate(), "samplingRate", n.stepCode()));
+            entity.setReticleRef(n.reticleRef());
+            entity.setContamLevel(n.contamLevel());
+            entity.setContamForbidden(n.contamForbidden());
+            entity.setNpwLimit(parseNullableInt(n.npwLimit(), "npwLimit", n.stepCode()));
             stepRepository.save(entity);
         }
         for (CanvasEdge e : edges) {
@@ -494,18 +763,165 @@ public class FlowAdminService {
             entity.setToNodeId(q.to());
             entity.setMaxMinutes(parseNullableInt(q.maxMinutes(), "maxMinutes", nodeCode(nodes, q.from())));
             entity.setAction(q.action());
+            entity.setAlarmCode(q.alarmCode());
             qtimeRepository.save(entity);
         }
+        // ICM（V22）：本次保存中消失的节点 → 级联删 STEP 级 assign/attr（事务内，防孤儿行）
+        Set<String> savedNodeIds = new HashSet<>();
+        nodes.forEach(n -> savedNodeIds.add(n.id()));
+        assignRepository.findByScopeTypeAndFlowIdAndDeletedFalse(CimEquipAssign.SCOPE_STEP, id)
+                .stream().filter(a -> !savedNodeIds.contains(a.getStepId()))
+                .forEach(assignRepository::delete);
+        attrRepository.findByContextTypeAndFlowIdAndDeletedFalse(CimEquipAssign.SCOPE_STEP, id)
+                .stream().filter(a -> !savedNodeIds.contains(a.getStepId()))
+                .forEach(attrRepository::delete);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "SAVE_XML",
+                FlowEventService.summary("nodes", nodes.size(), "edges", edges.size(),
+                        "qtimes", doc.qtimes().size()));
         return detail(id);
+    }
+
+    /**
+     * 直线流程生成请求：工序列（顺序即画布顺序；每工序生成一个 PROCESS 节点，START/END 自动补）。
+     */
+    public record GenerateDesignReq(java.util.List<String> operationCodes) {
+    }
+
+    /**
+     * generateDesign（P2，roadmap）：按工序列自动生成直线流程（START → N×PROCESS → END，
+     * MAIN 全链直线）。节点 operation_code 带出（equipType/recipeRef 随画布属性从工序默认带出，
+     * 即 ICM 的 L0 继承起点），后续差异在节点上局部覆盖。保存走 {@link #saveXml} 全量守门。
+     */
+    @Transactional
+    public FlowDetail generateDesign(String id, GenerateDesignReq req) {
+        requireFlow(id);
+        if (req.operationCodes() == null || req.operationCodes().isEmpty()) {
+            throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.generateOpsRequired");
+        }
+        List<CimOperation> ops = new ArrayList<>();
+        for (String code : req.operationCodes()) {
+            if (code == null || code.isBlank()) {
+                throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.flow.generateOpsRequired");
+            }
+            CimOperation op = operationRepository.findByOpCodeAndDeletedFalse(code.trim())
+                    .orElseThrow(() -> BizException.of(BizCode.DATA_NOT_FOUND,
+                            "mds.biz.flow.opRefNotFound", code.trim()));
+            if (!CimOperation.STATUS_ACTIVE.equals(op.getStatus())) {
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.flow.opRefNotActive", op.getOpCode(), op.getStatus());
+            }
+            ops.add(op);
+        }
+        return saveXml(id, new CanvasReq(buildLinearCanvasXml(ops)));
+    }
+
+    /** 直线画布 XML 组装（generateDesign / Excel 导入共用内核；字段均须 XML 转义）。 */
+    private String buildLinearCanvasXml(List<CimOperation> ops) {
+        StringBuilder sb = new StringBuilder(256 + ops.size() * 256);
+        sb.append("<canvas version=\"1\"><nodes>");
+        int x = 40;
+        sb.append(nodeXml("n1", "START", "开始", CimFlowStep.TYPE_START, null, x, 200));
+        x += 140;
+        for (int i = 0; i < ops.size(); i++) {
+            CimOperation op = ops.get(i);
+            sb.append(nodeXml("n" + (i + 2), String.format("STP%03d", i + 1),
+                    op.getOpName(), CimFlowStep.TYPE_PROCESS, op, x, 200));
+            x += 140;
+        }
+        sb.append(nodeXml("n" + (ops.size() + 2), "END", "结束", CimFlowStep.TYPE_END, null, x, 200));
+        sb.append("</nodes><edges>");
+        for (int i = 1; i <= ops.size() + 1; i++) {
+            sb.append("<edge id=\"e").append(i).append("\" from=\"n").append(i)
+                    .append("\" to=\"n").append(i + 1).append("\" edgeType=\"MAIN\"/>");
+        }
+        sb.append("</edges></canvas>");
+        return sb.toString();
+    }
+
+    /** 单节点 XML（空属性按画布契约写空串；stepName 为空用工序名兜底）。 */
+    private String nodeXml(String id, String stepCode, String stepName, String stepType,
+                           CimOperation op, int x, int y) {
+        String name = stepName == null || stepName.isBlank() ? "" : xmlEsc(stepName);
+        StringBuilder sb = new StringBuilder(256);
+        sb.append("<node id=\"").append(id).append("\" stepCode=\"").append(xmlEsc(stepCode))
+                .append("\" stepName=\"").append(name).append("\" stepType=\"").append(stepType).append('"');
+        if (op != null) {
+            sb.append(" operationCode=\"").append(xmlEsc(op.getOpCode())).append('"');
+            if (op.getRecipeRef() != null) {
+                sb.append(" recipeRef=\"").append(xmlEsc(op.getRecipeRef())).append('"');
+            }
+            if (op.getEquipType() != null) {
+                sb.append(" equipType=\"").append(xmlEsc(op.getEquipType())).append('"');
+            }
+            if (op.getQtimeMin() != null) {
+                sb.append(" qtimeMin=\"").append(op.getQtimeMin()).append('"');
+            }
+            if (op.getQtimeMax() != null) {
+                sb.append(" qtimeMax=\"").append(op.getQtimeMax()).append('"');
+            }
+            if (op.getReticleRef() != null) {
+                sb.append(" reticleRef=\"").append(xmlEsc(op.getReticleRef())).append('"');
+            }
+        }
+        sb.append(" x=\"").append(x).append("\" y=\"").append(y).append("\"/>");
+        return sb.toString();
+    }
+
+    /** XML 属性转义（& < > "）。 */
+    private static String xmlEsc(String v) {
+        return v.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     // ------------------------------------------------------------------ 校验 / 生命周期
 
-    /** 只校验不落库（画布「校验」按钮；基于库内解析产物）。 */
-    @Transactional(readOnly = true)
+    /**
+     * 全量校验并落库（ICM V22）：图结构规则（validateGraph 规则 1-8）+ ICM 约束规则
+     * （FlowValidateService：指派/KV/配方/光罩/污染/工序引用，全部消费 ContextResolver
+     * 解析值）。落 validate_state（ERROR≥1 → INVALID；否则 VALID）+ validate_msg 摘要
+     * + validate_time/user，明细全量替换 cim_flow_validate_result。
+     */
+    @Transactional
     public ValidationResult validate(String id) {
+        CimFlow flow = requireFlow(id);
+        ValidationResult graph = validateGraph(id);
+        List<FlowValidateService.Detail> details =
+                flowValidateService.runRules(flow, graph.problems());
+        // 落库：全量替换明细 + 主档校验态
+        validateResultRepository.findByFlowIdAndDeletedFalse(id)
+                .forEach(validateResultRepository::delete);
+        validateResultRepository.flush();
+        for (FlowValidateService.Detail d : details) {
+            CimFlowValidateResult row = new CimFlowValidateResult();
+            row.setFlowId(id);
+            row.setStepId(d.stepNodeId());
+            row.setRuleCode(d.ruleCode());
+            row.setSeverity(d.severity());
+            row.setMessage(d.message().length() > 512 ? d.message().substring(0, 512) : d.message());
+            validateResultRepository.save(row);
+        }
+        String state = FlowValidateService.stateOf(details);
+        flow.setValidateState(state);
+        flow.setValidateMsg(FlowValidateService.summaryOf(details));
+        flow.setValidateTime(java.time.LocalDateTime.now());
+        flow.setValidateUser(com.cim.mds.server.site.EditLockSupport.currentUser());
+        flowRepository.save(flow);
+        // P3-3：validate 出 ERROR（INVALID）→ 通知编辑锁占用者（灰度开关默认关）
+        if (!CimFlow.VS_VALID.equals(state)) {
+            flowNotifyService.validateFailed(flow,
+                    details.stream().filter(d -> CimFlowValidateResult.SEVERITY_ERROR.equals(d.severity())).count(),
+                    com.cim.mds.server.site.EditLockSupport.currentUser());
+        }
+        return new ValidationResult(CimFlow.VS_VALID.equals(state),
+                details.stream().map(d -> "[" + d.severity() + "/" + d.ruleCode() + "] " + d.message())
+                        .toList());
+    }
+
+    /** 校验明细（报告页；validate 之后调用）。 */
+    @Transactional(readOnly = true)
+    public List<CimFlowValidateResult> validateResult(String id) {
         requireFlow(id);
-        return validateGraph(id);
+        return validateResultRepository.findByFlowIdAndDeletedFalseOrderBySeverityAsc(id);
     }
 
     /**
@@ -525,6 +941,8 @@ public class FlowAdminService {
                     "mds.biz.flow.validateFailFreeze", String.join("；", result.problems()));
         }
         flow.setStatus(CimFlow.STATUS_FROZEN);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "FREEZE",
+                FlowEventService.summary("validateState", flow.getValidateState()));
         return toView(flowRepository.save(flow), countSteps(id));
     }
 
@@ -537,6 +955,7 @@ public class FlowAdminService {
                     "mds.biz.flow.onlyFrozenUnfreezable", flow.getStatus());
         }
         flow.setStatus(CimFlow.STATUS_UNFROZEN);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "UNFREEZE", null);
         return toView(flowRepository.save(flow), countSteps(id));
     }
 
@@ -552,6 +971,12 @@ public class FlowAdminService {
             throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
                     "mds.biz.flow.onlyFrozenActivatable", flow.getStatus());
         }
+        // ICM 生效硬闸（V22）：validate_state 必须 VALID（2004 拒绝）——先校验再激活
+        if (!CimFlow.VS_VALID.equals(flow.getValidateState())) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.activateRequiresValid",
+                    flow.getValidateState() + (flow.getValidateMsg() == null ? "" : " " + flow.getValidateMsg()));
+        }
         ValidationResult result = validateGraph(id);
         if (!result.valid()) {
             throw BizException.of(BizCode.PARAM_INVALID,
@@ -565,10 +990,12 @@ public class FlowAdminService {
                     flowRepository.save(old);
                 });
         flow.setStatus(CimFlow.STATUS_ACTIVE);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "ACTIVATE",
+                FlowEventService.summary("family", family, "versionNo", flow.getVersionNo()));
         return toView(flowRepository.save(flow), countSteps(id));
     }
 
-    /** 禁用：FROZEN / ACTIVE → DISABLED（淘汰，不再允许任何使用）。 */
+    /** 禁用：FROZEN / ACTIVE → DISABLED（淘汰，不再允许任何使用）；有 ACTIVE 产品绑定 → 2004 先解绑。 */
     @Transactional
     public FlowView disable(String id) {
         CimFlow flow = requireFlow(id);
@@ -577,7 +1004,15 @@ public class FlowAdminService {
             throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
                     "mds.biz.flow.onlyFrozenOrActiveDisablable", flow.getStatus());
         }
+        // ICM（V22）：防悬挂绑定——存在 ACTIVE 产品绑定须先解绑
+        String family = flow.getFamilyCode() == null ? flow.getFlowCode() : flow.getFamilyCode();
+        if (productFlowRepository.existsByFlowFamilyCodeAndBindStateAndDeletedFalse(
+                family, CimProductFlow.BIND_ACTIVE)) {
+            throw BizException.of(BizCode.OPERATION_NOT_ALLOWED,
+                    "mds.biz.flow.disableHasActiveBinding", family);
+        }
         flow.setStatus(CimFlow.STATUS_DISABLED);
+        flowEventService.record(id, flow.getFlowCode(), FlowEventService.T_FLOW, "DISABLE", null);
         return toView(flowRepository.save(flow), countSteps(id));
     }
 
@@ -604,6 +1039,9 @@ public class FlowAdminService {
         entity.setFamilyCode(source.getFamilyCode() == null ? source.getFlowCode() : source.getFamilyCode());
         entity.setVersionNo(nextVersionNo(entity.getFamilyCode()));
         entity.setFlowXml(source.getFlowXml()); // XML 源原样复制
+        entity.setStageCode(source.getStageCode());
+        entity.setReworkOfFamily(source.getReworkOfFamily());
+        entity.setReworkCountLimit(source.getReworkCountLimit());
         entity = flowRepository.save(entity);
         String newId = entity.getId();
         for (CimFlowStep s : stepRepository.findByFlowIdAndDeletedFalseOrderByStepNoAsc(id)) {
@@ -629,6 +1067,9 @@ public class FlowAdminService {
             clone.setHoldReason(s.getHoldReason());
             clone.setInspectPlan(s.getInspectPlan());
             clone.setSamplingRate(s.getSamplingRate());
+            clone.setReticleRef(s.getReticleRef());
+            clone.setContamLevel(s.getContamLevel());
+            clone.setContamForbidden(s.getContamForbidden());
             stepRepository.save(clone);
         }
         for (CimFlowEdge e : edgeRepository.findByFlowIdAndDeletedFalse(id)) {
@@ -657,9 +1098,69 @@ public class FlowAdminService {
             clone.setToNodeId(q.getToNodeId());
             clone.setMaxMinutes(q.getMaxMinutes());
             clone.setAction(q.getAction());
+            clone.setAlarmCode(q.getAlarmCode());
             qtimeRepository.save(clone);
         }
+        // ICM（V22）复制搬运：scope=FLOW / scope=STEP 的 assign 行全量复制（node_id 原样克隆，
+        // FLOW 级按新 flow_id 重挂）；scope=OPERATION 行不搬（模板共享，改工序默认全体受益）。
+        // rule 不自动复制（V15 显式维护口径不变）。
+        for (CimEquipAssign a : assignRepository.findByScopeTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_FLOW, id)) {
+            CimEquipAssign clone = cloneAssign(a);
+            clone.setFlowId(newId);
+            assignRepository.save(clone);
+        }
+        for (CimEquipAssign a : assignRepository.findByScopeTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_STEP, id)) {
+            CimEquipAssign clone = cloneAssign(a);
+            clone.setFlowId(newId); // step_id（node_id）原样——XML/解析产物克隆时 node_id 保持
+            assignRepository.save(clone);
+        }
+        for (CimConstraintAttr a : attrRepository.findByContextTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_FLOW, id)) {
+            CimConstraintAttr clone = cloneAttr(a);
+            clone.setFlowId(newId);
+            attrRepository.save(clone);
+        }
+        for (CimConstraintAttr a : attrRepository.findByContextTypeAndFlowIdAndDeletedFalse(
+                CimEquipAssign.SCOPE_STEP, id)) {
+            CimConstraintAttr clone = cloneAttr(a);
+            clone.setFlowId(newId);
+            attrRepository.save(clone);
+        }
+        flowEventService.record(newId, entity.getFlowCode(), FlowEventService.T_FLOW, "COPY",
+                FlowEventService.summary("fromFlowCode", source.getFlowCode(),
+                        "fromFlowId", id, "versionNo", entity.getVersionNo()));
         return toView(entity, countSteps(newId));
+    }
+
+    private static CimEquipAssign cloneAssign(CimEquipAssign a) {
+        CimEquipAssign c = new CimEquipAssign();
+        c.setScopeType(a.getScopeType());
+        c.setOperationCode(a.getOperationCode());
+        c.setStepId(a.getStepId());
+        c.setAssignType(a.getAssignType());
+        c.setAssignRef(a.getAssignRef());
+        c.setChamberRule(a.getChamberRule());
+        c.setRecipeRef(a.getRecipeRef());
+        c.setRecipeRule(a.getRecipeRule());
+        c.setRecipeMatch(a.getRecipeMatch());
+        c.setPriority(a.getPriority());
+        c.setEnabled(a.getEnabled());
+        c.setRemark(a.getRemark());
+        c.setDescription(a.getDescription());
+        return c;
+    }
+
+    private static CimConstraintAttr cloneAttr(CimConstraintAttr a) {
+        CimConstraintAttr c = new CimConstraintAttr();
+        c.setContextType(a.getContextType());
+        c.setOperationCode(a.getOperationCode());
+        c.setStepId(a.getStepId());
+        c.setAttrKey(a.getAttrKey());
+        c.setAttrValue(a.getAttrValue());
+        c.setDescription(a.getDescription());
+        return c;
     }
 
     // ------------------------------------------------------------------ 图校验（发布守门核心）
@@ -1032,7 +1533,11 @@ public class FlowAdminService {
                 f.getStatus(), f.getFlowXml(), f.getRemark(), f.getDescription(),
                 f.getFlowKind(), stepCount,
                 f.getFamilyCode() == null ? f.getFlowCode() : f.getFamilyCode(),
-                f.getVersionNo() == null ? 1 : f.getVersionNo());
+                f.getVersionNo() == null ? 1 : f.getVersionNo(),
+                f.getValidateState(), f.getValidateMsg(),
+                f.getValidateTime() == null ? null : f.getValidateTime().toString(),
+                f.getStageCode(), f.getReworkOfFamily(), f.getReworkCountLimit(),
+                f.getIsOccupied(), f.getOccupiedBy());
     }
 
     private static StepView toStepView(CimFlowStep s) {
@@ -1042,12 +1547,14 @@ public class FlowAdminService {
                 s.getFlowRef(), s.getBatchMode(), s.getBatchSize(),
                 s.getHoldPoint(), s.getHoldReason(),
                 s.getInspectPlan(), s.getSamplingRate(),
-                s.getCapabilityCode(), s.getEdcPlanCode());
+                s.getCapabilityCode(), s.getEdcPlanCode(),
+                s.getReticleRef(), s.getContamLevel(), s.getContamForbidden(),
+                s.getNpwLimit());
     }
 
     private static QtimeView toQtimeView(CimFlowQtime q) {
         return new QtimeView(q.getId(), q.getFromNodeId(), q.getToNodeId(),
-                q.getMaxMinutes(), q.getAction());
+                q.getMaxMinutes(), q.getAction(), q.getAlarmCode());
     }
 
     private static EdgeView toEdgeView(CimFlowEdge e) {
