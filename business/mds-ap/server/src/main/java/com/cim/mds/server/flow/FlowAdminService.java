@@ -822,16 +822,19 @@ public class FlowAdminService {
 
     /** 直线画布 XML 组装（generateDesign / Excel 导入共用内核；字段均须 XML 转义）。 */
     private String buildLinearCanvasXml(List<CimOperation> ops) {
+        // 节点步进：前端画布节点宽 168（FlowPage x6 body），间距须 ≥ 节点宽 + 视觉留白，
+        // 否则连线箭头叠在下一节点上（曾用 140 导致重叠）。
+        final int xStep = 260;
         StringBuilder sb = new StringBuilder(256 + ops.size() * 256);
         sb.append("<canvas version=\"1\"><nodes>");
         int x = 40;
         sb.append(nodeXml("n1", "START", "开始", CimFlowStep.TYPE_START, null, x, 200));
-        x += 140;
+        x += xStep;
         for (int i = 0; i < ops.size(); i++) {
             CimOperation op = ops.get(i);
             sb.append(nodeXml("n" + (i + 2), String.format("STP%03d", i + 1),
                     op.getOpName(), CimFlowStep.TYPE_PROCESS, op, x, 200));
-            x += 140;
+            x += xStep;
         }
         sb.append(nodeXml("n" + (ops.size() + 2), "END", "结束", CimFlowStep.TYPE_END, null, x, 200));
         sb.append("</nodes><edges>");
