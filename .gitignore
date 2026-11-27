@@ -43,3 +43,6 @@ business/approval-ap/web/_*
 
 # vite dev 临时产物
 *.timestamp-*.mjs
+
+# pw 冒烟运行截图产物
+business/*/web/pw-smoke/*.png
