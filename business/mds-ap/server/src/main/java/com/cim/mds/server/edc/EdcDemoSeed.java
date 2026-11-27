@@ -166,6 +166,9 @@ public final class EdcDemoSeed {
                 entity.setGroupCode("DC");
                 entity.setValueType(CimParamDef.VT_DECIMAL);
                 entity.setUnit(def.unit());
+                // 空 scopes = 不作为 ContextChain KV 暴露（纯 EDC 域引用参数，
+                // 不混进流程节点/工序可变参数的候选列表）
+                entity.setScopes("");
                 entity.setSortNo(def.sortNo());
                 paramDefRepository.save(entity);
                 created++;

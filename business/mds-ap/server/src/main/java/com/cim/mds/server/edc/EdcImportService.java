@@ -217,7 +217,8 @@ public class EdcImportService {
                 c[4],
                 c[5],
                 c[6] == null || "TRUE".equalsIgnoreCase(c[6]),
-                c[7] == null || c[7].isBlank() ? List.of("STEP") : List.of(c[7].split(",")),
+                // scopes 空白 = 纯字典参数（不作为 ContextChain KV 暴露），与 EdcDemoSeed 同口径
+                c[7] == null || c[7].isBlank() ? List.of() : List.of(c[7].split(",")),
                 parseInt(c[8], "sort_no"),
                 Boolean.TRUE);
         if (existing.isPresent()) {

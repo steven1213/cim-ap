@@ -81,6 +81,21 @@ public final class ProcessDemoSeed {
         /** 直线流程种子定义（operationCodes 顺序即画布顺序）。 */
         private static final String FLOW_CODE = "FLW-6IN-A";
 
+        /**
+         * 工艺长尾 KV 参数种子（ICM 三层演示数据；EDC 种子的 DC 参数是纯字典参数
+         * 不进 KV 层——本批补齐真正可配在层上的参数）。scopes 决定出现在哪层候选：
+         * PILOT/SPC 只配节点；SEASON 三层贯通（工序可变参数→流程覆盖→节点覆盖链路演示）。
+         */
+        record ParamDefSeed(String attrKey, String attrName, String groupCode, String valueType,
+                            String scopes, Boolean required, Integer sortNo) {}
+        static final List<ParamDefSeed> PARAM_DEFS = List.of(
+                new ParamDefSeed("pilot_sample_ratio", "抽检比例(%)", "PILOT",
+                        CimParamDef.VT_INT, "STEP", false, 10),
+                new ParamDefSeed("season_warm_wafers", "暖机片数", "SEASON",
+                        CimParamDef.VT_INT, "OPERATION,FLOW,STEP", false, 20),
+                new ParamDefSeed("spc_skip_flag", "SPC 跳测标记", "SPC",
+                        CimParamDef.VT_BOOLEAN, "STEP", false, 30));
+
         // ------------------------------------------------------------------ 依赖
 
         private final CimEquipmentClassRepository classRepository;
@@ -89,6 +104,7 @@ public final class ProcessDemoSeed {
         private final CimOperationRepository operationRepository;
         private final CimEquipAssignRepository assignRepository;
         private final CimFlowRepository flowRepository;
+        private final CimParamDefRepository paramDefRepository;
 
         private final EquipmentClassAdminService classAdminService;
         private final ReticleAdminService reticleAdminService;
@@ -102,6 +118,7 @@ public final class ProcessDemoSeed {
                     CimOperationRepository operationRepository,
                     CimEquipAssignRepository assignRepository,
                     CimFlowRepository flowRepository,
+                    CimParamDefRepository paramDefRepository,
                     EquipmentClassAdminService classAdminService,
                     ReticleAdminService reticleAdminService,
                     OperationAdminService operationAdminService,
@@ -113,6 +130,7 @@ public final class ProcessDemoSeed {
             this.operationRepository = operationRepository;
             this.assignRepository = assignRepository;
             this.flowRepository = flowRepository;
+            this.paramDefRepository = paramDefRepository;
             this.classAdminService = classAdminService;
             this.reticleAdminService = reticleAdminService;
             this.operationAdminService = operationAdminService;
@@ -124,11 +142,35 @@ public final class ProcessDemoSeed {
 
         @Transactional
         public void seed() {
+            ensureParamDefs();
             ensureMetroClass();
             ensureReticle();
             ensureOperations();
             ensureAssignments();
             ensureFlow();
+        }
+
+        /** 工艺长尾 KV 参数（幂等按 attrKey；直接落定义不走 admin 守门）。 */
+        private void ensureParamDefs() {
+            int created = 0;
+            for (ParamDefSeed def : PARAM_DEFS) {
+                if (paramDefRepository.findByAttrKeyAndDeletedFalse(def.attrKey()).isPresent()) {
+                    continue;
+                }
+                CimParamDef entity = new CimParamDef();
+                entity.setAttrKey(def.attrKey());
+                entity.setAttrName(def.attrName());
+                entity.setGroupCode(def.groupCode());
+                entity.setValueType(def.valueType());
+                entity.setScopes(def.scopes());
+                entity.setRequired(def.required());
+                entity.setSortNo(def.sortNo());
+                paramDefRepository.save(entity);
+                created++;
+            }
+            if (created > 0) {
+                log.info("[mds-process-seed] 工艺长尾参数种子完成：+{} 条（PILOT/SEASON/SPC）", created);
+            }
         }
 
         /** 检测机型（METRO/INSPECT；工序终检的资格门）。 */

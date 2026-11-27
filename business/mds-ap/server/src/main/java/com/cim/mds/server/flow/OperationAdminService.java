@@ -9,7 +9,6 @@ import com.cim.mds.server.equipment.CimEquipmentClassRepository;
 import com.cim.mds.server.site.CimTechnologyRepository;
 import com.cim.spring.support.web.BizCode;
 import com.cim.spring.support.web.BizException;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -481,7 +480,9 @@ public class OperationAdminService {
     /**
      * 可变参数整单替换（replace-all，镜像 EDC tpl items）。
      * 守门：仅 UNFROZEN 版本可维护（冻结/生效走复制新版，与主字段同口径）；
-     * param_key 必须在参数定义注册且启用；同单内不允许重复键。
+     * param_key 必须在参数定义注册且启用，且 scopes 须含 OPERATION（与
+     * ConstraintAttrAdminService 的层级守门同口径——定义未开放 OPERATION 层即拒）；
+     * 同单内不允许重复键。
      */
     @Transactional
     public List<VarParamView> saveVarParams(String opId, List<VarParamReq> items) {
@@ -498,6 +499,10 @@ public class OperationAdminService {
             CimParamDef def = paramDefRepository.findByAttrKeyAndDeletedFalse(key).orElse(null);
             if (def == null || !Boolean.TRUE.equals(def.getEnabled())) {
                 throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.operation.paramNotDefined", key);
+            }
+            if (def.getScopes() == null || !def.getScopes().contains(CimEquipAssign.SCOPE_OPERATION)) {
+                throw BizException.of(BizCode.PARAM_INVALID,
+                        "mds.biz.operation.paramScopeNotAllowed", key);
             }
             String level = r.overrideLevel() == null ? CimOperationVariableParam.LEVEL_NONE
                     : r.overrideLevel().trim();

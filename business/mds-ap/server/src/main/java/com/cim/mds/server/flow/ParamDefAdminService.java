@@ -99,8 +99,7 @@ public class ParamDefAdminService {
                 && (req.enumDict() == null || req.enumDict().isBlank())) {
             throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.paramDef.enumDictRequired");
         }
-        List<String> scopes = req.scopes() == null || req.scopes().isEmpty()
-                ? List.of(CimEquipAssign.SCOPE_STEP) : req.scopes();
+        List<String> scopes = req.scopes() == null ? List.of() : req.scopes();
         for (String s : scopes) {
             if (!VALID_SCOPES.contains(s)) {
                 throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.paramDef.scopeInvalid", s);
@@ -112,6 +111,7 @@ public class ParamDefAdminService {
         entity.setEnumDict(req.enumDict());
         entity.setUnit(ParamDefAdminService.blankToNull(req.unit()));
         entity.setRequired(Boolean.TRUE.equals(req.required()));
+        // 空 scopes = 纯字典参数（仅供 EDC 等域按 key 引用，不作为 ContextChain KV 暴露）
         entity.setScopes(String.join(",", scopes));
         entity.setSortNo(req.sortNo() == null ? 100 : req.sortNo());
         entity.setEnabled(req.enabled() == null ? Boolean.TRUE : req.enabled());

@@ -33,12 +33,16 @@ interface FormState {
   scopeOperation: boolean;
   scopeFlow: boolean;
   scopeStep: boolean;
+  scopeProduct: boolean;
   sortNo: string;
   enabled: boolean;
 }
 
 function formFrom(row: ParamDefRow | null): FormState {
-  const scopes = (row?.scopes ?? 'STEP').split(',');
+  // 编辑按真实值回显（空 scopes = 纯字典参数，四层全不勾）；
+  // 新建默认 STEP（最常见的节点 KV 用法）
+  const scopes = row ? (row.scopes ?? '') : 'STEP';
+  const parts = scopes.split(',');
   return {
     attrKey: row?.attrKey ?? '',
     attrName: row?.attrName ?? '',
@@ -47,9 +51,10 @@ function formFrom(row: ParamDefRow | null): FormState {
     enumDict: row?.enumDict ?? '',
     unit: row?.unit ?? '',
     required: Boolean(row?.required),
-    scopeOperation: scopes.includes('OPERATION'),
-    scopeFlow: scopes.includes('FLOW'),
-    scopeStep: scopes.includes('STEP'),
+    scopeOperation: parts.includes('OPERATION'),
+    scopeFlow: parts.includes('FLOW'),
+    scopeStep: parts.includes('STEP'),
+    scopeProduct: parts.includes('PRODUCT'),
     sortNo: row?.sortNo != null ? String(row.sortNo) : '100',
     enabled: row ? Boolean(row.enabled) : true,
   };
@@ -107,15 +112,13 @@ export default function ParamDefPage() {
       setErr(t('mds.paramDef.errKeyRequired'));
       return;
     }
+    // 空 scopes 合法 = 纯字典参数（仅供 EDC 等域按 key 引用，不作为 KV 层暴露）
     const scopes = [
       ...(form.scopeOperation ? ['OPERATION'] : []),
       ...(form.scopeFlow ? ['FLOW'] : []),
       ...(form.scopeStep ? ['STEP'] : []),
+      ...(form.scopeProduct ? ['PRODUCT'] : []),
     ];
-    if (!scopes.length) {
-      setErr(t('mds.paramDef.errScopeRequired'));
-      return;
-    }
     setBusy(true);
     try {
       const payload: api.ParamDefPayload = {
@@ -182,7 +185,15 @@ export default function ParamDefPage() {
         width: 70,
         render: (r) => (r.required ? <span className="op-ref-yes">{t('mds.paramDef.requiredYes')}</span> : <span className="dim">—</span>),
       },
-      { key: 'scopes', titleKey: 'mds.paramDef.field.scopes', width: 170, mono: true, ellipsis: true },
+      {
+        key: 'scopes',
+        titleKey: 'mds.paramDef.field.scopes',
+        width: 170,
+        mono: true,
+        ellipsis: true,
+        // 空 scopes = 纯字典参数（不作为 KV 层暴露）
+        render: (r) => r.scopes || <span className="dim">—</span>,
+      },
       {
         key: 'enabled',
         titleKey: 'mds.paramDef.field.enabled',
@@ -215,6 +226,7 @@ export default function ParamDefPage() {
     { kind: 'switch', key: 'scopeOperation', labelKey: 'mds.paramDef.scope.OPERATION' },
     { kind: 'switch', key: 'scopeFlow', labelKey: 'mds.paramDef.scope.FLOW' },
     { kind: 'switch', key: 'scopeStep', labelKey: 'mds.paramDef.scope.STEP' },
+    { kind: 'switch', key: 'scopeProduct', labelKey: 'mds.paramDef.scope.PRODUCT' },
     { kind: 'number', key: 'sortNo', labelKey: 'mds.paramDef.field.sortNo' },
     { kind: 'switch', key: 'enabled', labelKey: 'mds.paramDef.field.enabled' },
   ], [mode, form.valueType]);

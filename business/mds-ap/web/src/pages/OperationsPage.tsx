@@ -689,8 +689,9 @@ export default function OperationsPage() {
                                       onChange={(e) => setVarRow(idx, { paramKey: e.target.value })}
                                     >
                                       <option value="">{t('mds.recipeResolve.selectParamHint')}</option>
+                                      {/* 候选 = 启用且 scopes 含 OPERATION（与后端守门同口径） */}
                                       {(paramDefsRes.data ?? [])
-                                        .filter((d) => d.enabled)
+                                        .filter((d) => d.enabled && (d.scopes ?? '').split(',').includes('OPERATION'))
                                         .map((d) => (
                                           <option key={d.attrKey} value={d.attrKey}>{d.attrKey}</option>
                                         ))}

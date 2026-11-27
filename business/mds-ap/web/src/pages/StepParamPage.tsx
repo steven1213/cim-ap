@@ -302,10 +302,13 @@ export default function StepParamPage() {
     }));
   }, [assignType, toolGroupsRes.data, equipmentsRes.data, equipClassesRes.data]);
 
-  // KV 展示行：参数定义全集（含未配置键=MISSING）
+  // KV 展示行：参数定义按当前层过滤（scopes 守门的 UI 侧镜像——
+  // flow 层只列 scopes 含 FLOW 的定义、node 层只列含 STEP 的；
+  // 空 scopes = 纯字典参数，任何 KV 层都不出现）
   const kvRows = useMemo(() => {
+    const scopeTag = scope === 'flow' ? 'FLOW' : 'STEP';
     return defs
-      .filter((d: ParamDefRow) => d.enabled)
+      .filter((d: ParamDefRow) => d.enabled && (d.scopes ?? '').split(',').includes(scopeTag))
       .map((d: ParamDefRow) => {
         const eff = selectedNode && scope === 'node' ? selectedNode.attrs[d.attrKey] : null;
         const hasValue = attrValues[d.attrKey] != null && attrValues[d.attrKey] !== '';
@@ -526,8 +529,8 @@ export default function StepParamPage() {
                     <CimButton
                       size="small"
                       onClick={() => {
-                        // 空态守卫：KV 行按参数定义全集渲染，没有启用的参数定义时无行可编辑
-                        if (!defs.some((d: ParamDefRow) => d.enabled)) {
+                        // 空态守卫：KV 行按当前层过滤后的定义渲染，层内无可配参数时无行可编辑
+                        if (!kvRows.length) {
                           toast.error(t('mds.stepParam.kvNoDefs'));
                           return;
                         }
