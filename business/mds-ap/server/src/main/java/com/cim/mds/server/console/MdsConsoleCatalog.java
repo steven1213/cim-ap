@@ -93,8 +93,8 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.stage.delete", "topology", "mds.nav.topology.action.stage.delete",
                 MdsPermissions.STAGE_DELETE, 150));
 
-        // —— 产品管理（菜单 order = 用户操作动线序：建产品 → 定义字典 → 建工序 → 建流程 → 配参数 → 绑产品；
-        //    辅助页（规则/导入/对比/总览）置尾。前端 GuideBar 步骤索引与此前 7 步主链一致）——
+        // —— 产品管理（菜单 order = 用户操作动线序：建产品 → 定义字典 → 登记光罩 → 建工序 → 建流程 → 配参数 → 绑产品；
+        //    辅助页（规则/导入/对比/总览）置尾。前端 GuideBar 步骤索引与 8 步主链一致）——
         m.add(dir("grp.product", "mds.nav.group.product", 30));
         m.add(menu("technology", "grp.product", "/technologies", "TechnologyPage",
                 "mds.nav.technology", "sliders", MdsPermissions.TECH_VIEW, 10));
@@ -157,7 +157,7 @@ public final class MdsConsoleCatalog {
                 "mds.nav.paramDefs", "list", MdsPermissions.PARAM_DEF_VIEW, 25));
         m.add(menu("flowCompare", "grp.product", "/flow-compare", "FlowComparePage",
                 "mds.nav.flowCompare", "columns", MdsPermissions.FLOW_VIEW, 42));
-        // —— 产品↔流程绑定（动线第 7 步：流程建模/激活之后才可绑，FROZEN+VALID 可预绑）——
+        // —— 产品↔流程绑定（动线第 8 步：流程建模/激活之后才可绑，FROZEN+VALID 可预绑）——
         m.add(menu("productFlows", "grp.product", "/product-bindings", "ProductFlowPage",
                 "mds.nav.productFlows", "link", MdsPermissions.PRODUCT_FLOW_VIEW, 38));
         m.add(menu("flowImport", "grp.product", "/flow-import", "FlowImportPage",
@@ -197,7 +197,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.EDC_PLAN_UPDATE, 20));
         // —— 设备管理（v2，2026-11-24：Class—Instance—Capability，ISA-95 设备对象模型）——
         // 三页合一：机台台账 /equipments 覆盖加工与搬运设备（按机型大类筛选）；
-        // 动线：机型模板先行 → 派生实例 → 机台组=派工候选池（Work Center）→ 能力 → 存储区
+        // 动线：机型模板先行 → 派生实例 → 机台组=派工候选池（Work Center）→ 能力 → 存储区 → 载具
         m.add(dir("grp.equipment", "mds.nav.group.equipment", 35));
         m.add(menu("equipmentClasses", "grp.equipment", "/equipment-classes", "EquipmentClassPage",
                 "mds.nav.equipmentClasses", "sliders", MdsPermissions.EQC_VIEW, 10));
