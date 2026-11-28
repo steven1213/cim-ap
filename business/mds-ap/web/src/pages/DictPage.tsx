@@ -104,18 +104,18 @@ export default function DictPage() {
 
   const dictColumns = useMemo<Array<DataTableColumn<DictInfo>>>(
     () => [
-      { key: 'name', titleKey: 'mds.dict.name', width: 200, render: (r) => r.name ?? '—' },
-      { key: 'code', titleKey: 'mds.dict.code', width: 220, mono: true },
+      { key: 'name', titleKey: 'mds.dict.name', width: 130, render: (r) => r.name ?? '—' },
+      { key: 'code', titleKey: 'mds.dict.code', width: 150, mono: true, ellipsis: true },
       {
         key: 'isSystem',
         titleKey: 'mds.dict.system',
-        width: 110,
+        width: 70,
         render: (r) => (r.isSystem ? t('mds.dict.systemYes') : <span className="dim">—</span>),
       },
       {
         key: 'status',
         titleKey: 'mds.topo.status',
-        width: 90,
+        width: 64,
         render: (r) => (
           <span className={r.status === 'ENABLED' ? '' : 'dim'}>
             {r.status === 'ENABLED' ? t('mds.topo.enabled') : t('mds.topo.disabled')}
@@ -150,20 +150,20 @@ export default function DictPage() {
 
   const itemColumns = useMemo<Array<DataTableColumn<DictItem>>>(
     () => [
-      { key: 'itemKey', titleKey: 'mds.dict.itemKey', width: 180, mono: true },
-      { key: 'itemValue', titleKey: 'mds.dict.itemValue', width: 220, render: (r) => r.itemValue ?? '—' },
-      { key: 'i18nCode', titleKey: 'mds.dict.i18nCode', width: 200, render: (r) => r.i18nCode ?? '—' },
-      { key: 'sortNo', titleKey: 'mds.dict.sortNo', width: 90 },
+      { key: 'itemKey', titleKey: 'mds.dict.itemKey', width: 140, mono: true, ellipsis: true },
+      { key: 'itemValue', titleKey: 'mds.dict.itemValue', width: 160, render: (r) => r.itemValue ?? '—', ellipsis: true },
+      { key: 'i18nCode', titleKey: 'mds.dict.i18nCode', width: 150, render: (r) => r.i18nCode ?? '—', ellipsis: true },
+      { key: 'sortNo', titleKey: 'mds.dict.sortNo', width: 70 },
       {
         key: 'isSystem',
         titleKey: 'mds.dict.system',
-        width: 110,
+        width: 70,
         render: (r) => (r.isSystem ? t('mds.dict.systemYes') : <span className="dim">—</span>),
       },
       {
         key: 'status',
         titleKey: 'mds.topo.status',
-        width: 90,
+        width: 64,
         render: (r) => (
           <span className={r.status === 'ENABLED' ? '' : 'dim'}>
             {r.status === 'ENABLED' ? t('mds.topo.enabled') : t('mds.topo.disabled')}
@@ -198,38 +198,35 @@ export default function DictPage() {
 
   return (
     <Page>
-      <DataTable<DictInfo>
-        titleKey="mds.dict.listTitle"
-        columns={dictColumns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        loading={dictRes.loading}
-        error={dictRes.error?.message ?? null}
-        onRetry={dictRes.refresh}
-        onRowClick={(r) => selectOf(r)}
-        rowClassName={(r) => (selected?.id === r.id ? 'row-selected' : '')}
-        headActions={
-          <Can perm={MDS_PERMS.dict.save}>
-            <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
-              {t('mds.common.create')}
-            </CimButton>
-          </Can>
-        }
-        search={{
-          value: keyword,
-          onChange: setKeyword,
-          placeholderKey: 'mds.dict.searchPlaceholder',
-        }}
-        onRefresh={dictRes.refresh}
-      />
+      <div className="dict-layout">
+        <DataTable<DictInfo>
+          titleKey="mds.dict.listTitle"
+          columns={dictColumns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          loading={dictRes.loading}
+          error={dictRes.error?.message ?? null}
+          onRetry={dictRes.refresh}
+          onRowClick={(r) => selectOf(r)}
+          rowClassName={(r) => (selected?.id === r.id ? 'row-selected' : '')}
+          headActions={
+            <Can perm={MDS_PERMS.dict.save}>
+              <CimButton type="primary" size="small" onClick={() => setCreating(true)}>
+                {t('mds.common.create')}
+              </CimButton>
+            </Can>
+          }
+          search={{
+            value: keyword,
+            onChange: setKeyword,
+            placeholderKey: 'mds.dict.searchPlaceholder',
+          }}
+          onRefresh={dictRes.refresh}
+        />
 
-      {selected && (
-        <>
-          <h3 className="dict-items-title">
-            {t('mds.dict.itemsTitle', { name: selected.name ?? selected.code, code: selected.code })}
-          </h3>
+        {selected ? (
           <DataTable<DictItem>
-            titleKey="mds.dict.item.listTitle"
+            title={t('mds.dict.itemsTitle', { name: selected.name ?? selected.code, code: selected.code })}
             columns={itemColumns}
             rows={itemRes.data ?? NO_ITEMS}
             rowKey={(r) => r.id}
@@ -245,8 +242,10 @@ export default function DictPage() {
             }
             onRefresh={itemRes.refresh}
           />
-        </>
-      )}
+        ) : (
+          <div className="panel dict-empty">{t('mds.dict.pickHint')}</div>
+        )}
+      </div>
 
       {creating && (
         <DictFormModal

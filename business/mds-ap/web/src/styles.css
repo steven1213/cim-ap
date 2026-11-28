@@ -273,11 +273,20 @@
   margin: 0 0 8px;
 }
 
-/* 数据字典页：主从两表之间的小节标题 / 选中行高亮 */
-.dict-items-title {
+/* 数据字典页：左右主从布局（左=字典列表，右=选中字典的明细）；选中行高亮 */
+.dict-layout {
+  display: grid;
+  grid-template-columns: minmax(380px, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: start;
+}
+.dict-empty {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim, #888);
   font-size: var(--fs-md);
-  font-weight: 600;
-  margin: 20px 0 8px;
 }
 .row-selected {
   background: var(--c-primary-bg, rgba(59, 130, 246, 0.08));
