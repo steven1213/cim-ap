@@ -240,7 +240,19 @@ public class MdsDictSeedService {
             // BOM 失效策略标记（V38）：MDS 只存策略标记，FEFO/FIFO 拣配执行归运行时
             new DictDef("mds.cons_expiry_policy", "失效策略", List.of(
                     new ItemDef("FEFO", "先到期先出（FEFO）", 10),
-                    new ItemDef("FIFO", "先进先出（FIFO）", 20))));
+                    new ItemDef("FIFO", "先进先出（FIFO）", 20))),
+            // 动态查询/视图引擎（V39）
+            new DictDef("mds.dq_param_type", "查询参数类型", List.of(
+                    new ItemDef("STRING", "字符串", 10),
+                    new ItemDef("NUMBER", "数字", 20),
+                    new ItemDef("DATE", "日期", 30),
+                    new ItemDef("DICT", "字典下拉", 40))),
+            new DictDef("mds.dq_format_type", "列格式化类型", List.of(
+                    new ItemDef("NONE", "原样", 10),
+                    new ItemDef("DATE", "日期", 20),
+                    new ItemDef("DATETIME", "日期时间", 30),
+                    new ItemDef("DICT", "字典翻译", 40),
+                    new ItemDef("NUMBER", "数字", 50))));
 
     private final SysDictRepository dictRepository;
     private final SysDictItemRepository itemRepository;

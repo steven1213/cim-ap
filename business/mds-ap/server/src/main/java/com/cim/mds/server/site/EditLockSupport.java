@@ -52,6 +52,8 @@ public class EditLockSupport {
             Map.entry("reticle", "cim_reticle"),
             Map.entry("inspectionStd", "cim_inspection_std"),
             Map.entry("consumable", "cim_consumable"),
+            Map.entry("queryDef", "cim_query_def"),
+            Map.entry("viewModel", "cim_view_model"),
             Map.entry("consBom", "cim_cons_bom"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */

@@ -319,6 +319,27 @@ public final class MdsConsoleCatalog {
         m.add(button("btn.shiftLog.ack", "shiftLogs", "mds.nav.shiftLogs.action.ack",
                 MdsPermissions.SHIFTLOG_SAVE, 20));
 
+        // —— 动态查询/视图引擎（V39）：元数据驱动的列表配置，列调整零发版 ——
+        m.add(dir("grp.dq", "mds.nav.group.dq", 38));
+        m.add(menu("queryDefs", "grp.dq", "/query-defs", "QueryDefPage",
+                "mds.nav.queryDefs", "grid", MdsPermissions.DQ_VIEW, 10));
+        m.add(button("btn.queryDef.create", "queryDefs", "mds.nav.queryDefs.action.create",
+                MdsPermissions.DQ_CREATE, 10));
+        m.add(button("btn.queryDef.update", "queryDefs", "mds.nav.queryDefs.action.update",
+                MdsPermissions.DQ_UPDATE, 20));
+        m.add(button("btn.queryDef.delete", "queryDefs", "mds.nav.queryDefs.action.delete",
+                MdsPermissions.DQ_DELETE, 30));
+        m.add(menu("viewModelList", "grp.dq", "/view-models", "ViewModelPage",
+                "mds.nav.viewModelList", "columns", MdsPermissions.VM_VIEW, 20));
+        m.add(button("btn.viewModel.create", "viewModelList", "mds.nav.viewModelList.action.create",
+                MdsPermissions.VM_CREATE, 10));
+        m.add(button("btn.viewModel.update", "viewModelList", "mds.nav.viewModelList.action.update",
+                MdsPermissions.VM_UPDATE, 20));
+        m.add(button("btn.viewModel.delete", "viewModelList", "mds.nav.viewModelList.action.delete",
+                MdsPermissions.VM_DELETE, 30));
+        m.add(menu("dynamicViews", "grp.dq", "/dynamic-views", "DynamicViewsPage",
+                "mds.nav.dynamicViews", "monitor", MdsPermissions.DYNAMIC_VIEW, 30));
+
         m.add(dir("grp.system", "mds.nav.group.system", 40));
         m.add(menu("dicts", "grp.system", "/dicts", "DictPage",
                 "mds.nav.dicts", "list", PermissionCodes.DICT_LIST, 10));
@@ -569,6 +590,15 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.CONS_BOM_CREATE, "消耗品 BOM 新建"));
         p.add(new PermDef(MdsPermissions.CONS_BOM_UPDATE, "消耗品 BOM 编辑/明细维护/激活/停用"));
         p.add(new PermDef(MdsPermissions.CONS_BOM_DELETE, "消耗品 BOM 删除"));
+        p.add(new PermDef(MdsPermissions.DQ_VIEW, "动态查询 查看"));
+        p.add(new PermDef(MdsPermissions.DQ_CREATE, "动态查询 新建"));
+        p.add(new PermDef(MdsPermissions.DQ_UPDATE, "动态查询 编辑（保存前三层验证）"));
+        p.add(new PermDef(MdsPermissions.DQ_DELETE, "动态查询 删除"));
+        p.add(new PermDef(MdsPermissions.VM_VIEW, "视图模型 查看"));
+        p.add(new PermDef(MdsPermissions.VM_CREATE, "视图模型 新建"));
+        p.add(new PermDef(MdsPermissions.VM_UPDATE, "视图模型 编辑（列配置硬校验）"));
+        p.add(new PermDef(MdsPermissions.VM_DELETE, "视图模型 删除"));
+        p.add(new PermDef(MdsPermissions.DYNAMIC_VIEW, "动态视图 运行时访问（视图未配 perm_code 时的兜底）"));
         // 状态模型（SEMI E30 状态机口径，模型/状态/转换矩阵页面维护）
         p.add(new PermDef(MdsPermissions.STATE_MODEL_VIEW, "状态模型查看"));
         p.add(new PermDef(MdsPermissions.STATE_MODEL_CREATE, "状态模型新建"));
@@ -655,6 +685,12 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.INSP_VIEW, MdsPermissions.INSP_CREATE, MdsPermissions.INSP_UPDATE,
                 MdsPermissions.CONS_VIEW, MdsPermissions.CONS_CREATE, MdsPermissions.CONS_UPDATE,
                 MdsPermissions.CONS_BOM_VIEW, MdsPermissions.CONS_BOM_CREATE, MdsPermissions.CONS_BOM_UPDATE,
+                MdsPermissions.CONS_BOM_DELETE,
+                MdsPermissions.DQ_VIEW, MdsPermissions.DQ_CREATE, MdsPermissions.DQ_UPDATE,
+                MdsPermissions.DQ_DELETE,
+                MdsPermissions.VM_VIEW, MdsPermissions.VM_CREATE, MdsPermissions.VM_UPDATE,
+                MdsPermissions.VM_DELETE,
+                MdsPermissions.DYNAMIC_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.STATE_MODEL_CREATE, MdsPermissions.STATE_MODEL_UPDATE,
                 MdsPermissions.NAMING_RULE_VIEW, MdsPermissions.NAMING_RULE_CREATE, MdsPermissions.NAMING_RULE_UPDATE,
                 MdsPermissions.REASON_VIEW, MdsPermissions.REASON_CREATE, MdsPermissions.REASON_UPDATE,
@@ -670,6 +706,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.CARRIER_VIEW, MdsPermissions.RETICLE_VIEW,
                 MdsPermissions.INSP_VIEW, MdsPermissions.CONS_VIEW,
                 MdsPermissions.CONS_BOM_VIEW,
+                MdsPermissions.DQ_VIEW, MdsPermissions.VM_VIEW, MdsPermissions.DYNAMIC_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
                 MdsPermissions.REASON_VIEW,
                 PermissionCodes.DICT_LIST);
@@ -813,6 +850,16 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.consBoms.action.create", "BOM·新建", "BOM · create"));
         t.add(new TextDef("mds.nav.consBoms.action.update", "BOM·编辑", "BOM · update"));
         t.add(new TextDef("mds.nav.consBoms.action.delete", "BOM·删除", "BOM · delete"));
+        t.add(new TextDef("mds.nav.group.dq", "动态查询", "Dynamic Queries"));
+        t.add(new TextDef("mds.nav.queryDefs", "查询定义", "Query Definitions"));
+        t.add(new TextDef("mds.nav.queryDefs.action.create", "查询·新建", "Query · create"));
+        t.add(new TextDef("mds.nav.queryDefs.action.update", "查询·编辑", "Query · update"));
+        t.add(new TextDef("mds.nav.queryDefs.action.delete", "查询·删除", "Query · delete"));
+        t.add(new TextDef("mds.nav.viewModelList", "视图模型", "View Models"));
+        t.add(new TextDef("mds.nav.viewModelList.action.create", "视图·新建", "View model · create"));
+        t.add(new TextDef("mds.nav.viewModelList.action.update", "视图·编辑", "View model · update"));
+        t.add(new TextDef("mds.nav.viewModelList.action.delete", "视图·删除", "View model · delete"));
+        t.add(new TextDef("mds.nav.dynamicViews", "动态视图", "Dynamic Views"));
         t.add(new TextDef("mds.nav.stateModels", "状态模型", "State models"));
         t.add(new TextDef("mds.nav.stateModels.action.create", "状态模型·新建", "State model · create"));
         t.add(new TextDef("mds.nav.stateModels.action.save", "状态模型·维护", "State model · save"));

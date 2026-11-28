@@ -121,6 +121,17 @@ public final class MdsPermissions {
     public static final String CONS_BOM_UPDATE = "mds:consBom:update";
     public static final String CONS_BOM_DELETE = "mds:consBom:delete";
 
+    /** 动态查询/视图引擎（V39）：Query 管理四权限 + ViewModel 管理四权限 + 运行时兜底访问权限。 */
+    public static final String DQ_VIEW = "mds:queryDef:view";
+    public static final String DQ_CREATE = "mds:queryDef:create";
+    public static final String DQ_UPDATE = "mds:queryDef:update";
+    public static final String DQ_DELETE = "mds:queryDef:delete";
+    public static final String VM_VIEW = "mds:viewModel:view";
+    public static final String VM_CREATE = "mds:viewModel:create";
+    public static final String VM_UPDATE = "mds:viewModel:update";
+    public static final String VM_DELETE = "mds:viewModel:delete";
+    public static final String DYNAMIC_VIEW = "mds:dynamic:view";
+
     // ---------------- 状态模型（StateModel，系统管理域，SEMI E30 状态机口径） ----------------
     public static final String STATE_MODEL_VIEW = "mds:stateModel:view";
     public static final String STATE_MODEL_CREATE = "mds:stateModel:create";
@@ -318,6 +329,15 @@ public final class MdsPermissions {
         codes.add(CONS_BOM_CREATE);
         codes.add(CONS_BOM_UPDATE);
         codes.add(CONS_BOM_DELETE);
+        codes.add(DQ_VIEW);
+        codes.add(DQ_CREATE);
+        codes.add(DQ_UPDATE);
+        codes.add(DQ_DELETE);
+        codes.add(VM_VIEW);
+        codes.add(VM_CREATE);
+        codes.add(VM_UPDATE);
+        codes.add(VM_DELETE);
+        codes.add(DYNAMIC_VIEW);
         codes.add(STATE_MODEL_VIEW);
         codes.add(STATE_MODEL_CREATE);
         codes.add(STATE_MODEL_UPDATE);

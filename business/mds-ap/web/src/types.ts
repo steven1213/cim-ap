@@ -1472,3 +1472,121 @@ export interface ShiftSwapPayload {
   targetShiftCode?: string | null;
   reason?: string;
 }
+
+// ============================================================ 动态查询/视图引擎（V39）
+
+/** 查询声明参数（全量替换维护）。 */
+export interface QueryParamPayload {
+  paramKey: string;
+  paramLabel: string;
+  paramType: 'STRING' | 'NUMBER' | 'DATE' | 'DICT';
+  required?: boolean;
+  dictCode?: string | null;
+  sortNo?: number;
+}
+
+/** 查询定义（头 + 参数）。 */
+export interface QueryDef {
+  id: string;
+  queryCode: string;
+  queryName: string;
+  sqlText: string;
+  pageSizeMax: number;
+  enabled: boolean;
+  validatedAt: string | null;
+  params: Array<{
+    id: string;
+    paramKey: string;
+    paramLabel: string;
+    paramType: string;
+    required: boolean;
+    dictCode: string | null;
+    sortNo: number;
+  }>;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface QueryDefPayload {
+  queryCode: string;
+  queryName: string;
+  sqlText: string;
+  pageSizeMax?: number;
+  enabled?: boolean;
+  params: QueryParamPayload[];
+}
+
+/** dry-run 结果集列元数据。 */
+export interface QueryColumnMeta {
+  key: string;
+  label: string;
+  sqlType: string;
+}
+
+/** 视图模型列（全量替换维护）。 */
+export interface ViewModelColPayload {
+  colKey: string;
+  colTitle?: string | null;
+  titleKey?: string | null;
+  width?: number | null;
+  align?: 'LEFT' | 'CENTER' | 'RIGHT';
+  visible?: boolean;
+  formatType: 'NONE' | 'DATE' | 'DATETIME' | 'DICT' | 'NUMBER';
+  formatArg?: string | null;
+  sortNo?: number;
+}
+
+/** 视图模型（头 + 列）。 */
+export interface ViewModel {
+  id: string;
+  viewCode: string;
+  viewName: string;
+  queryCode: string;
+  queryName: string | null;
+  permCode: string | null;
+  allowExport: boolean;
+  pageSize: number;
+  enabled: boolean;
+  cols: Array<{
+    id: string;
+    colKey: string;
+    colTitle: string | null;
+    titleKey: string | null;
+    width: number | null;
+    align: string;
+    visible: boolean;
+    formatType: string;
+    formatArg: string | null;
+    sortNo: number;
+  }>;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ViewModelPayload {
+  viewCode: string;
+  viewName: string;
+  queryCode: string;
+  permCode?: string | null;
+  allowExport?: boolean;
+  pageSize?: number;
+  enabled?: boolean;
+  cols: ViewModelColPayload[];
+}
+
+/** 运行时元数据契约（meta 端点）。 */
+export interface DynamicMeta {
+  viewCode: string;
+  viewName: string;
+  queryCode: string;
+  allowExport: boolean;
+  pageSize: number;
+  params: Array<{ key: string; label: string; type: string; required: boolean; dictCode: string | null }>;
+  columns: Array<{ key: string; colTitle: string | null; titleKey: string | null; width: number | null; align: string; visible: boolean; formatType: string; formatArg: string | null }>;
+}
+
+/** 运行时数据契约（data 端点）。 */
+export interface DynamicPageData {
+  total: number;
+  rows: Array<Record<string, unknown>>;
+}

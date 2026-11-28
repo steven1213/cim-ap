@@ -21,6 +21,13 @@ import type {
   ConsBomPayload,
   ConsBomLine,
   ConsBomLinePayload,
+  QueryDef,
+  QueryDefPayload,
+  QueryColumnMeta,
+  ViewModel,
+  ViewModelPayload,
+  DynamicMeta,
+  DynamicPageData,
   DictInfo,
   DictItem,
   DictItemPayload,
@@ -807,7 +814,9 @@ export type LocationType =
   | 'reticle'
   | 'inspectionStd'
   | 'consumable'
-  | 'consBom';
+  | 'consBom'
+  | 'queryDef'
+  | 'viewModel';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {
@@ -1848,4 +1857,60 @@ export function importEdcExcel(
   targetId?: string | null,
 ): Promise<EdcImportReport> {
   return http.post<EdcImportReport>(`${BASE}/edc/import`, { kind, dataBase64, targetId: targetId ?? null });
+}
+
+// ============================================================ 动态查询/视图引擎（V39）
+
+export function listQueryDefs(keyword?: string, signal?: AbortSignal): Promise<QueryDef[]> {
+  return http.get<QueryDef[]>(`${BASE}/query-defs`, { keyword }, { signal });
+}
+
+export function queryDefColumns(id: string): Promise<QueryColumnMeta[]> {
+  return http.get<QueryColumnMeta[]>(`${BASE}/query-defs/${encodeURIComponent(id)}/columns`);
+}
+
+export function createQueryDef(payload: QueryDefPayload): Promise<QueryDef> {
+  return http.post<QueryDef>(`${BASE}/query-defs`, payload);
+}
+
+export function updateQueryDef(id: string, payload: QueryDefPayload): Promise<QueryDef> {
+  return http.put<QueryDef>(`${BASE}/query-defs/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteQueryDef(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/query-defs/${encodeURIComponent(id)}`);
+}
+
+export function listViewModels(keyword?: string, signal?: AbortSignal): Promise<ViewModel[]> {
+  return http.get<ViewModel[]>(`${BASE}/view-models`, { keyword }, { signal });
+}
+
+export function createViewModel(payload: ViewModelPayload): Promise<ViewModel> {
+  return http.post<ViewModel>(`${BASE}/view-models`, payload);
+}
+
+export function updateViewModel(id: string, payload: ViewModelPayload): Promise<ViewModel> {
+  return http.put<ViewModel>(`${BASE}/view-models/${encodeURIComponent(id)}`, payload);
+}
+
+export function deleteViewModel(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/view-models/${encodeURIComponent(id)}`);
+}
+
+/** 运行时契约：元数据。 */
+export function dynamicMeta(viewCode: string, signal?: AbortSignal): Promise<DynamicMeta> {
+  return http.get<DynamicMeta>(`${BASE}/view-models/${encodeURIComponent(viewCode)}/meta`, undefined, { signal });
+}
+
+/** 运行时契约：分页数据。 */
+export function dynamicData(
+  viewCode: string,
+  body: { params: Record<string, string>; page: number; size: number },
+  signal?: AbortSignal,
+): Promise<DynamicPageData> {
+  return http.post<DynamicPageData>(
+    `${BASE}/view-models/${encodeURIComponent(viewCode)}/data`,
+    body,
+    { signal },
+  );
 }

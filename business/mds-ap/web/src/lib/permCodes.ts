@@ -114,6 +114,20 @@ export const MDS_PERMS = {
     update: 'mds:consumable:update',
     delete: 'mds:consumable:delete',
   },
+  // 动态查询/视图引擎（V39）
+  queryDef: {
+    view: 'mds:queryDef:view',
+    create: 'mds:queryDef:create',
+    update: 'mds:queryDef:update',
+    delete: 'mds:queryDef:delete',
+  },
+  viewModel: {
+    view: 'mds:viewModel:view',
+    create: 'mds:viewModel:create',
+    update: 'mds:viewModel:update',
+    delete: 'mds:viewModel:delete',
+  },
+  dynamicView: 'mds:dynamic:view',
   // 消耗品 BOM（V38：工序×规格消耗契约）
   consBom: {
     view: 'mds:consBom:view',

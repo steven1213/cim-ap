@@ -107,6 +107,12 @@
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
         </dependency>
+        <!-- JSqlParser（动态查询 V39：保存前语法校验 + SELECT-only 白名单；Boot 不管理版本） -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.9</version>
+        </dependency>
     </dependencies>
 
     <build>

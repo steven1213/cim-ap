@@ -61,6 +61,8 @@ type Level = Exclude<
   | 'inspectionStd'
   | 'consumable'
   | 'consBom'
+  | 'queryDef'
+  | 'viewModel'
 >;
 
 /** 每层的直接子层（stage 是位置树叶子）。 */
