@@ -70,7 +70,7 @@ const EMPTY_LINE: ConsBomLinePayload = {
   note: '',
 };
 
-const LINE_INPUT_STYLE = { width: '100%', padding: '2px 6px' } as const;
+const LINE_INPUT_STYLE = { width: '100%' } as const;
 
 const STATUS_CLASS: Record<string, string> = {
   DRAFT: 'flow-status',
@@ -425,17 +425,17 @@ export default function ConsBomPage() {
               <h4 className="op-detail-title" style={{ marginTop: 16 }}>
                 {t('mds.consBom.linesTitle')}
               </h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table className="line-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 180, textAlign: 'left' }}>{t('mds.consBom.lineSpec')}</th>
-                    <th style={{ width: 100, textAlign: 'left' }}>{t('mds.consBom.lineType')}</th>
-                    <th style={{ width: 110, textAlign: 'left' }}>{t('mds.consBom.lineBasis')}</th>
-                    <th style={{ width: 100, textAlign: 'left' }}>{t('mds.consBom.lineStdQty')}</th>
-                    <th style={{ width: 90, textAlign: 'left' }}>{t('mds.consBom.lineTolerance')}</th>
-                    <th style={{ width: 130, textAlign: 'left' }}>{t('mds.consBom.lineParam')}</th>
-                    <th style={{ width: 120, textAlign: 'left' }}>{t('mds.consBom.lineParamQty')}</th>
-                    <th style={{ width: 110, textAlign: 'left' }}>{t('mds.consBom.lineExpiry')}</th>
+                    <th style={{ width: 180 }}>{t('mds.consBom.lineSpec')}</th>
+                    <th style={{ width: 100 }}>{t('mds.consBom.lineType')}</th>
+                    <th style={{ width: 110 }}>{t('mds.consBom.lineBasis')}</th>
+                    <th style={{ width: 100 }}>{t('mds.consBom.lineStdQty')}</th>
+                    <th style={{ width: 90 }}>{t('mds.consBom.lineTolerance')}</th>
+                    <th style={{ width: 130 }}>{t('mds.consBom.lineParam')}</th>
+                    <th style={{ width: 120 }}>{t('mds.consBom.lineParamQty')}</th>
+                    <th style={{ width: 110 }}>{t('mds.consBom.lineExpiry')}</th>
                     <th style={{ width: 56 }} />
                   </tr>
                 </thead>

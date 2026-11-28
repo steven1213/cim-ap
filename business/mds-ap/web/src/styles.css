@@ -400,6 +400,53 @@ table.naming-seg-table th {
   white-space: nowrap;
 }
 
+/* ============================================================
+   明细行小表（消耗品 BOM 消耗明细 / 检验标准检验项）：
+   动态行内联控件编辑表，DataTable 进不去（单元格是 select/input），
+   沿用状态矩阵同口径的原生 table 特例，颜色/字号全走平台令牌。
+   ============================================================ */
+table.line-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+
+table.line-table th,
+table.line-table td {
+  border: 0.5px solid var(--line);
+  padding: 4px 8px;
+  text-align: left;
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  vertical-align: middle;
+}
+
+table.line-table th {
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+table.line-table td {
+  word-break: break-word;
+}
+
+/* 行内输入控件收窄默认外观（平台 base.css 已给 input/select 边框，这里只调内距与宽度） */
+table.line-table input,
+table.line-table select {
+  padding: 3px 6px;
+  font-size: var(--fs-sm);
+}
+
+table.line-table .line-table-num {
+  width: 76px;
+}
+
+table.line-table .line-table-txt {
+  width: 100%;
+  min-width: 90px;
+}
+
+
 /* 弹窗内的段卡片列表（可排序） */
 .naming-seg-hint {
   margin: 10px 0 6px;

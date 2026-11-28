@@ -62,7 +62,7 @@ const EMPTY_ITEM: InspectionItemPayload = {
   sortNo: 0,
 };
 
-const ITEM_INPUT_STYLE = { width: '100%', padding: '2px 6px' } as const;
+const ITEM_INPUT_STYLE = { width: '100%' } as const;
 
 export default function InspectionPage() {
   const { t } = useTranslation();
@@ -347,15 +347,15 @@ export default function InspectionPage() {
               <h4 className="op-detail-title" style={{ marginTop: 16 }}>
                 {t('mds.inspection.itemsTitle')}
               </h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table className="line-table">
                 <thead>
                   <tr>
-                    <th style={{ width: 120, textAlign: 'left' }}>{t('mds.inspection.itemCode')}</th>
-                    <th style={{ width: 140, textAlign: 'left' }}>{t('mds.inspection.itemName')}</th>
-                    <th style={{ textAlign: 'left' }}>{t('mds.inspection.itemSpec')}</th>
-                    <th style={{ width: 110, textAlign: 'left' }}>{t('mds.inspection.itemMethod')}</th>
-                    <th style={{ width: 110, textAlign: 'left' }}>{t('mds.inspection.itemInstrument')}</th>
-                    <th style={{ width: 110, textAlign: 'left' }}>{t('mds.inspection.itemLevel')}</th>
+                    <th style={{ width: 120 }}>{t('mds.inspection.itemCode')}</th>
+                    <th style={{ width: 140 }}>{t('mds.inspection.itemName')}</th>
+                    <th>{t('mds.inspection.itemSpec')}</th>
+                    <th style={{ width: 110 }}>{t('mds.inspection.itemMethod')}</th>
+                    <th style={{ width: 110 }}>{t('mds.inspection.itemInstrument')}</th>
+                    <th style={{ width: 110 }}>{t('mds.inspection.itemLevel')}</th>
                     <th style={{ width: 56 }} />
                   </tr>
                 </thead>
