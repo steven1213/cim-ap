@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Can,
@@ -52,6 +52,9 @@ function formFrom(row: InspectionStd | null): StdFormState {
 
 const EMPTY_JSON = JSON.stringify(formFrom(null));
 
+/** 行编辑视图：payload + 页内临时行键（不提交后端）。 */
+type ItemRow = InspectionItemPayload & { uid: string };
+
 const EMPTY_ITEM: InspectionItemPayload = {
   itemCode: '',
   itemName: '',
@@ -73,7 +76,9 @@ export default function InspectionPage() {
   const defectDict = useDict('mds.defect_level');
 
   const [form, setForm] = useState<StdFormState>(() => formFrom(null));
-  const [items, setItems] = useState<InspectionItemPayload[]>([]);
+  const [items, setItems] = useState<ItemRow[]>([]);
+  const uidRef = useRef(0);
+  const nextUid = () => `l${++uidRef.current}`;
   const initialJsonRef = useRef(EMPTY_JSON);
   const modeRef = useRef<DetailMode>('view');
 
@@ -96,7 +101,7 @@ export default function InspectionPage() {
 
   // 明细跟随选中行/模式：查看与编辑拉现行明细，新建给一条空行起步
   useEffect(() => {
-    if (md.mode === 'view' && md.selected) {
+    if ((md.mode === 'view' || md.mode === 'edit') && md.selected) {
       api
         .listInspectionItems(md.selected.id)
         .then((rows) =>
@@ -108,26 +113,12 @@ export default function InspectionPage() {
             instrument: r.instrument ?? '',
             defectLevel: r.defectLevel ?? '',
             sortNo: r.sortNo,
-          }))),
-        )
-        .catch(() => setItems([]));
-    } else if (md.mode === 'edit' && md.selected) {
-      api
-        .listInspectionItems(md.selected.id)
-        .then((rows) =>
-          setItems(rows.map((r) => ({
-            itemCode: r.itemCode,
-            itemName: r.itemName,
-            spec: r.spec ?? '',
-            method: r.method ?? '',
-            instrument: r.instrument ?? '',
-            defectLevel: r.defectLevel ?? '',
-            sortNo: r.sortNo,
+            uid: nextUid(),
           }))),
         )
         .catch(() => setItems([]));
     } else if (md.mode === 'create') {
-      setItems([{ ...EMPTY_ITEM, sortNo: 10 }]);
+      setItems([{ ...EMPTY_ITEM, sortNo: 10, uid: nextUid() }]);
     } else {
       setItems([]);
     }
@@ -146,8 +137,12 @@ export default function InspectionPage() {
     initialJsonRef.current = JSON.stringify(formFrom(row));
   };
 
-  const patchItem = (idx: number, patch: Partial<InspectionItemPayload>) => {
-    setItems((list) => list.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const patchItem = (uid: string, patch: Partial<InspectionItemPayload>) => {
+    setItems((list) => list.map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
+  };
+
+  const removeItem = (uid: string) => {
+    setItems((list) => list.filter((it) => it.uid !== uid));
   };
 
   const save = async () => {
@@ -178,7 +173,15 @@ export default function InspectionPage() {
           : await api.updateInspectionStd(md.selected!.id, headerPayload);
       await api.replaceInspectionItems(
         ret.id,
-        items.map((it, i) => ({ ...it, itemCode: it.itemCode.trim(), itemName: it.itemName.trim(), sortNo: (i + 1) * 10 })),
+        items.map((it, i) => ({
+          itemCode: it.itemCode.trim(),
+          itemName: it.itemName.trim(),
+          spec: it.spec,
+          method: it.method,
+          instrument: it.instrument,
+          defectLevel: it.defectLevel,
+          sortNo: (i + 1) * 10,
+        })),
       );
       toast.success(t('mds.common.saved'));
       md.saved(ret.id);
@@ -260,7 +263,82 @@ export default function InspectionPage() {
   );
 
   const readOnly = md.mode === 'view';
-  const patchItemCb = useCallback(patchItem, []);
+
+  // 检验项列定义：行内控件编辑（input/select），只读态纯文本。
+  // 放不下时由 DataTable 内置横向滚动（列宽合计 > 容器自动出滚动条）。
+  const itemColumns = useMemo<Array<DataTableColumn<ItemRow>>>(
+    () => [
+      {
+        key: 'itemCode',
+        titleKey: 'mds.inspection.itemCode',
+        width: 130,
+        render: (r) => (
+          <input style={ITEM_INPUT_STYLE} value={r.itemCode} readOnly={readOnly} onChange={(e) => patchItem(r.uid, { itemCode: e.target.value })} />
+        ),
+      },
+      {
+        key: 'itemName',
+        titleKey: 'mds.inspection.itemName',
+        width: 150,
+        render: (r) => (
+          <input style={ITEM_INPUT_STYLE} value={r.itemName} readOnly={readOnly} onChange={(e) => patchItem(r.uid, { itemName: e.target.value })} />
+        ),
+      },
+      {
+        key: 'spec',
+        titleKey: 'mds.inspection.itemSpec',
+        width: 220,
+        render: (r) => (
+          <input style={ITEM_INPUT_STYLE} value={r.spec ?? ''} readOnly={readOnly} onChange={(e) => patchItem(r.uid, { spec: e.target.value })} />
+        ),
+      },
+      {
+        key: 'method',
+        titleKey: 'mds.inspection.itemMethod',
+        width: 120,
+        render: (r) => (
+          <input style={ITEM_INPUT_STYLE} value={r.method ?? ''} readOnly={readOnly} onChange={(e) => patchItem(r.uid, { method: e.target.value })} />
+        ),
+      },
+      {
+        key: 'instrument',
+        titleKey: 'mds.inspection.itemInstrument',
+        width: 120,
+        render: (r) => (
+          <input style={ITEM_INPUT_STYLE} value={r.instrument ?? ''} readOnly={readOnly} onChange={(e) => patchItem(r.uid, { instrument: e.target.value })} />
+        ),
+      },
+      {
+        key: 'defectLevel',
+        titleKey: 'mds.inspection.itemLevel',
+        width: 110,
+        render: (r) =>
+          readOnly ? (
+            r.defectLevel ?? '—'
+          ) : (
+            <select style={ITEM_INPUT_STYLE} value={r.defectLevel ?? ''} onChange={(e) => patchItem(r.uid, { defectLevel: e.target.value })}>
+              <option value="">—</option>
+              {defectDict.items.filter((d) => !d.disabled).map((d) => (
+                <option key={d.value} value={d.value}>{d.label}</option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'ops',
+        titleKey: 'mds.common.actions',
+        width: 76,
+        render: (r) =>
+          !readOnly && (
+            <CimButton size="small" danger onClick={() => removeItem(r.uid)}>
+              {t('mds.common.delete')}
+            </CimButton>
+          ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [readOnly, defectDict.items, t],
+  );
 
   return (
     <Page>
@@ -347,95 +425,25 @@ export default function InspectionPage() {
               <h4 className="op-detail-title" style={{ marginTop: 16 }}>
                 {t('mds.inspection.itemsTitle')}
               </h4>
-              <table className="line-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 120 }}>{t('mds.inspection.itemCode')}</th>
-                    <th style={{ width: 140 }}>{t('mds.inspection.itemName')}</th>
-                    <th>{t('mds.inspection.itemSpec')}</th>
-                    <th style={{ width: 110 }}>{t('mds.inspection.itemMethod')}</th>
-                    <th style={{ width: 110 }}>{t('mds.inspection.itemInstrument')}</th>
-                    <th style={{ width: 110 }}>{t('mds.inspection.itemLevel')}</th>
-                    <th style={{ width: 56 }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        <input
-                          style={ITEM_INPUT_STYLE}
-                          value={it.itemCode}
-                          readOnly={readOnly}
-                          onChange={(e) => patchItemCb(idx, { itemCode: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          style={ITEM_INPUT_STYLE}
-                          value={it.itemName}
-                          readOnly={readOnly}
-                          onChange={(e) => patchItemCb(idx, { itemName: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          style={ITEM_INPUT_STYLE}
-                          value={it.spec ?? ''}
-                          readOnly={readOnly}
-                          onChange={(e) => patchItemCb(idx, { spec: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          style={ITEM_INPUT_STYLE}
-                          value={it.method ?? ''}
-                          readOnly={readOnly}
-                          onChange={(e) => patchItemCb(idx, { method: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          style={ITEM_INPUT_STYLE}
-                          value={it.instrument ?? ''}
-                          readOnly={readOnly}
-                          onChange={(e) => patchItemCb(idx, { instrument: e.target.value })}
-                        />
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.defectLevel ?? '—'
-                        ) : (
-                          <select
-                            style={ITEM_INPUT_STYLE}
-                            value={it.defectLevel ?? ''}
-                            onChange={(e) => patchItemCb(idx, { defectLevel: e.target.value })}
-                          >
-                            <option value="">—</option>
-                            {defectDict.items.filter((i) => !i.disabled).map((i) => (
-                              <option key={i.value} value={i.value}>{i.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {!readOnly && (
-                          <CimButton size="small" danger onClick={() => setItems((list) => list.filter((_, i) => i !== idx))}>
-                            {t('mds.common.delete')}
-                          </CimButton>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!readOnly && (
-                <div style={{ marginTop: 8 }}>
-                  <CimButton size="small" onClick={() => setItems((list) => [...list, { ...EMPTY_ITEM, sortNo: (list.length + 1) * 10 }])}>
-                    {t('mds.inspection.addItem')}
-                  </CimButton>
-                </div>
-              )}
+              <DataTable<ItemRow>
+                columns={itemColumns}
+                rows={items}
+                rowKey={(r) => r.uid}
+                size="small"
+                flat
+                actions={
+                  !readOnly && (
+                    <CimButton
+                      size="small"
+                      onClick={() =>
+                        setItems((list) => [...list, { ...EMPTY_ITEM, sortNo: (list.length + 1) * 10, uid: nextUid() }])
+                      }
+                    >
+                      {t('mds.inspection.addItem')}
+                    </CimButton>
+                  )
+                }
+              />
             </div>
           )}
         </Panel>

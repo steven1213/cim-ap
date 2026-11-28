@@ -54,6 +54,9 @@ function formFrom(row: ConsBom | null): BomFormState {
 
 const EMPTY_JSON = JSON.stringify(formFrom(null));
 
+/** 行编辑视图：payload + 页内临时行键（不提交后端）。 */
+type LineRow = ConsBomLinePayload & { uid: string };
+
 const EMPTY_LINE: ConsBomLinePayload = {
   specId: '',
   consumeType: 'FIXED',
@@ -100,7 +103,9 @@ export default function ConsBomPage() {
   const expiryDict = useDict('mds.cons_expiry_policy');
 
   const [form, setForm] = useState<BomFormState>(() => formFrom(null));
-  const [lines, setLines] = useState<ConsBomLinePayload[]>([]);
+  const [lines, setLines] = useState<LineRow[]>([]);
+  const uidRef = useRef(0);
+  const nextUid = () => `l${++uidRef.current}`;
   const initialJsonRef = useRef(EMPTY_JSON);
   const initialLinesRef = useRef('[]');
   const modeRef = useRef<DetailMode>('view');
@@ -144,6 +149,7 @@ export default function ConsBomPage() {
             expiryPolicy: r.expiryPolicy ?? '',
             sortNo: r.sortNo,
             note: r.note ?? '',
+            uid: nextUid(),
           }));
           setLines(mapped);
           if (md.mode !== 'view') initialLinesRef.current = JSON.stringify(mapped);
@@ -153,7 +159,7 @@ export default function ConsBomPage() {
     if ((md.mode === 'view' || md.mode === 'edit') && md.selected) {
       pull();
     } else if (md.mode === 'create') {
-      setLines([{ ...EMPTY_LINE, sortNo: 10 }]);
+      setLines([{ ...EMPTY_LINE, sortNo: 10, uid: nextUid() }]);
       initialLinesRef.current = '[]';
     } else {
       setLines([]);
@@ -173,8 +179,12 @@ export default function ConsBomPage() {
     initialJsonRef.current = JSON.stringify(formFrom(row));
   };
 
-  const patchLine = (idx: number, patch: Partial<ConsBomLinePayload>) => {
-    setLines((list) => list.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const patchLine = (uid: string, patch: Partial<ConsBomLinePayload>) => {
+    setLines((list) => list.map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
+  };
+
+  const removeLine = (uid: string) => {
+    setLines((list) => list.filter((it) => it.uid !== uid));
   };
 
   const save = async () => {
@@ -211,15 +221,19 @@ export default function ConsBomPage() {
       await api.replaceConsBomLines(
         ret.id,
         lines.map((it, i) => ({
-          ...it,
           specId: it.specId,
+          consumeType: it.consumeType,
+          basis: it.basis,
           stdQty: Number(it.stdQty),
           tolerancePct: it.tolerancePct == null ? null : Number(it.tolerancePct),
+          lossFactor: it.lossFactor,
           paramKey: it.paramKey || null,
           paramQtyPerUnit: it.paramQtyPerUnit == null ? null : Number(it.paramQtyPerUnit),
           substituteGroup: it.substituteGroup || null,
+          subPriority: it.subPriority,
           expiryPolicy: it.expiryPolicy || null,
           sortNo: (i + 1) * 10,
+          note: it.note,
         })),
       );
       toast.success(t('mds.common.saved'));
@@ -349,6 +363,169 @@ export default function ConsBomPage() {
     !readOnly && selected && selected.sourceOpVersion != null && selected.opVersionNo != null &&
     selected.sourceOpVersion !== selected.opVersionNo;
 
+  // 明细行列定义：行内控件编辑（select/input），只读态纯文本。
+  // 放不下时由 DataTable 内置横向滚动（列宽合计 > 容器自动出滚动条）。
+  const lineColumns = useMemo<Array<DataTableColumn<LineRow>>>(
+    () => [
+      {
+        key: 'specId',
+        titleKey: 'mds.consBom.lineSpec',
+        width: 200,
+        render: (r) =>
+          readOnly ? (
+            specOptions.find((o) => o.value === r.specId)?.label ?? r.specId
+          ) : (
+            <select style={LINE_INPUT_STYLE} value={r.specId} onChange={(e) => patchLine(r.uid, { specId: e.target.value })}>
+              <option value="">—</option>
+              {specOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'consumeType',
+        titleKey: 'mds.consBom.lineType',
+        width: 110,
+        render: (r) =>
+          readOnly ? (
+            r.consumeType ?? '—'
+          ) : (
+            <select
+              style={LINE_INPUT_STYLE}
+              value={r.consumeType ?? 'FIXED'}
+              onChange={(e) =>
+                patchLine(r.uid, {
+                  consumeType: e.target.value as 'FIXED' | 'VARIABLE',
+                  paramKey: e.target.value === 'FIXED' ? '' : r.paramKey,
+                  paramQtyPerUnit: e.target.value === 'FIXED' ? null : r.paramQtyPerUnit,
+                })
+              }
+            >
+              {typeDict.items.filter((i) => !i.disabled).map((i) => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'basis',
+        titleKey: 'mds.consBom.lineBasis',
+        width: 110,
+        render: (r) =>
+          readOnly ? (
+            r.basis ?? '—'
+          ) : (
+            <select style={LINE_INPUT_STYLE} value={r.basis ?? 'PER_LOT'} onChange={(e) => patchLine(r.uid, { basis: e.target.value })}>
+              {basisDict.items.filter((i) => !i.disabled).map((i) => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'stdQty',
+        titleKey: 'mds.consBom.lineStdQty',
+        width: 90,
+        render: (r) =>
+          readOnly ? (
+            r.stdQty
+          ) : (
+            <input
+              style={LINE_INPUT_STYLE}
+              type="number"
+              min="0"
+              step="any"
+              value={r.stdQty}
+              onChange={(e) => patchLine(r.uid, { stdQty: Number(e.target.value) })}
+            />
+          ),
+      },
+      {
+        key: 'tolerancePct',
+        titleKey: 'mds.consBom.lineTolerance',
+        width: 90,
+        render: (r) =>
+          readOnly ? (
+            r.tolerancePct != null ? `${r.tolerancePct}%` : '—'
+          ) : (
+            <input
+              style={LINE_INPUT_STYLE}
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              value={r.tolerancePct ?? ''}
+              onChange={(e) => patchLine(r.uid, { tolerancePct: e.target.value === '' ? null : Number(e.target.value) })}
+            />
+          ),
+      },
+      {
+        key: 'paramKey',
+        titleKey: 'mds.consBom.lineParam',
+        width: 130,
+        render: (r) =>
+          readOnly ? (
+            r.paramKey ?? '—'
+          ) : r.consumeType === 'VARIABLE' ? (
+            <input style={LINE_INPUT_STYLE} value={r.paramKey ?? ''} onChange={(e) => patchLine(r.uid, { paramKey: e.target.value })} />
+          ) : (
+            '—'
+          ),
+      },
+      {
+        key: 'paramQtyPerUnit',
+        titleKey: 'mds.consBom.lineParamQty',
+        width: 120,
+        render: (r) =>
+          readOnly ? (
+            r.paramQtyPerUnit ?? '—'
+          ) : r.consumeType === 'VARIABLE' ? (
+            <input
+              style={LINE_INPUT_STYLE}
+              type="number"
+              min="0"
+              step="any"
+              value={r.paramQtyPerUnit ?? ''}
+              onChange={(e) => patchLine(r.uid, { paramQtyPerUnit: e.target.value === '' ? null : Number(e.target.value) })}
+            />
+          ) : (
+            '—'
+          ),
+      },
+      {
+        key: 'expiryPolicy',
+        titleKey: 'mds.consBom.lineExpiry',
+        width: 110,
+        render: (r) =>
+          readOnly ? (
+            r.expiryPolicy ?? '—'
+          ) : (
+            <select style={LINE_INPUT_STYLE} value={r.expiryPolicy ?? ''} onChange={(e) => patchLine(r.uid, { expiryPolicy: e.target.value })}>
+              <option value="">—</option>
+              {expiryDict.items.filter((i) => !i.disabled).map((i) => (
+                <option key={i.value} value={i.value}>{i.label}</option>
+              ))}
+            </select>
+          ),
+      },
+      {
+        key: 'ops',
+        titleKey: 'mds.common.actions',
+        width: 76,
+        render: (r) =>
+          !readOnly && (
+            <CimButton size="small" danger onClick={() => removeLine(r.uid)}>
+              {t('mds.common.delete')}
+            </CimButton>
+          ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [readOnly, specOptions, typeDict.items, basisDict.items, expiryDict.items, t],
+  );
+
+
   return (
     <Page>
       <GuideBar />
@@ -425,171 +602,25 @@ export default function ConsBomPage() {
               <h4 className="op-detail-title" style={{ marginTop: 16 }}>
                 {t('mds.consBom.linesTitle')}
               </h4>
-              <table className="line-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 180 }}>{t('mds.consBom.lineSpec')}</th>
-                    <th style={{ width: 100 }}>{t('mds.consBom.lineType')}</th>
-                    <th style={{ width: 110 }}>{t('mds.consBom.lineBasis')}</th>
-                    <th style={{ width: 100 }}>{t('mds.consBom.lineStdQty')}</th>
-                    <th style={{ width: 90 }}>{t('mds.consBom.lineTolerance')}</th>
-                    <th style={{ width: 130 }}>{t('mds.consBom.lineParam')}</th>
-                    <th style={{ width: 120 }}>{t('mds.consBom.lineParamQty')}</th>
-                    <th style={{ width: 110 }}>{t('mds.consBom.lineExpiry')}</th>
-                    <th style={{ width: 56 }} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((it, idx) => (
-                    <tr key={idx}>
-                      <td>
-                        {readOnly ? (
-                          specOptions.find((o) => o.value === it.specId)?.label ?? it.specId
-                        ) : (
-                          <select
-                            style={LINE_INPUT_STYLE}
-                            value={it.specId}
-                            onChange={(e) => patchLine(idx, { specId: e.target.value })}
-                          >
-                            <option value="">—</option>
-                            {specOptions.map((o) => (
-                              <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.consumeType ?? '—'
-                        ) : (
-                          <select
-                            style={LINE_INPUT_STYLE}
-                            value={it.consumeType ?? 'FIXED'}
-                            onChange={(e) =>
-                              patchLine(idx, {
-                                consumeType: e.target.value as 'FIXED' | 'VARIABLE',
-                                paramKey: e.target.value === 'FIXED' ? '' : it.paramKey,
-                                paramQtyPerUnit: e.target.value === 'FIXED' ? null : it.paramQtyPerUnit,
-                              })
-                            }
-                          >
-                            {typeDict.items.filter((i) => !i.disabled).map((i) => (
-                              <option key={i.value} value={i.value}>{i.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.basis ?? '—'
-                        ) : (
-                          <select
-                            style={LINE_INPUT_STYLE}
-                            value={it.basis ?? 'PER_LOT'}
-                            onChange={(e) => patchLine(idx, { basis: e.target.value })}
-                          >
-                            {basisDict.items.filter((i) => !i.disabled).map((i) => (
-                              <option key={i.value} value={i.value}>{i.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.stdQty
-                        ) : (
-                          <input
-                            style={LINE_INPUT_STYLE}
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={it.stdQty}
-                            onChange={(e) => patchLine(idx, { stdQty: Number(e.target.value) })}
-                          />
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.tolerancePct != null ? `${it.tolerancePct}%` : '—'
-                        ) : (
-                          <input
-                            style={LINE_INPUT_STYLE}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="any"
-                            value={it.tolerancePct ?? ''}
-                            onChange={(e) =>
-                              patchLine(idx, { tolerancePct: e.target.value === '' ? null : Number(e.target.value) })
-                            }
-                          />
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.paramKey ?? '—'
-                        ) : it.consumeType === 'VARIABLE' ? (
-                          <input
-                            style={LINE_INPUT_STYLE}
-                            value={it.paramKey ?? ''}
-                            onChange={(e) => patchLine(idx, { paramKey: e.target.value })}
-                          />
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.paramQtyPerUnit ?? '—'
-                        ) : it.consumeType === 'VARIABLE' ? (
-                          <input
-                            style={LINE_INPUT_STYLE}
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={it.paramQtyPerUnit ?? ''}
-                            onChange={(e) =>
-                              patchLine(idx, { paramQtyPerUnit: e.target.value === '' ? null : Number(e.target.value) })
-                            }
-                          />
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>
-                        {readOnly ? (
-                          it.expiryPolicy ?? '—'
-                        ) : (
-                          <select
-                            style={LINE_INPUT_STYLE}
-                            value={it.expiryPolicy ?? ''}
-                            onChange={(e) => patchLine(idx, { expiryPolicy: e.target.value })}
-                          >
-                            <option value="">—</option>
-                            {expiryDict.items.filter((i) => !i.disabled).map((i) => (
-                              <option key={i.value} value={i.value}>{i.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        {!readOnly && (
-                          <CimButton size="small" danger onClick={() => setLines((list) => list.filter((_, i) => i !== idx))}>
-                            {t('mds.common.delete')}
-                          </CimButton>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!readOnly && (
-                <div style={{ marginTop: 8 }}>
-                  <CimButton size="small" onClick={() => setLines((list) => [...list, { ...EMPTY_LINE, sortNo: (list.length + 1) * 10 }])}>
-                    {t('mds.consBom.lineAdd')}
-                  </CimButton>
-                </div>
-              )}
+              <DataTable<LineRow>
+                columns={lineColumns}
+                rows={lines}
+                rowKey={(r) => r.uid}
+                size="small"
+                flat
+                actions={
+                  !readOnly && (
+                    <CimButton
+                      size="small"
+                      onClick={() =>
+                        setLines((list) => [...list, { ...EMPTY_LINE, sortNo: (list.length + 1) * 10, uid: nextUid() }])
+                      }
+                    >
+                      {t('mds.consBom.lineAdd')}
+                    </CimButton>
+                  )
+                }
+              />
             </div>
           )}
         </Panel>
