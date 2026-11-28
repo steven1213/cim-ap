@@ -77,6 +77,7 @@ export default function InspectionPage() {
 
   const [form, setForm] = useState<StdFormState>(() => formFrom(null));
   const [items, setItems] = useState<ItemRow[]>([]);
+  const initialItemsRef = useRef('[]');
   const uidRef = useRef(0);
   const nextUid = () => `l${++uidRef.current}`;
   const initialJsonRef = useRef(EMPTY_JSON);
@@ -90,7 +91,8 @@ export default function InspectionPage() {
       r.stdCode.toLowerCase().includes(kw) || r.stdName.toLowerCase().includes(kw),
     isDirty: () =>
       modeRef.current !== 'view' &&
-      (JSON.stringify(form) !== initialJsonRef.current || items.length > 0),
+      (JSON.stringify(form) !== initialJsonRef.current ||
+        JSON.stringify(items) !== initialItemsRef.current),
   });
   modeRef.current = md.mode;
 
@@ -104,8 +106,8 @@ export default function InspectionPage() {
     if ((md.mode === 'view' || md.mode === 'edit') && md.selected) {
       api
         .listInspectionItems(md.selected.id)
-        .then((rows) =>
-          setItems(rows.map((r) => ({
+        .then((rows) => {
+          const mapped = rows.map((r) => ({
             itemCode: r.itemCode,
             itemName: r.itemName,
             spec: r.spec ?? '',
@@ -114,11 +116,15 @@ export default function InspectionPage() {
             defectLevel: r.defectLevel ?? '',
             sortNo: r.sortNo,
             uid: nextUid(),
-          }))),
-        )
+          }));
+          setItems(mapped);
+          if (md.mode === 'edit') initialItemsRef.current = JSON.stringify(mapped);
+        })
         .catch(() => setItems([]));
     } else if (md.mode === 'create') {
-      setItems([{ ...EMPTY_ITEM, sortNo: 10, uid: nextUid() }]);
+      const seed: ItemRow[] = [{ ...EMPTY_ITEM, sortNo: 10, uid: nextUid() }];
+      setItems(seed);
+      initialItemsRef.current = JSON.stringify(seed);
     } else {
       setItems([]);
     }

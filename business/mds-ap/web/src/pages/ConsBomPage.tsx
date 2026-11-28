@@ -159,8 +159,9 @@ export default function ConsBomPage() {
     if ((md.mode === 'view' || md.mode === 'edit') && md.selected) {
       pull();
     } else if (md.mode === 'create') {
-      setLines([{ ...EMPTY_LINE, sortNo: 10, uid: nextUid() }]);
-      initialLinesRef.current = '[]';
+      const seed: LineRow[] = [{ ...EMPTY_LINE, sortNo: 10, uid: nextUid() }];
+      setLines(seed);
+      initialLinesRef.current = JSON.stringify(seed);
     } else {
       setLines([]);
     }
