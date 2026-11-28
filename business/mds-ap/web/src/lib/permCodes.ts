@@ -114,6 +114,13 @@ export const MDS_PERMS = {
     update: 'mds:consumable:update',
     delete: 'mds:consumable:delete',
   },
+  // 消耗品 BOM（V38：工序×规格消耗契约）
+  consBom: {
+    view: 'mds:consBom:view',
+    create: 'mds:consBom:create',
+    update: 'mds:consBom:update',
+    delete: 'mds:consBom:delete',
+  },
   // 状态模型：模型/状态集/转换矩阵均页面维护（SEMI E30 状态机口径）
   stateModel: {
     view: 'mds:stateModel:view',

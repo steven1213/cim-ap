@@ -17,6 +17,10 @@ import type {
   CarrierPayload,
   Consumable,
   ConsumablePayload,
+  ConsBom,
+  ConsBomPayload,
+  ConsBomLine,
+  ConsBomLinePayload,
   DictInfo,
   DictItem,
   DictItemPayload,
@@ -598,6 +602,43 @@ export function deleteConsumable(id: string): Promise<void> {
   return http.del<void>(`${BASE}/consumables/${encodeURIComponent(id)}`);
 }
 
+// ---------- 消耗品 BOM（V38：「产品×流程×工序×机台」消耗契约） ----------
+
+export function listConsBoms(
+  params?: { productId?: string; flowId?: string; operationId?: string; status?: string; keyword?: string },
+  signal?: AbortSignal,
+): Promise<ConsBom[]> {
+  return http.get<ConsBom[]>(`${BASE}/cons-boms`, params, { signal });
+}
+
+export function listConsBomLines(id: string, signal?: AbortSignal): Promise<ConsBomLine[]> {
+  return http.get<ConsBomLine[]>(`${BASE}/cons-boms/${encodeURIComponent(id)}/lines`, undefined, { signal });
+}
+
+export function createConsBom(payload: ConsBomPayload): Promise<ConsBom> {
+  return http.post<ConsBom>(`${BASE}/cons-boms`, payload);
+}
+
+export function updateConsBom(id: string, payload: Partial<ConsBomPayload>): Promise<ConsBom> {
+  return http.put<ConsBom>(`${BASE}/cons-boms/${encodeURIComponent(id)}`, payload);
+}
+
+export function replaceConsBomLines(id: string, lines: ConsBomLinePayload[]): Promise<ConsBomLine[]> {
+  return http.put<ConsBomLine[]>(`${BASE}/cons-boms/${encodeURIComponent(id)}/lines`, lines);
+}
+
+export function activateConsBom(id: string): Promise<ConsBom> {
+  return http.post<ConsBom>(`${BASE}/cons-boms/${encodeURIComponent(id)}/activate`, {});
+}
+
+export function disableConsBom(id: string): Promise<ConsBom> {
+  return http.post<ConsBom>(`${BASE}/cons-boms/${encodeURIComponent(id)}/disable`, {});
+}
+
+export function deleteConsBom(id: string): Promise<void> {
+  return http.del<void>(`${BASE}/cons-boms/${encodeURIComponent(id)}`);
+}
+
 // ---------- 状态模型（SEMI E30 状态机口径：状态集 + 转换 allowlist + 触发条件） ----------
 
 export function listStateModels(signal?: AbortSignal): Promise<StateModel[]> {
@@ -765,7 +806,8 @@ export type LocationType =
   | 'carrier'
   | 'reticle'
   | 'inspectionStd'
-  | 'consumable';
+  | 'consumable'
+  | 'consBom';
 
 /** 抢锁：成功返回 claimed=true；失败后端抛「谁正在编辑」。 */
 export function claimLock(type: LocationType, id: string): Promise<{ claimed: boolean }> {

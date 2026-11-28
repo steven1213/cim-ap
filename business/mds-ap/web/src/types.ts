@@ -583,7 +583,7 @@ export interface InspectionItemPayload {
   sortNo?: number;
 }
 
-/** 耗材（Consumable）：生产辅助物料台账级主数据。 */
+/** 耗材/消耗品规格（Consumable）：带过程控制约束的物料静态档案（V34 台账 / V37 规格升级）。 */
 export interface Consumable {
   id: string;
   consCode: string;
@@ -605,6 +605,18 @@ export interface Consumable {
   enabled: boolean;
   occupied: boolean;
   occupiedBy: string | null;
+  /** 消耗品/耐用品边界标记（CONSUMABLE/DURABLE；DURABLE 不得被 BOM 引用）。 */
+  materialKind: string;
+  /** 资产生命周期（ACTIVE/END_OF_SALE/OBSOLETE；OBSOLETE 不得被新 BOM 引用）。 */
+  lifecycle: string;
+  shelfLifeDays: number | null;
+  lduHours: number | null;
+  storageTemp: string | null;
+  thawTime: number | null;
+  tolerancePct: number | null;
+  densityFactor: number | null;
+  substituteGroup: string | null;
+  lotControl: boolean;
 }
 
 export interface ConsumablePayload {
@@ -623,6 +635,89 @@ export interface ConsumablePayload {
   partNo?: string | null;
   expiryDate?: string | null;
   homeEquipmentId?: string | null;
+  enabled?: boolean;
+  materialKind?: string;
+  lifecycle?: string;
+  shelfLifeDays?: number | null;
+  lduHours?: number | null;
+  storageTemp?: string | null;
+  thawTime?: number | null;
+  tolerancePct?: number | null;
+  densityFactor?: number | null;
+  substituteGroup?: string | null;
+  lotControl?: boolean;
+}
+
+// ---------------------------------------------------------------- 消耗品 BOM（V38：工序×规格消耗契约）
+
+/** BOM 明细行视图（specCode/specName 由后端批量带出）。 */
+export interface ConsBomLine {
+  id: string;
+  specId: string;
+  specCode: string | null;
+  specName: string | null;
+  consumeType: 'FIXED' | 'VARIABLE' | null;
+  basis: string | null;
+  stdQty: number;
+  tolerancePct: number | null;
+  lossFactor: number | null;
+  paramKey: string | null;
+  paramQtyPerUnit: number | null;
+  substituteGroup: string | null;
+  subPriority: number | null;
+  expiryPolicy: string | null;
+  sortNo: number | null;
+  note: string | null;
+}
+
+/** BOM 行提交载荷（页内行编辑全量替换）。 */
+export interface ConsBomLinePayload {
+  specId: string;
+  consumeType: 'FIXED' | 'VARIABLE';
+  basis: string;
+  stdQty: number;
+  tolerancePct?: number | null;
+  lossFactor?: number | null;
+  paramKey?: string | null;
+  paramQtyPerUnit?: number | null;
+  substituteGroup?: string | null;
+  subPriority?: number | null;
+  expiryPolicy?: string | null;
+  sortNo?: number | null;
+  note?: string | null;
+}
+
+/** 消耗品 BOM 头（版本行：DRAFT→ACTIVE→SUPERSEDED/DISABLED）。 */
+export interface ConsBom {
+  id: string;
+  bomCode: string;
+  bomName: string;
+  productId: string;
+  productCode: string | null;
+  flowId: string;
+  flowCode: string | null;
+  operationId: string;
+  operationCode: string | null;
+  /** 工序当前版本号（与 sourceOpVersion 比对展示版本漂移告警）。 */
+  opVersionNo: number | null;
+  equipmentId: string | null;
+  equipmentCode: string | null;
+  status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'DISABLED';
+  versionNo: number;
+  sourceOpVersion: number | null;
+  enabled: boolean;
+  lineCount: number;
+  occupied: boolean;
+  occupiedBy: string | null;
+}
+
+export interface ConsBomPayload {
+  bomCode: string;
+  bomName: string;
+  productId: string;
+  flowId: string;
+  operationId: string;
+  equipmentId?: string | null;
   enabled?: boolean;
 }
 

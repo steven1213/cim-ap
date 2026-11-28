@@ -13,13 +13,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 耗材（Consumable）——生产辅助物料台账级主数据（V34）。
+ * 消耗品规格（Consumable Spec）——带过程控制约束的物料静态档案（V34 台账 / V37 规格升级）。
  *
- * <p>行业口径：编码/规格型号/类别/计量单位/寿命管理/库存水位。领用出库与盘点
- * 流水归 MES/物料域，主数据只存当前水位（stock_qty）与安全水位（min_qty）。
- * 寿命管理三轨（mds.consumable_life_type 字典）：CYCLE 按使用次数 / DAYS 按天数 /
- * QTY 按产量；life_limit = 寿命上限、life_used = 已消耗、warn_percent = 预警阈值（%），
- * 到期判定与预警触发归运行域。</p>
+ * <p>MDS 边界 = 定义「是什么」（规格档案）与「按什么标准消耗」（消耗品 BOM，V38）；
+ * 库存扣减/采购/齐套/上料阻断归 MES/ERP 运行时，本表只存基准与防呆约束。</p>
+ *
+ * <p>行业口径：编码/规格型号/类别/计量单位 + 过程控制属性（保质期/LDU/存储回温/
+ * 公差/密度效能因子）+ 治理属性（替代组/生命周期三态/批次标记/耐用品边界）。
+ * 寿命管理三轨（mds.consumable_life_type 字典）：CYCLE/DAYS/QTY；life_limit = 寿命上限、
+ * life_used = 已消耗快照、warn_percent = 预警阈值（%），到期判定与预警触发归运行域。</p>
  *
  * <p>cons_code 全局唯一、建后不可改；编辑锁三列与全库主数据同款。</p>
  */
@@ -43,9 +45,57 @@ public class CimConsumable extends EditLockDefData {
     @Column(name = "spec_model", length = 128)
     private String specModel;
 
-    /** 耗材类别（mds.consumable_type 字典：CHEMICAL/SLURRY/GAS/PART/TOOL/OTHER）。 */
+    /** 耗材类别（mds.consumable_type 字典：GAS/CHEMICAL/SLURRY/TARGET/PART/PACKAGING/OTHER；TOOL 移除，耐用工具归 equipment 域）。 */
     @Column(name = "cons_type", length = 32)
     private String consType;
+
+    /** 物料边界：CONSUMABLE 消耗品 / DURABLE 耐用品——DURABLE 不得被消耗品 BOM 引用。 */
+    @Column(name = "material_kind", nullable = false, length = 16)
+    private String materialKind = KIND_CONSUMABLE;
+
+    /** 生命周期：ACTIVE 在售 / END_OF_SALE 停售 / OBSOLETE 淘汰（不得被新 BOM 引用）。 */
+    @Column(name = "lifecycle", nullable = false, length = 16)
+    private String lifecycle = LC_ACTIVE;
+
+    /** 保质期（天，自生产日期起；空 = 不限；到期判定归运行时）。 */
+    @Column(name = "shelf_life_days")
+    private Integer shelfLifeDays;
+
+    /** 开封后使用时限（Pot Life，小时；超期阻断消耗，判定归运行时）。 */
+    @Column(name = "ldu_hours")
+    private Integer lduHours;
+
+    /** 存储温度要求（文本区间，例：2-8°C / -20°C）。 */
+    @Column(name = "storage_temp", length = 32)
+    private String storageTemp;
+
+    /** 回温/解冻时间（小时；上料前条件校验基准）。 */
+    @Column(name = "thaw_time")
+    private Integer thawTime;
+
+    /** 称量/配比容差（±%，例 5.00 = ±5%）。 */
+    @Column(name = "tolerance_pct", precision = 5, scale = 2)
+    private BigDecimal tolerancePct;
+
+    /** 密度/效能因子（体积↔重量换算与配方修正；空 = 1:1）。 */
+    @Column(name = "density_factor", precision = 12, scale = 6)
+    private BigDecimal densityFactor;
+
+    /** 替代组码（同组规格可互相替代；BOM 行按组引用，选择策略在运行时）。 */
+    @Column(name = "substitute_group", length = 64)
+    private String substituteGroup;
+
+    /** 批次追溯标记（关键化学品/靶材必开；实例化批次跟踪归 MES）。 */
+    @Column(name = "lot_control", nullable = false)
+    private Boolean lotControl = Boolean.FALSE;
+
+    /** 生命周期常量：ACTIVE 在售 / END_OF_SALE 停售 / OBSOLETE 淘汰。 */
+    public static final String LC_ACTIVE = "ACTIVE";
+    public static final String LC_END_OF_SALE = "END_OF_SALE";
+    public static final String LC_OBSOLETE = "OBSOLETE";
+    /** 物料边界常量：CONSUMABLE 消耗品 / DURABLE 耐用品。 */
+    public static final String KIND_CONSUMABLE = "CONSUMABLE";
+    public static final String KIND_DURABLE = "DURABLE";
 
     /** 计量单位（mds.measure_unit 字典：EA/BOX/SET/PACK/BOTTLE/CAN/ROLL）。 */
     @Column(name = "unit", length = 16)

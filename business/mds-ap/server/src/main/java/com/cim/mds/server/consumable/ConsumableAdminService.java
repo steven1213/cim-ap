@@ -43,6 +43,11 @@ public class ConsumableAdminService {
                                  BigDecimal stockQty, BigDecimal minQty,
                                  String vendor, String partNo, String expiryDate,
                                  String homeEquipmentId, String homeEquipmentCode,
+                                 String materialKind, String lifecycle,
+                                 Integer shelfLifeDays, Integer lduHours,
+                                 String storageTemp, Integer thawTime,
+                                 BigDecimal tolerancePct, BigDecimal densityFactor,
+                                 String substituteGroup, Boolean lotControl,
                                  Boolean enabled, Boolean occupied, String occupiedBy) {
     }
 
@@ -51,7 +56,12 @@ public class ConsumableAdminService {
                                 BigDecimal lifeLimit, BigDecimal lifeUsed, Integer warnPercent,
                                 BigDecimal stockQty, BigDecimal minQty,
                                 String vendor, String partNo, String expiryDate,
-                                String homeEquipmentId, Boolean enabled) {
+                                String homeEquipmentId, Boolean enabled,
+                                String materialKind, String lifecycle,
+                                Integer shelfLifeDays, Integer lduHours,
+                                String storageTemp, Integer thawTime,
+                                BigDecimal tolerancePct, BigDecimal densityFactor,
+                                String substituteGroup, Boolean lotControl) {
     }
 
     // ------------------------------------------------------------------ 查询
@@ -79,6 +89,8 @@ public class ConsumableAdminService {
         requireDictItem(DICT_MEASURE_UNIT, req.unit());
         requireDictItem(DICT_CONSUMABLE_LIFE_TYPE, req.lifeType());
         checkWarnPercent(req.warnPercent());
+        checkLifecycle(req.lifecycle());
+        checkKind(req.materialKind());
         CimConsumable entity = new CimConsumable();
         entity.setConsCode(code);
         apply(entity, req);
@@ -94,6 +106,8 @@ public class ConsumableAdminService {
         requireDictItem(DICT_MEASURE_UNIT, req.unit());
         requireDictItem(DICT_CONSUMABLE_LIFE_TYPE, req.lifeType());
         checkWarnPercent(req.warnPercent());
+        checkLifecycle(req.lifecycle());
+        checkKind(req.materialKind());
         assertNotLockedByOther(entity);
         apply(entity, req);
         clearLock(entity);
@@ -127,6 +141,38 @@ public class ConsumableAdminService {
                 ? null : java.time.LocalDate.parse(req.expiryDate()));
         entity.setHomeEquipmentId(trimToNull(req.homeEquipmentId()));
         entity.setEnabled(req.enabled() == null || req.enabled());
+        entity.setMaterialKind(trimToNull(req.materialKind()) == null
+                ? CimConsumable.KIND_CONSUMABLE : trimToNull(req.materialKind()));
+        entity.setLifecycle(trimToNull(req.lifecycle()) == null
+                ? CimConsumable.LC_ACTIVE : trimToNull(req.lifecycle()));
+        entity.setShelfLifeDays(req.shelfLifeDays());
+        entity.setLduHours(req.lduHours());
+        entity.setStorageTemp(trimToNull(req.storageTemp()));
+        entity.setThawTime(req.thawTime());
+        entity.setTolerancePct(req.tolerancePct());
+        entity.setDensityFactor(req.densityFactor());
+        entity.setSubstituteGroup(trimToNull(req.substituteGroup()));
+        entity.setLotControl(Boolean.TRUE.equals(req.lotControl()));
+    }
+
+    /** 生命周期三态守门（固定枚举，不进字典——治理口径不随站点配置漂移）。 */
+    private void checkLifecycle(String lifecycle) {
+        String v = trimToNull(lifecycle);
+        if (v == null || CimConsumable.LC_ACTIVE.equals(v)
+                || CimConsumable.LC_END_OF_SALE.equals(v) || CimConsumable.LC_OBSOLETE.equals(v)) {
+            return;
+        }
+        throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.consumable.lifecycleInvalid", v);
+    }
+
+    /** 物料边界守门：CONSUMABLE / DURABLE。 */
+    private void checkKind(String kind) {
+        String v = trimToNull(kind);
+        if (v == null || CimConsumable.KIND_CONSUMABLE.equals(v)
+                || CimConsumable.KIND_DURABLE.equals(v)) {
+            return;
+        }
+        throw BizException.of(BizCode.PARAM_INVALID, "mds.biz.consumable.kindInvalid", v);
     }
 
     private void checkWarnPercent(Integer warnPercent) {
@@ -176,7 +222,11 @@ public class ConsumableAdminService {
                 c.getVendor(), c.getPartNo(),
                 c.getExpiryDate() == null ? null : c.getExpiryDate().toString(),
                 c.getHomeEquipmentId(),
-                eqp == null ? null : eqp.getEquipmentCode(), c.getEnabled(),
+                eqp == null ? null : eqp.getEquipmentCode(),
+                c.getMaterialKind(), c.getLifecycle(),
+                c.getShelfLifeDays(), c.getLduHours(), c.getStorageTemp(), c.getThawTime(),
+                c.getTolerancePct(), c.getDensityFactor(), c.getSubstituteGroup(), c.getLotControl(),
+                c.getEnabled(),
                 c.getOccupied(), c.getOccupiedBy());
     }
 

@@ -125,10 +125,10 @@ class ConsumableDomainTest {
                 .andExpect(status().isOk());
         mvc.perform(delete("/api/v1/mds/consumables/" + consBId))
                 .andExpect(status().isOk());
-        // 删除后列表只剩种子 2 条
+        // 删除后列表剩种子：V34 两条 + ConsBomDemoSeed 的 CM-GA-001（种子 Runner 在测试上下文同样幂等执行）
         mvc.perform(get("/api/v1/mds/consumables"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2));
+                .andExpect(jsonPath("$.data.length()").value(3));
     }
 
     private String create(Map<String, ?> body) throws Exception {

@@ -115,6 +115,12 @@ public final class MdsPermissions {
     public static final String CONS_UPDATE = "mds:consumable:update";
     public static final String CONS_DELETE = "mds:consumable:delete";
 
+    // ---------------- 消耗品 BOM（ConsBom，质量域，「工序×规格」消耗契约，V38） ----------------
+    public static final String CONS_BOM_VIEW = "mds:consBom:view";
+    public static final String CONS_BOM_CREATE = "mds:consBom:create";
+    public static final String CONS_BOM_UPDATE = "mds:consBom:update";
+    public static final String CONS_BOM_DELETE = "mds:consBom:delete";
+
     // ---------------- 状态模型（StateModel，系统管理域，SEMI E30 状态机口径） ----------------
     public static final String STATE_MODEL_VIEW = "mds:stateModel:view";
     public static final String STATE_MODEL_CREATE = "mds:stateModel:create";
@@ -308,6 +314,10 @@ public final class MdsPermissions {
         codes.add(CONS_CREATE);
         codes.add(CONS_UPDATE);
         codes.add(CONS_DELETE);
+        codes.add(CONS_BOM_VIEW);
+        codes.add(CONS_BOM_CREATE);
+        codes.add(CONS_BOM_UPDATE);
+        codes.add(CONS_BOM_DELETE);
         codes.add(STATE_MODEL_VIEW);
         codes.add(STATE_MODEL_CREATE);
         codes.add(STATE_MODEL_UPDATE);

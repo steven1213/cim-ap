@@ -48,6 +48,16 @@ interface ConsFormState {
   minQty: string;
   homeEquipmentId: string;
   enabled: boolean;
+  materialKind: string;
+  lifecycle: string;
+  shelfLifeDays: string;
+  lduHours: string;
+  storageTemp: string;
+  thawTime: string;
+  tolerancePct: string;
+  densityFactor: string;
+  substituteGroup: string;
+  lotControl: boolean;
 }
 
 function formFrom(row: Consumable | null): ConsFormState {
@@ -68,6 +78,16 @@ function formFrom(row: Consumable | null): ConsFormState {
     minQty: row?.minQty != null ? String(row.minQty) : '',
     homeEquipmentId: row?.homeEquipmentId ?? '',
     enabled: row?.enabled ?? true,
+    materialKind: row?.materialKind ?? 'CONSUMABLE',
+    lifecycle: row?.lifecycle ?? 'ACTIVE',
+    shelfLifeDays: row?.shelfLifeDays != null ? String(row.shelfLifeDays) : '',
+    lduHours: row?.lduHours != null ? String(row.lduHours) : '',
+    storageTemp: row?.storageTemp ?? '',
+    thawTime: row?.thawTime != null ? String(row.thawTime) : '',
+    tolerancePct: row?.tolerancePct != null ? String(row.tolerancePct) : '',
+    densityFactor: row?.densityFactor != null ? String(row.densityFactor) : '',
+    substituteGroup: row?.substituteGroup ?? '',
+    lotControl: row?.lotControl ?? false,
   };
 }
 
@@ -148,6 +168,16 @@ export default function ConsumablePage() {
         minQty: num(form.minQty),
         homeEquipmentId: form.homeEquipmentId || null,
         enabled: form.enabled,
+        materialKind: form.materialKind || 'CONSUMABLE',
+        lifecycle: form.lifecycle || 'ACTIVE',
+        shelfLifeDays: num(form.shelfLifeDays),
+        lduHours: num(form.lduHours),
+        storageTemp: form.storageTemp.trim() || null,
+        thawTime: num(form.thawTime),
+        tolerancePct: num(form.tolerancePct),
+        densityFactor: num(form.densityFactor),
+        substituteGroup: form.substituteGroup.trim() || null,
+        lotControl: form.lotControl,
       };
       const ret =
         md.mode === 'create'
@@ -168,6 +198,24 @@ export default function ConsumablePage() {
       { key: 'consName', titleKey: 'mds.consumable.name', width: 200, ellipsis: true, render: (r) => <span className="flow-name-main">{r.consName}</span> },
       { key: 'specModel', titleKey: 'mds.consumable.spec', width: 130, mono: true, render: (r) => r.specModel ?? '—' },
       { key: 'consType', titleKey: 'mds.consumable.type', width: 100, render: (r) => r.consType ?? '—' },
+      {
+        key: 'lifecycle',
+        titleKey: 'mds.consumable.lifecycle',
+        width: 90,
+        render: (r) => (
+          <span
+            className={
+              r.lifecycle === 'ACTIVE'
+                ? 'flow-status flow-status-active'
+                : r.lifecycle === 'OBSOLETE'
+                  ? 'flow-status flow-status-disabled'
+                  : 'flow-status'
+            }
+          >
+            {t(`mds.consumable.lifecycle.${r.lifecycle ?? 'ACTIVE'}`)}
+          </span>
+        ),
+      },
       { key: 'vendor', titleKey: 'mds.consumable.vendor', width: 110, ellipsis: true, render: (r) => r.vendor ?? '—' },
       { key: 'partNo', titleKey: 'mds.consumable.partNo', width: 110, mono: true, ellipsis: true, render: (r) => r.partNo ?? '—' },
       { key: 'expiryDate', titleKey: 'mds.consumable.expiry', width: 110, render: (r) => r.expiryDate ?? '—' },
@@ -221,6 +269,29 @@ export default function ConsumablePage() {
         allowClear: true,
         options: typeDict.items.filter((i) => !i.disabled).map((i) => ({ value: i.value, label: i.label })),
       },
+      {
+        kind: 'select',
+        key: 'materialKind',
+        labelKey: 'mds.consumable.materialKind',
+        options: ['CONSUMABLE', 'DURABLE'].map((v) => ({ value: v, label: t(`mds.consumable.kind.${v}`) })),
+      },
+      {
+        kind: 'select',
+        key: 'lifecycle',
+        labelKey: 'mds.consumable.lifecycle',
+        options: ['ACTIVE', 'END_OF_SALE', 'OBSOLETE'].map((v) => ({
+          value: v,
+          label: t(`mds.consumable.lifecycle.${v}`),
+        })),
+      },
+      { kind: 'number', key: 'shelfLifeDays', labelKey: 'mds.consumable.shelfLifeDays', min: 0 },
+      { kind: 'number', key: 'lduHours', labelKey: 'mds.consumable.lduHours', min: 0 },
+      { kind: 'text', key: 'storageTemp', labelKey: 'mds.consumable.storageTemp' },
+      { kind: 'number', key: 'thawTime', labelKey: 'mds.consumable.thawTime', min: 0 },
+      { kind: 'number', key: 'tolerancePct', labelKey: 'mds.consumable.tolerancePct', min: 0, max: 100, unit: '%' },
+      { kind: 'number', key: 'densityFactor', labelKey: 'mds.consumable.densityFactor', min: 0 },
+      { kind: 'text', key: 'substituteGroup', labelKey: 'mds.consumable.substituteGroup', mono: true },
+      { kind: 'switch', key: 'lotControl', labelKey: 'mds.consumable.lotControl' },
       {
         kind: 'select',
         key: 'unit',

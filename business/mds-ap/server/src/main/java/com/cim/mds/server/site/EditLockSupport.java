@@ -51,7 +51,8 @@ public class EditLockSupport {
             Map.entry("carrier", "cim_carrier"),
             Map.entry("reticle", "cim_reticle"),
             Map.entry("inspectionStd", "cim_inspection_std"),
-            Map.entry("consumable", "cim_consumable"));
+            Map.entry("consumable", "cim_consumable"),
+            Map.entry("consBom", "cim_cons_bom"));
 
     /** URL 上的位置层类型集合（供控制器校验）。 */
     public static final Set<String> TYPES = TABLES.keySet();

@@ -46,7 +46,7 @@ public final class ProcessDemoSeed {
 
     @Slf4j
     @Service
-    static class SeedService {
+    public static class SeedService {
 
         // ------------------------------------------------------------------ 种子定义
 

@@ -204,13 +204,14 @@ public class MdsDictSeedService {
                     new ItemDef("CRITICAL", "致命缺陷（CRITICAL）", 10),
                     new ItemDef("MAJOR", "主要缺陷（MAJOR）", 20),
                     new ItemDef("MINOR", "次要缺陷（MINOR）", 30))),
-            // 耗材类别（V34）
+            // 耗材类别（V34/V37：TOOL 移除——耐用工具归 equipment 域）
             new DictDef("mds.consumable_type", "耗材类别", List.of(
                     new ItemDef("CHEMICAL", "化学品", 10),
                     new ItemDef("SLURRY", "研磨液", 20),
                     new ItemDef("GAS", "特气", 30),
                     new ItemDef("PART", "备件耗材", 40),
-                    new ItemDef("TOOL", "消耗工具", 50),
+                    new ItemDef("TARGET", "靶材", 50),
+                    new ItemDef("PACKAGING", "封装材料", 60),
                     new ItemDef("OTHER", "其他", 90))),
             // 计量单位（V34，耗材）
             new DictDef("mds.measure_unit", "计量单位", List.of(
@@ -226,7 +227,20 @@ public class MdsDictSeedService {
                     new ItemDef("CYCLE", "按使用次数", 10),
                     new ItemDef("DAYS", "按天数", 20),
                     new ItemDef("QTY", "按产量", 30),
-                    new ItemDef("NONE", "无寿命管理", 90))));
+                    new ItemDef("NONE", "无寿命管理", 90))),
+            // BOM 消耗类型（V38）：FIXED 固定用量 / VARIABLE 变量消耗（参数×单位用量，公式计算归运行时）
+            new DictDef("mds.cons_consume_type", "消耗类型", List.of(
+                    new ItemDef("FIXED", "固定用量", 10),
+                    new ItemDef("VARIABLE", "变量消耗", 20))),
+            // BOM 用量基准（V38）：标准用量配合基准解释
+            new DictDef("mds.cons_basis", "用量基准", List.of(
+                    new ItemDef("PER_WAFER", "每片（Per Wafer）", 10),
+                    new ItemDef("PER_LOT", "每批次（Per Lot）", 20),
+                    new ItemDef("PER_RUN", "每次运行（Per Run）", 30))),
+            // BOM 失效策略标记（V38）：MDS 只存策略标记，FEFO/FIFO 拣配执行归运行时
+            new DictDef("mds.cons_expiry_policy", "失效策略", List.of(
+                    new ItemDef("FEFO", "先到期先出（FEFO）", 10),
+                    new ItemDef("FIFO", "先进先出（FIFO）", 20))));
 
     private final SysDictRepository dictRepository;
     private final SysDictItemRepository itemRepository;
@@ -290,13 +304,33 @@ public class MdsDictSeedService {
             }
         }
         int aligned = alignProductSeedWaferTypes();
+        int retired = retireConsumableToolItem();
         SeedReport report = new SeedReport(dictCount, itemCount, aligned);
-        log.info("[mds-dict] 字典种子完成：字典 +{} · 明细 +{} · 产品晶圆类型对齐 {}",
-                report.dicts(), report.items(), report.alignedProducts());
+        log.info("[mds-dict] 字典种子完成：字典 +{} · 明细 +{} · 产品晶圆类型对齐 {} · 退役项清除 {}",
+                report.dicts(), report.items(), report.alignedProducts(), retired);
         return report;
     }
 
     /** V6 产品种子的中文晶圆类型 → 字典 itemKey（一次性对齐；幂等：找不到中文值即 0）。 */
+    /**
+     * 退役词表项清除（V37：TOOL 移出耗材类别——耐用工具归 equipment 域）。
+     *
+     * <p>种子只增不改，但退役项必须清——放在 Java 种子而非 Flyway 迁移：
+     * {@code sys_dict_item} 是平台 cim-system 域的表，不在 MDS 迁移 schema 内。
+     * 幂等：不存在即 0。</p>
+     */
+    private int retireConsumableToolItem() {
+        SysDict dict = dictRepository.findFirstByCodeOrderByCreateTimeAsc("mds.consumable_type").orElse(null);
+        if (dict == null) {
+            return 0;
+        }
+        List<SysDictItem> retired = itemRepository.findByDictIdOrderBySortNoAsc(dict.getId()).stream()
+                .filter(i -> "TOOL".equals(i.getItemKey()))
+                .toList();
+        itemRepository.deleteAll(retired);
+        return retired.size();
+    }
+
     private int alignProductSeedWaferTypes() {
         int n = 0;
         for (var p : productRepository.findAll()) {

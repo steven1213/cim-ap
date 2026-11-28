@@ -60,6 +60,7 @@ type Level = Exclude<
   | 'reticle'
   | 'inspectionStd'
   | 'consumable'
+  | 'consBom'
 >;
 
 /** 每层的直接子层（stage 是位置树叶子）。 */

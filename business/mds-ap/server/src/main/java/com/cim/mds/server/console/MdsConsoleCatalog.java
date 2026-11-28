@@ -275,6 +275,14 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.CONS_UPDATE, 20));
         m.add(button("btn.consumable.delete", "consumables", "mds.nav.consumables.action.delete",
                 MdsPermissions.CONS_DELETE, 30));
+        m.add(menu("consBoms", "grp.quality", "/cons-boms", "ConsBomPage",
+                "mds.nav.consBoms", "layers", MdsPermissions.CONS_BOM_VIEW, 30));
+        m.add(button("btn.consBom.create", "consBoms", "mds.nav.consBoms.action.create",
+                MdsPermissions.CONS_BOM_CREATE, 10));
+        m.add(button("btn.consBom.update", "consBoms", "mds.nav.consBoms.action.update",
+                MdsPermissions.CONS_BOM_UPDATE, 20));
+        m.add(button("btn.consBom.delete", "consBoms", "mds.nav.consBoms.action.delete",
+                MdsPermissions.CONS_BOM_DELETE, 30));
 
         // —— 数据字典（平台 sys_dict，系统级参照数据；挂「系统管理」组，与业务域分组分开）——
         // 权限码沿用平台 sys:dict:*（@PreAuthorize 在 cim-system 的字典服务上，另立编码只会 403）
@@ -556,6 +564,11 @@ public final class MdsConsoleCatalog {
         p.add(new PermDef(MdsPermissions.CONS_CREATE, "耗材新建"));
         p.add(new PermDef(MdsPermissions.CONS_UPDATE, "耗材编辑"));
         p.add(new PermDef(MdsPermissions.CONS_DELETE, "耗材删除"));
+        // 消耗品 BOM（V38）
+        p.add(new PermDef(MdsPermissions.CONS_BOM_VIEW, "消耗品 BOM 查看"));
+        p.add(new PermDef(MdsPermissions.CONS_BOM_CREATE, "消耗品 BOM 新建"));
+        p.add(new PermDef(MdsPermissions.CONS_BOM_UPDATE, "消耗品 BOM 编辑/明细维护/激活/停用"));
+        p.add(new PermDef(MdsPermissions.CONS_BOM_DELETE, "消耗品 BOM 删除"));
         // 状态模型（SEMI E30 状态机口径，模型/状态/转换矩阵页面维护）
         p.add(new PermDef(MdsPermissions.STATE_MODEL_VIEW, "状态模型查看"));
         p.add(new PermDef(MdsPermissions.STATE_MODEL_CREATE, "状态模型新建"));
@@ -641,6 +654,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.RETICLE_VIEW, MdsPermissions.RETICLE_CREATE, MdsPermissions.RETICLE_UPDATE,
                 MdsPermissions.INSP_VIEW, MdsPermissions.INSP_CREATE, MdsPermissions.INSP_UPDATE,
                 MdsPermissions.CONS_VIEW, MdsPermissions.CONS_CREATE, MdsPermissions.CONS_UPDATE,
+                MdsPermissions.CONS_BOM_VIEW, MdsPermissions.CONS_BOM_CREATE, MdsPermissions.CONS_BOM_UPDATE,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.STATE_MODEL_CREATE, MdsPermissions.STATE_MODEL_UPDATE,
                 MdsPermissions.NAMING_RULE_VIEW, MdsPermissions.NAMING_RULE_CREATE, MdsPermissions.NAMING_RULE_UPDATE,
                 MdsPermissions.REASON_VIEW, MdsPermissions.REASON_CREATE, MdsPermissions.REASON_UPDATE,
@@ -655,6 +669,7 @@ public final class MdsConsoleCatalog {
                 MdsPermissions.BANK_VIEW,
                 MdsPermissions.CARRIER_VIEW, MdsPermissions.RETICLE_VIEW,
                 MdsPermissions.INSP_VIEW, MdsPermissions.CONS_VIEW,
+                MdsPermissions.CONS_BOM_VIEW,
                 MdsPermissions.STATE_MODEL_VIEW, MdsPermissions.NAMING_RULE_VIEW,
                 MdsPermissions.REASON_VIEW,
                 PermissionCodes.DICT_LIST);
@@ -794,6 +809,10 @@ public final class MdsConsoleCatalog {
         t.add(new TextDef("mds.nav.consumables.action.create", "耗材·新建", "Consumable · create"));
         t.add(new TextDef("mds.nav.consumables.action.update", "耗材·编辑", "Consumable · update"));
         t.add(new TextDef("mds.nav.consumables.action.delete", "耗材·删除", "Consumable · delete"));
+        t.add(new TextDef("mds.nav.consBoms", "消耗品 BOM", "Consumable BOMs"));
+        t.add(new TextDef("mds.nav.consBoms.action.create", "BOM·新建", "BOM · create"));
+        t.add(new TextDef("mds.nav.consBoms.action.update", "BOM·编辑", "BOM · update"));
+        t.add(new TextDef("mds.nav.consBoms.action.delete", "BOM·删除", "BOM · delete"));
         t.add(new TextDef("mds.nav.stateModels", "状态模型", "State models"));
         t.add(new TextDef("mds.nav.stateModels.action.create", "状态模型·新建", "State model · create"));
         t.add(new TextDef("mds.nav.stateModels.action.save", "状态模型·维护", "State model · save"));
